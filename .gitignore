@@ -8,6 +8,7 @@ bin-int/
 *.vcxproj.user
 *.vcxproj.filters
 *.sln
+Vortex/fonts/*
 
 # Exclude
 !vendor/bin

@@ -1,79 +1,8 @@
 #include "Walnut/Application.h"
 #include "Walnut/EntryPoint.h"
-
-#include "Walnut/Image.h"
-#include "Walnut/Random.h"
-#include "Walnut/Timer.h"
-
-using namespace Walnut;
-
-class ExampleLayer : public Walnut::Layer
-{
-public:
-	virtual void OnUIRender() override
-	{
-		ImGui::Begin("Settings");
-		ImGui::Text("Last Render: %3fms!", m_LastRenderTime);
-		if (ImGui::Button("Render"))
-		{
-			// change Value of Boolean variable m_isRender
-			
-			m_isRender = !m_isRender;
-			Render();
-		}
-		ImGui::End();
-
-		ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
-		ImGui::Begin("Viewport");
-
-		m_ViewportWidth = ImGui::GetContentRegionAvail().x;
-		m_ViewportHeight = ImGui::GetContentRegionAvail().y;
-
-		if (m_Image)
-		{
-			ImGui::Image(m_Image->GetDescriptorSet(), { (float)m_Image->GetWidth(), (float)m_Image->GetHeight() });
-		}
-		
-		ImGui::End();
-		ImGui::PopStyleVar();
-		//ImGui::ShowDemoWindow();
-		
-		//Call Render function if m_isRender is True and m_Image is not empty  and the viewport size changed
-		if (m_isRender && m_Image && (m_Image->GetWidth() != m_ViewportWidth || m_Image->GetHeight() != m_ViewportHeight))
-		{
-			Render();
-		}
-	
-	}
-	
-	void Render()
-	{
-		Timer timer;
-		if (!m_Image || m_Image->GetWidth() != m_ViewportWidth || m_Image->GetHeight() != m_ViewportHeight)
-		{
-			m_Image = std::make_shared<Image>(m_ViewportWidth, m_ViewportHeight, ImageFormat::RGBA);
-			delete[] m_ImageData;
-			m_ImageData = new uint32_t[m_ViewportWidth * m_ViewportHeight];
-		}
-		
-		for (uint32_t i = 0; i < m_ViewportWidth * m_ViewportHeight; i++)
-		{
-			m_ImageData[i] = Random::UInt();
-			m_ImageData[i] |= 0xFF000000;
-		}
-
-		m_Image->SetData(m_ImageData);
-		m_LastRenderTime = timer.ElapsedMillis();
-	}
-private:
-	std::shared_ptr<Image> m_Image;
-	uint32_t* m_ImageData = nullptr;
-	uint32_t m_ViewportWidth = 0, m_ViewportHeight = 0;
-	float m_LastRenderTime = 0.0f;
-
-	//define a boolean variable
-	bool m_isRender = false;
-};
+#include "Utils.h"
+#include "EngineUI.h"
+#include "AppStyle.h"
 
 Walnut::Application* Walnut::CreateApplication(int argc, char** argv)
 {
@@ -81,7 +10,10 @@ Walnut::Application* Walnut::CreateApplication(int argc, char** argv)
 	spec.Name = "Vortex";
 
 	Walnut::Application* app = new Walnut::Application(spec);
-	app->PushLayer<ExampleLayer>();
+
+	AppUiStyle();
+	
+	app->PushLayer<EngineUI>();
 	app->SetMenubarCallback([app]()
 	{
 		if (ImGui::BeginMenu("File"))
