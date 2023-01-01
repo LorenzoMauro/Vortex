@@ -2,6 +2,7 @@
 #include <glm/gtc/type_ptr.hpp>
 #include "Scene.h"
 #include "Renderer.h"
+#include "spdlog/spdlog.h"
 #include "Walnut/Application.h"
 
 class EngineUI : public Walnut::Layer

@@ -5,6 +5,4 @@ workspace "Vortex"
    startproject "Vortex"
 
 outputdir = "%{cfg.buildcfg}-%{cfg.system}-%{cfg.architecture}"
-include "Walnut/WalnutExternal.lua"
-
 include "Vortex"

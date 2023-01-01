@@ -1,5 +1,6 @@
 #include "Walnut/Application.h"
 #include "Walnut/EntryPoint.h"
+#include "spdlog/spdlog.h"
 #include "Utils.h"
 #include "EngineUI.h"
 #include "AppStyle.h"

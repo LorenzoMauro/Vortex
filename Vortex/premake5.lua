@@ -1,3 +1,7 @@
+-- premake5.lua
+
+include "vendor/Walnut/WalnutExternal.lua"
+
 project "Vortex"
    kind "ConsoleApp"
    language "C++"
@@ -5,22 +9,26 @@ project "Vortex"
    targetdir "bin/%{cfg.buildcfg}"
    staticruntime "off"
 
-   files { "src/**.h", "src/**.cpp" }
-
+   files
+   {
+      "src/**.h",
+      "src/**.cpp" 
+   }
+    
    includedirs
    {
-      "../Walnut/vendor/imgui",
-      "../Walnut/vendor/glfw/include",
-      "../Walnut/vendor/glm",
-
-      "../Walnut/Walnut/src",
+      "vendor/Walnut/vendor/imgui",
+      "vendor/Walnut/vendor/glfw/include",
+      "vendor/Walnut/vendor/glm",
+      "vendor/Walnut/Walnut/src",
+      "vendor/spdlog/include",
 
       "%{IncludeDir.VulkanSDK}",
    }
 
    links
    {
-       "Walnut"
+       "Walnut",
    }
 
    targetdir ("../bin/" .. outputdir .. "/%{prj.name}")
@@ -47,3 +55,14 @@ project "Vortex"
       runtime "Release"
       optimize "On"
       symbols "Off"
+
+
+group "Dependencies"
+    include "vendor/Walnut/vendor/imgui"
+    include "vendor/Walnut/vendor/glfw"
+    include "vendor/Walnut"
+group ""
+
+group "Core"
+    include "Vortex"
+group ""

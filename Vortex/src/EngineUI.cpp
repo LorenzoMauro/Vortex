@@ -43,7 +43,7 @@ void EngineUI::OnUIRender()
 
 void EngineUI::OnAttach()
 {
-	std::filesystem::path p = "src\\fa-regular-400.ttf";
+	std::filesystem::path p = "fonts\\fa-regular-400.ttf";
 	std::filesystem::path absolute_path = std::filesystem::absolute(p);
 	Utils::AddIcons(absolute_path.string().data());
 }
