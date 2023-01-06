@@ -1,6 +1,0 @@
-[submodule "Vortex/vendor/spdlog"]
-	path = Vortex/vendor/spdlog
-	url = https://github.com/gabime/spdlog
-[submodule "Vortex/vendor/Walnut"]
-	path = Vortex/vendor/Walnut
-	url = https://github.com/TheCherno/Walnut
