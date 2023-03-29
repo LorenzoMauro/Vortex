@@ -4,6 +4,10 @@
 #include "glad/glad.h"
 #include "Options.h"
 #include "Log.h"
+#include "ImGuiOp.h"
+#include "Layers/GuiLayer.h"
+#include "Layers/AppLayer.h"
+#include "Layers/ViewportLayer.h"
 
 namespace vtx {
 
@@ -16,7 +20,16 @@ namespace vtx {
 	public:
 		void Init() {
 			InitWindow();
+			Init_ImGui(m_Window);
+			CreateLayer<AppLayer>();
+			CreateLayer<ViewportLayer>(&m_renderer);
 		};
+		void ShutDown() {
+			End_ImGui();
+			glfwDestroyWindow(m_Window);
+			glfwTerminate();
+			VTX_INFO("GLFW DESTROYED");
+		}
 		void InitWindow() {
 			glfwSetErrorCallback(glfw_error_callback);
 			if (!glfwInit())
@@ -38,11 +51,35 @@ namespace vtx {
 			glfwSetWindowUserPointer(m_Window, this);
 			//glfwSetFramebufferSizeCallback(m_Window, FramebufferResizeCallback);
 		}
+		
 		void Run() {
 			glfwPollEvents();
+			ImGuiRenderStart();
+			//////////////////////////
+			int layerCount = m_LayerStack.size();
+			for (int i = 0; i < layerCount; i++) {
+				auto& layer = m_LayerStack[i];
+				layer->OnUIRender();
+				layerCount = m_LayerStack.size();
+			}
+			ImGuiDraw(m_Window);
 			glfwSwapBuffers(m_Window);
 		};
+
+		template<typename T, typename... Args>
+		void CreateLayer(Args&&... args) {
+			static_assert(std::is_base_of<Layer, T>::value, "Pushed type is not subclass of Layer!");
+			m_LayerStack.emplace_back(std::make_shared<T>(std::forward<Args>(args)...))->OnAttach();
+		}
+
+		void PushLayer(const std::shared_ptr<Layer>& layer) {
+			m_LayerStack.emplace_back(layer);
+			layer->OnAttach();
+		}
+		
 	public:
 		GLFWwindow* m_Window;
+		std::vector<std::shared_ptr<Layer>> 	    m_LayerStack;
+		Renderer									m_renderer;
 	};
 }

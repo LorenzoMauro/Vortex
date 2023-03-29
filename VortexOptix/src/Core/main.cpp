@@ -1,6 +1,7 @@
 #include "Application.h"
 
 int main() {
+	vtx::Log::Init();
 	try {
 		vtx::Application app;
 		app.Init();
@@ -8,6 +9,7 @@ int main() {
 		{
 			app.Run();
 		}
+		app.ShutDown();
 	}
 	catch (const std::exception& e) {
 		VTX_ERROR("Error in main");

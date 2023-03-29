@@ -9,6 +9,10 @@ project "OptixApp"
     objdir (OBJ_DIR)
     buildcustomizations "BuildCustomizations/CUDA 12.0"
 
+    
+    postbuildcommands {
+        "{COPY} %{wks.location}/VortexOptix/src/data %{cfg.targetdir}/data/"}
+
     files{
         "src/**.h",
         "src/**.cpp"
