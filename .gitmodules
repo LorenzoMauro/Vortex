@@ -1,0 +1,9 @@
+[submodule "ext/glfw"]
+	path = ext/glfw
+	url = https://github.com/LorenzoMauro/glfw.git
+[submodule "ext/imgui"]
+	path = ext/imgui
+	url = https://github.com/LorenzoMauro/imgui.git
+[submodule "ext/spdlog"]
+	path = ext/spdlog
+	url = https://github.com/gabime/spdlog.git

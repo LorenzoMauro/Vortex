@@ -1,0 +1,23 @@
+# Ignore build output directories
+build/
+bin/
+bin-int/
+.vs/
+
+# Ignore object files and libraries
+*.o
+*.a
+*.lib
+*.dll
+*.so
+*.dylib
+
+# Ignore generated project files
+*.sln
+*.vcxproj
+*.vcxproj.filters
+*.xcodeproj
+*.xcworkspace
+*.make
+*.mk
+*.vcxproj.user
