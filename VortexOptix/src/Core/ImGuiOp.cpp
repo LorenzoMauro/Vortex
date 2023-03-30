@@ -37,7 +37,7 @@ namespace vtx {
         // Upload Fonts
         //LoadFonts();
 
-        ImGui::LoadIniSettingsFromDisk(utl::absolutePath(g_option.ImGuiIniFile).data());
+        ImGui::LoadIniSettingsFromDisk(utl::absolutePath(options.ImGuiIniFile).data());
 
         SetAppStyle();
     }
@@ -143,7 +143,7 @@ namespace vtx {
         glfwGetFramebufferSize(window, &display_w, &display_h);
         glViewport(0, 0, display_w, display_h);
 
-        ImVec4 clear_color(g_option.ClearColor[1], g_option.ClearColor[2], g_option.ClearColor[2], g_option.ClearColor[4]);
+        ImVec4 clear_color(options.ClearColor[1], options.ClearColor[2], options.ClearColor[2], options.ClearColor[4]);
         glClearColor(clear_color.x * clear_color.w, clear_color.y * clear_color.w, clear_color.z * clear_color.w, clear_color.w);
         glClear(GL_COLOR_BUFFER_BIT);
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
@@ -163,9 +163,11 @@ namespace vtx {
     
     void End_ImGui() {
         VTX_INFO("Destroying ImGui");
-        ImGui::SaveIniSettingsToDisk((utl::absolutePath(g_option.ImGuiIniFile)).data());
+        ImGui::SaveIniSettingsToDisk((utl::absolutePath(options.ImGuiIniFile)).data());
         ImGui_ImplOpenGL3_Shutdown();
         ImGui_ImplGlfw_Shutdown();
         ImGui::DestroyContext();
+
+        IMGUI_API
     }
 }

@@ -40,7 +40,7 @@ namespace vtx {
 			glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
 			glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 6);
 
-			m_Window = glfwCreateWindow(g_option.width, g_option.height, g_option.WindowName, NULL, NULL);
+			m_Window = glfwCreateWindow(options.width, options.height, options.WindowName.c_str(), NULL, NULL);
 			glfwMakeContextCurrent(m_Window);
 			if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
 			{

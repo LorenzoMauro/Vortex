@@ -11,6 +11,8 @@ bin-int/
 *.dll
 *.so
 *.dylib
+*.ii
+*.ii.res
 
 # Ignore generated project files
 *.sln
@@ -21,3 +23,4 @@ bin-int/
 *.make
 *.mk
 *.vcxproj.user
+Vortex.sln.nvsettings

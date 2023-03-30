@@ -19,8 +19,8 @@ namespace vtx {
 
     public:
         Renderer*   renderer;
-        uint32_t    m_width = g_option.width;
-        uint32_t    m_height = g_option.height;
+        uint32_t    m_width = options.width;
+        uint32_t    m_height = options.height;
         bool        m_isResized = false;
     };
 }

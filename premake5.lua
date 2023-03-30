@@ -1,5 +1,6 @@
 include "PremakeScripts/path.lua"
 
+
 workspace "Vortex"
 
     configurations { "Debug", "Release" }
@@ -14,15 +15,19 @@ workspace "Vortex"
     filter "configurations:Debug"
         runtime "Debug"
         symbols "on"
+        defines { "DEBUG" }
 
     filter "configurations:Release"
         runtime "Release"
         optimize "on"
+        defines { "NDEBUG" }
 
     filter "configurations:Dist"
         runtime "Release"
         optimize "on"
         symbols "off"
+        defines { "NDEBUG" }
+
     
 group "Dependencies"
     include "ext/glfw/glfw.lua"

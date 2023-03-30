@@ -1,12 +1,21 @@
 #pragma once
-
+#include "optix.h"
+#include <string>
 
 struct Options {
 	int width = 2100;
 	int height = 900;
-	char* WindowName = "Vortex";
-	char* ImGuiIniFile = "./data/ImGui.ini";
+	std::string WindowName = "Vortex";
+	std::string ImGuiIniFile = "./data/ImGui.ini";
 	float ClearColor[4] = { 0.45f, 0.55f, 0.60f, 1.00f };
+#ifdef NDEBUG
+	bool isDebug = false;
+#else
+	bool isDebug = true;
+#endif
+	int OptixVersion = OPTIX_VERSION;
+	std::string LaunchParamName = "optixLaunchParams";
+	std::string modulePath = "./data/ptx/";
 };
 
-static Options g_option;
+static Options options;

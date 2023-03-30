@@ -23,9 +23,10 @@ IncludeDir["GLFW"] = my_project_dir .. "/ext/glfw/include"
 IncludeDir["GLAD"] = my_project_dir .. "/ext/glad/include"
 IncludeDir["ImGui"] = my_project_dir .. "/ext/imgui"
 IncludeDir["spdlog"] = my_project_dir .. "/ext/spdlog/include"
-IncludeDir["OPTIX"] = path.join(optix_sdk_path, "include")
-IncludeDir["CUDA"] = path.join(cuda_toolkit_path, "include")
+IncludeDir["gdt"] = my_project_dir .. "/ext/gdt"
+IncludeDir["OPTIX"] = path.join(OPTIX_SDK_PATH, "include")
+IncludeDir["CUDA"] = path.join(CUDA_TOOLKIT_PATH, "include")
 
 LibDir = {}
-LibDir["CUDA"] = path.join(cuda_toolkit_path, "lib/x64")
+LibDir["CUDA"] = path.join(CUDA_TOOLKIT_PATH, "lib/x64")
 LibDir["DevIL"] = "ext/DevIL/lib/x64/Release"
