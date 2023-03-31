@@ -8,6 +8,7 @@
 #include "Layers/GuiLayer.h"
 #include "Layers/AppLayer.h"
 #include "Layers/ViewportLayer.h"
+#include "Scene/Scene.h"
 
 namespace vtx {
 
@@ -23,6 +24,7 @@ namespace vtx {
 			Init_ImGui(m_Window);
 			CreateLayer<AppLayer>();
 			CreateLayer<ViewportLayer>(&m_renderer);
+			m_scene.Start();
 		};
 		void ShutDown() {
 			End_ImGui();
@@ -81,5 +83,7 @@ namespace vtx {
 		GLFWwindow* m_Window;
 		std::vector<std::shared_ptr<Layer>> 	    m_LayerStack;
 		Renderer									m_renderer;
+		Scene										m_scene;
+
 	};
 }
