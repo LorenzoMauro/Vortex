@@ -13,8 +13,8 @@ VORTEX_RP = "../VortexOptix/"
 IMGUI_RP = "../ext/imgui/"
 
 -- External Resources Paths
-OPTIX_SDK_PATH = "C:/ProgramData/NVIDIA Corporation/OptiX SDK 7.6.0"
-CUDA_TOOLKIT_PATH = "C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v12.0"
+OPTIX_SDK_PATH = "C:/ProgramData/NVIDIA Corporation/OptiX SDK 7.7.0"
+CUDA_TOOLKIT_PATH = "C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v12.1"
 MDL_SDK_PATH = "E:/Repo/MDLBinaries"
 
 

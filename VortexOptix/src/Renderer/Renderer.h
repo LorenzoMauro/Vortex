@@ -3,6 +3,7 @@
 #include <cstdint>
 #include "CUDABuffer.h"
 #include "LaunchParams.h"
+#include "DeviceData.h"
 
 namespace vtx {
 
@@ -43,7 +44,7 @@ namespace vtx {
 
 		GLuint GetFrame();
 
-
+		void ElaborateScene(std::shared_ptr<scene::Group> Root);
 
 	private:
 		/* Check For Capable Devices and Initialize Optix*/
@@ -73,6 +74,7 @@ namespace vtx {
 		/*Set Stack Sizes*/
 		void SetStackSize();
 
+
 		/* Helper Function to Create a Record for the SBT */
 		template<typename R, typename D>
 		void FillAndUploadRecord(OptixProgramGroup& pg, std::vector<R>& records, D Data)
@@ -84,7 +86,7 @@ namespace vtx {
 		}
 
 		/*Create SBT*/
-		void CreateSBD();
+		void CreateSBT();
 
 		void Render();
 
@@ -119,15 +121,19 @@ namespace vtx {
 		CUDABuffer						MissRecordBuffer;
 		CUDABuffer						HitRecordBuffer;
 
-		//Global Data
-		LaunchParams					launchParams;
-		CUDABuffer						launchParamsBuffer;
-		CUDABuffer						cudaColorBuffer;
-
 		//GL Interop
 		glFrameBuffer					glFrameBuffer;
 		CUgraphicsResource				m_cudaGraphicsResource = nullptr;
 		CUarray							dstArray;
+
+		//Scene Representation on Device
+		DeviceScene						deviceData;
+
+		CUDABuffer						launchParamsBuffer;
+		CUDABuffer						cudaColorBuffer;
+		LaunchParams					launchParams;
+
+
 
 	};
 }

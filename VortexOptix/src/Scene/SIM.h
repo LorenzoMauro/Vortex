@@ -19,8 +19,8 @@ namespace vtx {
                 if (Map.size() == 0) {
                     Map.resize(int(NT_NUM_NODE_TYPES + 1));
                 }
-                Map[(int)node->type].insert({ node->id, node });
-                idToType.insert({ node->id, node->type });
+                Map[(int)node->getType()].insert({node->getID(), node});
+                idToType.insert({ node->getID(), node->getType() });
             }
 
             // Operator[] definition

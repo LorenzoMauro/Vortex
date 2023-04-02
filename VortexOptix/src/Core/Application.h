@@ -25,6 +25,7 @@ namespace vtx {
 			CreateLayer<AppLayer>();
 			CreateLayer<ViewportLayer>(&m_renderer);
 			m_scene.Start();
+			m_renderer.ElaborateScene(m_scene.rootNode);
 		};
 		void ShutDown() {
 			End_ImGui();

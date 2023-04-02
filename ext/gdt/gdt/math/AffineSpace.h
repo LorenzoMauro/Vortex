@@ -96,7 +96,11 @@ namespace gdt {
       return AffineSpaceT(L(U,V,Z),eye);
     }
 
+
+
   };
+
+
 
   ////////////////////////////////////////////////////////////////////////////////
   // Unary Operators

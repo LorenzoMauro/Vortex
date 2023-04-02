@@ -46,7 +46,9 @@ namespace vtx {
 		CreatePrograms();
 		CreatePipeline();
 		SetStackSize();
-		CreateSBD();
+		CreateSBT();
+		deviceData.optixContext = optixContext;
+		deviceData.stream = stream;
 		launchParamsBuffer.alloc(sizeof(launchParams));
 	}
 
@@ -138,13 +140,13 @@ namespace vtx {
 		pipelineLinkOptions = {};
 
 		pipelineLinkOptions.maxTraceDepth = 2;
-		if (options.isDebug) {
-			pipelineLinkOptions.debugLevel = OPTIX_COMPILE_DEBUG_LEVEL_FULL; // Full debug. Never profile kernels with this setting!
-		}
-		else {
-			pipelineLinkOptions.debugLevel = OPTIX_COMPILE_DEBUG_LEVEL_MINIMAL;
-			//m_plo.debugLevel = OPTIX_COMPILE_DEBUG_LEVEL_LINEINFO; // Version < 7.4
-		}
+		//if (options.isDebug) {
+		//	pipelineLinkOptions.debugLevel = OPTIX_COMPILE_DEBUG_LEVEL_FULL; // Full debug. Never /profile /kernels with this setting!
+		//}
+		//else {
+		//	pipelineLinkOptions.debugLevel = OPTIX_COMPILE_DEBUG_LEVEL_MINIMAL;
+		//	//m_plo.debugLevel = OPTIX_COMPILE_DEBUG_LEVEL_LINEINFO; // Version < 7.4
+		//}
 	}
 
 	void Renderer::CreateModules()
@@ -153,7 +155,7 @@ namespace vtx {
 		// Each source file results in one OptixModule.
 		modules.resize(NUM_MODULE_IDENTIFIERS);
 		modulesPath.resize(NUM_MODULE_IDENTIFIERS);
-		modulesPath[MODULE_ID_DEVICEPROGRAM] = utl::absolutePath(options.modulePath + "devicePrograms.ptx");
+		modulesPath[MODULE_ID_DEVICEPROGRAM] = utl::absolutePath(options.modulePath + "devicePrograms.optixir");
 
 		// Create all modules:
 		for (size_t i = 0; i < modulesPath.size(); ++i)
@@ -165,7 +167,7 @@ namespace vtx {
 
 			char log[2048];
 			size_t sizeof_log = sizeof(log);
-			OPTIX_CHECK(optixModuleCreateFromPTX(
+			OPTIX_CHECK(optixModuleCreate(
 				optixContext,
 				&moduleCompileOptions,
 				&pipelineCompileOptions,
@@ -252,7 +254,7 @@ namespace vtx {
 		for (OptixProgramGroup pg : programGroups) {
 			OptixStackSizes ss;
 
-			OPTIX_CHECK(optixProgramGroupGetStackSize(pg, &ss));
+			OPTIX_CHECK(optixProgramGroupGetStackSize(pg, &ss, pipeline));
 
 			ssp.cssRG = std::max(ssp.cssRG, ss.cssRG);
 			ssp.cssMS = std::max(ssp.cssMS, ss.cssMS);
@@ -292,7 +294,18 @@ namespace vtx {
 
 	}
 
-	void Renderer::CreateSBD()
+	void Renderer::ElaborateScene(std::shared_ptr<scene::Group> Root)
+	{
+		InstanceData instanceData;
+		math::affine3f transform = math::affine3f(math::Identity);
+
+		deviceData.Traverse(Root, instanceData, transform);
+		launchParams.topObject = deviceData.createTLAS();
+		launchParams.geometryInstanceData = deviceData.uploadGeometryInstanceData();
+
+	}
+
+	void Renderer::CreateSBT()
 	{
 		VTX_INFO("Filling Shader Table");
 

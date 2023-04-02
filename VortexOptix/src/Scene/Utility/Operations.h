@@ -1,6 +1,7 @@
 #pragma once
 #include <memory>
 #include <vector>
+#include <algorithm>
 #include "Scene/SceneGraph.h"
 #include "Core/VortexID.h"
 #include "Core/Log.h"
@@ -20,7 +21,7 @@ namespace vtx {
             return node;
         }
 
-        static void AddMaterial(std::shared_ptr<Mesh> mesh, std::shared_ptr<Material> material) {
+        /*static void AddMaterial(std::shared_ptr<Mesh> mesh, std::shared_ptr<Material> material) {
             auto iter = std::find(mesh->materials.begin(), mesh->materials.end(), material);
             if (iter != mesh->materials.end()) {
                 return;
@@ -28,7 +29,7 @@ namespace vtx {
             else {
                 mesh->materials.push_back(material);
             }
-        }
+        }*/
 
         // A simple unit cube built from 12 triangles.
         static std::shared_ptr<Mesh> createBox()
@@ -187,7 +188,7 @@ namespace vtx {
             return mesh;
         }
 
-        static void applyTransformation(TransformAttribute& transformation, const math::Affine3f& affine) {
+        static void applyTransformation(TransformAttribute& transformation, const math::affine3f& affine) {
             transformation.AffineTransform = transformation.AffineTransform * affine;
             transformation.updateFromAffine();
         }

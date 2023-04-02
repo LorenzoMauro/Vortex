@@ -4,12 +4,16 @@ function genNvccCommand(cu_file, ptx_file, cuda_path, include_dirs)
     local nvcc_path = '"' .. path.join(cuda_path, "bin/nvcc.exe") .. '"'
     CudaCompileCommand = nvcc_path
     CudaCompileCommand = CudaCompileCommand .. " " .. cu_file
-    CudaCompileCommand = CudaCompileCommand .. " --ptx"
+    --CudaCompileCommand = CudaCompileCommand .. " --ptx"
+    CudaCompileCommand = CudaCompileCommand .. " --optix-ir"
+    CudaCompileCommand = CudaCompileCommand .. " -G"
     CudaCompileCommand = CudaCompileCommand .. " --generate-line-info"
     CudaCompileCommand = CudaCompileCommand .. " --use_fast_math"
     CudaCompileCommand = CudaCompileCommand .. " --keep"
     CudaCompileCommand = CudaCompileCommand .. " --relocatable-device-code=true"
+    CudaCompileCommand = CudaCompileCommand .. " --keep-device-functions"
     CudaCompileCommand = CudaCompileCommand .. " -Wno-deprecated-gpu-targets"
+    CudaCompileCommand = CudaCompileCommand .. " -m64"
     CudaCompileCommand = CudaCompileCommand .. " -o " .. ptx_file
     
     -- Add additional include directories
@@ -35,7 +39,7 @@ project "OptixApp"
     cppdialect "C++17"
     targetdir (TARGET_DIR)
     objdir (OBJ_DIR)
-    buildcustomizations "BuildCustomizations/CUDA 12.0"
+    buildcustomizations "BuildCustomizations/CUDA 12.1"
 
     
     postbuildcommands {
@@ -77,7 +81,7 @@ project "OptixApp"
     filter "files:src/Renderer/DevicePrograms/**.cu"
 
         local cu_file = "%{file.relpath}"
-        local ptx_file = "%{cfg.targetdir}/data/ptx/%{file.basename}.ptx"
+        local ptx_file = "%{cfg.targetdir}/data/ptx/%{file.basename}.optixir"
 
         -- include dirs for the compilation of ptx files
         local include_dirs = {
@@ -87,7 +91,6 @@ project "OptixApp"
         }
         cudaCompileCommand = genNvccCommand(cu_file, ptx_file, CUDA_TOOLKIT_PATH, include_dirs)
         
-        local Output = "%{file.directory}/%{file.basename}.ptx"
         
         -- Build message showing the command being used
         -- buildmessage("Compiling %{file.relpath} with command: " .. Command)
