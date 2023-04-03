@@ -3,6 +3,7 @@
 #include <optix_device.h>
 #include <cuda_runtime.h>
 #include "Renderer/LaunchParams.h"
+#include <optix.h>
 
 namespace vtx {
 	
@@ -72,6 +73,11 @@ namespace vtx {
         // compute a test pattern based on pixel ID
         const int ix = optixGetLaunchIndex().x;
         const int iy = optixGetLaunchIndex().y;
+
+        math::vec2f pixel = math::vec2f(ix, iy);
+        math::vec2f sample = math::vec2f(0.5f, 0.5f);
+        math::vec2f screen = math::vec2f(optixLaunchParams.fbSize.x, optixLaunchParams.fbSize.y);
+        const LensRay ray = optixDirectCall<LensRay, const math::vec2f, const math::vec2f, const math::vec2f>(0, screen, pixel, sample);
 
         const int r = ((ix + frameID) % 256);
         const int g = ((iy + frameID) % 256);

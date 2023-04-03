@@ -18,22 +18,7 @@ namespace vtx {
 	typedef sbtRecord<void*> RaygenRecord;
 	typedef sbtRecord<void*> MissRecord;
 	typedef sbtRecord<int> HitgroupRecord;
-
-	enum ModuleIdentifier {
-		MODULE_ID_DEVICEPROGRAM,
-
-		NUM_MODULE_IDENTIFIERS
-	};
-
-	enum ProgramGroupIdentifier {
-		PROGRAMGROUP_ID_RAYGEN,
-		PROGRAMGROUP_ID_MISS,
-		PROGRAMGROUP_ID_HIT,
-
-
-
-		NUM_PROGRAMGROUP_IDENTIFIERS
-	};
+	typedef sbtRecord<void*> CallableRecord;
 
 	class Renderer {
 	public:
@@ -107,6 +92,10 @@ namespace vtx {
 		std::vector<std::string>		modulesPath;
 		std::vector<OptixModule>		modules;
 		std::vector<OptixProgramGroup>	programGroups;
+		std::vector<OptixProgramGroup>	raygenProgramGroups;
+		std::vector<OptixProgramGroup>	missProgramGroups;
+		std::vector<OptixProgramGroup>	hitProgramGroups;
+		std::vector<OptixProgramGroup>	CallableProgramGroups;
 
 		OptixPipeline					pipeline;
 
@@ -120,6 +109,7 @@ namespace vtx {
 		CUDABuffer						RaygenRecordBuffer;
 		CUDABuffer						MissRecordBuffer;
 		CUDABuffer						HitRecordBuffer;
+		CUDABuffer						CallableRecordBuffer;
 
 		//GL Interop
 		glFrameBuffer					glFrameBuffer;

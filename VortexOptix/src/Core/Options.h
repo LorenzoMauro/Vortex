@@ -14,8 +14,6 @@ struct Options {
 	bool isDebug = true;
 #endif
 	int OptixVersion = OPTIX_VERSION;
-	std::string LaunchParamName = "optixLaunchParams";
-	std::string modulePath = "./data/ptx/";
 };
 
 static Options options;

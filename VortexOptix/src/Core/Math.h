@@ -6,6 +6,10 @@
 namespace vtx {
 	namespace math {
 
+#define PI 3.1415926535897932384626433832795
+#define PI_180 0.01745329251994329576923690768489
+#define _180_PI 57.295779513082320876798154814105
+
 
 		template<typename T>
 		constexpr auto lenght = gdt::length<T>;
@@ -13,6 +17,15 @@ namespace vtx {
 		using OneTy = gdt::OneTy;
 		static OneTy Identity = gdt::one;
 
+		template<typename T>
+		T toRadians(T degree) {
+			return degree * T(PI_180);
+		}
+
+		template<typename T>
+		T toDegrees(T  radian) {
+			return radian * _180_PI;
+		}
 
 		///////////////////////////////////////////////////////////////////////////
 		///// Vector Definitions //////////////////////////////////////////////////
@@ -40,6 +53,11 @@ namespace vtx {
 		define_vec_types(uint64_t, ul);
 		define_vec_types(float, f);
 		define_vec_types(double, d);
+
+		template<typename T>
+		static inline __both__ vec_t<T, 3> normalize(const vec_t<T, 3>& v) {
+			return gdt::normalize(v);
+		}
 		
 		///////////////////////////////////////////////////////////////////////////
 		///// Linear Space Definitions ////////////////////////////////////////////
@@ -156,6 +174,29 @@ namespace vtx {
 
 		using affine2f = AffineSpace2f;
 		using affine3f = AffineSpace3f;
+
+		static inline vec3f TransfomrVector3f(const affine3f& affine, const vec3f& vec) {
+			return gdt::xfmVector<LinearSpace3f>(affine, vec);
+		}
+
+		static inline vec3f TransfomrPoint3f(const affine3f& affine, const vec3f& vec) {
+			return gdt::xfmPoint<LinearSpace3f>(affine, vec);
+		}
+
+		static inline vec3f TransfomrNormal3f(const affine3f& affine, const vec3f& vec) {
+			return gdt::xfmNormal<LinearSpace3f>(affine, vec);
+		}
+
+		/////////////////////////////////////////////////////////////
+		/////////////////// Some Utils Definition ///////////////////
+		/////////////////////////////////////////////////////////////
+
+		static vec3f xAxis = vec3f{ 1.0f, 0.0f, 0.0f };
+		static vec3f yAxis = vec3f{ 0.0f, 1.0f, 0.0f };
+		static vec3f zAxis = vec3f{ 0.0f, 0.0f, 1.0f };
+		static vec3f origin = vec3f{ 0.0f, 0.0f, 1.0f };
 	}
+
+
 }
 

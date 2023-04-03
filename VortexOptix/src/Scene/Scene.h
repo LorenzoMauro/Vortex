@@ -3,6 +3,8 @@
 #include "SIM.h"
 #include "Utility/Operations.h"
 #include "Core/Log.h"
+#include "Camera.h"
+
 namespace vtx {
 	namespace scene {
 
@@ -17,21 +19,30 @@ namespace vtx {
 				std::shared_ptr<Mesh> Cube = ops::createBox();
 
 				std::shared_ptr<Transform> Transformation_1 = ops::CreateNode<Transform>();
-				Transformation_1->transformationAttribute.AffineTransform.p.x = -2.0f;
-				Transformation_1->transformationAttribute.updateFromAffine();
+				Transformation_1->translate(math::xAxis, -2.0f);
+
 				std::shared_ptr<Instance> instance_1 = ops::CreateNode<Instance>();
 				instance_1->setChild(Cube);
 				instance_1->setTransform(Transformation_1);
 				rootNode->addChild(instance_1);
 
 				std::shared_ptr<Transform> Transformation_2 = ops::CreateNode<Transform>();
-				Transformation_2->transformationAttribute.AffineTransform.p.x = 2.0f;
-				Transformation_2->transformationAttribute.updateFromAffine();
+				Transformation_1->translate(math::xAxis, 2.0f);
+
 				std::shared_ptr<Instance> instance_2 = ops::CreateNode<Instance>();
 				instance_2->setChild(Cube);
 				instance_2->setTransform(Transformation_2);
-
 				rootNode->addChild(instance_2);
+
+				std::shared_ptr<Camera> camera = ops::CreateNode<Camera>();;
+				rootNode->addChild(instance_2);
+
+				camera->transform = std::make_shared<Transform>();
+				camera->transform->translate(math::xAxis, 5.0f);
+				camera->transform->rotateAroundPointDegree(math::origin, math::zAxis, 45.0f);
+				camera->UpdateDirections();
+				camera->transform->rotateAroundPointDegree(math::origin, camera->right, 45.0f);
+
 			}
 
 

@@ -6,6 +6,7 @@
 #include "Core/Utils.h"
 #include <algorithm>
 #include <cudaGL.h>
+#include "ShadersDefinitions.h"
 
 namespace vtx {
 
@@ -126,7 +127,7 @@ namespace vtx {
 		}
 		else
 			pipelineCompileOptions.exceptionFlags = OPTIX_EXCEPTION_FLAG_NONE;
-		pipelineCompileOptions.pipelineLaunchParamsVariableName = options.LaunchParamName.c_str();
+		pipelineCompileOptions.pipelineLaunchParamsVariableName = LaunchParamName.c_str();
 		if (options.OptixVersion != 70000)
 			pipelineCompileOptions.usesPrimitiveTypeFlags = 
 			OPTIX_PRIMITIVE_TYPE_FLAGS_TRIANGLE |
@@ -154,28 +155,23 @@ namespace vtx {
 		VTX_INFO("Creating Modules");
 		// Each source file results in one OptixModule.
 		modules.resize(NUM_MODULE_IDENTIFIERS);
-		modulesPath.resize(NUM_MODULE_IDENTIFIERS);
-		modulesPath[MODULE_ID_DEVICEPROGRAM] = utl::absolutePath(options.modulePath + "devicePrograms.optixir");
 
 		// Create all modules:
-		for (size_t i = 0; i < modulesPath.size(); ++i)
-		{
-			// Since OptiX 7.5.0 the program input can either be *.ptx source code or *.optixir binary code.
-			// The module filenames are automatically switched between *.ptx or *.optixir extension based on the definition of USE_OPTIX_IR
-			std::vector<char> programData = utl::readData(modulesPath[i]);
+		for (int moduleID = 0; moduleID < NUM_MODULE_IDENTIFIERS; moduleID++) {
 
+			std::string& modulePath = MODULE_FILENAME[(ModuleIdentifier)moduleID];
+			std::vector<char> programData = utl::readData(modulePath);
 
 			char log[2048];
 			size_t sizeof_log = sizeof(log);
-			OPTIX_CHECK(optixModuleCreate(
-				optixContext,
-				&moduleCompileOptions,
-				&pipelineCompileOptions,
-				programData.data(), 
-				programData.size(),
-				log, &sizeof_log,
-				&modules[i]));
-			if (sizeof_log > 1){
+			OPTIX_CHECK(optixModuleCreate(	optixContext,
+											&moduleCompileOptions,
+											&pipelineCompileOptions,
+											programData.data(),
+											programData.size(),
+											log, &sizeof_log,
+											&modules[moduleID]));
+			if (sizeof_log > 1) {
 				VTX_WARN(log);
 			}
 
@@ -187,29 +183,40 @@ namespace vtx {
 		VTX_INFO("Creating Programs");
 		OptixProgramGroupOptions pgOptions = {};
 
-		std::vector<OptixProgramGroupDesc>	programGroupDescriptions(NUM_PROGRAMGROUP_IDENTIFIERS);
-		programGroups.resize(NUM_PROGRAMGROUP_IDENTIFIERS);
+		std::vector<OptixProgramGroupDesc>	programGroupDescriptions(NUM_PROGRAM_GROUPS);
+		programGroups.resize(NUM_PROGRAM_GROUPS);
 		OptixProgramGroupDesc* pgd;
 
+		int definedPGDesc = 0;
 		// Raygen program:
+
 		pgd = &programGroupDescriptions[PROGRAMGROUP_ID_RAYGEN];
 		pgd->kind = OPTIX_PROGRAM_GROUP_KIND_RAYGEN;
-		pgd->raygen.module = modules[MODULE_ID_DEVICEPROGRAM];
-		pgd->raygen.entryFunctionName = "__raygen__renderFrame";
+		pgd->raygen.module = modules[funcPropMap[__RAYGEN__RENDERFRAME].module];
+		pgd->raygen.entryFunctionName = funcPropMap[__RAYGEN__RENDERFRAME].name;
 
 		// Miss program:
+
 		pgd = &programGroupDescriptions[PROGRAMGROUP_ID_MISS];
 		pgd->kind = OPTIX_PROGRAM_GROUP_KIND_MISS;
-		pgd->raygen.module = modules[MODULE_ID_DEVICEPROGRAM];
-		pgd->raygen.entryFunctionName = "__miss__radiance";
+		pgd->raygen.module = modules[funcPropMap[__MISS__RADIANCE].module];
+		pgd->raygen.entryFunctionName = funcPropMap[__MISS__RADIANCE].name;
 
 		//Hit Program
+
 		pgd = &programGroupDescriptions[PROGRAMGROUP_ID_HIT];
-		pgd->kind = OPTIX_PROGRAM_GROUP_KIND_HITGROUP;
-		pgd->hitgroup.moduleCH = modules[MODULE_ID_DEVICEPROGRAM];
-		pgd->hitgroup.entryFunctionNameCH = "__closesthit__radiance";
-		pgd->hitgroup.moduleAH = modules[MODULE_ID_DEVICEPROGRAM];
-		pgd->hitgroup.entryFunctionNameAH = "__anyhit__radiance";
+		pgd->kind =							OPTIX_PROGRAM_GROUP_KIND_HITGROUP;
+		pgd->hitgroup.moduleCH = modules[funcPropMap[__CLOSESTHIT__RADIANCE].module];
+		pgd->hitgroup.entryFunctionNameCH = funcPropMap[__CLOSESTHIT__RADIANCE].name;
+		pgd->hitgroup.moduleAH = modules[funcPropMap[__ANYHIT__RADIANCE].module];
+		pgd->hitgroup.entryFunctionNameAH = funcPropMap[__ANYHIT__RADIANCE].name;
+
+		// Callables
+		pgd = &programGroupDescriptions[PROGRAMGROUP_ID_CAMERA];
+		pgd->kind = OPTIX_PROGRAM_GROUP_KIND_CALLABLES;
+		pgd->flags = OPTIX_PROGRAM_GROUP_FLAGS_NONE;
+		pgd->callables.moduleDC = modules[funcPropMap[__CALLABLE__PINHOLECAMERA].module];
+		pgd->callables.entryFunctionNameDC = funcPropMap[__CALLABLE__PINHOLECAMERA].name;
 
 		char log[2048];
 		size_t sizeof_log = sizeof(log);
@@ -302,6 +309,7 @@ namespace vtx {
 		deviceData.Traverse(Root, instanceData, transform);
 		launchParams.topObject = deviceData.createTLAS();
 		launchParams.geometryInstanceData = deviceData.uploadGeometryInstanceData();
+		launchParams.CameraData = deviceData.uploadCamera();
 
 	}
 
@@ -314,6 +322,7 @@ namespace vtx {
 			programGroups[PROGRAMGROUP_ID_RAYGEN],
 			RaygenRecords,
 			nullptr);
+		SBT_POSITION.insert({ PROGRAMGROUP_ID_RAYGEN , 0 });
 		RaygenRecordBuffer.alloc_and_upload(RaygenRecords);
 
 		std::vector<MissRecord> MissRecords;
@@ -321,27 +330,41 @@ namespace vtx {
 			programGroups[PROGRAMGROUP_ID_MISS],
 			MissRecords,
 			nullptr);
+		SBT_POSITION.insert({ PROGRAMGROUP_ID_MISS , 0 });
 		MissRecordBuffer.alloc_and_upload(RaygenRecords);
 
-		int numObjects = 1;
 		std::vector<HitgroupRecord> HitgroupRecords;
 		OptixProgramGroup hitgroupPG = programGroups[PROGRAMGROUP_ID_HIT];
-		for (int i = 0; i < numObjects; i++) {
-			FillAndUploadRecord(
-				programGroups[PROGRAMGROUP_ID_HIT],
-				HitgroupRecords,
-				i);
-		}
+		FillAndUploadRecord(
+			programGroups[PROGRAMGROUP_ID_HIT],
+			HitgroupRecords,
+			0);
+		SBT_POSITION.insert({ PROGRAMGROUP_ID_HIT , 0 });
 		HitRecordBuffer.alloc_and_upload(HitgroupRecords);
+
+		std::vector<CallableRecord> CallableRecords;
+		OptixProgramGroup callablePG = programGroups[PROGRAMGROUP_ID_CAMERA];
+		FillAndUploadRecord(
+			programGroups[PROGRAMGROUP_ID_CAMERA],
+			CallableRecords,
+			nullptr);
+		SBT_POSITION.insert({ PROGRAMGROUP_ID_CAMERA , 0 });
+		CallableRecordBuffer.alloc_and_upload(CallableRecords);
 
 		sbt = {};
 		sbt.raygenRecord = RaygenRecordBuffer.d_pointer();
 		sbt.missRecordBase = MissRecordBuffer.d_pointer();
 		sbt.missRecordStrideInBytes = sizeof(MissRecord);
 		sbt.missRecordCount = (int)MissRecords.size();
+
 		sbt.hitgroupRecordBase = HitRecordBuffer.d_pointer();
 		sbt.hitgroupRecordStrideInBytes = sizeof(HitgroupRecord);
 		sbt.hitgroupRecordCount = (int)HitgroupRecords.size();
+
+
+		sbt.callablesRecordBase = CallableRecordBuffer.d_pointer();
+		sbt.callablesRecordStrideInBytes = sizeof(CallableRecord);
+		sbt.callablesRecordCount = (int)CallableRecords.size();
 
 	}
 

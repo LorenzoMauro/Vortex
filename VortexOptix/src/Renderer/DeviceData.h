@@ -1,5 +1,6 @@
 #pragma once
 #include "Scene/SceneGraph.h"
+#include "Scene/Camera.h"
 #include "LaunchParams.h"
 #include <map>
 
@@ -37,17 +38,19 @@ namespace vtx {
 	class DeviceScene {
 	public:
 		//copy operator default
-		void ElaborateScene(std::shared_ptr<scene::Node> root);
-
 		void Traverse(std::shared_ptr<scene::Node> node, InstanceData instanceData, math::affine3f transform);
 
 		void createInstanceData(GeometryData geometryData, InstanceData instanceData, math::affine3f transform);
+
+		void createCameraData(std::shared_ptr<scene::Camera> camera);
 
 		GeometryData createBLAS(std::shared_ptr<scene::Mesh> mesh);
 
 		OptixTraversableHandle createTLAS();
 
 		GeometryInstanceData* uploadGeometryInstanceData();
+
+		CameraData* uploadCamera();
 
 	public:
 		OptixDeviceContext						optixContext;
@@ -57,6 +60,7 @@ namespace vtx {
 		vtxID									m_SequentialInstanceID = 0;
 		std::vector<GeometryInstanceData>		m_GeometryInstanceData;
 		std::vector<OptixInstance>				m_OptixInstanceData;
+		CameraData								m_CameraData;
 	};
 }
 /*

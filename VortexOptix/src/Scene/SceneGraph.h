@@ -25,13 +25,18 @@ namespace vtx {
             math::vec3f eulerAngles{ 0.0f };
             math::affine3f AffineTransform = math::affine3f(math::Identity);
 
+            /* Update the transformation given the vector representation*/
             void updateFromVectors() {
 				AffineTransform = math::affine3f::translate(translation) * (math::affine3f)math::AffineFromEuler<math::LinearSpace3f>(eulerAngles) * math::affine3f::scale(scale);
 			}
 
+            /* Update the vector representation given the affine matrix*/
             void updateFromAffine() {
                 math::VectorFromAffine<math::LinearSpace3f>(AffineTransform, scale, translation, eulerAngles);
             }
+
+            
+
         };
 
 		enum NodeType {
@@ -40,6 +45,7 @@ namespace vtx {
 			NT_MESH,
             NT_MATERIAL,
             NT_TRANSFORM,
+            NT_CAMERA,
 
             NT_NUM_NODE_TYPES
 		};
@@ -69,6 +75,54 @@ namespace vtx {
         class Transform : public Node {
         public:
             Transform() : Node(NT_TRANSFORM) {};
+
+            math::vec3f TransformVector(const math::vec3f& vector) {
+                return math::TransfomrVector3f(transformationAttribute.AffineTransform, vector);
+            }
+
+            math::vec3f TransformNormal(const math::vec3f& vector) {
+                return math::TransfomrNormal3f(transformationAttribute.AffineTransform, vector);
+            }
+
+            math::vec3f TransformPoint(const math::vec3f& vector) {
+                return math::TransfomrPoint3f(transformationAttribute.AffineTransform, vector);
+            }
+
+            /* Translation utility given vector */
+            void translate(math::vec3f translation) {
+                math::affine3f translationMatrix = math::affine3f::translate(translation);
+                transformationAttribute.AffineTransform = translationMatrix * transformationAttribute.AffineTransform;
+                transformationAttribute.updateFromAffine();
+            }
+
+            /* Translation utility given axis and ammount */
+            void translate(math::vec3f direction, float ammount) {
+                translate(direction * ammount);
+            }
+
+            /* Rotation utility for axis angle in radians */
+            void rotate(math::vec3f axis, float radian) {
+                math::affine3f rotationMatrix = math::affine3f::rotate(axis, radian);
+                transformationAttribute.AffineTransform = rotationMatrix * transformationAttribute.AffineTransform;
+                transformationAttribute.updateFromAffine();
+            }
+
+            /* Rotation utility for axis angle in degree */
+            void rotateDegree(math::vec3f axis, float degree) {
+                rotate(axis, math::toRadians(degree));
+            }
+
+            /* Rotation utility for axis angle around point in radians */
+            void rotateAroundPoint(math::vec3f point, math::vec3f axis, float radian) {
+                math::affine3f transformation = math::affine3f::rotate(point, axis, radian);
+                transformationAttribute.AffineTransform = transformation * transformationAttribute.AffineTransform;
+                transformationAttribute.updateFromAffine();
+            }
+
+            /* Rotation utility for axis angle around point in degree */
+            void rotateAroundPointDegree(math::vec3f point, math::vec3f axis, float degree) {
+                rotateAroundPoint(point, axis, math::toRadians(degree));
+            }
 
             TransformAttribute transformationAttribute;
         };
