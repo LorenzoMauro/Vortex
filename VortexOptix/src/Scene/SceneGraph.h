@@ -32,7 +32,7 @@ namespace vtx {
 
             /* Update the vector representation given the affine matrix*/
             void updateFromAffine() {
-                math::VectorFromAffine<math::LinearSpace3f>(AffineTransform, scale, translation, eulerAngles);
+                math::VectorFromAffine<math::LinearSpace3f>(AffineTransform, translation, scale, eulerAngles);
             }
 
             
@@ -46,6 +46,7 @@ namespace vtx {
             NT_MATERIAL,
             NT_TRANSFORM,
             NT_CAMERA,
+            NT_RENDERER,
 
             NT_NUM_NODE_TYPES
 		};
@@ -122,6 +123,21 @@ namespace vtx {
             /* Rotation utility for axis angle around point in degree */
             void rotateAroundPointDegree(math::vec3f point, math::vec3f axis, float degree) {
                 rotateAroundPoint(point, axis, math::toRadians(degree));
+            }
+
+            void rotateQuaternion(math::Quaternion3f quat) {
+                math::LinearSpace3f rotationMatrix = math::LinearSpace3f(quat);
+                math::affine3f transformation = math::affine3f(rotationMatrix);
+                transformationAttribute.AffineTransform = transformation * transformationAttribute.AffineTransform;
+                transformationAttribute.updateFromAffine();
+            }
+
+            void rotateOrbit(float pitch, math::vec3f xAxis, float yaw, math::vec3f zAxis) {
+                math::affine3f rotationPITCHMatrix = math::affine3f::rotate(xAxis, pitch);
+                math::affine3f rotationYAWMatrix = math::affine3f::rotate(zAxis, yaw);
+                transformationAttribute.AffineTransform = rotationPITCHMatrix * rotationYAWMatrix * transformationAttribute.AffineTransform;
+
+                transformationAttribute.updateFromAffine();
             }
 
             TransformAttribute transformationAttribute;

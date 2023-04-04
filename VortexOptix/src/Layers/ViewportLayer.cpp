@@ -2,10 +2,9 @@
 #include "imgui.h"
 
 namespace vtx {
-	ViewportLayer::ViewportLayer(Renderer* _Renderer)
+	ViewportLayer::ViewportLayer(std::shared_ptr<Renderer> _Renderer)
 	{
         renderer = _Renderer;
-
 	}
 
     void ViewportLayer::OnAttach()
@@ -18,6 +17,7 @@ namespace vtx {
 
     void ViewportLayer::OnUpdate(float ts)
     {
+        renderer->camera->OnUpdate(ts);
     }
 
     void ViewportLayer::OnUIRender() {
@@ -27,6 +27,9 @@ namespace vtx {
         renderer->Resize(m_Width, m_Height);
         GLuint frameAttachment = renderer->GetFrame();
         ImGui::Image((void*)frameAttachment, ImVec2{ (float)m_Width, (float)m_Height }, ImVec2{ 0, 1 }, ImVec2{ 1, 0 });
+        if (!renderer->camera->NavigationActive) {
+            renderer->camera->NavigationActive = ImGui::IsItemHovered();
+        }
         ImGui::End();
     }
 }

@@ -9,8 +9,8 @@ namespace vtx {
     // Camera
     struct CameraData {
         math::vec3f  position;
-        math::vec3f  up;
-        math::vec3f  right;
+        math::vec3f  vertical;
+        math::vec3f  horizontal;
         math::vec3f  direction;
     };
 
@@ -30,7 +30,13 @@ namespace vtx {
 
         OptixTraversableHandle      topObject;
         GeometryInstanceData*       geometryInstanceData; // Attributes, indices, idMaterial, idLight, idObject per instance.
-        CameraData*                 CameraData;
+        CameraData                  CameraData;
+    };
+
+    enum TypeRay
+    {
+        TYPE_RAY_RADIANCE = 0,
+        NUM_RAY_TYPES
     };
 
     struct LensRay

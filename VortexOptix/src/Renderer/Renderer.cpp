@@ -37,7 +37,7 @@ namespace vtx {
 	//	int objectID;
 	//};
 
-	Renderer::Renderer() {
+	Renderer::Renderer() : Node(scene::NT_RENDERER) {
 		InitOptix();
 		createContext();
 		setModuleCompilersOptions();
@@ -139,7 +139,6 @@ namespace vtx {
 		// OptixPipelineLinkOptions
 		VTX_INFO("Setting Pipeline Linker Options");
 		pipelineLinkOptions = {};
-
 		pipelineLinkOptions.maxTraceDepth = 2;
 		//if (options.isDebug) {
 		//	pipelineLinkOptions.debugLevel = OPTIX_COMPILE_DEBUG_LEVEL_FULL; // Full debug. Never /profile /kernels with this setting!
@@ -159,7 +158,7 @@ namespace vtx {
 		// Create all modules:
 		for (int moduleID = 0; moduleID < NUM_MODULE_IDENTIFIERS; moduleID++) {
 
-			std::string& modulePath = MODULE_FILENAME[(ModuleIdentifier)moduleID];
+			std::string& modulePath = utl::absolutePath(MODULE_FILENAME[(ModuleIdentifier)moduleID]);
 			std::vector<char> programData = utl::readData(modulePath);
 
 			char log[2048];
@@ -187,36 +186,49 @@ namespace vtx {
 		programGroups.resize(NUM_PROGRAM_GROUPS);
 		OptixProgramGroupDesc* pgd;
 
-		int definedPGDesc = 0;
 		// Raygen program:
-
 		pgd = &programGroupDescriptions[PROGRAMGROUP_ID_RAYGEN];
 		pgd->kind = OPTIX_PROGRAM_GROUP_KIND_RAYGEN;
 		pgd->raygen.module = modules[funcPropMap[__RAYGEN__RENDERFRAME].module];
 		pgd->raygen.entryFunctionName = funcPropMap[__RAYGEN__RENDERFRAME].name;
 
-		// Miss program:
 
+		pgd = &programGroupDescriptions[PROGRAMGROUP_ID_ECXEPTION];
+		pgd->kind = OPTIX_PROGRAM_GROUP_KIND_EXCEPTION;
+		pgd->flags = OPTIX_PROGRAM_GROUP_FLAGS_NONE;
+		pgd->exception.module = modules[funcPropMap[__EXCEPTION__ALL].module];
+		pgd->exception.entryFunctionName = funcPropMap[__EXCEPTION__ALL].name;
+
+		// Miss program:
 		pgd = &programGroupDescriptions[PROGRAMGROUP_ID_MISS];
 		pgd->kind = OPTIX_PROGRAM_GROUP_KIND_MISS;
 		pgd->raygen.module = modules[funcPropMap[__MISS__RADIANCE].module];
 		pgd->raygen.entryFunctionName = funcPropMap[__MISS__RADIANCE].name;
-
+		
 		//Hit Program
-
 		pgd = &programGroupDescriptions[PROGRAMGROUP_ID_HIT];
-		pgd->kind =							OPTIX_PROGRAM_GROUP_KIND_HITGROUP;
+		pgd->kind = OPTIX_PROGRAM_GROUP_KIND_HITGROUP;
 		pgd->hitgroup.moduleCH = modules[funcPropMap[__CLOSESTHIT__RADIANCE].module];
 		pgd->hitgroup.entryFunctionNameCH = funcPropMap[__CLOSESTHIT__RADIANCE].name;
 		pgd->hitgroup.moduleAH = modules[funcPropMap[__ANYHIT__RADIANCE].module];
 		pgd->hitgroup.entryFunctionNameAH = funcPropMap[__ANYHIT__RADIANCE].name;
 
-		// Callables
+
+		//Hit Program
 		pgd = &programGroupDescriptions[PROGRAMGROUP_ID_CAMERA];
 		pgd->kind = OPTIX_PROGRAM_GROUP_KIND_CALLABLES;
-		pgd->flags = OPTIX_PROGRAM_GROUP_FLAGS_NONE;
 		pgd->callables.moduleDC = modules[funcPropMap[__CALLABLE__PINHOLECAMERA].module];
 		pgd->callables.entryFunctionNameDC = funcPropMap[__CALLABLE__PINHOLECAMERA].name;
+
+		// Callables
+		/*if (false)
+		{
+			pgd = &programGroupDescriptions[PROGRAMGROUP_ID_CAMERA];
+			pgd->kind = OPTIX_PROGRAM_GROUP_KIND_CALLABLES;
+			pgd->flags = OPTIX_PROGRAM_GROUP_FLAGS_NONE;
+			pgd->callables.moduleDC = modules[funcPropMap[__CALLABLE__PINHOLECAMERA].module];
+			pgd->callables.entryFunctionNameDC = funcPropMap[__CALLABLE__PINHOLECAMERA].name;
+		}*/
 
 		char log[2048];
 		size_t sizeof_log = sizeof(log);
@@ -278,13 +290,8 @@ namespace vtx {
 		const unsigned int maxDCDepth = 2;
 
 		// Arguments
-
-		// FromTraversal: DC is invoked from IS or AH.      
-		// Possible stack size optimizations.
-		unsigned int directCallableStackSizeFromTraversal = ssp.dssDC * maxDCDepth; 
-		// FromState:     DC is invoked from RG, MS, or CH. 
-		// Possible stack size optimizations.
-		unsigned int directCallableStackSizeFromState = ssp.dssDC * maxDCDepth; 
+		unsigned int directCallableStackSizeFromTraversal = ssp.dssDC * maxDCDepth; // FromTraversal: DC is invoked from IS or AH.    // Possible stack size optimizations.
+		unsigned int directCallableStackSizeFromState = ssp.dssDC * maxDCDepth; // FromState:     DC is invoked from RG, MS, or CH. // Possible stack size optimizations.
 		unsigned int continuationStackSize = 
 			ssp.cssRG + 
 			cssCCTree + 
@@ -293,7 +300,7 @@ namespace vtx {
 		unsigned int maxTraversableGraphDepth = 2;
 
 		OPTIX_CHECK(optixPipelineSetStackSize(
-			pipeline,
+		 	pipeline,
 			directCallableStackSizeFromTraversal, 
 			directCallableStackSizeFromState, 
 			continuationStackSize,
@@ -301,70 +308,47 @@ namespace vtx {
 
 	}
 
-	void Renderer::ElaborateScene(std::shared_ptr<scene::Group> Root)
+	void Renderer::ElaborateScene()
 	{
 		InstanceData instanceData;
 		math::affine3f transform = math::affine3f(math::Identity);
 
-		deviceData.Traverse(Root, instanceData, transform);
+		deviceData.Traverse(sceneRoot, instanceData, transform);
 		launchParams.topObject = deviceData.createTLAS();
 		launchParams.geometryInstanceData = deviceData.uploadGeometryInstanceData();
-		launchParams.CameraData = deviceData.uploadCamera();
-
 	}
 
 	void Renderer::CreateSBT()
 	{
 		VTX_INFO("Filling Shader Table");
 
-		std::vector<RaygenRecord> RaygenRecords;
-		FillAndUploadRecord(
-			programGroups[PROGRAMGROUP_ID_RAYGEN],
-			RaygenRecords,
-			nullptr);
-		SBT_POSITION.insert({ PROGRAMGROUP_ID_RAYGEN , 0 });
-		RaygenRecordBuffer.alloc_and_upload(RaygenRecords);
+		const int numHeaders = static_cast<int>(programGroups.size());
 
-		std::vector<MissRecord> MissRecords;
-		FillAndUploadRecord(
-			programGroups[PROGRAMGROUP_ID_MISS],
-			MissRecords,
-			nullptr);
-		SBT_POSITION.insert({ PROGRAMGROUP_ID_MISS , 0 });
-		MissRecordBuffer.alloc_and_upload(RaygenRecords);
+		std::vector<SbtRecordHeader> sbtRecordHeaders(numHeaders);
 
-		std::vector<HitgroupRecord> HitgroupRecords;
-		OptixProgramGroup hitgroupPG = programGroups[PROGRAMGROUP_ID_HIT];
-		FillAndUploadRecord(
-			programGroups[PROGRAMGROUP_ID_HIT],
-			HitgroupRecords,
-			0);
-		SBT_POSITION.insert({ PROGRAMGROUP_ID_HIT , 0 });
-		HitRecordBuffer.alloc_and_upload(HitgroupRecords);
+		for (int i = 0; i < numHeaders; ++i)
+		{
+			OPTIX_CHECK(optixSbtRecordPackHeader(programGroups[PROGRAMGROUP_ID_RAYGEN + i], &sbtRecordHeaders[i]));
+		}
 
-		std::vector<CallableRecord> CallableRecords;
-		OptixProgramGroup callablePG = programGroups[PROGRAMGROUP_ID_CAMERA];
-		FillAndUploadRecord(
-			programGroups[PROGRAMGROUP_ID_CAMERA],
-			CallableRecords,
-			nullptr);
-		SBT_POSITION.insert({ PROGRAMGROUP_ID_CAMERA , 0 });
-		CallableRecordBuffer.alloc_and_upload(CallableRecords);
+		CUDABuffer sbtRecordHeadersBuffer;
+		sbtRecordHeadersBuffer.alloc_and_upload(sbtRecordHeaders);
 
 		sbt = {};
-		sbt.raygenRecord = RaygenRecordBuffer.d_pointer();
-		sbt.missRecordBase = MissRecordBuffer.d_pointer();
-		sbt.missRecordStrideInBytes = sizeof(MissRecord);
-		sbt.missRecordCount = (int)MissRecords.size();
+		sbt.raygenRecord = sbtRecordHeadersBuffer.d_pointer();
+		sbt.exceptionRecord = sbtRecordHeadersBuffer.d_pointer() + sizeof(SbtRecordHeader)*PROGRAMGROUP_ID_ECXEPTION;
 
-		sbt.hitgroupRecordBase = HitRecordBuffer.d_pointer();
-		sbt.hitgroupRecordStrideInBytes = sizeof(HitgroupRecord);
-		sbt.hitgroupRecordCount = (int)HitgroupRecords.size();
+		sbt.missRecordBase = sbtRecordHeadersBuffer.d_pointer() + sizeof(SbtRecordHeader) * PROGRAMGROUP_ID_MISS;
+		sbt.missRecordStrideInBytes = (unsigned int)sizeof(SbtRecordHeader);
+		sbt.missRecordCount = NUM_MISS_PROGRAM;
 
+		sbt.hitgroupRecordBase = sbtRecordHeadersBuffer.d_pointer() + sizeof(SbtRecordHeader) * PROGRAMGROUP_ID_HIT;
+		sbt.hitgroupRecordStrideInBytes = (unsigned int)sizeof(SbtRecordHeader);
+		sbt.hitgroupRecordCount = NUM_HIT_PROGRAM;
 
-		sbt.callablesRecordBase = CallableRecordBuffer.d_pointer();
-		sbt.callablesRecordStrideInBytes = sizeof(CallableRecord);
-		sbt.callablesRecordCount = (int)CallableRecords.size();
+		sbt.callablesRecordBase = sbtRecordHeadersBuffer.d_pointer() + sizeof(SbtRecordHeader) * PROGRAMGROUP_ID_CAMERA;
+		sbt.callablesRecordStrideInBytes = (unsigned int)sizeof(SbtRecordHeader);
+		sbt.callablesRecordCount = NUM_CALLABLE_PROGRAM;
 
 	}
 
@@ -424,6 +408,11 @@ namespace vtx {
 		launchParams.fbSize.x = width;
 		launchParams.fbSize.y = height;
 		launchParams.colorBuffer = cudaColorBuffer.d_pointer();
+		camera->Resize(width, height);
+		launchParams.CameraData.position = camera->position;
+		launchParams.CameraData.direction = camera->direction;
+		launchParams.CameraData.vertical = cos(camera->FovY)*camera->vertical;
+		launchParams.CameraData.horizontal = cos(camera->FovY)*camera->aspect*camera->horizontal;
 
 		glFrameBuffer.SetSize(width, height);
 

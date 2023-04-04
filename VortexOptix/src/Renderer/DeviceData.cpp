@@ -66,9 +66,8 @@ namespace vtx {
 			break;
 
 			case scene::NodeType::NT_CAMERA: {
-				std::shared_ptr<scene::Camera> camera = std::static_pointer_cast<scene::Camera>(node);
-				createCameraData(camera);
 			}
+			break;
 		}
 	}
 
@@ -96,14 +95,6 @@ namespace vtx {
 
 		m_GeometryInstanceData.push_back(gid);
 		m_OptixInstanceData.push_back(OptixInstance);
-	}
-
-	void DeviceScene::createCameraData(std::shared_ptr<scene::Camera> camera)
-	{
-		m_CameraData.direction = camera->direction;
-		m_CameraData.position = camera->position;
-		m_CameraData.up = camera->up;
-		m_CameraData.right = camera->right;
 	}
 
 	GeometryData DeviceScene::createBLAS(std::shared_ptr<scene::Mesh> mesh)
@@ -291,14 +282,6 @@ namespace vtx {
 		CUDABuffer geometryInstanceBuffer;
 		geometryInstanceBuffer.alloc_and_upload(m_GeometryInstanceData);
 		return reinterpret_cast<GeometryInstanceData*>(geometryInstanceBuffer.d_pointer());
-	}
-
-	CameraData* DeviceScene::uploadCamera()
-	{
-		CUDABuffer cameraDataBuffer;
-		cameraDataBuffer.alloc(sizeof(CameraData));
-		cameraDataBuffer.upload(&m_CameraData, 1);
-		return reinterpret_cast<CameraData*>(cameraDataBuffer.d_pointer());
 	}
 
 }

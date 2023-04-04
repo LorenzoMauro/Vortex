@@ -14,6 +14,7 @@ namespace vtx {
 		template<typename T>
 		constexpr auto lenght = gdt::length<T>;
 
+
 		using OneTy = gdt::OneTy;
 		static OneTy Identity = gdt::one;
 
@@ -57,6 +58,11 @@ namespace vtx {
 		template<typename T>
 		static inline __both__ vec_t<T, 3> normalize(const vec_t<T, 3>& v) {
 			return gdt::normalize(v);
+		}
+
+		inline __both__ vec3f randomColor(int i)
+		{
+			return gdt::randomColor(i);
 		}
 		
 		///////////////////////////////////////////////////////////////////////////

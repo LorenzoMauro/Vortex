@@ -42,7 +42,7 @@ namespace vtx {
 
 		void createInstanceData(GeometryData geometryData, InstanceData instanceData, math::affine3f transform);
 
-		void createCameraData(std::shared_ptr<scene::Camera> camera);
+		void setCameraData(std::shared_ptr<scene::Camera> camera);
 
 		GeometryData createBLAS(std::shared_ptr<scene::Mesh> mesh);
 

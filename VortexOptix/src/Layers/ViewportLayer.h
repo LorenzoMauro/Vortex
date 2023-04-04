@@ -7,7 +7,7 @@ namespace vtx {
     class ViewportLayer : public Layer {
     public:
 
-        ViewportLayer(Renderer* _Renderer);
+        ViewportLayer(std::shared_ptr<Renderer> _Renderer);
 
         virtual void OnAttach();
 
@@ -18,7 +18,7 @@ namespace vtx {
         virtual void OnUIRender();
 
     public:
-        Renderer*   renderer;
+        std::shared_ptr<Renderer> renderer;
         uint32_t    m_width = options.width;
         uint32_t    m_height = options.height;
         bool        m_isResized = false;

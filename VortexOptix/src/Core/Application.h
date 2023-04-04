@@ -21,11 +21,12 @@ namespace vtx {
 	public:
 		void Init() {
 			InitWindow();
+			Input::SetWindowHandle(m_Window);
 			Init_ImGui(m_Window);
 			CreateLayer<AppLayer>();
-			CreateLayer<ViewportLayer>(&m_renderer);
 			m_scene.Start();
-			m_renderer.ElaborateScene(m_scene.rootNode);
+			CreateLayer<ViewportLayer>(m_scene.renderer);
+			m_scene.renderer->ElaborateScene();
 		};
 		void ShutDown() {
 			End_ImGui();
@@ -59,6 +60,9 @@ namespace vtx {
 			glfwPollEvents();
 			ImGuiRenderStart();
 			//////////////////////////
+			for (auto& layer : m_LayerStack)
+				layer->OnUpdate(m_TimeStep);
+
 			int layerCount = m_LayerStack.size();
 			for (int i = 0; i < layerCount; i++) {
 				auto& layer = m_LayerStack[i];
@@ -67,6 +71,12 @@ namespace vtx {
 			}
 			ImGuiDraw(m_Window);
 			glfwSwapBuffers(m_Window);
+
+			float time = (float)glfwGetTime();
+			m_FrameTime = time - m_LastFrameTime;
+			m_TimeStep = std::min(m_FrameTime, 0.0333f);
+			m_LastFrameTime = time;
+
 		};
 
 		template<typename T, typename... Args>
@@ -83,8 +93,10 @@ namespace vtx {
 	public:
 		GLFWwindow* m_Window;
 		std::vector<std::shared_ptr<Layer>> 	    m_LayerStack;
-		Renderer									m_renderer;
-		Scene										m_scene;
+		Graph										m_scene;
 
+		float m_TimeStep = 0.0f;
+		float m_FrameTime = 0.0f;
+		float m_LastFrameTime = 0.0f;
 	};
 }

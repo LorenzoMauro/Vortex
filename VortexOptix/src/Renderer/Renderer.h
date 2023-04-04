@@ -4,23 +4,18 @@
 #include "CUDABuffer.h"
 #include "LaunchParams.h"
 #include "DeviceData.h"
+#include "Scene/SceneGraph.h"
 
 namespace vtx {
 
 
 	/*SBT Record Template*/
-	template<typename T>
-	struct sbtRecord {
+	struct SbtRecordHeader
+	{
 		__align__(OPTIX_SBT_RECORD_ALIGNMENT) char header[OPTIX_SBT_RECORD_HEADER_SIZE];
-		T Data;
 	};
 
-	typedef sbtRecord<void*> RaygenRecord;
-	typedef sbtRecord<void*> MissRecord;
-	typedef sbtRecord<int> HitgroupRecord;
-	typedef sbtRecord<void*> CallableRecord;
-
-	class Renderer {
+	class Renderer : public scene::Node {
 	public:
 
 		Renderer();
@@ -29,7 +24,15 @@ namespace vtx {
 
 		GLuint GetFrame();
 
-		void ElaborateScene(std::shared_ptr<scene::Group> Root);
+		void ElaborateScene();
+
+		void setCamera(std::shared_ptr<scene::Camera> _camera) {
+			camera = _camera;
+		}
+
+		void setScene(std::shared_ptr<scene::Group> _scene) {
+			sceneRoot = _scene;
+		}
 
 	private:
 		/* Check For Capable Devices and Initialize Optix*/
@@ -102,10 +105,6 @@ namespace vtx {
 		//Shader Table Data;
 		OptixShaderBindingTable			sbt;
 
-		std::vector<RaygenRecord>		RaygenRecords;
-		std::vector<MissRecord>			MissRecords;
-		std::vector<HitgroupRecord>		HitgroupRecords;
-
 		CUDABuffer						RaygenRecordBuffer;
 		CUDABuffer						MissRecordBuffer;
 		CUDABuffer						HitRecordBuffer;
@@ -123,7 +122,7 @@ namespace vtx {
 		CUDABuffer						cudaColorBuffer;
 		LaunchParams					launchParams;
 
-
-
+		std::shared_ptr<scene::Camera>	camera;
+		std::shared_ptr<scene::Group>	sceneRoot;
 	};
 }
