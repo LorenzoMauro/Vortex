@@ -15,45 +15,27 @@ enum OptixLogLevels {
 };
 
 static void checkCudaError(cudaError_t rc) {
-    if (rc != cudaSuccess) {
-        std::stringstream txt;
-        cudaError_t err = rc;
-        txt << "CUDA Driver API Error " << cudaGetErrorName(err) << " (" << cudaGetErrorString(err) << ")";
-        VTX_ERROR(txt.str());
-        throw std::runtime_error(txt.str());
-    }
+    VTX_ASSERT_CLOSE(rc == cudaSuccess, "CUDA Driver API Error {} ({})", cudaGetErrorName(rc), cudaGetErrorString(rc));
 }
 
 static void checkCuResultError(CUresult rc) {
-    if (rc != CUDA_SUCCESS) {
-        std::stringstream txt;
-        const char* errorName = nullptr;
-        const char* errorString = nullptr;
+    const char* errorName = nullptr;
+    const char* errorString = nullptr;
 
-        cuGetErrorName(rc, &errorName);
-        cuGetErrorString(rc, &errorString);
+    cuGetErrorName(rc, &errorName);
+    cuGetErrorString(rc, &errorString);
 
-        txt << "CUDA Driver API Error " << errorName << " (" << errorString << ")";
-        VTX_ERROR(txt.str());
-        throw std::runtime_error(txt.str());
-    }
+    VTX_ASSERT_CLOSE(rc == CUDA_SUCCESS, "CUDA Driver API Error {} ({})", errorName, errorString);
 }
 
 static void checkOptixError(OptixResult res, const std::string& call_str, int line) {
-    if (res != OPTIX_SUCCESS) {
-        VTX_ERROR("Optix call ({}) failed with code {} (line {})", call_str, res, line);
-        std::exit(2);
-    }
+    VTX_ASSERT_CLOSE(res == OPTIX_SUCCESS, "Optix call ({}) failed with code {} (line {})", call_str, res, line);
 }
 
 static void cudaSynchonize(std::string file, int line) {
     cudaDeviceSynchronize();                                            
-    cudaError_t error = cudaGetLastError();                             
-    if (error != cudaSuccess)                                          
-    {                                                                 
-        VTX_ERROR("error (%s: line %d): %s\n", file, line, cudaGetErrorString(error));
-        exit(2);                                                      
-    }                                                                 
+    cudaError_t error = cudaGetLastError();    
+    VTX_ASSERT_CLOSE(error == cudaSuccess, "error (%s: line %d): %s\n", file, line, cudaGetErrorString(error));
 }
 
 

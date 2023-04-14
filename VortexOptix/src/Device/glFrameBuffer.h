@@ -2,11 +2,19 @@
 #include <glad/glad.h>
 #include <cstdint>
 #include "Core/Log.h"
+#include "Core/Options.h"
 
 namespace vtx {
-	class glFrameBuffer
+	class GlFrameBuffer
 	{
 	public:
+		GlFrameBuffer() :
+			m_Height(getOptions()->height),
+			m_Width(getOptions()->width)
+		{
+			generate();
+		}
+
 		void SetSize(uint32_t width, uint32_t height) {
 			if (width != m_Width || height != m_Height) {
 				m_Width = width;

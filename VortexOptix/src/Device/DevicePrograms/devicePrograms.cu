@@ -3,7 +3,7 @@
 #include <optix.h>
 #include <optix_device.h>
 #include <cuda_runtime.h>
-#include "Renderer/LaunchParams.h"
+#include "Device/LaunchParams.h"
 #include "RayData.h"
 
 namespace vtx {
@@ -119,6 +119,9 @@ namespace vtx {
         float minClamp = 0.00001f;
         float maxClamp = 1000;
 
+        //VTX_INFO("Ray Origin: %f %f %f", ray.org.x, ray.org.y, ray.org.z);
+        //printVector(ray.org, "ray origin: ");
+        //printVector(ray.dir, "ray direction: ");
         //printVector(camera.position, "Camera Position: ");
         //printVector(camera.right, "Camera Right: ");
         //printVector(camera.up, "Camera Up: ");

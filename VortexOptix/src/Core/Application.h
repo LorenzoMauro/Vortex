@@ -1,102 +1,48 @@
 #pragma once
 #define GLFW_INCLUDE_NONE
 #include <GLFW/glfw3.h>
-#include "glad/glad.h"
 #include "Options.h"
 #include "Log.h"
-#include "ImGuiOp.h"
 #include "Layers/GuiLayer.h"
 #include "Layers/AppLayer.h"
-#include "Layers/ViewportLayer.h"
 #include "Scene/Scene.h"
+#include "Scene/Material/mdlTools.h"
+#include "Layers/ViewportLayer.h"
 
 namespace vtx {
 
-	static void glfw_error_callback(int error, const char* description)
+	static void glfwErrorCallback(int error, const char* description)
 	{
 		VTX_ERROR("Glfw Error {}: {}", error, description);
 	}
 
 	class Application {
 	public:
-		void Init() {
-			InitWindow();
-			Input::SetWindowHandle(m_Window);
-			Init_ImGui(m_Window);
-			CreateLayer<AppLayer>();
-			m_scene.Start();
-			CreateLayer<ViewportLayer>(m_scene.renderer);
-			m_scene.renderer->ElaborateScene();
-		};
-		void ShutDown() {
-			End_ImGui();
-			glfwDestroyWindow(m_Window);
-			glfwTerminate();
-			VTX_INFO("GLFW DESTROYED");
-		}
-		void InitWindow() {
-			glfwSetErrorCallback(glfw_error_callback);
-			if (!glfwInit())
-			{
-				VTX_ERROR("GLFW: Could not initalize GLFW!");
-				return;
-			}
-			glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
-			glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 6);
+		void init();
 
-			m_Window = glfwCreateWindow(options.width, options.height, options.WindowName.c_str(), NULL, NULL);
-			glfwMakeContextCurrent(m_Window);
-			if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
-			{
-				VTX_ERROR("Failed to create GLFW window");
-			}
-			glfwSwapInterval(1); // Enable vsync
-			// Initialize the window
-			glfwSetWindowUserPointer(m_Window, this);
-			//glfwSetFramebufferSizeCallback(m_Window, FramebufferResizeCallback);
-		}
+		void shutDown();
+
+		void initWindow();
 		
-		void Run() {
-			glfwPollEvents();
-			ImGuiRenderStart();
-			//////////////////////////
-			for (auto& layer : m_LayerStack)
-				layer->OnUpdate(m_TimeStep);
-
-			int layerCount = m_LayerStack.size();
-			for (int i = 0; i < layerCount; i++) {
-				auto& layer = m_LayerStack[i];
-				layer->OnUIRender();
-				layerCount = m_LayerStack.size();
-			}
-			ImGuiDraw(m_Window);
-			glfwSwapBuffers(m_Window);
-
-			float time = (float)glfwGetTime();
-			m_FrameTime = time - m_LastFrameTime;
-			m_TimeStep = std::min(m_FrameTime, 0.0333f);
-			m_LastFrameTime = time;
-
-		};
+		void run();
 
 		template<typename T, typename... Args>
-		void CreateLayer(Args&&... args) {
-			static_assert(std::is_base_of<Layer, T>::value, "Pushed type is not subclass of Layer!");
-			m_LayerStack.emplace_back(std::make_shared<T>(std::forward<Args>(args)...))->OnAttach();
+		void createLayer(Args&&... args) {
+			static_assert(std::is_base_of_v<Layer, T>, "Pushed type is not subclass of Layer!");
+			layerStack.emplace_back(std::make_shared<T>(std::forward<Args>(args)...))->OnAttach();
 		}
 
-		void PushLayer(const std::shared_ptr<Layer>& layer) {
-			m_LayerStack.emplace_back(layer);
+		void pushLayer(const std::shared_ptr<Layer>& layer) {
+			layerStack.emplace_back(layer);
 			layer->OnAttach();
 		}
 		
 	public:
-		GLFWwindow* m_Window;
-		std::vector<std::shared_ptr<Layer>> 	    m_LayerStack;
-		Graph										m_scene;
-
-		float m_TimeStep = 0.0f;
-		float m_FrameTime = 0.0f;
-		float m_LastFrameTime = 0.0f;
+		GLFWwindow*									window;
+		std::vector<std::shared_ptr<Layer>> 	    layerStack;
+		graph::Scene								scene;
+		float										timeStep = 0.0f;
+		float										frameTime = 0.0f;
+		float										lastFrameTime = 0.0f;
 	};
 }

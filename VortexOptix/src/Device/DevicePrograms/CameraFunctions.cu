@@ -1,6 +1,6 @@
 #include <optix_device.h>
 #include <cuda_runtime.h>
-#include "Renderer/LaunchParams.h"
+#include "Device/LaunchParams.h"
 #include "Core/Math.h"
 #include <optix.h>
 

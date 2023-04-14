@@ -267,7 +267,7 @@ bool    ImGui_ImplOpenGL3_Init(const char* glsl_version)
 #endif
 
     // Setup backend capabilities flags
-    ImGui_ImplOpenGL3_Data* bd = IM_NEW(ImGui_ImplOpenGL3_Data)();
+    auto* bd = IM_NEW(ImGui_ImplOpenGL3_Data)();
     io.BackendRendererUserData = (void*)bd;
     io.BackendRendererName = "imgui_impl_opengl3";
 
@@ -658,7 +658,7 @@ void ImGui_ImplOpenGL3_DestroyFontsTexture()
     if (bd->FontTexture)
     {
         glDeleteTextures(1, &bd->FontTexture);
-        io.Fonts->SetTexID(0);
+        io.Fonts->SetTexID(nullptr);
         bd->FontTexture = 0;
     }
 }

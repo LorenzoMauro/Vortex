@@ -4,12 +4,12 @@ int main() {
 	vtx::Log::Init();
 	try {
 		vtx::Application app;
-		app.Init();
-		while (!glfwWindowShouldClose(app.m_Window))
+		app.init();
+		while (!glfwWindowShouldClose(app.window))
 		{
-			app.Run();
+			app.run();
 		}
-		app.ShutDown();
+		app.shutDown();
 	}
 	catch (const std::exception& e) {
 		VTX_ERROR("Error in main");

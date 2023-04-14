@@ -13,6 +13,7 @@ function genNvccCommand(cu_file, ptx_file, cuda_path, include_dirs)
     CudaCompileCommand = CudaCompileCommand .. " --relocatable-device-code=true"
     CudaCompileCommand = CudaCompileCommand .. " --keep-device-functions"
     CudaCompileCommand = CudaCompileCommand .. " -Wno-deprecated-gpu-targets"
+    CudaCompileCommand = CudaCompileCommand .. " --std=c++17"
     CudaCompileCommand = CudaCompileCommand .. " -m64"
     CudaCompileCommand = CudaCompileCommand .. " -o " .. ptx_file
     
@@ -41,10 +42,6 @@ project "OptixApp"
     objdir (OBJ_DIR)
     buildcustomizations "BuildCustomizations/CUDA 12.1"
 
-    
-    postbuildcommands {
-        "{COPY} %{wks.location}/VortexOptix/src/data %{cfg.targetdir}/data/"}
-
     files{
         "%{IncludeDir.gdt}/**.h",
         "%{IncludeDir.gdt}/**.cpp",
@@ -61,11 +58,13 @@ project "OptixApp"
         "%{IncludeDir.spdlog}",
         "%{IncludeDir.OPTIX}",
         "%{IncludeDir.CUDA}",
-        "%{IncludeDir.gdt}"
+        "%{IncludeDir.gdt}",
+        "%{IncludeDir.MDL}"
     }
     
     libdirs {
-        "%{LibDir.CUDA}"
+        "%{LibDir.CUDA}",
+        "%{LibDir.MDL}"
     }
 
     links {
@@ -74,7 +73,11 @@ project "OptixApp"
         "GLFW",
         "Glad",
         "opengl32.lib",
-        "ImGui"
+        "ImGui",
+        "mdl_sdk.lib",
+        "mdl_core.lib",
+        "nv_freeimage.lib",
+        "dds.lib"
     }
 
     -- Custom build step to compile .cu files to .ptx files
@@ -86,6 +89,7 @@ project "OptixApp"
         -- include dirs for the compilation of ptx files
         local include_dirs = {
             IncludeDir["OPTIX"],
+            IncludeDir["spdlog"],
             "src/",
             "../ext/gdt/"
         }
@@ -101,4 +105,34 @@ project "OptixApp"
         }
         buildoutputs {
             ptx_file,
+        }
+
+    
+    filter "configurations:Debug"
+        postbuildcommands {
+            "{COPY} %{wks.location}/VortexOptix/src/data %{cfg.targetdir}/data/",
+            "{MKDIR} %{cfg.targetdir}/lib",
+            "{COPY} %{wks.location}ext/MDL/debug/bin/libmdl_sdk.dll %{cfg.targetdir}/lib",
+            "{COPY} %{wks.location}ext/MDL/debug/bin/nv_freeimage.dll %{cfg.targetdir}/lib",
+            "{COPY} %{wks.location}ext/MDL/debug/bin/freeimage.dll %{cfg.targetdir}/lib",
+            "{COPY} %{wks.location}ext/MDL/debug/bin/dds.dll %{cfg.targetdir}/lib"
+        }
+
+        
+        libdirs {
+            "%{LibDir.MDL_Debug}"
+        }
+
+    filter "configurations:Release"
+        postbuildcommands {
+            "{COPY} %{wks.location}/VortexOptix/src/data %{cfg.targetdir}/data/",
+            "{MKDIR} %{cfg.targetdir}/lib",
+            "{COPY} %{wks.location}ext/MDL/release/bin/libmdl_sdk.dll %{cfg.targetdir}/lib",
+            "{COPY} %{wks.location}ext/MDL/release/bin/nv_freeimage.dll %{cfg.targetdir}/lib",
+            "{COPY} %{wks.location}ext/MDL/release/bin/freeimage.dll %{cfg.targetdir}/lib",
+            "{COPY} %{wks.location}ext/MDL/release/bin/dds.dll %{cfg.targetdir}/lib"
+        }
+
+        libdirs {
+            "%{LibDir.MDL_Release}"
         }

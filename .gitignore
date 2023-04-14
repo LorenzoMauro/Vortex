@@ -3,6 +3,8 @@ build/
 bin/
 bin-int/
 .vs/
+ext/MDL/
+old/
 
 # Ignore object files and libraries
 *.o
@@ -24,3 +26,4 @@ bin-int/
 *.mk
 *.vcxproj.user
 Vortex.sln.nvsettings
+*.user

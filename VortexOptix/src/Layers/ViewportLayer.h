@@ -1,5 +1,5 @@
 #pragma once
-#include "Renderer/Renderer.h"
+#include "Scene/Nodes/Renderer.h"
 #include "Layers/GuiLayer.h"
 #include "Core/Options.h"
 
@@ -7,7 +7,7 @@ namespace vtx {
     class ViewportLayer : public Layer {
     public:
 
-        ViewportLayer(std::shared_ptr<Renderer> _Renderer);
+        ViewportLayer(std::shared_ptr<graph::Renderer> _Renderer);
 
         virtual void OnAttach();
 
@@ -18,9 +18,9 @@ namespace vtx {
         virtual void OnUIRender();
 
     public:
-        std::shared_ptr<Renderer> renderer;
-        uint32_t    m_width = options.width;
-        uint32_t    m_height = options.height;
+        std::shared_ptr<graph::Renderer> renderer;
+        uint32_t    m_width = getOptions()->width;
+        uint32_t    m_height = getOptions()->height;
         bool        m_isResized = false;
     };
 }

@@ -1,5 +1,4 @@
 #include "Input.h"
-
 #include "Core/Window.h"
 #include "imgui.h"
 #include "Core/Application.h"

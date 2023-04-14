@@ -2,6 +2,7 @@
 #include "spdlog/spdlog.h"
 #include "spdlog/sinks/stdout_color_sinks.h"
 #include <memory>
+#include <iostream>
 
 namespace vtx
 {
@@ -20,8 +21,70 @@ namespace vtx
 	};
 }
 
+
 // Vortex Log Macros
 #define VTX_TRACE(...)	::vtx::Log::GetVortexLogger()->trace(__VA_ARGS__)
 #define VTX_INFO(...)	::vtx::Log::GetVortexLogger()->info(__VA_ARGS__)
 #define VTX_WARN(...)	::vtx::Log::GetVortexLogger()->warn(__VA_ARGS__)
 #define VTX_ERROR(...)	::vtx::Log::GetVortexLogger()->error(__VA_ARGS__)
+
+inline void waitAndClose() {
+    std::cerr << "Press ENTER to exit..." << std::endl;
+    std::cin.get();
+    std::exit(EXIT_FAILURE);
+}
+
+//#define VTX_ASSERT(successCondition, operation, ...) do { \
+//    if (!successCondition) { \
+//        switch(operation) \
+//		{\
+//			case CLOSE: \
+//				VTX_ERROR(__VA_ARGS__); \
+//				waitAndClose(); \
+//				break; \
+//			case RETURN: \
+//				VTX_WARN(__VA_ARGS__); \
+//				return; \
+//				break; \
+//			case CONTINUE: \
+//				break; \
+//		}\
+//    }\
+//} while(0)
+
+
+
+#define VTX_ASSERT_CLOSE(successCondition, ...) do { \
+    if (!successCondition) { \
+		VTX_ERROR(__VA_ARGS__); \
+		waitAndClose(); \
+	}\
+} while(0)
+
+#define VTX_ASSERT_CONTINUE(successCondition, ...) do { \
+    if (!successCondition) { \
+		VTX_WARN(__VA_ARGS__);\
+	}\
+} while(0)
+
+#define VTX_ASSERT_RETURN(successCondition, ...) do { \
+    if (!successCondition) { \
+		VTX_WARN(__VA_ARGS__); \
+		return;\
+	}\
+} while(0)
+
+
+#define VTX_ASSERT_BREAK(successCondition, ...) do { \
+    if (!successCondition) { \
+		VTX_WARN(__VA_ARGS__); \
+		break;\
+	}\
+} while(0)
+
+#define VTX_ASSERT_RETURNV(successCondition, ...) do { \
+    if (!successCondition) { \
+		VTX_WARN(__VA_ARGS__); \
+		return 0; \
+	}\
+} while(0)

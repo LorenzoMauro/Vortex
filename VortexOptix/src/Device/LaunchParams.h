@@ -3,6 +3,7 @@
 #include "Core/VortexID.h"
 #include "cuda.h"
 #include "optix.h"
+#include "Device/CUDAmap.h"
 
 namespace vtx {
 
@@ -29,7 +30,8 @@ namespace vtx {
         math::vec2i                 fbSize;
 
         OptixTraversableHandle      topObject;
-        GeometryInstanceData*       geometryInstanceData; // Attributes, indices, idMaterial, idLight, idObject per instance.
+        CudaMap<vtxID, GeometryInstanceData>*       geometryInstanceData;
+        //GeometryInstanceData*       geometryInstanceData; // Attributes, indices, idMaterial, idLight, idObject per instance.
         CameraData                  CameraData;
     };
 

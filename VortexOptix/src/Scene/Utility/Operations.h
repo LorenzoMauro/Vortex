@@ -2,20 +2,20 @@
 #include <memory>
 #include <vector>
 #include <algorithm>
-#include "Scene/SceneGraph.h"
+#include "Scene/Graph.h"
 #include "Core/VortexID.h"
 #include "Core/Log.h"
 #include "Scene/SIM.h"
 
 namespace vtx {
-    using namespace scene;
+    using namespace graph;
 
     namespace ops {
 
 
         template<typename T>
-        std::shared_ptr<T> CreateNode() {
-            static_assert(std::is_base_of<Node, T>::value, "Pushed type is not subclass of Node!");
+        std::shared_ptr<T> createNode() {
+            static_assert(std::is_base_of_v<graph::Node, T>, "Pushed type is not subclass of Node!");
             std::shared_ptr<T> node = std::make_shared<T>();
             SIM::Get()->Record(node);
             return node;
@@ -32,10 +32,10 @@ namespace vtx {
         }*/
 
         // A simple unit cube built from 12 triangles.
-        static std::shared_ptr<Mesh> createBox()
+        static std::shared_ptr<graph::Mesh> createBox()
         {
             VTX_INFO("Creating Box");
-            std::shared_ptr<Mesh> mesh = CreateNode<Mesh>();
+            std::shared_ptr<graph::Mesh> mesh = createNode<graph::Mesh>();
 
             //std::shared_ptr<Mesh> mesh = (std::shared_ptr<Mesh>)nodeRecall;
             {
@@ -50,26 +50,26 @@ namespace vtx {
                 const float back = -1.0f;
                 const float front = 1.0f;
 
-                VertexAttributes attrib;
+                graph::VertexAttributes attrib;
 
                 // Left.
                 attrib.tangent = math::vec3f(0.0f, 0.0f, 1.0f);
                 attrib.normal = math::vec3f(-1.0f, 0.0f, 0.0f);
 
                 attrib.position = math::vec3f(left, bottom, back);
-                attrib.texcoord = math::vec3f(0.0f, 0.0f, 0.0f);
+                attrib.texCoord = math::vec3f(0.0f, 0.0f, 0.0f);
                 mesh->vertices.push_back(attrib);
 
                 attrib.position = math::vec3f(left, bottom, front);
-                attrib.texcoord = math::vec3f(1.0f, 0.0f, 0.0f);
+                attrib.texCoord = math::vec3f(1.0f, 0.0f, 0.0f);
                 mesh->vertices.push_back(attrib);
 
                 attrib.position = math::vec3f(left, top, front);
-                attrib.texcoord = math::vec3f(1.0f, 1.0f, 0.0f);
+                attrib.texCoord = math::vec3f(1.0f, 1.0f, 0.0f);
                 mesh->vertices.push_back(attrib);
 
                 attrib.position = math::vec3f(left, top, back);
-                attrib.texcoord = math::vec3f(0.0f, 1.0f, 0.0f);
+                attrib.texCoord = math::vec3f(0.0f, 1.0f, 0.0f);
                 mesh->vertices.push_back(attrib);
 
                 // Right.
@@ -77,19 +77,19 @@ namespace vtx {
                 attrib.normal = math::vec3f(1.0f, 0.0f, 0.0f);
 
                 attrib.position = math::vec3f(right, bottom, front);
-                attrib.texcoord = math::vec3f(0.0f, 0.0f, 0.0f);
+                attrib.texCoord = math::vec3f(0.0f, 0.0f, 0.0f);
                 mesh->vertices.push_back(attrib);
 
                 attrib.position = math::vec3f(right, bottom, back);
-                attrib.texcoord = math::vec3f(1.0f, 0.0f, 0.0f);
+                attrib.texCoord = math::vec3f(1.0f, 0.0f, 0.0f);
                 mesh->vertices.push_back(attrib);
 
                 attrib.position = math::vec3f(right, top, back);
-                attrib.texcoord = math::vec3f(1.0f, 1.0f, 0.0f);
+                attrib.texCoord = math::vec3f(1.0f, 1.0f, 0.0f);
                 mesh->vertices.push_back(attrib);
 
                 attrib.position = math::vec3f(right, top, front);
-                attrib.texcoord = math::vec3f(0.0f, 1.0f, 0.0f);
+                attrib.texCoord = math::vec3f(0.0f, 1.0f, 0.0f);
                 mesh->vertices.push_back(attrib);
 
                 // Back.  
@@ -97,19 +97,19 @@ namespace vtx {
                 attrib.normal = math::vec3f(0.0f, 0.0f, -1.0f);
 
                 attrib.position = math::vec3f(right, bottom, back);
-                attrib.texcoord = math::vec3f(0.0f, 0.0f, 0.0f);
+                attrib.texCoord = math::vec3f(0.0f, 0.0f, 0.0f);
                 mesh->vertices.push_back(attrib);
 
                 attrib.position = math::vec3f(left, bottom, back);
-                attrib.texcoord = math::vec3f(1.0f, 0.0f, 0.0f);
+                attrib.texCoord = math::vec3f(1.0f, 0.0f, 0.0f);
                 mesh->vertices.push_back(attrib);
 
                 attrib.position = math::vec3f(left, top, back);
-                attrib.texcoord = math::vec3f(1.0f, 1.0f, 0.0f);
+                attrib.texCoord = math::vec3f(1.0f, 1.0f, 0.0f);
                 mesh->vertices.push_back(attrib);
 
                 attrib.position = math::vec3f(right, top, back);
-                attrib.texcoord = math::vec3f(0.0f, 1.0f, 0.0f);
+                attrib.texCoord = math::vec3f(0.0f, 1.0f, 0.0f);
                 mesh->vertices.push_back(attrib);
 
                 // Front.
@@ -117,19 +117,19 @@ namespace vtx {
                 attrib.normal = math::vec3f(0.0f, 0.0f, 1.0f);
 
                 attrib.position = math::vec3f(left, bottom, front);
-                attrib.texcoord = math::vec3f(0.0f, 0.0f, 0.0f);
+                attrib.texCoord = math::vec3f(0.0f, 0.0f, 0.0f);
                 mesh->vertices.push_back(attrib);
 
                 attrib.position = math::vec3f(right, bottom, front);
-                attrib.texcoord = math::vec3f(1.0f, 0.0f, 0.0f);
+                attrib.texCoord = math::vec3f(1.0f, 0.0f, 0.0f);
                 mesh->vertices.push_back(attrib);
 
                 attrib.position = math::vec3f(right, top, front);
-                attrib.texcoord = math::vec3f(1.0f, 1.0f, 0.0f);
+                attrib.texCoord = math::vec3f(1.0f, 1.0f, 0.0f);
                 mesh->vertices.push_back(attrib);
 
                 attrib.position = math::vec3f(left, top, front);
-                attrib.texcoord = math::vec3f(0.0f, 1.0f, 0.0f);
+                attrib.texCoord = math::vec3f(0.0f, 1.0f, 0.0f);
                 mesh->vertices.push_back(attrib);
 
                 // Bottom.
@@ -137,19 +137,19 @@ namespace vtx {
                 attrib.normal = math::vec3f(0.0f, -1.0f, 0.0f);
 
                 attrib.position = math::vec3f(left, bottom, back);
-                attrib.texcoord = math::vec3f(0.0f, 0.0f, 0.0f);
+                attrib.texCoord = math::vec3f(0.0f, 0.0f, 0.0f);
                 mesh->vertices.push_back(attrib);
 
                 attrib.position = math::vec3f(right, bottom, back);
-                attrib.texcoord = math::vec3f(1.0f, 0.0f, 0.0f);
+                attrib.texCoord = math::vec3f(1.0f, 0.0f, 0.0f);
                 mesh->vertices.push_back(attrib);
 
                 attrib.position = math::vec3f(right, bottom, front);
-                attrib.texcoord = math::vec3f(1.0f, 1.0f, 0.0f);
+                attrib.texCoord = math::vec3f(1.0f, 1.0f, 0.0f);
                 mesh->vertices.push_back(attrib);
 
                 attrib.position = math::vec3f(left, bottom, front);
-                attrib.texcoord = math::vec3f(0.0f, 1.0f, 0.0f);
+                attrib.texCoord = math::vec3f(0.0f, 1.0f, 0.0f);
                 mesh->vertices.push_back(attrib);
 
                 // Top.
@@ -157,19 +157,19 @@ namespace vtx {
                 attrib.normal = math::vec3f(0.0f, 1.0f, 0.0f);
 
                 attrib.position = math::vec3f(left, top, front);
-                attrib.texcoord = math::vec3f(0.0f, 0.0f, 0.0f);
+                attrib.texCoord = math::vec3f(0.0f, 0.0f, 0.0f);
                 mesh->vertices.push_back(attrib);
 
                 attrib.position = math::vec3f(right, top, front);
-                attrib.texcoord = math::vec3f(1.0f, 0.0f, 0.0f);
+                attrib.texCoord = math::vec3f(1.0f, 0.0f, 0.0f);
                 mesh->vertices.push_back(attrib);
 
                 attrib.position = math::vec3f(right, top, back);
-                attrib.texcoord = math::vec3f(1.0f, 1.0f, 0.0f);
+                attrib.texCoord = math::vec3f(1.0f, 1.0f, 0.0f);
                 mesh->vertices.push_back(attrib);
 
                 attrib.position = math::vec3f(left, top, back);
-                attrib.texcoord = math::vec3f(0.0f, 1.0f, 0.0f);
+                attrib.texCoord = math::vec3f(0.0f, 1.0f, 0.0f);
                 mesh->vertices.push_back(attrib);
 
                 for (unsigned int i = 0; i < 6; ++i)
@@ -188,8 +188,8 @@ namespace vtx {
             return mesh;
         }
 
-        static void applyTransformation(TransformAttribute& transformation, const math::affine3f& affine) {
-            transformation.AffineTransform = transformation.AffineTransform * affine;
+        static void applyTransformation(graph::TransformAttribute& transformation, const math::affine3f& affine) {
+            transformation.affineTransform = transformation.affineTransform * affine;
             transformation.updateFromAffine();
         }
 		
