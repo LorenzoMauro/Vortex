@@ -21,9 +21,9 @@ namespace vtx::graph
 
 		std::vector<std::shared_ptr<Material>>& getMaterials();
 
-		void addmaterial(std::shared_ptr<Material> _material);
+		void addMaterial(std::shared_ptr<Material> _material);
 
-		void RemoveMaterial(vtxID matID);
+		void removeMaterial(vtxID matID);
 
 		void traverse(const std::vector<std::shared_ptr<NodeVisitor>>& orderedVisitors) override;
 

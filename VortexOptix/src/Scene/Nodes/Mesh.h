@@ -1,16 +1,9 @@
 #pragma once
 #include "Scene/Node.h"
+#include "Scene/DataStructs/VertexAttribute.h"
 
 namespace vtx::graph
 {
-
-	struct VertexAttributes {
-		math::vec3f position;
-		math::vec3f normal;
-		math::vec3f tangent;
-		math::vec3f texCoord;
-		int         instanceMaterialIndex;
-	};
 
 	class Mesh : public Node {
 	public:

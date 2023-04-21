@@ -47,7 +47,7 @@ project "OptixApp"
         "%{IncludeDir.gdt}/**.cpp",
         "src/**.h",
         "src/**.cpp",
-        "src/Renderer/DevicePrograms/**.cu"
+        "src/Device/DevicePrograms/**.cu"
     }
 
     includedirs{
@@ -81,7 +81,7 @@ project "OptixApp"
     }
 
     -- Custom build step to compile .cu files to .ptx files
-    filter "files:src/Renderer/DevicePrograms/**.cu"
+    filter "files:src/Device/DevicePrograms/**.cu"
 
         local cu_file = "%{file.relpath}"
         local ptx_file = "%{cfg.targetdir}/data/ptx/%{file.basename}.optixir"
@@ -90,6 +90,7 @@ project "OptixApp"
         local include_dirs = {
             IncludeDir["OPTIX"],
             IncludeDir["spdlog"],
+            IncludeDir["MDL"],
             "src/",
             "../ext/gdt/"
         }

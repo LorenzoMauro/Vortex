@@ -2,6 +2,8 @@
 #include "Scene/Nodes/Renderer.h"
 #include "Layers/GuiLayer.h"
 #include "Core/Options.h"
+#include "Device/DeviceData.h"
+#include "Scene/HostVisitor.h"
 
 namespace vtx {
     class ViewportLayer : public Layer {
@@ -22,5 +24,7 @@ namespace vtx {
         uint32_t    m_width = getOptions()->width;
         uint32_t    m_height = getOptions()->height;
         bool        m_isResized = false;
+        std::shared_ptr<device::DeviceVisitor> deviceVisitor;
+        std::shared_ptr<HostVisitor> hostVisitor;
     };
 }

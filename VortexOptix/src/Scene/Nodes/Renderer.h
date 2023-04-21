@@ -21,8 +21,6 @@ namespace vtx::graph
 
 		GLuint getFrame();
 
-		void elaborateScene(std::shared_ptr<Renderer> rendererNode);
-
 		void setCamera(std::shared_ptr<Camera> _camera);
 
 		void setScene(std::shared_ptr<Group> _sceneRoot);
@@ -46,7 +44,6 @@ namespace vtx::graph
 
 		std::shared_ptr<Camera>							camera;
 		std::shared_ptr<Group>							sceneRoot;
-		std::shared_ptr<device::DeviceVisitor>			deviceVisitor;
 
 		uint32_t										width;
 		uint32_t										height;

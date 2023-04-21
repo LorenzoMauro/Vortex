@@ -1,8 +1,5 @@
-#include <optix_device.h>
-#include <cuda_runtime.h>
-#include "Device/LaunchParams.h"
+#include "LaunchParams.h"
 #include "Core/Math.h"
-#include <optix.h>
 
 namespace vtx {
 
@@ -12,7 +9,7 @@ namespace vtx {
         const math::vec2f fragment = pixel + sample;                    // Jitter the sub-pixel location
         const math::vec2f ndc = (fragment / screen) * 2.0f - 1.0f;      // Normalized device coordinates in range [-1, 1].
 
-        const CameraData camera = optixLaunchParams.CameraData;
+        const CameraData camera = optixLaunchParams.cameraData;
 
         LensRay ray;
 

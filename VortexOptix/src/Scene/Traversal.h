@@ -14,6 +14,9 @@ namespace vtx {
 		class Camera;
 		class Renderer;
 		class Shader;
+		class Texture;
+		class BsdfMeasurement;
+		class LightProfile;
 	}
 
 	class NodeVisitor {
@@ -26,7 +29,10 @@ namespace vtx {
 		virtual void visit(std::shared_ptr<graph::Material> material)= 0;
 		virtual void visit(std::shared_ptr<graph::Camera> camera)= 0;
 		virtual void visit(std::shared_ptr<graph::Renderer> renderer) = 0;
-		virtual void visit(std::shared_ptr<graph::Shader> shader)= 0;
+		virtual void visit(std::shared_ptr<graph::Shader> shader) = 0;
+		virtual void visit(std::shared_ptr<graph::Texture> texture)= 0;
+		virtual void visit(std::shared_ptr<graph::BsdfMeasurement> bsdfMeasurement) = 0;
+		virtual void visit(std::shared_ptr<graph::LightProfile> lightProfile) = 0;
 	};
 
 }

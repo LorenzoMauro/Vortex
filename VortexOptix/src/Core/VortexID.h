@@ -1,8 +1,10 @@
 #pragma once
+
+#ifndef VTXIDX_H
+#define VTXIDX_H
 #include <cstdint>
-#include <set>
-#include <memory>
 
 namespace vtx {
 	typedef uint32_t vtxID ;
 }
+#endif

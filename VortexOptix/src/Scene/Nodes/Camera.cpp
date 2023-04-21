@@ -118,7 +118,7 @@ namespace vtx::graph
 
 	void Camera::traverse(const std::vector<std::shared_ptr<NodeVisitor>>& orderedVisitors)
 	{
-		ACCEPT(NodeVisitor)
+		ACCEPT(orderedVisitors)
 	}
 
 	void Camera::accept(std::shared_ptr<NodeVisitor> visitor)

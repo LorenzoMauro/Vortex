@@ -1,11 +1,12 @@
 #include "ViewportLayer.h"
 #include "imgui.h"
-
 namespace vtx {
 	ViewportLayer::ViewportLayer(std::shared_ptr<graph::Renderer> _Renderer)
 	{
         renderer = _Renderer;
-	}
+        deviceVisitor = std::make_shared<device::DeviceVisitor>();
+        hostVisitor = std::make_shared<HostVisitor>();
+    }
 
     void ViewportLayer::OnAttach()
     {
@@ -18,17 +19,22 @@ namespace vtx {
     void ViewportLayer::OnUpdate(float ts)
     {
         renderer->camera->onUpdate(ts);
-        renderer->elaborateScene(renderer);
+        renderer->traverse({std::dynamic_pointer_cast<NodeVisitor>(hostVisitor)});
+        renderer->traverse({std::dynamic_pointer_cast<NodeVisitor>(deviceVisitor)});
+        device::incrementFrame();
+		device::finalizeUpload();
+
+
         renderer->render();
     }
 
     void ViewportLayer::OnUIRender() {
         ImGui::Begin("Viewport");
-        uint32_t m_Width = ImGui::GetContentRegionAvail().x;
-        uint32_t m_Height = ImGui::GetContentRegionAvail().y;
-        renderer->resize(m_Width, m_Height);
-        GLuint frameAttachment = renderer->getFrame();
-        ImGui::Image((void*)frameAttachment, ImVec2{ (float)m_Width, (float)m_Height }, ImVec2{ 0, 1 }, ImVec2{ 1, 0 });
+        const uint32_t width = ImGui::GetContentRegionAvail().x;
+        const uint32_t height = ImGui::GetContentRegionAvail().y;
+        renderer->resize(width, height);
+        const GLuint frameAttachment = renderer->getFrame();
+        ImGui::Image(reinterpret_cast<void*>(frameAttachment), ImVec2{ static_cast<float>(width), static_cast<float>(height) }, ImVec2{ 0, 1 }, ImVec2{ 1, 0 });
         if (!renderer->camera->navigationActive) {
             renderer->camera->navigationActive = ImGui::IsItemHovered();
         }

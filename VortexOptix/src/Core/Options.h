@@ -22,15 +22,19 @@ namespace vtx {
 		////////////////////////////////////////////////////////////////////////////////////
 		int OptixVersion = OPTIX_VERSION;
 		int deviceID = 0;
+		int maxDcDepth = 2;
+		int maxTraversableGraphDepth = 2;
+		std::string LaunchParamName = "optixLaunchParams";
+		bool enableCache = true;
 
 		////////////////////////////////////////////////////////////////////////////////////
 		/////////////////// MDL Options ////////////////////////////////////////////////////
 		////////////////////////////////////////////////////////////////////////////////////
-		std::vector<std::string> mdlSearchPath = { "./data/", "./" };
+		std::vector<std::string> mdlSearchPath = { "./data/", "./" , "E:/Dev/OptixTut/bin/Debug-windows-x86_64/OptixApp/mdl"};
 		int numTextureSpaces = 1;//should be set to 1 for performance reasons If you do not use the hair BSDF.
 		int numTextureResults = 16;
-		bool enable_derivatives = true;
-
+		bool enable_derivatives = false;
+		const char* mdlOptLevel = "2";
 	};
 
 	Options* getOptions();

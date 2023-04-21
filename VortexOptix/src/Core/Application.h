@@ -6,7 +6,7 @@
 #include "Layers/GuiLayer.h"
 #include "Layers/AppLayer.h"
 #include "Scene/Scene.h"
-#include "Scene/Material/mdlTools.h"
+#include "MDL/MdlWrapper.h"
 #include "Layers/ViewportLayer.h"
 
 namespace vtx {

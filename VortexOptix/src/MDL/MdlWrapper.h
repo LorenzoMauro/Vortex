@@ -7,19 +7,20 @@
 #include <string>
 #include "Core/Log.h"
 
-#include "Scene/Nodes/Shader.h"
+#include "Scene/Nodes/Shader/Shader.h"
+#include "Scene/Nodes/Material.h"
 
 namespace vtx::mdl
 {
 
-	class MDLlogger : public mi::base::Interface_implement<mi::base::ILogger> {
+	class MdlLogger : public mi::base::Interface_implement<mi::base::ILogger> {
 	public:
 		void message(mi::base::Message_severity level,
 		             const char* /* module_category */,
 		             const mi::base::Message_details& /* details */,
 		             const char* message) override
 		{
-			const char* severity = 0;
+			const char* severity = nullptr;
 
 			switch (level)
 			{
@@ -53,11 +54,11 @@ namespace vtx::mdl
 			}
 		}
 
-		void message(mi::base::Message_severity level,
-		             const char* module_category,
+		void message(const mi::base::Message_severity level,
+		             const char* moduleCategory,
 		             const char* message) override
 		{
-			this->message(level, module_category, mi::base::Message_details(), message);
+			this->message(level, moduleCategory, mi::base::Message_details(), message);
 		}
 	};
 
@@ -67,49 +68,63 @@ namespace vtx::mdl
 		mi::base::Handle<mi::neuraylib::IMdl_configuration>     config;
 		mi::base::Handle<mi::base::ILogger>                     logger;
 		mi::base::Handle<mi::neuraylib::IDatabase>              database;
-		mi::base::Handle<mi::neuraylib::IScope>                 global_scope;
+		mi::base::Handle<mi::neuraylib::IScope>                 globalScope;
 		mi::base::Handle<mi::neuraylib::IMdl_factory>           factory;
-		mi::base::Handle<mi::neuraylib::IExpression_factory>    expression_factory;
-		mi::base::Handle<mi::neuraylib::IValue_factory>         value_factory;
-		mi::base::Handle<mi::neuraylib::IType_factory>          type_factory;
+		mi::base::Handle<mi::neuraylib::IExpression_factory>    expressionFactory;
+		mi::base::Handle<mi::neuraylib::IValue_factory>         valueFactory;
+		mi::base::Handle<mi::neuraylib::IType_factory>          typeFactory;
 		mi::base::Handle<mi::neuraylib::IMdl_execution_context> context;
 		mi::base::Handle<mi::neuraylib::IMdl_backend>           backend;
 		mi::base::Handle<mi::neuraylib::IImage_api>             imageApi;
 		mi::base::Handle<mi::neuraylib::ITransaction>           transaction;
-		mi::base::Handle<mi::neuraylib::IMdl_impexp_api>        impexpApi;
+		mi::base::Handle<mi::neuraylib::IMdl_impexp_api>        impExpApi;
 		std::vector<std::string>                                searchStartupPaths;
 		std::string                                             lastError;
 		mi::Sint32                                              result;
-		State() {
+		State(): result(0)
+		{
 			printf("INITIALIZING STATE MDL!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
 		}
 	};
 
 	State* getState();
 
+	/*ShutDown the MDL SDK*/
 	void shutDown();
 
+	/*Initialize the MDL SDK*/
 	void init();
 
-	//void loadIneuray();
-
-	//void printLibraryVersion();
-
-	//void configure();
-
+	/*Add a search path to the MDL SDK*/
 	void addSearchPath(std::string path);
 
-	//void loadPlugin(std::string path);
-
-	//void startInterfaces();
-
+	/*Get the global transaction if it exists, create a new one if it doesn't*/
 	mi::neuraylib::ITransaction* getGlobalTransaction();
 
-	//bool logMessage(mi::neuraylib::IMdl_execution_context* context);
+	/*Compile a material from a given path*/
+	void compileMaterial(const std::string& path, std::string materialName, std::string* materialDbName=nullptr);
 
-	void loadShaderData(std::shared_ptr<graph::Shader> shader);
+	/*Get the shader configuration for the given material*/
+	graph::Shader::Configuration determineShaderConfiguration(const std::string& materialDbName);
 
-	//void storeMaterialInfo();
+	/*Create a target code for the given material and configuration*/
+	mi::base::Handle<mi::neuraylib::ITarget_code const> createTargetCode(const std::string& materialDbName, const graph::Shader::Configuration& config, const vtxID& shaderIndex);
+
+	/*Analyze target Code and extract all parameters, it sets the values of the argumentBlockClone, params list and mapEnumTypes*/	
+	void setMaterialParameters(const std::string& materialDbName,
+							   const mi::base::Handle<mi::neuraylib::ITarget_code const>& targetCode,
+							   mi::base::Handle<mi::neuraylib::ITarget_argument_block>& argumentBlockClone,
+							   std::list<graph::ParamInfo>& params,
+							   std::map<std::string, std::shared_ptr<graph::EnumTypeInfo>>& mapEnumTypes);
+
+	/*Analyze mdl to prepare cuda descriptors for texture*/
+	void fetchTextureData(const std::shared_ptr<graph::Texture>& textureNode);
+
+	/*fetch data to create bsdf sampling*/
+	graph::BsdfMeasurement::BsdfPartData fetchBsdfData(const std::string& bsdfDbName, const mi::neuraylib::Mbsdf_part part);
+
+	/*fetch data to create light profile sampling*/
+	graph::LightProfile::LightProfileData fetchLightProfileData(const std::string& lightDbName);
 
 }
 

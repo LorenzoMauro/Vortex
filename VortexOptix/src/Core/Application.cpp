@@ -1,7 +1,8 @@
 #include "Application.h"
 #include "glad/glad.h"
 #include "ImGuiOp.h"
-#include "Device/OptixUtils.h"
+#include "Device/OptixWrapper.h"
+#include "Device/PipelineConfiguration.h"
 
 namespace vtx
 {
@@ -11,7 +12,7 @@ namespace vtx
 		Init_ImGui(window);
 
 		optix::init();
-		optix::createRenderingPipeline();
+		pipelineConfiguration();
 		mdl::init();
 
 		createLayer<AppLayer>();

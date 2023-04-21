@@ -25,23 +25,29 @@ namespace vtx::graph
 		return materials;
 	}
 
-	void Instance::addmaterial(std::shared_ptr<Material> _material) {
+	void Instance::addMaterial(std::shared_ptr<Material> _material) {
 		materials.push_back(_material);
 	}
 
-	void Instance::RemoveMaterial(vtxID matID) {
-
+	void Instance::removeMaterial(vtxID matID) {
+		for (auto it = materials.begin(); it != materials.end(); ++it)
+		{
+			if ((*it)->getID() == matID)
+			{
+				materials.erase(it);
+				break;
+			}
+		}
 	}
 
 	void Instance::traverse(const std::vector<std::shared_ptr<NodeVisitor>>& orderedVisitors)
 	{
-		ACCEPT(orderedVisitors);
-
 		for (auto& material : materials) {
 			material->traverse(orderedVisitors);
 		}
 		transform->traverse(orderedVisitors);
 		child->traverse(orderedVisitors);
+		ACCEPT(orderedVisitors);
 	}
 
 	void Instance::accept(std::shared_ptr<NodeVisitor> visitor)

@@ -1,7 +1,10 @@
 #pragma once
+#ifndef H_MATH
+#define H_MATH
 #include "gdt/math/vec.h"
 #include "gdt/math/AffineSpace.h"
 #include <tuple>
+#include <cuda_runtime.h>
 
 namespace vtx::math
 {
@@ -116,6 +119,35 @@ namespace vtx::math
 			m[8] = (Scalar_t)l.vx.z; m[9] = (Scalar_t)l.vy.z; m[10] = (Scalar_t)l.vz.z; m[11] = (Scalar_t)p.z;
 			return m;
 		}
+
+		//Constructor from Scalar_t[12] array in row major order
+		AffineSpaceT(const Scalar_t* rowMajor)
+		{
+			l.vx.x = rowMajor[0]; l.vy.x = rowMajor[1]; l.vz.x = rowMajor[2]; p.x = rowMajor[3];
+			l.vx.y = rowMajor[4]; l.vy.y = rowMajor[5]; l.vz.y = rowMajor[6]; p.y = rowMajor[7];
+			l.vx.z = rowMajor[8]; l.vy.z = rowMajor[9]; l.vz.z = rowMajor[10]; p.z = rowMajor[11];
+		}
+//#ifdef __CUDACC__
+		//Constructor from float4 array in row major order
+		__host__ __device__ AffineSpaceT(const float4* rowMajor)
+		{
+			l.vx.x = rowMajor[0].x;
+			l.vx.y = rowMajor[1].x;
+			l.vx.z = rowMajor[2].x;
+
+			l.vy.x = rowMajor[0].y;
+			l.vy.y = rowMajor[1].y;
+			l.vy.z = rowMajor[2].y;
+
+			l.vz.x = rowMajor[0].z;
+			l.vz.y = rowMajor[1].z;
+			l.vz.z = rowMajor[2].z;
+
+			p.x = rowMajor[0].w;
+			p.y = rowMajor[1].w;
+			p.z = rowMajor[2].w;
+		}
+//#endif
 	};
 
 	template<typename T>
@@ -181,15 +213,15 @@ namespace vtx::math
 	using affine2f = AffineSpace2f;
 	using affine3f = AffineSpace3f;
 
-	static inline vec3f transformVector3F(const affine3f& affine, const vec3f& vec) {
+	__device__ __host__ static inline vec3f transformVector3F(const affine3f& affine, const vec3f& vec) {
 		return gdt::xfmVector<LinearSpace3f>(affine, vec);
 	}
 
-	static inline vec3f transformPoint3F(const affine3f& affine, const vec3f& vec) {
+	__device__ __host__ static inline vec3f transformPoint3F(const affine3f& affine, const vec3f& vec) {
 		return gdt::xfmPoint<LinearSpace3f>(affine, vec);
 	}
 
-	static inline vec3f transformNormal3F(const affine3f& affine, const vec3f& vec) {
+	__device__ __host__ static inline vec3f transformNormal3F(const affine3f& affine, const vec3f& vec) {
 		return gdt::xfmNormal<LinearSpace3f>(affine, vec);
 	}
 
@@ -203,3 +235,4 @@ namespace vtx::math
 	static vec3f origin = vec3f{ 0.0f, 0.0f, 1.0f };
 }
 
+#endif // !__GDT_MATH_H__

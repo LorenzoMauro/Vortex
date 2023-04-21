@@ -25,16 +25,21 @@ namespace vtx::graph
 
 	enum NodeType {
 		NT_GROUP,
+
 		NT_INSTANCE,
 		NT_MESH,
-		NT_MATERIAL,
 		NT_TRANSFORM,
+
 		NT_CAMERA,
 		NT_RENDERER,
-		NT_MDLSHADER,
-		NT_SHADER,
 
-		NT_NUM_NODE_TYPES
+		NT_MATERIAL,
+		NT_MDL_SHADER,
+		NT_MDL_TEXTURE,
+		NT_MDL_BSDF,
+		NT_MDL_LIGHTPROFILE,
+
+		NT_NUM_NODE_TYPES,
 	};
         
 	class Node : public std::enable_shared_from_this<Node> {
@@ -61,5 +66,6 @@ namespace vtx::graph
 		std::shared_ptr<SIM> sim;
 		NodeType type;
 		vtxID id;
+		bool isUpdated;
 	};
 }

@@ -21,7 +21,6 @@ namespace vtx
 	};
 }
 
-
 // Vortex Log Macros
 #define VTX_TRACE(...)	::vtx::Log::GetVortexLogger()->trace(__VA_ARGS__)
 #define VTX_INFO(...)	::vtx::Log::GetVortexLogger()->info(__VA_ARGS__)
@@ -31,6 +30,7 @@ namespace vtx
 inline void waitAndClose() {
     std::cerr << "Press ENTER to exit..." << std::endl;
     std::cin.get();
+	__debugbreak();
     std::exit(EXIT_FAILURE);
 }
 
@@ -55,20 +55,20 @@ inline void waitAndClose() {
 
 
 #define VTX_ASSERT_CLOSE(successCondition, ...) do { \
-    if (!successCondition) { \
+    if (!(successCondition)) { \
 		VTX_ERROR(__VA_ARGS__); \
 		waitAndClose(); \
 	}\
 } while(0)
 
 #define VTX_ASSERT_CONTINUE(successCondition, ...) do { \
-    if (!successCondition) { \
+    if (!(successCondition)) { \
 		VTX_WARN(__VA_ARGS__);\
 	}\
 } while(0)
 
 #define VTX_ASSERT_RETURN(successCondition, ...) do { \
-    if (!successCondition) { \
+    if (!(successCondition)) { \
 		VTX_WARN(__VA_ARGS__); \
 		return;\
 	}\
@@ -76,14 +76,14 @@ inline void waitAndClose() {
 
 
 #define VTX_ASSERT_BREAK(successCondition, ...) do { \
-    if (!successCondition) { \
+    if (!(successCondition)) { \
 		VTX_WARN(__VA_ARGS__); \
 		break;\
 	}\
 } while(0)
 
 #define VTX_ASSERT_RETURNV(successCondition, ...) do { \
-    if (!successCondition) { \
+    if (!(successCondition)) { \
 		VTX_WARN(__VA_ARGS__); \
 		return 0; \
 	}\

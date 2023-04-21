@@ -1,23 +1,25 @@
-#pragma once
-
-#include <optix.h>
 #include <optix_device.h>
-#include <cuda_runtime.h>
-#include "Device/LaunchParams.h"
 #include "RayData.h"
+#include "DataFetcher.h"
+#define TEX_SUPPORT_NO_VTABLES
+#define TEX_SUPPORT_NO_DUMMY_SCENEDATA
+#include "texture_lookup.h"
 
 namespace vtx {
 	
-    /*! launch parameters in constant memory, filled in by optix upon
-      optixLaunch (this gets filled in from the buffer we pass to
-      optixLaunch) */
-    extern "C" __constant__ LaunchParams optixLaunchParams;
+
+    __forceinline__ __device__ uint32_t makeColor(const math::vec3f& radiance)
+    {
+
+        const auto r = static_cast<uint8_t>(radiance.x * 255.0f);
+        const auto g = static_cast<uint8_t>(radiance.y * 255.0f);
+        const auto b = static_cast<uint8_t>(radiance.z * 255.0f);
+        const auto a = static_cast<uint8_t>(1.0f * 255.0f);
+        const uint32_t returnColor = (a << 24) | (b << 16) | (g << 8) | r;
+        return returnColor;
 
 
-    __device__ void printVector(const math::vec3f& vec, const char* message = nullptr) {
-        printf("%s (%f %f %f)\n", message, vec.x, vec.y, vec.z);
     }
-
     //------------------------------------------------------------------------------
     // closest hit and anyhit programs for radiance-type rays.
     //
@@ -45,10 +47,61 @@ namespace vtx {
 
     extern "C" __global__ void __closesthit__radiance()
     { /*! for this simple example, this will remain empty */
-        unsigned int instanceID = optixGetInstanceId();
-        unsigned int primitveID = optixGetPrimitiveIndex();
-        PerRayData* thePrd = mergePointer(optixGetPayload_0(), optixGetPayload_1());
-        thePrd->color = math::randomColor(instanceID+ primitveID);
+
+        const unsigned int instanceId = optixGetInstanceId();
+        const unsigned int primitiveId = optixGetPrimitiveIndex();
+
+        const InstanceData* instance = getData<InstanceData>(instanceId);
+        const GeometryData* geometry = getData<GeometryData>(instance->geometryDataId);
+
+        vtxID* materialIds = nullptr;
+        const MaterialData* material = nullptr;
+        if (instance->numberOfMaterials > 0)
+        {
+            materialIds = instance->materialsDataId;
+            material = getData<MaterialData>(instance->materialsDataId[0]);
+        }
+
+        PerRayData* prd = mergePointer(optixGetPayload_0(), optixGetPayload_1());
+        prd->distance = optixGetRayTmax();
+        prd->position += prd->wi * prd->distance;
+
+        math::vec3ui triangleIndices = geometry->indicesData[primitiveId];
+
+        const math::vec3ui* indices = reinterpret_cast<math::vec3ui*>(geometry->indicesData);
+        const math::vec3ui  tri = indices[primitiveId];
+
+        const graph::VertexAttributes vertex0 = geometry->vertexAttributeData[tri.x];
+        const graph::VertexAttributes vertex1 = geometry->vertexAttributeData[tri.y];
+        const graph::VertexAttributes vertex2 = geometry->vertexAttributeData[tri.z];
+
+        const math::vec2f baricenter = optixGetTriangleBarycentrics();
+        const float alpha = 1.0f - baricenter.x - baricenter.y;
+
+        const float4* wTo = optixGetInstanceInverseTransformFromHandle(optixGetTransformListHandle(geometry->traversable));
+        const float4* oTw = optixGetInstanceTransformFromHandle(optixGetTransformListHandle(geometry->traversable));
+
+        const math::affine3f objectToWorld(oTw);
+        const math::affine3f worldToObject(wTo);
+        math::vec3f ns = vertex0.normal * alpha + vertex1.normal * baricenter.x + vertex2.normal * baricenter.y;
+        math::vec3f ng = cross(vertex1.position - vertex0.position, vertex2.position - vertex0.position);
+        math::vec3f tg = vertex0.tangent * alpha + vertex1.tangent * baricenter.x + vertex2.tangent * baricenter.y;
+        ns = math::normalize(transformNormal3F(worldToObject, ns));
+        ng = math::normalize(transformNormal3F(worldToObject, ng));
+        tg = math::normalize(transformVector3F(worldToObject, tg));
+        math::vec3f bt = math::normalize(cross(ns, tg));
+        tg = cross(bt, ns);
+        math::vec3f textureCoordinate = vertex0.texCoord * alpha + vertex1.texCoord * baricenter.x + vertex2.texCoord * baricenter.y;
+        math::vec3f textureBitangent = bt;
+        math::vec3f textureTangent = tg;
+
+        prd->debugColor = 0.5f * (ns + 1.0f);
+        //prd->debugColor = prd->position*0.25f;
+
+        //typedef mi::neuraylib::Shading_state_material MdlState;
+        //MdlState mdlState;
+        //mdlState.normal;
+        //mdlState.position;
         //printVector(thePrd->color, "HIT COLOR");
     }
 
@@ -69,7 +122,7 @@ namespace vtx {
     extern "C" __global__ void __miss__radiance()
     { /*! for this simple example, this will remain empty */
         PerRayData* thePrd = mergePointer(optixGetPayload_0(), optixGetPayload_1());
-        thePrd->color = math::vec3f(1.0f, 1.0f, 1.0f);
+        thePrd->debugColor = math::vec3f(0.2f, 0.2f, 0.2f);
         //printVector(thePrd->color, "MISS COLOR");
     }
 
@@ -81,61 +134,31 @@ namespace vtx {
     //------------------------------------------------------------------------------
     extern "C" __global__ void __raygen__renderFrame()
     {
-        const int frameID = optixLaunchParams.frameID;
-        if (frameID == 0 &&
-            optixGetLaunchIndex().x == 0 &&
-            optixGetLaunchIndex().y == 0) {
-            // we could of course also have used optixGetLaunchDims to query
-            // the launch size, but accessing the optixLaunchParams here
-            // makes sure they're not getting optimized away (because
-            // otherwise they'd not get used)
-            printf("############################################\n");
-            printf("Hello world from OptiX 7 raygen program!\n(within a %ix%i-sized launch)\n",
-                   optixLaunchParams.fbSize.x,
-                   optixLaunchParams.fbSize.y);
-            printf("############################################\n");
-        }
-
-        // ------------------------------------------------------------------
-        // for this example, produce a simple test pattern:
-        // ------------------------------------------------------------------
-
-        // compute a test pattern based on pixel ID
-        const int ix = optixGetLaunchIndex().x;
-        const int iy = optixGetLaunchIndex().y;
-
-        math::vec2f pixel = math::vec2f(ix, iy);
-        math::vec2f sample = math::vec2f(0.5f, 0.5f);
-        math::vec2f screen = math::vec2f(optixLaunchParams.fbSize.x, optixLaunchParams.fbSize.y);
-
-        const LensRay ray = optixDirectCall<LensRay, const math::vec2f, const math::vec2f, const math::vec2f>(0, screen, pixel, sample);
-
+        const FrameBufferData* frameBuffer = getData<FrameBufferData>();
+	    const math::vec2ui& frameSize = frameBuffer->frameSize;
+        
+    	const math::vec2f pixel = math::vec2f(optixGetLaunchIndex().x, optixGetLaunchIndex().y);
+        const math::vec2f sample{ 0.5f, 0.5f };
+        const math::vec2f screen{ static_cast<float>(frameSize.x), static_cast<float>(frameSize.y) };
+        
+        const LensRay cameraRay = optixDirectCall<LensRay, const math::vec2f, const math::vec2f, const math::vec2f>(0, screen, pixel, sample);
+        
         PerRayData prd;
-        prd.color = math::vec3f(0.0f, 0.0f, 0.0f);
-        prd.position = ray.org;
-        prd.wi = ray.dir;
-        uint2 payload = splitPointer(&prd);
-
+        prd.radiance = math::vec3f(0.0f, 0.0f, 0.0f);
+        prd.position = cameraRay.org;
+        prd.wi = cameraRay.dir;
+        math::vec2ui payload = splitPointer(&prd);
+        
         float minClamp = 0.00001f;
         float maxClamp = 1000;
-
-        //VTX_INFO("Ray Origin: %f %f %f", ray.org.x, ray.org.y, ray.org.z);
-        //printVector(ray.org, "ray origin: ");
-        //printVector(ray.dir, "ray direction: ");
-        //printVector(camera.position, "Camera Position: ");
-        //printVector(camera.right, "Camera Right: ");
-        //printVector(camera.up, "Camera Up: ");
-        //printVector(camera.direction, "Camera Direction: ");
-        //printVector(prd.position, "PRD Position: ");
-        //printVector(prd.wi, "PRD Right: ");
-
+        
         optixTrace(optixLaunchParams.topObject,
                    prd.position,
                    prd.wi, // origin, direction
                    minClamp, 
                    maxClamp,
                    0.0f, // tmin, tmax, time
-                   OptixVisibilityMask(0xFF), 
+                   static_cast<OptixVisibilityMask>(0xFF), 
                    OPTIX_RAY_FLAG_DISABLE_ANYHIT, //OPTIX_RAY_FLAG_NONE,
                    TYPE_RAY_RADIANCE, //SBT Offset
                    NUM_RAY_TYPES, // SBT stride
@@ -143,31 +166,23 @@ namespace vtx {
                    payload.x,
                    payload.y);
 
-        //const int r = ((ix + frameID) % 256);
-        //const int g = ((iy + frameID) % 256);
-        //const int b = ((ix + iy + frameID) % 256);
-
-        //const int r = 50;
-        //const int g = 50;
-        //const int b = 50;
-
-
-        //const int r = int(prd.color.x * 256);
-        //const int g = int(prd.color.y * 256);
-        //const int b = int(prd.color.z * 256);
-
-        const int r = int(255.99f * prd.color.x);
-        const int g = int(255.99f * prd.color.y);
-        const int b = int(255.99f * prd.color.z);
-
+        //const int r = static_cast<int>(255.99f * prd.debugColor.x);
+        //const int g = static_cast<int>(255.99f * prd.debugColor.y);
+        //const int b = static_cast<int>(255.99f * prd.debugColor.z);
+        
         // convert to 32-bit rgba value (we explicitly set alpha to 0xff
         // to make stb_image_write happy ...
-        const uint32_t rgba = 0xff000000
-            | (r << 0) | (g << 8) | (b << 16);
-
+        //const uint32_t rgba = 0xff000000
+         //   | (r << 0) | (g << 8) | (b << 16);
+        
         // and write to frame buffer ...
-        const uint32_t fbIndex = ix + iy * optixLaunchParams.fbSize.x;
-        uint32_t* colorBuffer = reinterpret_cast<uint32_t*>(optixLaunchParams.colorBuffer); // This is a per device launch sized buffer in this renderer strategy.
-        colorBuffer[fbIndex] = rgba;
+        
+        const int ix = optixGetLaunchIndex().x;
+        const int iy = optixGetLaunchIndex().y;
+        
+        // and write to frame buffer ...
+        const uint32_t fbIndex = ix + iy * frameSize.x;
+        uint32_t* colorBuffer = reinterpret_cast<uint32_t*>(frameBuffer->colorBuffer); // This is a per device launch sized buffer in this renderer strategy.
+        colorBuffer[fbIndex] = makeColor(prd.debugColor);
     }
 }

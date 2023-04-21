@@ -1,9 +1,22 @@
 #pragma once
-
+#ifndef CUDAMAP_H
+#define CUDAMAP_H
 #include <cuda_runtime.h>
 #include "CUDABuffer.h"
+#include "DevicePrograms/CudaDebugHelper.h"
 
 namespace vtx {
+
+    __host__ __device__ inline uint32_t stringHash(const char* str) {
+        uint32_t hash = 5381;
+        int c;
+
+        while ((c = *str++))
+            hash = ((hash << 5) + hash) + c; // hash * 33 + c
+
+        return hash;
+    }
+
     template <typename TKey, typename TValue>
     class CudaMap {
     public:
@@ -11,81 +24,113 @@ namespace vtx {
         TValue* values;
         int size;
         int capacity;
+        bool isUpdated;
+#ifndef __CUDACC__
+        CUDABuffer keyBuffer;
+        CUDABuffer valueBuffer;
+        CUDABuffer mapBuffer;
+#endif
 
-        __host__ CudaMap() : keys(nullptr), values(nullptr), size(0), capacity(0) {}
+
+        __host__ CudaMap() :
+    		keys(nullptr),
+    		values(nullptr),
+    		size(0),
+    		capacity(0),
+			isUpdated(true)
+    	{}
 
         __host__ ~CudaMap() {
             delete[] keys;
             delete[] values;
+
+            // With this trick we should be able to free cuda resources once the CudaMap on the host ends its life
+            if(keyBuffer.dPointer())
+            {
+	            keyBuffer.free();
+            }
+            if(valueBuffer.dPointer())
+            {
+	            valueBuffer.free();
+			}
         }
 
 
         __host__ void insert(const TKey& key, const TValue& value) {
-            if (size >= capacity) {
-                int new_capacity = capacity == 0 ? 1 : capacity * 2;
-                resize(new_capacity);
+            int keyIndex = find_index(key);
+            if(keyIndex > -1)
+            {
+	            values[keyIndex] = value;
+                isUpdated = true;
+			}
+            else
+            {
+                if (size >= capacity) {
+                    int new_capacity = capacity == 0 ? 1 : capacity * 2;
+                    resize(new_capacity);
+                }
+                keys[size] = key;
+                values[size] = value;
+                ++size;
+                isUpdated = true;
             }
-            keys[size] = key;
-            values[size] = value;
-            ++size;
         }
-
 
         __host__ __device__ TValue& operator[](const TKey& key) {
             int index = find_index(key);
-            return values[index];
+            if(index<0)
+            {
+                CUDA_ERROR_PRINT("Trying to access a non valid index %d!", key);
+                return TValue();
+            }
+            TValue& value = values[index];
+            //CUDA_DEBUG_PRINT("Value %p Index %d on CudaMap operator []!\n", &value, key);
+            return value;
         }
 
         __host__ __device__ const TValue& operator[](const TKey& key) const {
             int index = find_index(key);
-            return values[index];
+            if (index < 0)
+            {
+                CUDA_ERROR_PRINT("Trying to access a non valid index %d!", key);
+                return TValue();
+            }
+            TValue& value = values[index];
+            //CUDA_DEBUG_PRINT("Value %p Index %d found on CudaMap operator []!\n", &value, key);
+            return value;
         }
 
         __host__ __device__ bool contains(const TKey& key) const {
             return find_index(key) >= 0;
         }
 
-        __host__ CudaMap* allocAndUpload() {
+        __host__ CudaMap* upload() {
             // Copy the map to the device and iterate over all elements
             finalize();
+            if(size>0)
+            {
+        	    keyBuffer.upload(keys, size);
+                valueBuffer.upload(values, size);
 
-            CUDABuffer keysBuffer;
-            CUDABuffer valuesBuffer;
+                CudaMap<TKey, TValue>  tempMap;
+                tempMap.keys = keyBuffer.castedPointer<TKey>();
+                tempMap.values = valueBuffer.castedPointer<TValue>();
+                VTX_ASSERT_CONTINUE(tempMap.keys, "Cuda pointer of Cuda Map keys seems to be null!");
+                VTX_ASSERT_CONTINUE(tempMap.values, "Cuda pointer of Cuda Map values seems to be null!");
+                tempMap.size = size;
+                tempMap.capacity = capacity;
 
-            std::vector<TKey> keysVec(keys, keys + size);
-            std::vector<TValue> valuesVec(values, values + size);
+                mapBuffer.upload(tempMap);
 
-            keysBuffer.alloc_and_upload(keysVec);
-            valuesBuffer.alloc_and_upload(valuesVec);
+                // DO this so that when the destructor is called it won't try to free cuda memory...
+                tempMap.keys = nullptr;
+                tempMap.values = nullptr;
 
-            CudaMap<TKey, TValue>  temp_map;
+                isUpdated = false;
 
-            temp_map.keys = reinterpret_cast<TKey*>(keysBuffer.d_pointer());
-            temp_map.values = reinterpret_cast<TValue*>(valuesBuffer.d_pointer());
-            temp_map.size = size;
-            temp_map.capacity = capacity;
-
-            CudaMap<TKey, TValue>* d_map;
-
-            cudaMalloc((void**)&d_map, sizeof(CudaMap<TKey, TValue>));
-            cudaMemcpy(d_map, &temp_map, sizeof(CudaMap<TKey, TValue>), cudaMemcpyHostToDevice);
-
-            // DO this so that when the destructor is called it won't try to free cuda memory...
-            temp_map.keys = nullptr;
-            temp_map.values = nullptr;
-
-            return d_map;
-
-            //
-            //TKey* d_keys;
-            //TValue* d_values;
-            //cudaMalloc(&d_keys, size * sizeof(TKey));
-            //cudaMalloc(&d_values, size * sizeof(TValue));
-            //cudaMemcpy(d_keys, keys, size * sizeof(TKey), cudaMemcpyHostToDevice);
-            //cudaMemcpy(d_values, values, size * sizeof(TValue), cudaMemcpyHostToDevice);
-            //
-            //cudaMemcpy(&((*d_map)->keys), &d_keys, sizeof(TKey*), cudaMemcpyHostToDevice);
-            //cudaMemcpy(&((*d_map)->values), &d_values, sizeof(TValue*), cudaMemcpyHostToDevice);
+                return mapBuffer.castedPointer<CudaMap<TKey, TValue>>();
+            }
+            return nullptr;
         }
 
         class iterator {
@@ -139,9 +184,11 @@ namespace vtx {
         __host__ __device__ int find_index(const TKey& key) const {
             for (int i = 0; i < size; ++i) {
                 if (keys[i] == key) {
+                    //CUDA_DEBUG_PRINT("Index %d found!\n", key);
                     return i;
                 }
             }
+            //CUDA_DEBUG_PRINT("Index %d Not found!\n", key);
             return -1;
         }
 
@@ -154,3 +201,4 @@ namespace vtx {
 
 }
 
+#endif // CUDAMAP_H
