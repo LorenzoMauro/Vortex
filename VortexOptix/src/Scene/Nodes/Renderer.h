@@ -1,14 +1,24 @@
 #pragma once
 #include <cstdint>
 #include "Device/glFrameBuffer.h"
-#include "Device/DeviceData.h"
-
+#include "Device/DeviceVisitor.h"
 #include "Scene/Node.h"
 #include "Camera.h"
 #include "Group.h"
+#include "Core/Timer.h"
 
 namespace vtx::graph
 {
+
+	struct RendererSettings
+	{
+		int			iteration;
+		int			maxBounces;
+		int			maxSamples;
+		bool		accumulate;
+		bool		isUpdated;
+	};
+
 	class Renderer : public Node
 	{
 	public:
@@ -17,7 +27,7 @@ namespace vtx::graph
 
 		void resize(uint32_t width, uint32_t height);
 
-		static void render();
+		void render();
 
 		GLuint getFrame();
 
@@ -47,7 +57,16 @@ namespace vtx::graph
 
 		uint32_t										width;
 		uint32_t										height;
+		RendererSettings								settings;
 		bool											resized = true;
+		FrameBufferData::FrameBufferType				frameBufferType = FrameBufferData::FB_NOISY;
+
+		vtx::Timer timer;
+		float      frameTime;
+		float      fps;
+		float      totalTimeSeconds;
+		float      sppS;
+		float      averageFrameTime;
 	};
 
 }

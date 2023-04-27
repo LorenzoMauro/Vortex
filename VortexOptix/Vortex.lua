@@ -1,20 +1,21 @@
 include "../PremakeScripts/path.lua"
 
-function genNvccCommand(cu_file, ptx_file, cuda_path, include_dirs)
+function genNvccCommand(cu_file, ptx_file, cuda_path, include_dirs, debug)
     local nvcc_path = '"' .. path.join(cuda_path, "bin/nvcc.exe") .. '"'
     CudaCompileCommand = nvcc_path
     CudaCompileCommand = CudaCompileCommand .. " " .. cu_file
-    --CudaCompileCommand = CudaCompileCommand .. " --ptx"
     CudaCompileCommand = CudaCompileCommand .. " --optix-ir"
-    CudaCompileCommand = CudaCompileCommand .. " -G"
-    CudaCompileCommand = CudaCompileCommand .. " --generate-line-info"
     CudaCompileCommand = CudaCompileCommand .. " --use_fast_math"
     CudaCompileCommand = CudaCompileCommand .. " --keep"
-    CudaCompileCommand = CudaCompileCommand .. " --relocatable-device-code=true"
-    CudaCompileCommand = CudaCompileCommand .. " --keep-device-functions"
     CudaCompileCommand = CudaCompileCommand .. " -Wno-deprecated-gpu-targets"
     CudaCompileCommand = CudaCompileCommand .. " --std=c++17"
     CudaCompileCommand = CudaCompileCommand .. " -m64"
+    CudaCompileCommand = CudaCompileCommand .. " --keep-device-functions"
+    CudaCompileCommand = CudaCompileCommand .. " --relocatable-device-code=true"
+    CudaCompileCommand = CudaCompileCommand .. " --generate-line-info"
+    if(debug) then 
+        CudaCompileCommand = CudaCompileCommand .. " -G"
+    end
     CudaCompileCommand = CudaCompileCommand .. " -o " .. ptx_file
     
     -- Add additional include directories
@@ -80,49 +81,35 @@ project "OptixApp"
         "dds.lib"
     }
 
-    -- Custom build step to compile .cu files to .ptx files
-    filter "files:src/Device/DevicePrograms/**.cu"
-
-        local cu_file = "%{file.relpath}"
-        local ptx_file = "%{cfg.targetdir}/data/ptx/%{file.basename}.optixir"
-
-        -- include dirs for the compilation of ptx files
-        local include_dirs = {
-            IncludeDir["OPTIX"],
-            IncludeDir["spdlog"],
-            IncludeDir["MDL"],
-            "src/",
-            "../ext/gdt/"
-        }
-        cudaCompileCommand = genNvccCommand(cu_file, ptx_file, CUDA_TOOLKIT_PATH, include_dirs)
-        
-        
-        -- Build message showing the command being used
-        -- buildmessage("Compiling %{file.relpath} with command: " .. Command)
-        
-        buildcommands {
-            'echo "Running NVCC:"' .. CudaCompileCommand .. '"',
-            CudaCompileCommand,
-        }
-        buildoutputs {
-            ptx_file,
-        }
-
+    useMdlDebug = false
     
     filter "configurations:Debug"
-        postbuildcommands {
-            "{COPY} %{wks.location}/VortexOptix/src/data %{cfg.targetdir}/data/",
-            "{MKDIR} %{cfg.targetdir}/lib",
-            "{COPY} %{wks.location}ext/MDL/debug/bin/libmdl_sdk.dll %{cfg.targetdir}/lib",
-            "{COPY} %{wks.location}ext/MDL/debug/bin/nv_freeimage.dll %{cfg.targetdir}/lib",
-            "{COPY} %{wks.location}ext/MDL/debug/bin/freeimage.dll %{cfg.targetdir}/lib",
-            "{COPY} %{wks.location}ext/MDL/debug/bin/dds.dll %{cfg.targetdir}/lib"
-        }
-
-        
-        libdirs {
-            "%{LibDir.MDL_Debug}"
-        }
+        if useMdlDebug then
+            postbuildcommands {
+                "{COPY} %{wks.location}/VortexOptix/src/data %{cfg.targetdir}/data/",
+                "{MKDIR} %{cfg.targetdir}/lib",
+                "{COPY} %{wks.location}ext/MDL/debug/bin/libmdl_sdk.dll %{cfg.targetdir}/lib",
+                "{COPY} %{wks.location}ext/MDL/debug/bin/nv_freeimage.dll %{cfg.targetdir}/lib",
+                "{COPY} %{wks.location}ext/MDL/debug/bin/freeimage.dll %{cfg.targetdir}/lib",
+                "{COPY} %{wks.location}ext/MDL/debug/bin/dds.dll %{cfg.targetdir}/lib"
+            }
+            libdirs {
+                "%{LibDir.MDL_Debug}"
+            }
+        else
+            postbuildcommands {
+                "{COPY} %{wks.location}/VortexOptix/src/data %{cfg.targetdir}/data/",
+                "{MKDIR} %{cfg.targetdir}/lib",
+                "{COPY} %{wks.location}ext/MDL/release/bin/libmdl_sdk.dll %{cfg.targetdir}/lib",
+                "{COPY} %{wks.location}ext/MDL/release/bin/nv_freeimage.dll %{cfg.targetdir}/lib",
+                "{COPY} %{wks.location}ext/MDL/release/bin/freeimage.dll %{cfg.targetdir}/lib",
+                "{COPY} %{wks.location}ext/MDL/release/bin/dds.dll %{cfg.targetdir}/lib"
+            }
+    
+            libdirs {
+                "%{LibDir.MDL_Release}"
+            }
+        end
 
     filter "configurations:Release"
         postbuildcommands {
@@ -136,4 +123,41 @@ project "OptixApp"
 
         libdirs {
             "%{LibDir.MDL_Release}"
+        }
+    
+    local cu_file = "%{file.relpath}"
+    local ptx_file = "%{cfg.targetdir}/data/ptx/%{file.basename}.optixir"
+
+    -- include dirs for the compilation of ptx files
+    local include_dirs = {
+        IncludeDir["OPTIX"],
+        IncludeDir["spdlog"],
+        IncludeDir["MDL"],
+        "src/",
+        "../ext/gdt/"
+    }
+    -- Custom build step to compile .cu files to .ptx files
+    filter {"configurations:Debug", "files:src/Device/DevicePrograms/**.cu"}
+        
+        cudaCompileCommand = genNvccCommand(cu_file, ptx_file, CUDA_TOOLKIT_PATH, include_dirs, true)
+        
+        buildcommands {
+            'echo "Running NVCC:"' .. CudaCompileCommand .. '"',
+            CudaCompileCommand,
+        }
+        buildoutputs {
+            ptx_file,
+        }
+
+    -- Custom build step to compile .cu files to .ptx files
+    filter {"configurations:Release", "files:src/Device/DevicePrograms/**.cu"}
+
+        cudaCompileCommand = genNvccCommand(cu_file, ptx_file, CUDA_TOOLKIT_PATH, include_dirs, false)
+        
+        buildcommands {
+            'echo "Running NVCC:"' .. CudaCompileCommand .. '"',
+            CudaCompileCommand,
+        }
+        buildoutputs {
+            ptx_file,
         }

@@ -99,6 +99,11 @@ namespace vtx
     }
 
 
+    template<>
+    __forceinline__ __device__ const LightData* getData(const vtxID nodeId) {
+        return getData(optixLaunchParams.lightMap, nodeId, "Light");
+    }
+
     template<typename T>
     const T* getData();
 
@@ -109,7 +114,7 @@ namespace vtx
 
     template<>
     __forceinline__ __device__ const FrameBufferData* getData() {
-        if (optixLaunchParams.frameBuffer.colorBuffer == 0)
+        if (optixLaunchParams.frameBuffer.outputBuffer == 0)
         {
             CUDA_ERROR_PRINT("FrameBuffer color Buffer is not set!\n");
             return nullptr;

@@ -47,7 +47,7 @@
 
 #pragma once
 
-#include "gdt/gdt.h"
+#include "gdt.h"
 
 namespace gdt {
 

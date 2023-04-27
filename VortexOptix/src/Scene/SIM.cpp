@@ -3,37 +3,47 @@
 
 namespace vtx::graph
 {
-	std::shared_ptr<SIM> SIM::s_Instance = nullptr;
+	std::shared_ptr<SIM> SIM::sInstance = nullptr;
 
-	std::shared_ptr<SIM> vtx::graph::SIM::Get() {
-		return SIM::s_Instance;
+	std::shared_ptr<SIM> SIM::Get() {
+		return sInstance;
 	}
 
 	vtxID SIM::getFreeIndex() {
-		if (freeIndices.empty()) {
+		const auto sim = Get();
+
+		if (sim->freeIndices.empty()) {
 			// If no free indices available, create a new one
-			return nextIndex++;
+			return sim->nextIndex++;
 		}
-		else {
-			// If there are free indices, use the first one and remove it from the set
-			auto it = freeIndices.begin();
-			vtxID idx = *it;
-			freeIndices.erase(it);
-			return idx;
-		}
+		
+		// If there are free indices, use the first one and remove it from the set
+		const auto it = sim->freeIndices.begin();
+		const vtxID idx = *it;
+		sim->freeIndices.erase(it);
+		return idx;
 	}
 
 	void SIM::releaseIndex(vtxID id) {
-		NodeType type = idToType[id];
-		Map[type].erase(id);
-		idToType.erase(id);
-		if (id + 1 == nextIndex) {
-			// If the released index is the last one, just decrement nextIndex
-			--nextIndex;
+
+		const auto sim = Get();
+
+		//verify id has been used to register a node:
+		// This approach is caused by the fact that just generating a node will use a new index, but the node is not registered automatically
+		if (sim->idToType.find(id) != sim->idToType.end())
+		{
+			const NodeType type = sim->idToType[id];
+			sim->map[type].erase(id);
+			sim->idToType.erase(id);
+		}
+
+		if (id + 1 == sim->nextIndex) {
+			// If the released index is the last one, just decrement sim->nextIndex
+			--sim->nextIndex;
 		}
 		else {
 			// Otherwise, add it to the set of free indices
-			freeIndices.insert(id);
+			sim->freeIndices.insert(id);
 		}
 	}
 }

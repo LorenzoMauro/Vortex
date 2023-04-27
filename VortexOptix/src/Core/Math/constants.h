@@ -16,7 +16,7 @@
 
 #pragma once
 
-#include "gdt/math/vec.h"
+#include "vec.h"
 #ifdef __CUDA_ARCH__
 #include <math_constants.h>
 #else

@@ -13,6 +13,7 @@ namespace vtx {
         ImGui::CreateContext();
 
         ImGuiIO& io = ImGui::GetIO();
+        io.DeltaTime = 1.0f / 1000000.0f;
         (void)io;
         io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
         io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;

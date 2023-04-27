@@ -19,6 +19,13 @@ namespace vtx::graph
 
 	/* Translation utility given vector */
 
+	void Transform::scale(float scale)
+	{
+		const math::affine3f scaleMatrix = math::affine3f::scale(scale);
+		transformationAttribute.affineTransform = scaleMatrix * transformationAttribute.affineTransform;
+		transformationAttribute.updateFromAffine();
+	}
+
 	void Transform::translate(const math::vec3f& translation) {
 		const math::affine3f translationMatrix = math::affine3f::translate(translation);
 		transformationAttribute.affineTransform = translationMatrix * transformationAttribute.affineTransform;

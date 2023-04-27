@@ -16,8 +16,8 @@
 
 #pragma once
 
-#include "gdt/gdt.h"
-#include "gdt/math/constants.h"
+#include "gdt.h"
+#include "constants.h"
 #include <iostream>
 
 namespace gdt {

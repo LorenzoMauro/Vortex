@@ -27,3 +27,5 @@ old/
 *.vcxproj.user
 Vortex.sln.nvsettings
 *.user
+VortexOptix/Vortex.lua
+*.DotSettings

@@ -3,7 +3,7 @@
 #define CUDAMAP_H
 #include <cuda_runtime.h>
 #include "CUDABuffer.h"
-#include "DevicePrograms/CudaDebugHelper.h"
+#include "Device/DevicePrograms/CudaDebugHelper.h"
 
 namespace vtx {
 
@@ -81,7 +81,6 @@ namespace vtx {
             if(index<0)
             {
                 CUDA_ERROR_PRINT("Trying to access a non valid index %d!", key);
-                return TValue();
             }
             TValue& value = values[index];
             //CUDA_DEBUG_PRINT("Value %p Index %d on CudaMap operator []!\n", &value, key);
@@ -93,7 +92,6 @@ namespace vtx {
             if (index < 0)
             {
                 CUDA_ERROR_PRINT("Trying to access a non valid index %d!", key);
-                return TValue();
             }
             TValue& value = values[index];
             //CUDA_DEBUG_PRINT("Value %p Index %d found on CudaMap operator []!\n", &value, key);

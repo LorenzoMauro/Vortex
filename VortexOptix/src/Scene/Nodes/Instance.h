@@ -1,10 +1,22 @@
 #pragma once
 #include "Scene/Node.h"
+#include "Light.h"
 #include "Material.h"
 #include "Transform.h"
+#include <unordered_map>
 
 namespace vtx::graph
 {
+	struct PairHash {
+		template <class T1, class T2>
+		std::size_t operator () (const std::pair<T1, T2>& pair) const {
+			auto h1 = std::hash<T1>{}(pair.first);
+			auto h2 = std::hash<T2>{}(pair.second);
+
+			// A simple hashing technique to combine h1 and h2
+			return h1 ^ h2;
+		}
+	};
 
 	class Instance : public Node {
 	public:
@@ -13,7 +25,7 @@ namespace vtx::graph
 
 		std::shared_ptr<Node> getChild();
 
-		void setChild(std::shared_ptr<Node> _child);
+		void setChild(const std::shared_ptr<Node>& _child);
 
 		std::shared_ptr<Transform> getTransform();
 
@@ -21,19 +33,33 @@ namespace vtx::graph
 
 		std::vector<std::shared_ptr<Material>>& getMaterials();
 
-		void addMaterial(std::shared_ptr<Material> _material);
+		void addMaterial(const std::shared_ptr<Material>& _material);
 
 		void removeMaterial(vtxID matID);
+
+		void clearMeshLights();
 
 		void traverse(const std::vector<std::shared_ptr<NodeVisitor>>& orderedVisitors) override;
 
 		void accept(std::shared_ptr<NodeVisitor> visitor) override;
 
-	private:
-		std::shared_ptr<Node>       child;
-		std::shared_ptr<Transform>  transform;
-		std::vector<std::shared_ptr<Material>> materials;
+		void createMeshLight();
 
+		void createMeshLight(const std::shared_ptr<graph::Material>& materialNode, unsigned int relativeSlot);
+
+		void clearMeshLight(vtxID matID);
+
+		std::shared_ptr<graph::Light> getMeshLight(vtxID materialID);
+
+	public:
+	private:
+		std::shared_ptr<Node>											child;
+		std::shared_ptr<Transform>										transform;
+		std::vector<std::shared_ptr<Material>>							materials;
+		std::vector<std::shared_ptr<graph::Light>>						meshLights;
+		std::unordered_map<std::pair<vtxID, vtxID>, vtxID, PairHash>	meshLightMap;
+		bool															childIsMesh = false;
+		//bool												isDirty = true;
 	};
 
 }

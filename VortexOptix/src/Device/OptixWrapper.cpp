@@ -612,7 +612,7 @@ namespace vtx::optix
 		OptixInstance optixInstance = {};
 
 		float* matrix = transform;
-		memcpy(optixInstance.transform, transform, sizeof(float) * 12);
+		memcpy(optixInstance.transform, (float*)transform, sizeof(float) * 12);
 
 		//++m_SequentialInstanceID;
 		//OptixInstance.instanceId = m_SequentialInstanceID; // User defined instance index, queried with optixGetInstanceId().

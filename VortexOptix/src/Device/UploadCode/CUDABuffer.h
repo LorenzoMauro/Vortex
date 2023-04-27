@@ -1,5 +1,5 @@
 #pragma once
-#include "CUDAChecks.h"
+#include "Device/CUDAChecks.h"
 #include <vector>
 #include <assert.h>
 #include "Core/Log.h"

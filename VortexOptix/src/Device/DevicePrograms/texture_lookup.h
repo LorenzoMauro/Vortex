@@ -60,8 +60,6 @@ typedef mi::neuraylib::Mbsdf_part                         Mbsdf_part;
 //using namespace mi::neuraylib;
 using namespace vtx;
 
-#ifdef __CUDACC__
-
 __device__ const float INVALID_FLOAT = std::numeric_limits<float>::quiet_NaN();
 
 // Stores a float4 in a float[4] array.
@@ -274,7 +272,7 @@ extern "C" __device__ void tex_lookup_float4_2d(
     }
 
 	const float u = getActualUv(coord[0], wrap_u, crop_u, textureData->invSize.x);
-	const float v = getActualUv(coord[0], wrap_v, crop_v, textureData->invSize.y);
+	const float v = getActualUv(coord[1], wrap_v, crop_v, textureData->invSize.y);
 
     if (isnan(u) || isnan(v))
     {
@@ -1534,7 +1532,5 @@ extern "C" __device__ void scene_data_lookup_deriv_float(
 //  scene_data_lookup_deriv_color,
 //};
 //#endif // TEX_SUPPORT_NO_VTABLES
-
-#endif // __CUDACC__
 
 #endif // TEXTURE_LOOKUP_H

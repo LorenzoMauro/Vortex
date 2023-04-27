@@ -12,5 +12,10 @@ namespace vtx::graph
 		math::vec3f texCoord;
 		int         instanceMaterialIndex;
 	};
+
+	struct FaceAttributes
+	{
+		unsigned int materialSlotId = 0;
+	};
 }
 #endif

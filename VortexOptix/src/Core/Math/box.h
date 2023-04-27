@@ -16,7 +16,7 @@
 
 #pragma once
 
-#include "gdt/math/vec.h"
+#include "vec.h"
 
 namespace gdt {
 

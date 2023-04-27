@@ -14,8 +14,9 @@ namespace vtx::graph
 		void accept(std::shared_ptr<NodeVisitor> visitor) override;
 
 	public:
-		std::vector<VertexAttributes> vertices;
-		std::vector<vtxID> indices; // indices for triangles (every 3 indices define a triangle)
+		std::vector<VertexAttributes>	vertices;
+		std::vector<vtxID>				indices; // indices for triangles (every 3 indices define a triangle)
+		std::vector<FaceAttributes>		faceAttributes;
 	};
 
 }

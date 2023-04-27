@@ -184,6 +184,9 @@ namespace vtx::mdl
 		state.result = state.backend->set_option("tex_lookup_call_mode", "direct_call");
 		VTX_ASSERT_CLOSE(state.result == 0, "Error with tex look up mode");
 
+		state.result = state.backend->set_option("enable_auxiliary", "on");
+		VTX_ASSERT_CLOSE(state.result == 0, "Error with enable auxiliary");
+
 		state.result = state.backend->set_option("fast_math", "on");
 		VTX_ASSERT_CLOSE(state.result == 0, "Error with tex fast_math mode");
 
@@ -673,6 +676,36 @@ namespace vtx::mdl
 			Handle<IExpression const> hair_bsdf_expr(compiledMaterial->lookup_sub_expression("hair"));
 
 			config.isHairBsdfValid = isValidDistribution(hair_bsdf_expr.get()); // True if hair != hair_bsdf().
+
+			// Check if front face is emissive
+
+			bool isSurfaceEmissive = false;
+			bool isBackfaceEmissive = false;
+			bool isThinWalled = false;
+
+			if (config.isSurfaceEdfValid) {
+				if (!config.isSurfaceIntensityConstant) {
+					isSurfaceEmissive = true;
+				}
+				else if (config.surfaceIntensity[0] != 0.0f || config.surfaceIntensity[1] != 0.0f || config.surfaceIntensity[2] != 0.0f) {
+					isSurfaceEmissive = true;
+				}
+			}
+
+			if (!config.isThinWalledConstant || (config.isThinWalledConstant && config.thinWalled)) { // To be emissive on the backface it needs to be thinWalled
+				isThinWalled = true;
+			}
+
+			if (config.isBackfaceEdfValid) {
+				if (!config.isBackfaceIntensityConstant) {
+					isBackfaceEmissive = true;
+				}
+				else if (config.backfaceIntensity[0] != 0.0f || config.backfaceIntensity[1] != 0.0f || config.backfaceIntensity[2] != 0.0f) {
+					isBackfaceEmissive = true;
+				}
+			}
+			config.isEmissive = isSurfaceEmissive || (isThinWalled && isBackfaceEmissive);
+
 			compiledMaterial->release();
 			
 		} while (0);
@@ -1172,27 +1205,32 @@ namespace vtx::mdl
 			}
 			dimension.x = canvas->get_resolution_x();
 			dimension.y = canvas->get_resolution_y();
-			dimension.z = canvas->get_layers_size();
+			// Copy image data to GPU array depending on texture shape
+			if (shape == mi::neuraylib::ITarget_code::Texture_shape_cube ||
+				shape == mi::neuraylib::ITarget_code::Texture_shape_3d ||
+				shape == mi::neuraylib::ITarget_code::Texture_shape_bsdf_data)
+			{
+				dimension.z = canvas->get_layers_size();
+				// Cubemap and 3D texture objects require 3D CUDA arrays.
+				VTX_ASSERT_BREAK((shape != ITarget_code::Texture_shape_cube || dimension.z == 6),
+								 "ERROR: prepareTextureMDL() Invalid number of layers ({}), cube Maps must have 6 layers!", dimension.z);
+			}
+			else
+			{
+				dimension.z = 0;
+			}
 			dimension.w = 4;
 			textureNode->effectiveGamma = texture->get_effective_gamma(0, 0);
 
-			//Fetch pointers to the texture layers data (for non 3d images the number of layers is 0!)
-			for (unsigned int z = 0; z < dimension.z; ++z)
-			{
 
+			//Fetch pointers to the texture layers data (for non 3d images the number of layers is 0!)
+			for (unsigned int z = 0; z < canvas->get_layers_size(); ++z)
+			{
 				const auto tile = make_handle<const ITile>(canvas->get_tile(z));
 				void* dst = malloc(dimension.x*dimension.y*pixelBytesSize* dimension.w);
-				memcpy(dst, tile->get_data(), dimension.x * dimension.y * pixelBytesSize* dimension.w);
+				memcpy(dst, tile->get_data(), dimension.x * dimension.y * pixelBytesSize * dimension.w);
 				imageLayersPointers.push_back(dst);
 			}
-
-
-			// Cubemap and 3D texture objects require 3D CUDA arrays.
-			VTX_ASSERT_BREAK((shape != ITarget_code::Texture_shape_cube || dimension.z == 6),
-							 "ERROR: prepareTextureMDL() Invalid number of layers ({}), cube Maps must have 6 layers!", dimension.z);
-
-			// For cube maps we need clamped address mode to avoid artifacts in the corners.
-			
 		}
 		transaction->commit();
 	}

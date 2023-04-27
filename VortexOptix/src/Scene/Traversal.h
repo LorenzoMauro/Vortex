@@ -5,6 +5,7 @@ namespace vtx {
 
 	namespace graph
 	{
+		class Light;
 		class Node;
 		class Transform;
 		class Instance;
@@ -33,6 +34,7 @@ namespace vtx {
 		virtual void visit(std::shared_ptr<graph::Texture> texture)= 0;
 		virtual void visit(std::shared_ptr<graph::BsdfMeasurement> bsdfMeasurement) = 0;
 		virtual void visit(std::shared_ptr<graph::LightProfile> lightProfile) = 0;
+		virtual void visit(std::shared_ptr<graph::Light> lightProfile) = 0;
 	};
 
 }

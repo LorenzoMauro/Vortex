@@ -10,12 +10,6 @@
 
 namespace vtx::graph
 {
-	// Defines for the DeviceShaderConfiguration::flags
-	#define IS_THIN_WALLED     (1u << 0)
-	// These flags are used to control which specific hit record is used.
-	#define USE_EMISSION       (1u << 1)
-	#define USE_CUTOUT_OPACITY (1u << 2)
-
 	using namespace mi;
 	using namespace base;
 	using namespace neuraylib;
@@ -60,42 +54,8 @@ namespace vtx::graph
 			mi::math::Color scatteringCoefficient;
 			Float32			directionalBias{};
 			Float32			cutoutOpacity{};
+			bool            isEmissive = false;
 
-			bool isEmissive()
-			{
-				// Check if front face is emissive
-				if (isSurfaceEdfValid) {
-					if (!isSurfaceIntensityConstant) {
-						return true;
-					}
-					else {
-						if (surfaceIntensity[0] != 0.0f || surfaceIntensity[1] != 0.0f || surfaceIntensity[2] != 0.0f) {
-							return true;
-						}
-					}
-				}
-
-				// To be emissive on the backface it needs to be thinWalled
-				if (isThinWalledConstant) {
-					if (!thinWalled) {
-						return false;
-					}
-				}
-
-				// Check if back face is emissive
-				if (isBackfaceEdfValid) {
-					if (!isBackfaceIntensityConstant) {
-						return true;
-					}
-					else {
-						if (backfaceIntensity[0] != 0.0f || backfaceIntensity[1] != 0.0f || backfaceIntensity[2] != 0.0f) {
-							return true;
-						}
-					}
-				}
-
-				return false;
-			}
 		};
 
 		struct FunctionNames {
@@ -154,9 +114,11 @@ namespace vtx::graph
 
 			std::shared_ptr<optix::ProgramOptix> pgSurfaceScatteringSample;
 			std::shared_ptr<optix::ProgramOptix> pgSurfaceScatteringEval;
+			std::shared_ptr<optix::ProgramOptix> pgSurfaceScatteringAuxiliary;
 
 			std::shared_ptr<optix::ProgramOptix> pgBackfaceScatteringSample;
 			std::shared_ptr<optix::ProgramOptix> pgBackfaceScatteringEval;
+			std::shared_ptr<optix::ProgramOptix> pgBackfaceScatteringAuxiliary;
 
 			std::shared_ptr<optix::ProgramOptix> pgSurfaceEmissionEval;
 			std::shared_ptr<optix::ProgramOptix> pgSurfaceEmissionIntensity;
@@ -177,7 +139,10 @@ namespace vtx::graph
 			std::shared_ptr<optix::ProgramOptix> pgHairSample;
 			std::shared_ptr<optix::ProgramOptix> pgHairEval;
 
-			unsigned int  flags;
+			bool isEmissive = false;
+			bool isThinWalled = true;
+			bool hasOpacity = false;
+			//unsigned int  flags;
 		};
 
 		void init();
@@ -198,6 +163,8 @@ namespace vtx::graph
 
 		void accept(std::shared_ptr<NodeVisitor> visitor) override;
 		std::string getMaterialDbName();
+
+		bool isEmissive();
 
 		std::vector<std::shared_ptr<graph::Texture>>  getTextures();
 		std::vector<std::shared_ptr<graph::BsdfMeasurement>>  getBsdfs();

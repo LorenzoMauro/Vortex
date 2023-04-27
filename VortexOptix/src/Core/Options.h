@@ -16,7 +16,12 @@ namespace vtx {
 #else
 		bool isDebug = true;
 #endif
-
+		////////////////////////////////////////////////////////////////////////////////////
+		/////////////////// Rendering Settings /////////////////////////////////////////////
+		////////////////////////////////////////////////////////////////////////////////////
+		uint32_t                      maxBounces = 5;
+		uint32_t                      maxSamples = 500;
+		bool                          accumulate = true;
 		////////////////////////////////////////////////////////////////////////////////////
 		/////////////////// Optix Options //////////////////////////////////////////////////
 		////////////////////////////////////////////////////////////////////////////////////
@@ -30,11 +35,11 @@ namespace vtx {
 		////////////////////////////////////////////////////////////////////////////////////
 		/////////////////// MDL Options ////////////////////////////////////////////////////
 		////////////////////////////////////////////////////////////////////////////////////
-		std::vector<std::string> mdlSearchPath = { "./data/", "./" , "E:/Dev/OptixTut/bin/Debug-windows-x86_64/OptixApp/mdl"};
-		int numTextureSpaces = 1;//should be set to 1 for performance reasons If you do not use the hair BSDF.
-		int numTextureResults = 16;
-		bool enable_derivatives = false;
-		const char* mdlOptLevel = "2";
+		std::vector<std::string> mdlSearchPath      = { "./data/", "./" , "E:/Dev/OptixTut/bin/Debug-windows-x86_64/OptixApp/mdl"};
+		int                      numTextureSpaces   = 1; //should be set to 1 for performance reasons If you do not use the hair BSDF.
+		int                      numTextureResults  = 16;
+		bool                     enable_derivatives = false;
+		const char*              mdlOptLevel        = "2";
 	};
 
 	Options* getOptions();

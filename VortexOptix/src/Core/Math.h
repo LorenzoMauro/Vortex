@@ -1,8 +1,8 @@
 #pragma once
 #ifndef H_MATH
 #define H_MATH
-#include "gdt/math/vec.h"
-#include "gdt/math/AffineSpace.h"
+#include "math/vec.h"
+#include "math/AffineSpace.h"
 #include <tuple>
 #include <cuda_runtime.h>
 
@@ -17,6 +17,18 @@ namespace vtx::math
 	template<typename T>
 	constexpr auto length = gdt::length<T>;
 
+	template<typename T>
+	__both__ T max(T a , T b)
+	{
+		return a > b ? a : b;
+	}
+
+	template<typename T>
+	__both__ T min(T a, T b)
+	{
+		return a < b ? a : b;
+	}
+	
 
 	using OneTy = gdt::OneTy;
 	static OneTy Identity = gdt::one;
@@ -34,10 +46,10 @@ namespace vtx::math
 	///////////////////////////////////////////////////////////////////////////
 		///// Vector Definitions //////////////////////////////////////////////////
 		///////////////////////////////////////////////////////////////////////////
-
+	
 	template<typename T, int N>
 	using vec_t = gdt::vec_t<T, N>;
-		
+
 	template<typename T>
 	using vec3a_t = gdt::vec3a_t<T>;
 		
@@ -112,7 +124,7 @@ namespace vtx::math
 		using gdt::AffineSpaceT<T>::AffineSpaceT; // Inherit all constructors
 
 		/* Assign values to a transform matrix expressed as float[12] with a conversion operator*/
-		inline operator Scalar_t* () const {
+		inline __both__  operator Scalar_t* () const {
 			auto* m = (Scalar_t*)alloca(12 * sizeof(Scalar_t));
 			m[0] = (Scalar_t)l.vx.x; m[1] = (Scalar_t)l.vy.x; m[2] = (Scalar_t)l.vz.x; m[3] = (Scalar_t)p.x;
 			m[4] = (Scalar_t)l.vx.y; m[5] = (Scalar_t)l.vy.y; m[6] = (Scalar_t)l.vz.y; m[7] = (Scalar_t)p.y;
@@ -120,8 +132,16 @@ namespace vtx::math
 			return m;
 		}
 
+		inline __both__ operator float4* () const {
+			auto* m = (float4*)alloca(3 * sizeof(float4));
+			m[0].x = (float)l.vx.x; m[0].y = (float)l.vx.y; m[0].z = (float)l.vx.z; m[0].w = 0.0f;
+			m[1].x = (float)l.vy.x; m[1].y = (float)l.vy.y; m[1].z = (float)l.vy.z; m[1].w = 0.0f;
+			m[2].x = (float)l.vz.x; m[2].y = (float)l.vz.y; m[2].z = (float)l.vz.z; m[2].w = 0.0f;
+			return m;
+		}
+
 		//Constructor from Scalar_t[12] array in row major order
-		AffineSpaceT(const Scalar_t* rowMajor)
+		__both__ AffineSpaceT(const Scalar_t* rowMajor)
 		{
 			l.vx.x = rowMajor[0]; l.vy.x = rowMajor[1]; l.vz.x = rowMajor[2]; p.x = rowMajor[3];
 			l.vx.y = rowMajor[4]; l.vy.y = rowMajor[5]; l.vz.y = rowMajor[6]; p.y = rowMajor[7];
@@ -129,7 +149,7 @@ namespace vtx::math
 		}
 //#ifdef __CUDACC__
 		//Constructor from float4 array in row major order
-		__host__ __device__ AffineSpaceT(const float4* rowMajor)
+		__both__  AffineSpaceT(const float4* rowMajor)
 		{
 			l.vx.x = rowMajor[0].x;
 			l.vx.y = rowMajor[1].x;
@@ -233,6 +253,7 @@ namespace vtx::math
 	static vec3f yAxis = vec3f{ 0.0f, 1.0f, 0.0f };
 	static vec3f zAxis = vec3f{ 0.0f, 0.0f, 1.0f };
 	static vec3f origin = vec3f{ 0.0f, 0.0f, 1.0f };
+
 }
 
 #endif // !__GDT_MATH_H__

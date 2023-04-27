@@ -29,6 +29,7 @@ namespace vtx::graph
 		NT_INSTANCE,
 		NT_MESH,
 		NT_TRANSFORM,
+		NT_LIGHT,
 
 		NT_CAMERA,
 		NT_RENDERER,
@@ -56,6 +57,8 @@ namespace vtx::graph
 		virtual void traverse(const std::vector<std::shared_ptr<NodeVisitor>>& orderedVisitors) = 0;
 
 		virtual void accept(std::shared_ptr<NodeVisitor> visitor) = 0;
+	public:
+		bool isUpdated;
 	protected:
 		template <class Derived>
 		std::shared_ptr<Derived> sharedFromBase()
@@ -66,6 +69,5 @@ namespace vtx::graph
 		std::shared_ptr<SIM> sim;
 		NodeType type;
 		vtxID id;
-		bool isUpdated;
 	};
 }

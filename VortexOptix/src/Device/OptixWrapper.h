@@ -1,8 +1,8 @@
 #pragma once
 #include "cuda.h"
 #include "cuda_runtime.h"
-#include "CUDABuffer.h"
-#include "CUDAMap.h"
+#include "UploadCode/CUDABuffer.h"
+#include "UploadCode/CUDAMap.h"
 #include "Core/Math.h"
 #include <map>
 

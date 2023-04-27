@@ -6,9 +6,10 @@
 #include "Core/math.h"
 #include "Core/VortexID.h"
 #include "cuda.h"
-#include "Device/CUDAmap.h"
+#include "Device/UploadCode/CUDAmap.h"
 #include <mi/neuraylib/target_code_types.h>
 #include "Scene/DataStructs/VertexAttribute.h"
+#include "Scene/Nodes/LightTypes.h"
 
 namespace vtx {
 
@@ -50,9 +51,12 @@ namespace vtx {
         PrimitiveType				type;
         OptixTraversableHandle		traversable;
         graph::VertexAttributes*	vertexAttributeData;
+        graph::FaceAttributes*      faceAttributeData;
+
         vtxID*					    indicesData;
         size_t						numVertices;
         size_t						numIndices;
+        size_t                      numFaces;
     };
 
     struct InstanceData
@@ -60,41 +64,47 @@ namespace vtx {
 	    vtxID						instanceId;
         vtxID                       geometryDataId;
         vtxID*                      materialsDataId;
+	    vtxID*                      meshLightDataId;
         int                         numberOfMaterials;
-	};
+        math::affine3f              transform;
+    };
 
     struct DeviceShaderConfiguration
     {
-        unsigned int flags; // See defines above.
+        bool isEmissive = false;
+        bool isThinWalled = true;
+        bool hasOpacity = false;
 
-        int idxCallInit; // The material global init function.
+        int idxCallInit = -1; // The material global init function.
 
-        int idxCallThinWalled;
+        int idxCallThinWalled = -1;
 
-        int idxCallSurfaceScatteringSample;
-        int idxCallSurfaceScatteringEval;
+        int idxCallSurfaceScatteringSample = -1;
+        int idxCallSurfaceScatteringEval = -1;
+        int idxCallSurfaceScatteringAuxiliary = -1;
 
-        int idxCallBackfaceScatteringSample;
-        int idxCallBackfaceScatteringEval;
+        int idxCallBackfaceScatteringSample = -1;
+        int idxCallBackfaceScatteringEval = -1;
+        int idxCallBackfaceScatteringAuxiliary = -1;
 
-        int idxCallSurfaceEmissionEval;
-        int idxCallSurfaceEmissionIntensity;
-        int idxCallSurfaceEmissionIntensityMode;
+        int idxCallSurfaceEmissionEval = -1;
+        int idxCallSurfaceEmissionIntensity = -1;
+        int idxCallSurfaceEmissionIntensityMode = -1;
 
-        int idxCallBackfaceEmissionEval;
-        int idxCallBackfaceEmissionIntensity;
-        int idxCallBackfaceEmissionIntensityMode;
+        int idxCallBackfaceEmissionEval = -1;
+        int idxCallBackfaceEmissionIntensity = -1;
+        int idxCallBackfaceEmissionIntensityMode = -1;
 
-        int idxCallIor;
+        int idxCallIor = -1;
 
-        int idxCallVolumeAbsorptionCoefficient;
-        int idxCallVolumeScatteringCoefficient;
-        int idxCallVolumeDirectionalBias;
+        int idxCallVolumeAbsorptionCoefficient = -1;
+        int idxCallVolumeScatteringCoefficient = -1;
+        int idxCallVolumeDirectionalBias = -1;
 
-        int idxCallGeometryCutoutOpacity;
+        int idxCallGeometryCutoutOpacity = -1;
 
-        int idxCallHairSample;
-        int idxCallHairEval;
+        int idxCallHairSample = -1;
+        int idxCallHairEval = -1;
 
         // The constant expression values:
         //bool thin_walled; // Stored inside flags.
@@ -111,11 +121,29 @@ namespace vtx {
 
     struct TextureData
     {
-        CUtexObject     texObj; 
-        CUtexObject     texObjUnfiltered;
-        math::vec4ui    dimension;
-        math::vec3f     invSize;
+        cudaTextureObject_t     texObj;
+        cudaTextureObject_t     texObjUnfiltered;
+        math::vec4ui            dimension;
+        math::vec3f             invSize;
 
+    };
+
+
+    struct MeshLightAttributes
+    {
+        vtxID           instanceId;
+        vtxID           materialID;
+
+        float*          cdfArea;
+        uint32_t*       actualTriangleIndices;
+        float           totalArea;
+        int             size;
+    };
+    struct LightData
+    {
+        LightType   type;
+        CUdeviceptr attributes;
+        
     };
 
     struct BsdfSamplingPartData
@@ -171,8 +199,28 @@ namespace vtx {
 
     struct FrameBufferData
     {
-        CUdeviceptr                                 colorBuffer{};
+        enum FrameBufferType
+        {
+            FB_NOISY,
+            FB_DIFFUSE,
+            FB_ORIENTATION,
+            FB_TRUE_NORMAL,
+            FB_SHADING_NORMAL,
+            FB_DEBUG_1,
+            FB_DEBUG_2,
+            FB_DEBUG_3
+        };
+        math::vec3f*                                radianceBuffer;
+        CUdeviceptr                                 outputBuffer{};
         math::vec2ui                                frameSize;
+        FrameBufferType                             frameBufferType;
+    };
+
+    struct RendererDeviceSettings
+    {
+        int	        iteration;
+        int	        maxBounces;
+        bool		accumulate;
     };
 
 	struct LaunchParams
@@ -180,6 +228,7 @@ namespace vtx {
         int*                                    frameID;
         FrameBufferData                         frameBuffer;
     	CameraData                              cameraData;
+        RendererDeviceSettings*                 settings;
 
         OptixTraversableHandle                  topObject;
     	CudaMap<vtxID, InstanceData>*			instanceMap;
@@ -191,6 +240,7 @@ namespace vtx {
 		CudaMap<vtxID, TextureData>*			textureMap;
         CudaMap<vtxID, BsdfData>*				bsdfMap;
         CudaMap<vtxID, LightProfileData>*		lightProfileMap;
+        CudaMap<vtxID, LightData>*              lightMap;
     };
 
     enum TypeRay

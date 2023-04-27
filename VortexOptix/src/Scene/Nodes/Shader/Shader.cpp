@@ -1,6 +1,7 @@
 #include "Shader.h"
 #include "Scene/Traversal.h"
 #include "MDL/MdlWrapper.h"
+#include "ShaderFlags.h"
 
 namespace vtx::graph
 {
@@ -91,12 +92,14 @@ namespace vtx::graph
 		{
 			devicePrograms.pgSurfaceScatteringSample = optix::createDcProgram(module, fNames.surfaceScattering + "_sample");
 			devicePrograms.pgSurfaceScatteringEval = optix::createDcProgram(module, fNames.surfaceScattering + "_evaluate");
+			devicePrograms.pgSurfaceScatteringAuxiliary = optix::createDcProgram(module, fNames.surfaceScattering + "_auxiliary");
 		}
 
 		if (config.isBackfaceBsdfValid)
 		{
 			devicePrograms.pgBackfaceScatteringSample = optix::createDcProgram(module, fNames.backfaceScattering + "_sample");
 			devicePrograms.pgBackfaceScatteringEval = optix::createDcProgram(module, fNames.backfaceScattering + "_evaluate");
+			devicePrograms.pgBackfaceScatteringAuxiliary = optix::createDcProgram(module, fNames.backfaceScattering + "_auxiliary");
 		}
 
 		if (config.isSurfaceEdfValid)
@@ -118,7 +121,7 @@ namespace vtx::graph
 		{
 			if (config.useBackfaceEdf)
 			{
-				devicePrograms.pgBackfaceEmissionEval = optix::createDcProgram(module, fNames.backfaceEmissionEmission);
+				devicePrograms.pgBackfaceEmissionEval = optix::createDcProgram(module, fNames.backfaceEmissionEmission + "_evaluate");
 			}
 			else // Surface and backface expressions were identical. Reuse the code of the surface expression.
 			{
@@ -150,9 +153,9 @@ namespace vtx::graph
 			}
 		}
 
-		if (config.isEmissive())
+		if (config.isEmissive)
 		{
-			devicePrograms.flags |= USE_EMISSION;
+			devicePrograms.isEmissive = true;
 		}
 
 		if (!config.isIorConstant)
@@ -186,7 +189,7 @@ namespace vtx::graph
 
 		if (config.useCutoutOpacity)
 		{
-			devicePrograms.flags |= USE_CUTOUT_OPACITY;
+			devicePrograms.hasOpacity = true;
 
 			if (!config.isCutoutOpacityConstant)
 			{
@@ -244,6 +247,15 @@ namespace vtx::graph
 			init();
 		}
 		return materialDbName;
+	}
+
+	bool Shader::isEmissive()
+	{
+		if(!isInitialized)
+		{
+			init();
+		}
+		return config.isEmissive;
 	}
 
 	std::vector<std::shared_ptr<graph::Texture>>  Shader::getTextures()

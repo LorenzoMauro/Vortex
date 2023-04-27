@@ -1,5 +1,10 @@
+#ifndef OPTIXCODE
+#define OPTIXCODE
+#endif
+
 #include "LaunchParams.h"
 #include "Core/Math.h"
+
 
 namespace vtx {
 

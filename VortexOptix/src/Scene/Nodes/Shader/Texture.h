@@ -2,7 +2,7 @@
 #include "Scene/Node.h"
 #include <mi/mdl_sdk.h>
 
-#include "Device/CUDABuffer.h"
+#include "Device/UploadCode/CUDABuffer.h"
 
 namespace vtx::graph
 {

@@ -5,7 +5,7 @@ namespace vtx::graph
 {
 	void Scene::start() {
 		graphIndexManager = std::make_shared<SIM>();
-		SIM::s_Instance = graphIndexManager;
+		SIM::sInstance = graphIndexManager;
 
 		//////////////////////////////////////////////////////////////////////////
 		//////////////// Scene Graph /////////////////////////////////////////////
@@ -13,54 +13,92 @@ namespace vtx::graph
 
 		sceneRoot = ops::createNode<Group>();
 		VTX_INFO("Starting Scene");
-		std::shared_ptr<Mesh> Cube = ops::createBox();
+		std::shared_ptr<Mesh> cube = ops::createBox();
 
-		std::shared_ptr<Transform> Transformation_1 = ops::createNode<Transform>();
-		Transformation_1->translate(math::xAxis, 2.0f);
+		std::shared_ptr<Transform> transformation1 = ops::createNode<Transform>();
+		transformation1->translate(math::xAxis, 2.0f);
 
-		std::shared_ptr<Instance> instance_1 = ops::createNode<Instance>();
-		instance_1->setChild(Cube);
-		instance_1->setTransform(Transformation_1);
-		sceneRoot->addChild(instance_1);
+		std::shared_ptr<Instance> instance1 = ops::createNode<Instance>();
+		instance1->setChild(cube);
+		instance1->setTransform(transformation1);
 
-		std::shared_ptr<Transform> Transformation_2 = ops::createNode<Transform>();
-		Transformation_2->translate(math::yAxis, 2.0f);
+		std::shared_ptr<Transform> transformation2 = ops::createNode<Transform>();
+		transformation2->translate(math::yAxis, 2.0f);
 
-		std::shared_ptr<Instance> instance_2 = ops::createNode<Instance>();
-		instance_2->setChild(Cube);
-		instance_2->setTransform(Transformation_2);
-		sceneRoot->addChild(instance_2);
+		std::shared_ptr<Instance> instance2 = ops::createNode<Instance>();
+		instance2->setChild(cube);
+		instance2->setTransform(transformation2);
 
 
-		std::shared_ptr<Transform> Transformation_3 = ops::createNode<Transform>();
-		Transformation_3->translate(math::zAxis, 2.0f);
+		std::shared_ptr<Transform> transformation3 = ops::createNode<Transform>();
+		transformation3->rotateDegree(math::xAxis, 45.0f);
+		transformation3->translate(math::zAxis, 2.0f);
 
-		std::shared_ptr<Instance> instance_3 = ops::createNode<Instance>();
-		instance_3->setChild(Cube);
-		instance_3->setTransform(Transformation_3);
-		sceneRoot->addChild(instance_3);
+		std::shared_ptr<Instance> instance3 = ops::createNode<Instance>();
+		instance3->setChild(cube);
+		instance3->setTransform(transformation3);
 
-		if(false)
+
+		std::shared_ptr<Mesh> plane = ops::createPlane();
+
+		std::shared_ptr<Transform> transformation4 = ops::createNode<Transform>();
+		transformation4->rotateDegree(math::xAxis, 180.0f);
+		transformation4->translate(math::zAxis, 5.0f);
+
+		std::shared_ptr<Instance> instance4 = ops::createNode<Instance>();
+		instance4->setChild(plane);
+		instance4->setTransform(transformation4);
+
+
+		std::shared_ptr<Transform> transformation5 = ops::createNode<Transform>();
+		transformation5->scale(100.0f);
+		transformation5->translate(math::zAxis, -1.0f);
+
+		std::shared_ptr<Instance> instance5 = ops::createNode<Instance>();
+		instance5->setChild(plane);
+		instance5->setTransform(transformation5);
+
+
+		sceneRoot->addChild(instance1);
+		sceneRoot->addChild(instance2);
+		sceneRoot->addChild(instance3);
+		sceneRoot->addChild(instance4);
+		sceneRoot->addChild(instance5);
+
+		if(true)
 		{
-			std::shared_ptr<Shader> stoneMediteranneanShader = ops::createNode<Shader>();
-			stoneMediteranneanShader->name = "Stone_Mediterranean";
-			stoneMediteranneanShader->path = "\\vMaterials_2\\Stone\\Stone_Mediterranean.mdl";
-			//stoneMediteranneanShader->name = "bsdf_diffuse_reflection";
-			//stoneMediteranneanShader->path = "\\bsdf_diffuse_reflection.mdl";
-			std::shared_ptr<Material> stoneMediteranneanMaterial = ops::createNode<Material>();
-			stoneMediteranneanMaterial->setShader(stoneMediteranneanShader);
+			std::shared_ptr<Shader> shader1 = ops::createNode<Shader>();
+			shader1->name = "Stone_Mediterranean";
+			shader1->path = "\\vMaterials_2\\Stone\\Stone_Mediterranean.mdl";
+			//Shader1->name = "bsdf_diffuse_reflection";
+			//Shader1->path = "\\bsdf_diffuse_reflection.mdl";
+			std::shared_ptr<Material> material1 = ops::createNode<Material>();
+			material1->setShader(shader1);
 
 
-			std::shared_ptr<Shader> carbonFibershader = ops::createNode<Shader>();
-			carbonFibershader->name = "Carbon_Fiber";
-			carbonFibershader->path = "\\vMaterials_2\\Composite\\Carbon_Fiber.mdl";
-			//carbonFibershader->name = "bsdf_specular_reflect_transmit";
-			//carbonFibershader->path = "\\bsdf_specular_reflect_transmit.mdl";
-			std::shared_ptr<Material> carbonFiberMaterial = ops::createNode<Material>();
-			carbonFiberMaterial->setShader(carbonFibershader);
+			//std::shared_ptr<Shader> Shader2 = ops::createNode<Shader>();
+			//Shader2->name = "Carbon_Fiber";
+			//Shader2->path = "\\vMaterials_2\\Composite\\Carbon_Fiber.mdl";
+			////Shader2->name = "bsdf_specular_reflect_transmit";
+			////Shader2->path = "\\bsdf_specular_reflect_transmit.mdl";
+			//std::shared_ptr<Material> Material2 = ops::createNode<Material>();
+			//Material2->setShader(Shader2);
 
-			instance_1->addMaterial(stoneMediteranneanMaterial);
-			instance_2->addMaterial(carbonFiberMaterial);
+			std::shared_ptr<Shader> shaderEmissive = ops::createNode<Shader>();
+			shaderEmissive->name = "naturalwhite_4000k";
+			shaderEmissive->path = "\\nvidia\\vMaterials\\AEC\\Lights\\Lights_Emitter.mdl";
+			std::shared_ptr<Material> materialEmissive = ops::createNode<Material>();
+			materialEmissive->setShader(shaderEmissive);
+
+			instance1->addMaterial(material1);
+			instance2->addMaterial(material1);
+			instance3->addMaterial(material1);
+			instance5->addMaterial(material1);
+			//instance4->addMaterial(material1);
+			//instance1->addMaterial(materialEmissive);
+			//instance2->addMaterial(materialEmissive);
+			//instance3->addMaterial(materialEmissive);
+			instance4->addMaterial(materialEmissive);
 		}
 
 		//////////////////////////////////////////////////////////////////////////

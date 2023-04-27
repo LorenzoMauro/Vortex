@@ -5,15 +5,24 @@
 #include "Core/Utils.h"
 #include <cudaGL.h>
 #include "Device/OptixWrapper.h"
+#include "Device/UploadCode/UploadBuffers.h"
+#include "Device/UploadCode/UploadData.h"
 #include "Scene/Traversal.h"
 
 namespace vtx::graph
 {
+
+
 	Renderer::Renderer() :
 		Node(NT_RENDERER),
 		width(getOptions()->width),
 		height(getOptions()->height)
 	{
+		settings = RendererSettings();
+		settings.iteration = 0;
+		settings.maxBounces = getOptions()->maxBounces;
+		settings.accumulate = getOptions()->accumulate;
+		settings.maxSamples = getOptions()->maxSamples;
 	}
 
 	void Renderer::setCamera(std::shared_ptr<Camera> _camera) {
@@ -46,9 +55,11 @@ namespace vtx::graph
 
 	void Renderer::render()
 	{
-		const LaunchParams& launchParams = device::getLaunchParams();
-		const CUDABuffer& launchParamsBuffer = device::getLaunchParamsBuffer();
 
+		const LaunchParams& launchParams = UPLOAD_DATA->launchParams;
+		const CUDABuffer& launchParamsBuffer = UPLOAD_BUFFERS->launchParamsBuffer;
+
+		
 		if (launchParams.frameBuffer.frameSize.x == 0) return;
 
 		device::incrementFrame();
@@ -57,6 +68,7 @@ namespace vtx::graph
 		const OptixPipeline& pipeline = optix::getRenderingPipeline()->getPipeline();
 		const OptixShaderBindingTable& sbt = optix::getRenderingPipeline()->getSbt();
 
+		timer.reset();
 		const auto result = optixLaunch(/*! pipeline we're launching launch: */
 			pipeline, state.stream,
 			/*! parameters and SBT */
@@ -68,6 +80,22 @@ namespace vtx::graph
 			launchParams.frameBuffer.frameSize.y,
 			1
 		);
+		CUDA_SYNC_CHECK();
+
+		frameTime = timer.elapsedMillis();
+		if(settings.iteration == 0)
+		{
+			totalTimeSeconds = 0;
+		}
+		else
+		{
+			totalTimeSeconds += frameTime/1000.0f;
+		}
+
+		fps = (float)(settings.iteration + 1) / totalTimeSeconds;
+		sppS = ((float)width*(float)height*((float)settings.iteration + 1))/totalTimeSeconds;
+		averageFrameTime = (float)(settings.iteration + 1) / (totalTimeSeconds *1000.0f);
+
 		OPTIX_CHECK(result);
 	}
 
@@ -83,7 +111,7 @@ namespace vtx::graph
 
 	void Renderer::copyToGl() {
 		optix::State& state = *(optix::getState());
-		LaunchParams& launchParams = device::getLaunchParams();
+		const LaunchParams& launchParams = UPLOAD_DATA->launchParams;
 
 		CUresult result = cuGraphicsMapResources(1, &cudaGraphicsResource, state.stream); // This is an implicit cuSynchronizeStream().
 		CU_CHECK(result);
@@ -92,13 +120,13 @@ namespace vtx::graph
 		CUDA_MEMCPY3D params = {};
 
 		params.srcMemoryType = CU_MEMORYTYPE_DEVICE;
-		params.srcDevice = launchParams.frameBuffer.colorBuffer;
-		params.srcPitch = launchParams.frameBuffer.frameSize.x * sizeof(uint32_t);
+		params.srcDevice = launchParams.frameBuffer.outputBuffer;
+		params.srcPitch = launchParams.frameBuffer.frameSize.x * sizeof(math::vec4f);
 		params.srcHeight = launchParams.frameBuffer.frameSize.y;
 
 		params.dstMemoryType = CU_MEMORYTYPE_ARRAY;
 		params.dstArray = dstArray;
-		params.WidthInBytes = launchParams.frameBuffer.frameSize.x * sizeof(uint32_t);
+		params.WidthInBytes = launchParams.frameBuffer.frameSize.x * sizeof(math::vec4f);
 		params.Height = launchParams.frameBuffer.frameSize.y;
 		params.Depth = 1;
 

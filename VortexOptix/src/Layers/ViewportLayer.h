@@ -2,7 +2,7 @@
 #include "Scene/Nodes/Renderer.h"
 #include "Layers/GuiLayer.h"
 #include "Core/Options.h"
-#include "Device/DeviceData.h"
+#include "Device/DeviceVisitor.h"
 #include "Scene/HostVisitor.h"
 
 namespace vtx {

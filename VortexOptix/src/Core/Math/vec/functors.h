@@ -17,6 +17,7 @@
 #pragma once
 
 #include <type_traits>
+#include <vector_types.h>
 
 namespace gdt {
 
@@ -153,6 +154,11 @@ namespace gdt {
   { return vec_t<T,3>(a.x op b.x, a.y op b.y, a.z op b.z); }            \
                                                                         \
   template<typename T>                                                  \
+  inline __both__ vec_t<T,3> operator op(const vec_t<T,3> &a,           \
+                                         const float3 &b)               \
+  { return vec_t<T,3>(a.x op b.x, a.y op b.y, a.z op b.z); }            \
+                                                                        \
+  template<typename T>                                                  \
   inline __both__ vec_t<T,4> operator op(const vec_t<T,4> &a,           \
                                          const vec_t<T,4> &b)           \
   { return vec_t<T,4>(a.x op b.x,a.y op b.y,a.z op b.z,a.w op b.w); }   \
@@ -259,6 +265,18 @@ namespace gdt {
     a.w op (T)b.w;                                                      \
     return a;                                                           \
   }                                                                     \
+																		\
+                                                                        \
+  template<typename T>                                                  \
+  inline __both__ vec_t<T,3> &operator_op(vec_t<T,3> &a,                \
+                                          const float3 &b)              \
+  {                                                                     \
+    a.x op (T)b.x;                                                      \
+    a.y op (T)b.y;                                                      \
+    a.z op (T)b.z;                                                      \
+    return a;                                                           \
+  }                                                                     \
+																		\
                                                                         \
   /* vec op scalar */                                                   \
   template<typename T, typename OT>                                     \

@@ -1,5 +1,8 @@
 ﻿#include "HostVisitor.h"
+#include "SIM.h"
 #include "MDL//mdlWrapper.h"
+#include "Nodes/Instance.h"
+
 namespace vtx
 {
 	void HostVisitor::visit(std::shared_ptr<graph::Instance> instance) {
@@ -38,4 +41,9 @@ namespace vtx
 	void HostVisitor::visit(std::shared_ptr<graph::LightProfile> lightProfile) {
 
 	};
+
+	void HostVisitor::visit(std::shared_ptr<graph::Light> lightNode) {
+
+	};
+	
 }

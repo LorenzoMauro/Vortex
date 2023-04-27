@@ -32,6 +32,9 @@ namespace vtx::graph
 
 		math::vec3f transformPoint(const math::vec3f& vector);
 
+		/* Scale utility given float */
+		void scale(float scale);
+
 		/* Translation utility given vector */
 		void translate(const math::vec3f& translation);
 
