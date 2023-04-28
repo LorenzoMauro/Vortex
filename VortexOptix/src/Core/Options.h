@@ -3,6 +3,8 @@
 #include <string>
 #include <vector>
 
+#include "Device/DevicePrograms/LaunchParams.h"
+
 namespace vtx {
 	struct Options {
 		int width = 2100;
@@ -13,15 +15,18 @@ namespace vtx {
 		float ClearColor[4] = { 0.45f, 0.55f, 0.60f, 1.00f };
 #ifdef NDEBUG
 		bool isDebug = false;
-#else
+		#else
 		bool isDebug = true;
 #endif
 		////////////////////////////////////////////////////////////////////////////////////
 		/////////////////// Rendering Settings /////////////////////////////////////////////
 		////////////////////////////////////////////////////////////////////////////////////
-		uint32_t                      maxBounces = 5;
-		uint32_t                      maxSamples = 500;
-		bool                          accumulate = true;
+		
+		uint32_t									maxBounces = 5;
+		uint32_t									maxSamples = 500;
+		bool										accumulate = true;
+		RendererDeviceSettings::SamplingTechnique   samplingTechnique	= RendererDeviceSettings::SamplingTechnique::S_BSDF;
+		RendererDeviceSettings::DisplayBuffer		displayBuffer		= RendererDeviceSettings::DisplayBuffer::FB_NOISY;
 		////////////////////////////////////////////////////////////////////////////////////
 		/////////////////// Optix Options //////////////////////////////////////////////////
 		////////////////////////////////////////////////////////////////////////////////////

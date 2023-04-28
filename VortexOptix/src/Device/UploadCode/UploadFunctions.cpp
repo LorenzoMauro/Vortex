@@ -33,45 +33,36 @@ namespace vtx::device
 			VTX_ERROR("Requesting Mesh device Data of Mesh Node {} but not found!", meshId);
 		}
 
-		std::vector<vtxID> materialsIds;
-		std::vector<vtxID> meshLightIds;
-		for (std::shared_ptr<graph::Material> materialNode : instanceNode->getMaterials())
+		std::vector<InstanceData::SlotIds> materialSlots;
+		for (const graph::MaterialSlot& materialSlot : instanceNode->getMaterialSlots())
 		{
-			vtxID materialId = materialNode->getID();
+			InstanceData::SlotIds slotIds = {0,0};
 
-			if (materialDataMap.contains(materialId))
+			if (vtxID materialId = materialSlot.material->getID(); materialDataMap.contains(materialId))
 			{
-				materialsIds.push_back(materialId);
+				slotIds.materialId = materialId;
 
-				std::shared_ptr<graph::Light> lightNode = instanceNode->getMeshLight(materialId);
-				if(lightNode)
-				{
-					meshLightIds.push_back(lightNode->getID());
-				}
-				else
-				{
-					meshLightIds.push_back(INVALID_INDEX);
+				if (vtxID lightId = materialSlot.meshLight->getID(); lightDataMap.contains(lightId)) {
+					slotIds.meshLightId = lightId;
 				}
 			}
 			else
 			{
 				VTX_ERROR("Requesting Material device Data of Material Node {} but not found!", materialId);
 			}
-		}
-		if (!materialsIds.empty())
-		{
-			CUDABuffer& materialsIdBuffer = GET_BUFFER(Buffers::InstanceBuffers, instanceId, materialsIdBuffer);
-			materialsIdBuffer.upload(materialsIds);
-			data.materialsDataId = materialsIdBuffer.castedPointer<vtxID>();
-			data.numberOfMaterials = materialsIds.size();
 
-			CUDABuffer& meshLightIdBuffer = GET_BUFFER(Buffers::InstanceBuffers, instanceId, meshLightIdBuffer);
-			meshLightIdBuffer.upload(meshLightIds);
-			data.meshLightDataId = meshLightIdBuffer.castedPointer<vtxID>();
+			materialSlots.push_back(slotIds);
+		}
+		if (!materialSlots.empty())
+		{
+			CUDABuffer& materialSlotsBuffer = GET_BUFFER(Buffers::InstanceBuffers, instanceId, materialSlotsBuffer);
+			materialSlotsBuffer.upload(materialSlots);
+			data.materialSlotsId = materialSlotsBuffer.castedPointer<InstanceData::SlotIds>();
+			data.numberOfSlots = materialSlots.size();
 		}
 		else
 		{
-			data.materialsDataId = nullptr;
+			data.materialSlotsId = nullptr;
 		}
 
 		return data;
@@ -451,13 +442,19 @@ namespace vtx::device
 
 		CUresult result;
 		CUarray& textureArray = GET_BUFFER(Buffers::TextureBuffers, textureNode->getID(), textureArray);
+		cudaTextureObject_t& texObj = GET_BUFFER(Buffers::TextureBuffers, textureNode->getID(), texObj);
+		cudaTextureObject_t& texObjUnfiltered = GET_BUFFER(Buffers::TextureBuffers, textureNode->getID(), texObjUnfiltered);
+
 		CUDA_RESOURCE_DESC resourceDescription = uploadTexture(textureNode->imageLayersPointers, descArray3D, textureNode->pixelBytesSize, textureArray);
 
-		result = cuTexObjectCreate(&textureData.texObj, &resourceDescription, &textureDesc, nullptr);
+
+		result = cuTexObjectCreate(&texObj, &resourceDescription, &textureDesc, nullptr);
 		CU_CHECK(result);
-		result = cuTexObjectCreate(&textureData.texObjUnfiltered, &resourceDescription, &textureDescUnfiltered, nullptr);
+		result = cuTexObjectCreate(&texObjUnfiltered, &resourceDescription, &textureDescUnfiltered, nullptr);
 		CU_CHECK(result);
 
+		textureData.texObj = texObj;
+		textureData.texObjUnfiltered = texObjUnfiltered;
 		textureData.dimension = textureNode->dimension;
 		textureData.invSize = math::vec3f{ 1.0f / textureData.dimension.x, 1.0f / textureData.dimension.y, 1.0f / textureData.dimension.z };
 
@@ -469,6 +466,7 @@ namespace vtx::device
 		BsdfSamplingPartData bsdfSamplingData{};
 		CUDABuffer& sampleData = buffers.sampleData;
 		CUDABuffer& albedoData = buffers.albedoData;
+		CUtexObject& evalData = buffers.evalData;
 
 		sampleData.upload(bsdfData.sampleData);
 		albedoData.upload(bsdfData.albedoData);
@@ -520,9 +518,10 @@ namespace vtx::device
 		textureDescription.borderColor[2] = 0.0f;
 		textureDescription.borderColor[3] = 0.0f;
 
-		const CUresult result = cuTexObjectCreate(&bsdfSamplingData.evalData, &resourceDescription, &textureDescription, nullptr);
+		const CUresult result = cuTexObjectCreate(&evalData, &resourceDescription, &textureDescription, nullptr);
 		CU_CHECK(result);
 
+		bsdfSamplingData.evalData = evalData;
 		return bsdfSamplingData;
 	}
 
@@ -595,12 +594,12 @@ namespace vtx::device
 		textureDescription.borderColor[1] = 1.0f;
 		textureDescription.borderColor[2] = 1.0f;
 		textureDescription.borderColor[3] = 1.0f;
-		CUtexObject texObj;
-		CU_CHECK(cuTexObjectCreate(&texObj, &resourceDescription, &textureDescription, nullptr));
+		CUtexObject& evalData = GET_BUFFER(Buffers::LightProfileBuffers, lightProfile->getID(), evalData);
+		CU_CHECK(cuTexObjectCreate(&evalData, &resourceDescription, &textureDescription, nullptr));
 
 		LightProfileData lightProfileData{};
 		lightProfileData.lightProfileArray = lightProfileSourceArray;
-		lightProfileData.evalData = texObj;
+		lightProfileData.evalData = evalData;
 		lightProfileData.cdfData = cdfBuffer.castedPointer<float>();
 		lightProfileData.angularResolution = lightProfile->lightProfileData.resolution;
 		lightProfileData.invAngularResolution = math::vec2f(1.0f / static_cast<float>(lightProfileData.angularResolution.x), 1.0f / static_cast<float>(lightProfileData.angularResolution.y));
@@ -626,45 +625,33 @@ namespace vtx::device
 		//const math::affine3f objectToWorld(tt);
 
 		if (rendererNode->resized) {
-			if (rendererNode->cudaGraphicsResource != nullptr) {
-				const CUresult result = cuGraphicsUnregisterResource(rendererNode->cudaGraphicsResource);
-				CU_CHECK(result);
-			}
-
-			rendererNode->glFrameBuffer.SetSize(rendererNode->width, rendererNode->height);
+			rendererNode->threadData.bufferUpdateReady = false;
 
 			CUDABuffer& cudaOutputBuffer = GET_BUFFER(Buffers::FrameBufferBuffers, rendererNode->getID(), cudaOutputBuffer);
-			cudaOutputBuffer.resize(rendererNode->width * rendererNode->height * sizeof(math::vec4f));
+			cudaOutputBuffer.resize((size_t)rendererNode->width * (size_t)rendererNode->height * sizeof(math::vec4f));
 			UPLOAD_DATA->frameBufferData.outputBuffer = cudaOutputBuffer.dPointer();
 
 			CUDABuffer& radianceBuffer = GET_BUFFER(Buffers::FrameBufferBuffers, rendererNode->getID(), radianceBuffer);
-			radianceBuffer.resize(rendererNode->width * rendererNode->height * sizeof(math::vec3f));
+			radianceBuffer.resize((size_t)rendererNode->width * (size_t)rendererNode->height * sizeof(math::vec3f));
 			UPLOAD_DATA->frameBufferData.radianceBuffer = radianceBuffer.castedPointer<math::vec3f>();
 
 			UPLOAD_DATA->frameBufferData.frameSize.x = rendererNode->width;
 			UPLOAD_DATA->frameBufferData.frameSize.y = rendererNode->height;
 
-			UPLOAD_DATA->frameBufferData.frameBufferType = rendererNode->frameBufferType;
-
-			const CUresult result = cuGraphicsGLRegisterImage(&rendererNode->cudaGraphicsResource,
-															  rendererNode->glFrameBuffer.m_ColorAttachment,
-															  GL_TEXTURE_2D, CU_GRAPHICS_REGISTER_FLAGS_WRITE_DISCARD);
-			CU_CHECK(result);
 			rendererNode->resized = false;
 			UPLOAD_DATA->isFrameBufferUpdated = true;
+			rendererNode->resizeGlBuffer = true;
 		}
-		else if (rendererNode->isUpdated)
-		{
-			UPLOAD_DATA->frameBufferData.frameBufferType = rendererNode->frameBufferType;
-			rendererNode->isUpdated = false;
-			UPLOAD_DATA->isFrameBufferUpdated = true;
-		}
+		
 
 		if(rendererNode->settings.isUpdated)
 		{
-			UPLOAD_DATA->settings.iteration = rendererNode->settings.iteration;
-			UPLOAD_DATA->settings.accumulate = rendererNode->settings.accumulate;
-			UPLOAD_DATA->settings.maxBounces = rendererNode->settings.maxBounces;
+			UPLOAD_DATA->settings.iteration			= rendererNode->settings.iteration;
+			UPLOAD_DATA->settings.accumulate		= rendererNode->settings.accumulate;
+			UPLOAD_DATA->settings.maxBounces		= rendererNode->settings.maxBounces;
+			UPLOAD_DATA->settings.displayBuffer		= rendererNode->settings.displayBuffer;
+			UPLOAD_DATA->settings.samplingTechnique = rendererNode->settings.samplingTechnique;
+
 			UPLOAD_DATA->isSettingsUpdated = true;
 			rendererNode->settings.isUpdated = false;
 		}
@@ -680,6 +667,23 @@ namespace vtx::device
 			cameraNode->updated = false;
 			UPLOAD_DATA->isCameraUpdated = true;
 		}
+	}
+
+
+	SbtProgramIdx setProgramsSbt()
+	{
+		// This is hard Coded, I didn't find a better way which didn't have some hardcoded design or some hash map conversion from string on the device
+		SbtProgramIdx pg{};
+		optix::PipelineOptix* rp = optix::getRenderingPipeline();
+		const CudaMap<vtxID, optix::sbtPosition>& sbtMap = rp->getSbtMap();
+
+		pg.raygen = optix::PipelineOptix::getProgramSbt(sbtMap, "raygen");
+		pg.exception = optix::PipelineOptix::getProgramSbt(sbtMap, "exception");
+		pg.miss = optix::PipelineOptix::getProgramSbt(sbtMap, "miss");
+		pg.hit = optix::PipelineOptix::getProgramSbt(sbtMap, "hit");
+		pg.pinhole = optix::PipelineOptix::getProgramSbt(sbtMap, "pinhole");
+
+		return pg;
 	}
 
 	CUDA_RESOURCE_DESC uploadTexture(

@@ -53,4 +53,6 @@ namespace vtx::device
 	void setRendererData(std::shared_ptr<graph::Renderer> rendererNode);
 
 	void setCameraData(std::shared_ptr<graph::Camera> cameraNode);
+
+	SbtProgramIdx setProgramsSbt();
 }

@@ -6,17 +6,21 @@
 #include "Camera.h"
 #include "Group.h"
 #include "Core/Timer.h"
+#include <mutex>
+#include <condition_variable>
+
 
 namespace vtx::graph
 {
-
 	struct RendererSettings
 	{
-		int			iteration;
-		int			maxBounces;
-		int			maxSamples;
-		bool		accumulate;
-		bool		isUpdated;
+		int					iteration;
+		int					maxBounces;
+		int					maxSamples;
+		bool				accumulate;
+		RendererDeviceSettings::SamplingTechnique	samplingTechnique;
+		RendererDeviceSettings::DisplayBuffer		displayBuffer;
+		bool				isUpdated;
 	};
 
 	class Renderer : public Node
@@ -29,7 +33,7 @@ namespace vtx::graph
 
 		void render();
 
-		GLuint getFrame();
+		GlFrameBuffer getFrame();
 
 		void setCamera(std::shared_ptr<Camera> _camera);
 
@@ -43,12 +47,15 @@ namespace vtx::graph
 
 		void accept(std::shared_ptr<NodeVisitor> visitor) override;
 
-	private:
-		void copyToGl();
+		bool isReady(bool setBusy = false);
 
+		void threadedRender();
+
+		void copyToGl();
 	public:
 		//GL Interop
-		GlFrameBuffer									glFrameBuffer;
+		GlFrameBuffer									drawFrameBuffer;
+		GlFrameBuffer									displayFrameBuffer;
 		CUgraphicsResource								cudaGraphicsResource = nullptr;
 		CUarray											dstArray;
 
@@ -59,7 +66,6 @@ namespace vtx::graph
 		uint32_t										height;
 		RendererSettings								settings;
 		bool											resized = true;
-		FrameBufferData::FrameBufferType				frameBufferType = FrameBufferData::FB_NOISY;
 
 		vtx::Timer timer;
 		float      frameTime;
@@ -67,6 +73,45 @@ namespace vtx::graph
 		float      totalTimeSeconds;
 		float      sppS;
 		float      averageFrameTime;
+
+		struct ThreadData {
+			template <typename Fn>
+			ThreadData(Fn renderFunction, Renderer* instance):
+				renderThreadBusy(false),
+				exitRenderThread(false),
+				bufferUpdateReady(false){
+				renderThread = std::thread([this, renderFunction, instance] {
+					while (true) {
+						std::unique_lock<std::mutex> lock(renderMutex);
+						renderCondition.wait(lock, [this] { return exitRenderThread || renderThreadBusy; });
+						if (exitRenderThread) {
+							break;
+						}
+						std::invoke(renderFunction, instance); // Use std::invoke to call the member function pointer
+						renderThreadBusy = false;
+						bufferUpdateReady = true;
+					}
+				});
+			}
+
+			~ThreadData() {
+				{
+					std::lock_guard<std::mutex> lock(renderMutex);
+					exitRenderThread = true;
+				}
+				renderCondition.notify_one();
+				renderThread.join();
+			}
+
+			bool renderThreadBusy;
+			bool exitRenderThread;
+			std::mutex renderMutex;
+			std::condition_variable renderCondition;
+			std::thread renderThread;
+			std::atomic<bool> bufferUpdateReady;
+		} threadData;
+
+		bool resizeGlBuffer;
 	};
 
 }

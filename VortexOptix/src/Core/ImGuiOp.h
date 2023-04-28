@@ -7,7 +7,7 @@ namespace vtx {
 
     void SetAppStyle();
 
-	void End_ImGui();
+	void shutDownImGui();
 	
 	void ImGuiRenderStart();
 

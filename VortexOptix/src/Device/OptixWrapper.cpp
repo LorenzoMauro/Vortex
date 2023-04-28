@@ -37,6 +37,21 @@ namespace vtx::optix
 		setPipelineCompilersOptions();
 		setPipelineLinkOptions();
 		state.isValid = true;
+
+
+	}
+
+	void shutDown()
+	{
+		VTX_INFO("ShuttingDown: Optix");
+		CU_CHECK_CONTINUE(cuCtxSetCurrent(state.cudaContext)); // Activate this CUDA context. Not using activate() because this needs a no-throw check.
+		CU_CHECK_CONTINUE(cuCtxSynchronize());
+
+		OPTIX_CHECK_CONTINUE(optixPipelineDestroy(optix::getRenderingPipeline()->getPipeline()));
+		OPTIX_CHECK_CONTINUE(optixDeviceContextDestroy(state.optixContext));
+
+		CU_CHECK_CONTINUE(cuStreamDestroy(state.stream));
+		//CU_CHECK_CONTINUE(cuCtxDestroy(state.cudaContext));
 	}
 
 	void startOptix()
@@ -186,7 +201,7 @@ namespace vtx::optix
 													 log,
 													 &logSize,
 													 &module);
-		VTX_ASSERT_CONTINUE(logSize <= 1, log);
+		//VTX_ASSERT_CONTINUE(logSize <= 1, log);
 		OPTIX_CHECK(result);
 	}
 
@@ -274,7 +289,7 @@ namespace vtx::optix
 														   log,
 														   &logSize,
 														   &pg);
-		VTX_ASSERT_CONTINUE(logSize <= 1, log);
+		//VTX_ASSERT_CONTINUE(logSize <= 1, log);
 		OPTIX_CHECK(result);
 	}
 
@@ -351,7 +366,7 @@ namespace vtx::optix
 													   log,
 													   &logSize,
 													   &pipeline);
-		VTX_ASSERT_CONTINUE(logSize <= 1, log);
+		//VTX_ASSERT_CONTINUE(logSize <= 1, log);
 		OPTIX_CHECK(result);
 
 		computeStackSize();

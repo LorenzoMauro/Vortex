@@ -57,6 +57,9 @@ namespace vtx::graph
 		virtual void traverse(const std::vector<std::shared_ptr<NodeVisitor>>& orderedVisitors) = 0;
 
 		virtual void accept(std::shared_ptr<NodeVisitor> visitor) = 0;
+
+		void          updateMaterialSlots(int removedSlot);
+
 	public:
 		bool isUpdated;
 	protected:

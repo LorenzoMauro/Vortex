@@ -259,6 +259,8 @@ namespace vtx::mdl
 	}
 
 	void shutDown() {
+
+		VTX_INFO("Shutdown: MDL");
 		state.imageApi.reset();
 		state.backend.reset();
 		state.context.reset();

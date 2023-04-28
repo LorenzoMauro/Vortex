@@ -210,6 +210,17 @@ namespace vtx::ops
         return mesh;
     }
 
+    void updateMaterialSlots(std::shared_ptr<graph::Mesh> mesh, int removedSlot)
+    {
+        for(FaceAttributes& face : mesh->faceAttributes)
+        {
+	        if(face.materialSlotId >= removedSlot && face.materialSlotId != 0)
+	        {
+                face.materialSlotId += -1;
+	        }
+        }
+    }
+
 
 }
 

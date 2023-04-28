@@ -22,7 +22,10 @@ namespace vtx::device
 		UploadData(UploadData&&) = delete;                  // Disable move constructor
 		UploadData& operator=(UploadData&&) = delete;       // Disable move assignment operator
 		
-
+		void shutDown()
+		{
+			
+		}
 
 		//This first Set of Data is used to manage the cuda memory buffer memory, not create a new memory everytime something changes.
 		// Each node will use its own buffer, and the buffer will be updated when the node is visited.
@@ -47,6 +50,8 @@ namespace vtx::device
 		bool									isFrameIdUpdated;
 		RendererDeviceSettings					settings;
 		bool									isSettingsUpdated;
+
+		SbtProgramIdx							programs;
 
 		std::vector<OptixInstance>				optixInstances;
 		LaunchParams							launchParams;

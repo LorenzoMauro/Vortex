@@ -20,11 +20,20 @@ namespace vtx::device
 			return &buffersInstance;
 		}
 
-		Buffers(const Buffers&) = delete;             // Disable copy constructor
-		Buffers& operator=(const Buffers&) = delete;  // Disable assignment operator
+		Buffers(const Buffers&)            = delete; // Disable copy constructor
+		Buffers& operator=(const Buffers&) = delete; // Disable assignment operator
 		Buffers(Buffers&&) = delete;                  // Disable move constructor
 		Buffers& operator=(Buffers&&) = delete;       // Disable move assignment operator
-		
+
+		void shutDown()
+		{
+			VTX_INFO("Shutting Down Buffers");
+			frameIdBuffer.free();
+			launchParamsBuffer.free();
+			rendererSettingsBuffer.free();
+			sbtProgramIdxBuffer.free();
+		}
+
 
 		struct GeometryBuffers
 		{
@@ -35,6 +44,7 @@ namespace vtx::device
 			GeometryBuffers() = default;
 			~GeometryBuffers()
 			{
+				VTX_INFO("ShutDown: Destroying Geometry Buffers");
 				vertexBuffer.free();
 				indexBuffer.free();
 				faceBuffer.free();
@@ -43,13 +53,13 @@ namespace vtx::device
 
 		struct InstanceBuffers
 		{
-			CUDABuffer materialsIdBuffer;
-			CUDABuffer meshLightIdBuffer;
+			CUDABuffer materialSlotsBuffer;
 
 			InstanceBuffers() = default;
 			~InstanceBuffers()
 			{
-				materialsIdBuffer.free();
+				VTX_INFO("ShutDown: Destroying Instance Buffers");
+				materialSlotsBuffer.free();
 			}
 		};
 
@@ -60,10 +70,8 @@ namespace vtx::device
 			MaterialBuffers() = default;
 			~MaterialBuffers()
 			{
-				if (argBlockBuffer.dPointer())
-				{
-					argBlockBuffer.free();
-				}
+				VTX_INFO("ShutDown: Material Buffers");
+				argBlockBuffer.free();
 			}
 		};
 
@@ -78,29 +86,32 @@ namespace vtx::device
 			ShaderBuffers() = default;
 			~ShaderBuffers()
 			{
-				if (shaderConfigBuffer.dPointer()) { shaderConfigBuffer.free(); }
-				if (textureIdBuffer.dPointer()) { textureIdBuffer.free(); }
-				if (bsdfIdBuffer.dPointer()) { bsdfIdBuffer.free(); }
-				if (lightProfileBuffer.dPointer()) { lightProfileBuffer.free(); }
-				if (TextureHandlerBuffer.dPointer()) { TextureHandlerBuffer.free(); }
+				VTX_INFO("ShutDown: Shaders Buffers");
+				shaderConfigBuffer.free();
+				textureIdBuffer.free();
+				bsdfIdBuffer.free();
+				lightProfileBuffer.free();
+				TextureHandlerBuffer.free();
 			}
 		};
 
 		struct BsdfPartBuffer
 		{
-			CUDABuffer sampleData;
-			CUDABuffer albedoData;
-			CUDABuffer partBuffer;
-			CUarray	   lookUpArray;
+			CUDABuffer	sampleData;
+			CUDABuffer	albedoData;
+			CUDABuffer	partBuffer;
+			CUarray		lookUpArray;
+			CUtexObject	evalData;
 
 			BsdfPartBuffer() = default;
 			~BsdfPartBuffer()
 			{
-				if (sampleData.dPointer()) { sampleData.free(); }
-				if (albedoData.dPointer()) { albedoData.free(); }
-				if (partBuffer.dPointer()) { partBuffer.free(); }
-				const cudaError result = cudaFree((void*)lookUpArray);
-				CUDA_CHECK(result);
+				VTX_INFO("ShutDown: Destroying BSDF Part Buffers");
+				sampleData.free();
+				albedoData.free();
+				partBuffer.free();
+				CU_CHECK_CONTINUE(cuArrayDestroy(lookUpArray));
+				CU_CHECK_CONTINUE(cuTexObjectDestroy(evalData));
 			}
 
 		};
@@ -115,13 +126,15 @@ namespace vtx::device
 		{
 			CUDABuffer cdfBuffer;
 			CUarray	   lightProfileSourceArray;
+			CUtexObject	evalData;
 
 			LightProfileBuffers() = default;
 			~LightProfileBuffers()
 			{
+				VTX_INFO("ShutDown: Light Buffers");
 				cdfBuffer.free();
-				const cudaError result = cudaFree((void*)lightProfileSourceArray);
-				CUDA_CHECK(result);
+				CU_CHECK_CONTINUE(cuArrayDestroy(lightProfileSourceArray));
+				CU_CHECK_CONTINUE(cuTexObjectDestroy(evalData));
 			}
 		};
 
@@ -133,19 +146,25 @@ namespace vtx::device
 			FrameBufferBuffers() = default;
 			~FrameBufferBuffers()
 			{
+				VTX_INFO("ShutDown: Frame Buffers");
 				cudaOutputBuffer.free();
+				radianceBuffer.free();
 			}
 		};
 
 		struct TextureBuffers
 		{
-			CUarray textureArray;
+			CUarray					textureArray;
+			cudaTextureObject_t		texObj;
+			cudaTextureObject_t		texObjUnfiltered;
 
 			TextureBuffers() = default;
 			~TextureBuffers()
 			{
-				const cudaError result = cudaFree((void*)textureArray);
-				CUDA_CHECK(result);
+				VTX_INFO("ShutDown: Texture Buffers");
+				CU_CHECK_CONTINUE(cuArrayDestroy(textureArray));
+				CU_CHECK_CONTINUE(cuTexObjectDestroy(texObj));
+				CU_CHECK_CONTINUE(cuTexObjectDestroy(texObjUnfiltered));
 			}
 		};
 
@@ -159,7 +178,10 @@ namespace vtx::device
 			LightBuffers() = default;
 			~LightBuffers()
 			{
+				VTX_INFO("ShutDown: Light Buffers");
 				areaCdfBuffer.free();
+				actualTriangleIndices.free();
+				attributeBuffer.free();
 			}
 		};
 
@@ -168,7 +190,12 @@ namespace vtx::device
 		{
 			if (const auto it = bufferCollectionMap.find(nodeId); it != bufferCollectionMap.end())
 				return it->second;
-			bufferCollectionMap.try_emplace(nodeId, T());
+			// Use emplace to construct the object directly in the map
+			bufferCollectionMap.emplace(std::piecewise_construct,
+																std::forward_as_tuple(nodeId),
+																std::tuple<>());
+
+			//bufferCollectionMap.try_emplace(nodeId, T());
 			return bufferCollectionMap[nodeId];
 		}
 
@@ -220,18 +247,19 @@ namespace vtx::device
 			return getBufferCollectionElement(light, nodeId);
 		}
 
-		std::map<vtxID, InstanceBuffers>			instance;
-		std::map<vtxID, GeometryBuffers>			geometry;
-		std::map<vtxID, MaterialBuffers>			material;
-		std::map<vtxID, ShaderBuffers>				shader;
-		std::map<vtxID, TextureBuffers>				texture;
-		std::map<vtxID, BsdfBuffers>				bsdf;
-		std::map<vtxID, LightProfileBuffers>		lightProfile;
-		std::map<vtxID, FrameBufferBuffers>			frameBuffer;
-		std::map<vtxID, LightBuffers>				light;
-		CUDABuffer									frameIdBuffer;
-		CUDABuffer									launchParamsBuffer;
-		CUDABuffer									rendererSettingsBuffer;
+		std::map<vtxID, InstanceBuffers>     instance;
+		std::map<vtxID, GeometryBuffers>     geometry;
+		std::map<vtxID, MaterialBuffers>     material;
+		std::map<vtxID, ShaderBuffers>       shader;
+		std::map<vtxID, TextureBuffers>      texture;
+		std::map<vtxID, BsdfBuffers>         bsdf;
+		std::map<vtxID, LightProfileBuffers> lightProfile;
+		std::map<vtxID, FrameBufferBuffers>  frameBuffer;
+		std::map<vtxID, LightBuffers>        light;
+		CUDABuffer                           frameIdBuffer;
+		CUDABuffer                           launchParamsBuffer;
+		CUDABuffer                           rendererSettingsBuffer;
+		CUDABuffer                           sbtProgramIdxBuffer;
 
 	private:
 		~Buffers() = default;

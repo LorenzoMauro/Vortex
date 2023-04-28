@@ -5,6 +5,7 @@
 #include "Core/ImguiBackEnds/imgui_impl_glfw.h"
 #include "Core/ImguiBackEnds/imgui_impl_opengl3.h"
 #include "Core/Options.h"
+#include "glad/glad.h"
 
 namespace vtx {
     void Init_ImGui(GLFWwindow* window) {
@@ -162,8 +163,8 @@ namespace vtx {
         }
     }
     
-    void End_ImGui() {
-        VTX_INFO("Destroying ImGui");
+    void shutDownImGui() {
+        VTX_INFO("ShutDown: ImGui");
         ImGui::SaveIniSettingsToDisk((utl::absolutePath(getOptions()->ImGuiIniFile)).data());
         ImGui_ImplOpenGL3_Shutdown();
         ImGui_ImplGlfw_Shutdown();

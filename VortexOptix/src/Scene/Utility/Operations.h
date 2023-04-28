@@ -20,4 +20,6 @@ namespace vtx::ops {
 
         std::shared_ptr<graph::Mesh> createPlane();
 
+        void updateMaterialSlots(std::shared_ptr<graph::Mesh> mesh, int removedSlot);
+
 }

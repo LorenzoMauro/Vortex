@@ -138,6 +138,8 @@ namespace vtx::optix
 	/* Initialize Optix, contexts and stream and relative options*/
 	void init();
 
+	void shutDown();
+
 	/* Check For Capable Devices and Initialize Optix*/
 	void startOptix();
 

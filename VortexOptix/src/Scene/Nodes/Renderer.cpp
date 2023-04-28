@@ -8,6 +8,7 @@
 #include "Device/UploadCode/UploadBuffers.h"
 #include "Device/UploadCode/UploadData.h"
 #include "Scene/Traversal.h"
+#include <thread>
 
 namespace vtx::graph
 {
@@ -16,13 +17,28 @@ namespace vtx::graph
 	Renderer::Renderer() :
 		Node(NT_RENDERER),
 		width(getOptions()->width),
-		height(getOptions()->height)
+		height(getOptions()->height),
+		threadData(&Renderer::render, this)
 	{
 		settings = RendererSettings();
 		settings.iteration = 0;
 		settings.maxBounces = getOptions()->maxBounces;
 		settings.accumulate = getOptions()->accumulate;
 		settings.maxSamples = getOptions()->maxSamples;
+		settings.samplingTechnique = getOptions()->samplingTechnique;
+		settings.displayBuffer = getOptions()->displayBuffer;
+
+		drawFrameBuffer.SetSize(width, height);
+		drawFrameBuffer.Bind();
+		glClearColor(0.2f, 0.2f, 0.2f, 1.0f);
+		glClear(GL_COLOR_BUFFER_BIT);
+		drawFrameBuffer.Unbind();
+
+		displayFrameBuffer.SetSize(width, height);
+		displayFrameBuffer.Bind();
+		glClearColor(0.2f, 0.2f, 0.2f, 1.0f);
+		glClear(GL_COLOR_BUFFER_BIT);
+		displayFrameBuffer.Unbind();
 	}
 
 	void Renderer::setCamera(std::shared_ptr<Camera> _camera) {
@@ -53,14 +69,42 @@ namespace vtx::graph
 		visitor->visit(sharedFromBase<Renderer>());
 	}
 
+	bool Renderer::isReady(bool setBusy) {
+		if (threadData.renderMutex.try_lock()) {
+			std::unique_lock<std::mutex> lock(threadData.renderMutex, std::adopt_lock);
+			if (!threadData.renderThreadBusy) {
+				if (setBusy) {
+					threadData.renderThreadBusy = true;
+				}
+				return true;
+			}
+			return false;
+		}
+		return false;
+	}
+
+	void Renderer::threadedRender()
+	{
+		if(isReady(true))
+		{
+			std::unique_lock<std::mutex> lock(threadData.renderMutex);
+			threadData.renderThreadBusy = true;
+			threadData.renderCondition.notify_one();
+		}
+
+	}
+
 	void Renderer::render()
 	{
-
+		//std::this_thread::sleep_for(std::chrono::milliseconds(4000));
 		const LaunchParams& launchParams = UPLOAD_DATA->launchParams;
 		const CUDABuffer& launchParamsBuffer = UPLOAD_BUFFERS->launchParamsBuffer;
 
 		
-		if (launchParams.frameBuffer.frameSize.x == 0) return;
+		if (launchParams.frameBuffer.frameSize.x == 0)
+		{
+			return;
+		};
 
 		device::incrementFrame();
 
@@ -80,8 +124,8 @@ namespace vtx::graph
 			launchParams.frameBuffer.frameSize.y,
 			1
 		);
+		OPTIX_CHECK(result);
 		CUDA_SYNC_CHECK();
-
 		frameTime = timer.elapsedMillis();
 		if(settings.iteration == 0)
 		{
@@ -95,8 +139,6 @@ namespace vtx::graph
 		fps = (float)(settings.iteration + 1) / totalTimeSeconds;
 		sppS = ((float)width*(float)height*((float)settings.iteration + 1))/totalTimeSeconds;
 		averageFrameTime = (float)(settings.iteration + 1) / (totalTimeSeconds *1000.0f);
-
-		OPTIX_CHECK(result);
 	}
 
 	void Renderer::resize(uint32_t _width, uint32_t _height) {
@@ -110,15 +152,37 @@ namespace vtx::graph
 	}
 
 	void Renderer::copyToGl() {
+		// Update the GL buffer here
+
 		optix::State& state = *(optix::getState());
 		const LaunchParams& launchParams = UPLOAD_DATA->launchParams;
 
-		CUresult result = cuGraphicsMapResources(1, &cudaGraphicsResource, state.stream); // This is an implicit cuSynchronizeStream().
-		CU_CHECK(result);
-		result = cuGraphicsSubResourceGetMappedArray(&dstArray, cudaGraphicsResource, 0, 0); // arrayIndex = 0, mipLevel = 0
-		CU_CHECK(result);
-		CUDA_MEMCPY3D params = {};
+		if(resizeGlBuffer)
+		{
+			if (cudaGraphicsResource != nullptr) {
+				const CUresult result = cuGraphicsUnregisterResource(cudaGraphicsResource);
+				CU_CHECK(result);
+			}
+			drawFrameBuffer.SetSize(launchParams.frameBuffer.frameSize.x, launchParams.frameBuffer.frameSize.y);
 
+			const CUresult result = cuGraphicsGLRegisterImage(&cudaGraphicsResource,
+															  drawFrameBuffer.m_ColorAttachment,
+															  GL_TEXTURE_2D, CU_GRAPHICS_REGISTER_FLAGS_WRITE_DISCARD);
+			CU_CHECK(result);
+			resizeGlBuffer = false;
+		}
+
+		drawFrameBuffer.Bind();
+		glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
+		glClear(GL_COLOR_BUFFER_BIT);
+		drawFrameBuffer.Unbind();
+
+		CUresult CUresult = cuGraphicsMapResources(1, &cudaGraphicsResource, state.stream); // This is an implicit cuSynchronizeStream().
+		CU_CHECK(CUresult);
+		CUresult = cuGraphicsSubResourceGetMappedArray(&dstArray, cudaGraphicsResource, 0, 0); // arrayIndex = 0, mipLevel = 0
+		CU_CHECK(CUresult);
+
+		CUDA_MEMCPY3D params = {};
 		params.srcMemoryType = CU_MEMORYTYPE_DEVICE;
 		params.srcDevice = launchParams.frameBuffer.outputBuffer;
 		params.srcPitch = launchParams.frameBuffer.frameSize.x * sizeof(math::vec4f);
@@ -133,15 +197,23 @@ namespace vtx::graph
 		CU_CHECK(cuMemcpy3D(&params)); // Copy from linear to array layout.
 
 		CU_CHECK(cuGraphicsUnmapResources(1, &cudaGraphicsResource, state.stream)); // This is an implicit cuSynchronizeStream().
+
+		//// SWAP BUFFERS ///////////////////
+		//threadData.bufferUpdateReady = false;
+		//auto* tempBuffer = updatedFrameBuffer;
+		displayFrameBuffer.copyToThis(drawFrameBuffer);
+		//currentFrameBuffer = tempBuffer;
 	}
 
-	GLuint Renderer::getFrame() {
-		glFrameBuffer.Bind();
-		glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
-		glClear(GL_COLOR_BUFFER_BIT);
-		glFrameBuffer.Unbind();
-		copyToGl();
-		return glFrameBuffer.m_ColorAttachment;
+	GlFrameBuffer Renderer::getFrame() {
+		if(threadData.bufferUpdateReady)
+		{
+			// This section is helpfull when the renderer update is slow, else it's better not to have it!
+			copyToGl();
+			threadData.bufferUpdateReady = false;
+		}
+		return displayFrameBuffer;
+		
 	}
 }
 

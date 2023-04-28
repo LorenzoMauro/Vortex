@@ -18,13 +18,24 @@ namespace vtx::graph
 		static void record(std::shared_ptr<T> node) {
 
 			const auto sim = Get();
-
+			const NodeType& type = node->getType();
 			static_assert(std::is_base_of_v<Node, T>, "Template type is not a subclass of Node!");
 			if (sim->map.size() == 0) {
 				sim->map.resize(NT_NUM_NODE_TYPES + 1);
 			}
-			sim->map[static_cast<int>(node->getType())].insert({node->getID(), node});
-			sim->idToType.insert({ node->getID(), node->getType() });
+			sim->map[static_cast<int>(type)].insert({ node->getID(), node });
+			sim->idToType.insert({ node->getID(), type });
+
+			if (sim->vectorsOfNodes.find(type) != sim->vectorsOfNodes.end())
+			{
+				sim->vectorsOfNodes[type].push_back(node);
+			}
+			else
+			{
+				std::vector<std::shared_ptr<Node>> vector;
+				vector.push_back(node);
+				sim->vectorsOfNodes.insert({ type,  vector});
+			}
 		}
 
 		// Operator[] definition
@@ -43,12 +54,20 @@ namespace vtx::graph
 			return std::static_pointer_cast<T>(nodePtr);
 		}
 
-		vtxID nextIndex = 0;
-		std::set<vtxID> freeIndices;
-		std::vector<std::map<vtxID, std::shared_ptr<Node>>> map;
-		std::map<vtxID, NodeType> idToType;
+		static std::vector<std::shared_ptr<Node>> getAllNodeOfType(NodeType nodeType)
+		{
+			const auto sim = Get();
+			return sim->vectorsOfNodes[nodeType];
 
-		static std::shared_ptr<SIM> sInstance;
+		}
+
+		vtxID														nextIndex = 1; // Index Zero is reserved for Invalid Index, maybe I can use invalid unsigned
+		std::set<vtxID>												freeIndices;
+		std::vector<std::map<vtxID, std::shared_ptr<Node>>>			map;
+		std::map<NodeType, std::vector<std::shared_ptr<Node>>>		vectorsOfNodes;
+		std::map<vtxID, NodeType>									idToType;
+
+		static std::shared_ptr<SIM>									sInstance;
 	};
 
 }

@@ -1,4 +1,6 @@
 #pragma once
+#include <set>
+
 #include "Scene/Node.h"
 #include "Light.h"
 #include "Material.h"
@@ -7,6 +9,13 @@
 
 namespace vtx::graph
 {
+	struct MaterialSlot
+	{
+		int slotIndex;
+		std::shared_ptr<Material> material;
+		std::shared_ptr <Light> meshLight;
+		bool isMeshLightEvaluated;
+	};
 	struct PairHash {
 		template <class T1, class T2>
 		std::size_t operator () (const std::pair<T1, T2>& pair) const {
@@ -33,6 +42,8 @@ namespace vtx::graph
 
 		std::vector<std::shared_ptr<Material>>& getMaterials();
 
+		//TODO Slot addition and removal, currently we can add or remove materials
+		//Removing Material won't delete the slot
 		void addMaterial(const std::shared_ptr<Material>& _material);
 
 		void removeMaterial(vtxID matID);
@@ -51,15 +62,14 @@ namespace vtx::graph
 
 		std::shared_ptr<graph::Light> getMeshLight(vtxID materialID);
 
+		std::vector<MaterialSlot>&     getMaterialSlots();
+
 	public:
 	private:
-		std::shared_ptr<Node>											child;
-		std::shared_ptr<Transform>										transform;
-		std::vector<std::shared_ptr<Material>>							materials;
-		std::vector<std::shared_ptr<graph::Light>>						meshLights;
-		std::unordered_map<std::pair<vtxID, vtxID>, vtxID, PairHash>	meshLightMap;
-		bool															childIsMesh = false;
-		//bool												isDirty = true;
+		std::shared_ptr<Node>							child;
+		std::shared_ptr<Transform>						transform;
+		std::vector<MaterialSlot>                       materialSlots;
+		bool											childIsMesh = false;
 	};
 
 }

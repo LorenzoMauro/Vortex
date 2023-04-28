@@ -28,6 +28,21 @@ namespace vtx::graph
 
 		const auto sim = Get();
 
+		const std::shared_ptr<Node> nodePtr = (*sim)[id];
+		const NodeType              type    = nodePtr->getType();
+		auto&                       vector  = sim->vectorsOfNodes[type];
+
+		int vectorReleaseIndex = -1;
+		for(int i = 0; i<vector.size(); i++)
+		{
+			if(vector[i]->getID() == id)
+			{
+				vectorReleaseIndex = i;
+				break;
+			}
+		}
+		vector.erase(vector.begin() + vectorReleaseIndex);
+
 		//verify id has been used to register a node:
 		// This approach is caused by the fact that just generating a node will use a new index, but the node is not registered automatically
 		if (sim->idToType.find(id) != sim->idToType.end())

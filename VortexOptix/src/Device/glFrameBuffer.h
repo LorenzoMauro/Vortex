@@ -3,6 +3,7 @@
 #include <cstdint>
 #include "Core/Log.h"
 #include "Core/Options.h"
+#include "glad/glad.h"
 
 namespace vtx {
 	class GlFrameBuffer
@@ -23,8 +24,8 @@ namespace vtx {
 			}
 		}
 		void generate() {
-			glCreateFramebuffers(1, &m_RendererID);
-			glBindFramebuffer(GL_FRAMEBUFFER, m_RendererID);
+			glCreateFramebuffers(1, &frameBufferId);
+			glBindFramebuffer(GL_FRAMEBUFFER, frameBufferId);
 
 			glCreateTextures(GL_TEXTURE_2D, 1, &m_ColorAttachment);
 			glBindTexture(GL_TEXTURE_2D, m_ColorAttachment);
@@ -45,7 +46,7 @@ namespace vtx {
 		}
 
 		void Bind() {
-			glBindFramebuffer(GL_FRAMEBUFFER, m_RendererID);
+			glBindFramebuffer(GL_FRAMEBUFFER, frameBufferId);
 		}
 
 		void Unbind() {
@@ -59,6 +60,15 @@ namespace vtx {
 		void UploadExternalColorAttachment(void* data) {
 			glBindTexture(GL_TEXTURE_2D, m_ColorAttachment);
 			glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, m_Width, m_Height, GL_RGBA, GL_UNSIGNED_BYTE, data);
+		}
+
+		void copyToThis(GlFrameBuffer src)
+		{
+			SetSize(src.m_Width, src.m_Height);
+			glBindFramebuffer(GL_READ_FRAMEBUFFER, src.frameBufferId); // Source framebuffer
+			glBindFramebuffer(GL_DRAW_FRAMEBUFFER, frameBufferId); // Destination framebuffer
+			glBlitFramebuffer(0, 0, m_Width, m_Height, 0, 0, src.m_Width, src.m_Height, GL_COLOR_BUFFER_BIT, GL_NEAREST);
+			glBindFramebuffer(GL_FRAMEBUFFER, 0);
 		}
 
 		void CheckFrameBufferStatus()
@@ -81,7 +91,7 @@ namespace vtx {
 
 
 	public:
-		GLuint			m_RendererID;
+		GLuint			frameBufferId;
 		GLuint			m_DepthAttachment;
 		GLuint			m_StencilAttachment;
 		GLuint			m_ColorAttachment;

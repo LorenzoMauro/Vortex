@@ -17,17 +17,25 @@ namespace vtx {
 #define FLAG_HIT           0x00000001
 #define FLAG_SHADOW        0x00000002
 
+	enum TraceEvent
+	{
+		TR_MISS,
+		TR_HIT,
+		TR_SHADOW,
+
+		TR_UNKNOWN
+	};
 
 	struct HitProperties
 	{
-		const InstanceData* instance;
-		const GeometryData* geometry;
-		const MaterialData* material;
-		const ShaderData* shader;
-		const DeviceShaderConfiguration* shaderConfiguration;
+		const InstanceData* instance = nullptr;
+		const GeometryData* geometry = nullptr;
+		const MaterialData* material = nullptr;
+		const ShaderData* shader = nullptr;
+		const DeviceShaderConfiguration* shaderConfiguration = nullptr;
 
-		const LightData* meshLight;
-		const MeshLightAttributes* meshLightAttributes;
+		const LightData* meshLight = nullptr;
+		const MeshLightAttributes* meshLightAttributes = nullptr;
 
 		// Ray properties
 		math::vec3f             position;
@@ -78,6 +86,7 @@ namespace vtx {
 		math::vec3f position; //Current Hit Position
 		float		distance; //Distance of hit Position to Ray origin
 		int			depth;
+		TraceEvent	traceEvent; // Bitfield with flags. See FLAG_* defines above for its contents.
 
 		math::vec3f wo; //Outgoing direction, to observer in world space
 		math::vec3f wi; //Incoming direction, to light, in world space
@@ -85,7 +94,6 @@ namespace vtx {
 		math::vec3f	radiance; //Radiance along the current path segment
 		float pdf; //last Bdsf smaple, tracked for multiple importance sampling
 		math::vec3f throughput; //Throughput of the current path segment, starts white and gets modulated with bsdf_over_pdf with each sample.
-		unsigned int flags; // Bitfield with flags. See FLAG_* defines above for its contents.
 		mi::neuraylib::Bsdf_event_type eventType; // The type of events created by BSDF importance sampling.
 
 

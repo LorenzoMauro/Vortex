@@ -46,10 +46,10 @@ namespace vtx {
 		anyHitFunction->module = deviceProgramModule;
 		anyHitFunction->type = optix::OptixFunctionType::F_AnyHit;
 
-		auto pinholeFunction = std::make_shared<optix::FunctionOptix>();
-		pinholeFunction->name = "__direct_callable__pinhole";
-		pinholeFunction->module = cameraFunctionsModule;
-		pinholeFunction->type = optix::OptixFunctionType::F_DirectCallable;
+		//auto pinholeFunction = std::make_shared<optix::FunctionOptix>();
+		//pinholeFunction->name = "__direct_callable__pinhole";
+		//pinholeFunction->module = cameraFunctionsModule;
+		//pinholeFunction->type = optix::OptixFunctionType::F_DirectCallable;
 
 		///////////////////////////////////////////////////////////////////
 		/////////////////////// Programs //////////////////////////////////
@@ -76,10 +76,11 @@ namespace vtx {
 		hitProgram->closestHitFunction = closestHitFunction;
 		hitProgram->anyHitFunction = anyHitFunction;
 
-		auto pinholeProgram = std::make_shared<optix::ProgramOptix>();
-		pinholeProgram->name = "pinHole";
-		pinholeProgram->type = optix::OptixProgramType::P_DirectCallable;
-		pinholeProgram->directCallableFunction = pinholeFunction;
+
+		//auto pinholeProgram = std::make_shared<optix::ProgramOptix>();
+		//pinholeProgram->name = "pinHole";
+		//pinholeProgram->type = optix::OptixProgramType::P_DirectCallable;
+		//pinholeProgram->directCallableFunction = pinholeFunction;
 
 		optix::PipelineOptix* pipeline = optix::getRenderingPipeline();
 
@@ -87,7 +88,9 @@ namespace vtx {
 		pipeline->registerProgram(exceptionProgram);
 		pipeline->registerProgram(missProgram);
 		pipeline->registerProgram(hitProgram);
-		pipeline->registerProgram(pinholeProgram);
+		//pipeline->registerProgram(pinholeProgram);
+
+		optix::createDcProgram(cameraFunctionsModule, "__direct_callable__pinhole");
 	}
 
 }

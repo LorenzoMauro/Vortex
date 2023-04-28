@@ -10,9 +10,18 @@
 #include <mi/neuraylib/target_code_types.h>
 #include "Scene/DataStructs/VertexAttribute.h"
 #include "Scene/Nodes/LightTypes.h"
+//#include "Scene/Nodes/Renderer.h"
 
 namespace vtx {
 
+    struct SbtProgramIdx
+    {
+        int raygen = -1;
+        int exception = -1;
+        int miss = -1;
+        int hit = -1;
+        int pinhole = -1;
+    };
 
     struct TextureHandler : mi::neuraylib::Texture_handler_base
     {
@@ -61,11 +70,15 @@ namespace vtx {
 
     struct InstanceData
     {
+        struct SlotIds
+        {
+            vtxID materialId;
+            vtxID meshLightId;
+        };
 	    vtxID						instanceId;
         vtxID                       geometryDataId;
-        vtxID*                      materialsDataId;
-	    vtxID*                      meshLightDataId;
-        int                         numberOfMaterials;
+        SlotIds*                    materialSlotsId;
+        int                         numberOfSlots;
         math::affine3f              transform;
     };
 
@@ -199,7 +212,29 @@ namespace vtx {
 
     struct FrameBufferData
     {
-        enum FrameBufferType
+        math::vec3f*                                radianceBuffer;
+        CUdeviceptr                                 outputBuffer{};
+        math::vec2ui                                frameSize;
+    };
+
+    struct RendererDeviceSettings
+    {
+        enum SamplingTechnique
+        {
+	        S_BSDF,
+            S_LIGHT,
+            S_MIS,
+
+            S_COUNT
+        };
+
+        inline static const char* samplingTechniqueNames[] = {
+                "Bsdf Sampling",
+                "Light Sampling",
+                "Multiple Importance Sampling",
+        };
+
+        enum DisplayBuffer
         {
             FB_NOISY,
             FB_DIFFUSE,
@@ -208,20 +243,28 @@ namespace vtx {
             FB_SHADING_NORMAL,
             FB_DEBUG_1,
             FB_DEBUG_2,
-            FB_DEBUG_3
-        };
-        math::vec3f*                                radianceBuffer;
-        CUdeviceptr                                 outputBuffer{};
-        math::vec2ui                                frameSize;
-        FrameBufferType                             frameBufferType;
-    };
+            FB_DEBUG_3,
 
-    struct RendererDeviceSettings
-    {
-        int	        iteration;
-        int	        maxBounces;
-        bool		accumulate;
-    };
+            FB_COUNT
+        };
+
+        inline static const char* displayBufferNames[] = {
+                "Noisy",
+                "Diffuse",
+                "Orientation",
+                "True Normal",
+                "Shading Normal",
+                "Debug1",
+                "Debug2",
+                "Debug3"
+        };
+
+        int               iteration;
+        int               maxBounces;
+        bool              accumulate;
+        SamplingTechnique samplingTechnique;
+		DisplayBuffer     displayBuffer;
+	};
 
 	struct LaunchParams
     {
@@ -229,6 +272,8 @@ namespace vtx {
         FrameBufferData                         frameBuffer;
     	CameraData                              cameraData;
         RendererDeviceSettings*                 settings;
+
+        SbtProgramIdx*                           programs;
 
         OptixTraversableHandle                  topObject;
     	CudaMap<vtxID, InstanceData>*			instanceMap;

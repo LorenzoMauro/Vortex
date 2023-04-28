@@ -197,6 +197,16 @@ namespace vtx::device
 				isLaunchParamsUpdated = true;
 			}
 		}
+
+		//ATTENTION We do this only once! (hence the no update) However, this might be a way to swap rendering pipeline by changing the set of programSbt
+		if (!uploadData->launchParams.programs)
+		{
+			uploadData->programs = setProgramsSbt();
+			uploadBuffers->sbtProgramIdxBuffer.upload(uploadData->programs);
+			uploadData->launchParams.programs = uploadBuffers->sbtProgramIdxBuffer.castedPointer<SbtProgramIdx>();
+			isLaunchParamsUpdated = true;
+		}
+
 		if(isLaunchParamsUpdated)
 		{
 			uploadBuffers->launchParamsBuffer.upload(uploadData->launchParams);

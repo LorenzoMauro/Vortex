@@ -118,6 +118,7 @@ namespace vtx::graph
 		renderer = ops::createNode<Renderer>();
 		renderer->setCamera(camera);
 		renderer->setScene(sceneRoot);
+		VTX_INFO("Finishing Scene Definition!");
 	}
 
 }

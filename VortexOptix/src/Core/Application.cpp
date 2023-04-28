@@ -1,4 +1,5 @@
 #include "Application.h"
+#include "ShutDownOperations.h"
 #include "glad/glad.h"
 #include "ImGuiOp.h"
 #include "Device/OptixWrapper.h"
@@ -6,6 +7,12 @@
 
 namespace vtx
 {
+	bool isWindowMinimized(GLFWwindow* window) {
+		int width, height;
+		glfwGetFramebufferSize(window, &width, &height);
+		return (width == 0 || height == 0);
+	}
+
 	void Application::init() {
 		initWindow();
 		Input::SetWindowHandle(window);
@@ -23,7 +30,8 @@ namespace vtx
 	}
 
 	void Application::shutDown() {
-		End_ImGui();
+		//Last run!
+		shutDownOperations();
 		glfwDestroyWindow(window);
 		glfwTerminate();
 		VTX_INFO("GLFW DESTROYED");
@@ -53,19 +61,23 @@ namespace vtx
 
 	void Application::run() {
 		glfwPollEvents();
-		ImGuiRenderStart();
 		//////////////////////////
 		for (auto& layer : layerStack)
 			layer->OnUpdate(timeStep);
 
 		int layerCount = layerStack.size();
-		for (int i = 0; i < layerCount; i++) {
-			auto& layer = layerStack[i];
-			layer->OnUIRender();
-			layerCount = layerStack.size();
+		if(!isWindowMinimized(window))
+		{
+			ImGuiRenderStart();
+			for (int i = 0; i < layerCount; i++) {
+				auto& layer = layerStack[i];
+				layer->OnUIRender();
+				layerCount = layerStack.size();
+			}
+			ImGuiDraw(window);
+			glfwSwapBuffers(window);
 		}
-		ImGuiDraw(window);
-		glfwSwapBuffers(window);
+		
 
 		auto time = static_cast<float>(glfwGetTime());
 		frameTime = time - lastFrameTime;

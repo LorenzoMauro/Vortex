@@ -25,6 +25,7 @@ namespace vtx::graph
 		virtual void init() = 0;
 
 		LightType lightType;
+		bool								isValid;
 	};
 
 	struct PointLightAttributes : public LightAttributes
@@ -66,9 +67,18 @@ namespace vtx::graph
 
 		void init() override
 		{
-			computeAreaCdf();
-			isValid = (cdfAreas.size() > 1);
-			isInitialized = true;
+			if(material->shader->isEmissive())
+			{
+				computeAreaCdf();
+				isValid = (cdfAreas.size() > 1);
+				isInitialized = true;
+			}
+			else
+			{
+				isValid = false;
+				isInitialized = true;
+			}
+			
 		}
 
 		void computeAreaCdf()
@@ -139,6 +149,8 @@ namespace vtx::graph
 			}
 
 			area = areaSurface;
+
+			VTX_INFO("Fnished Computation of Mesh Area Light for Mesh {} with Material {}", mesh->getID(), material->getID());
 		}
 
 		std::shared_ptr<graph::Mesh>		mesh;
@@ -150,7 +162,6 @@ namespace vtx::graph
 		std::vector<unsigned int>			actualTriangleIndices;
 		float								area;
 		bool								isInitialized;
-		bool								isValid;
 	};
 
 

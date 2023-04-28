@@ -73,7 +73,6 @@ namespace vtx {
         const graph::VertexAttributes   vertex0         = hitP->geometry->vertexAttributeData[triVerticesIndices.x];
         const graph::VertexAttributes   vertex1         = hitP->geometry->vertexAttributeData[triVerticesIndices.y];
         const graph::VertexAttributes   vertex2         = hitP->geometry->vertexAttributeData[triVerticesIndices.z];
-        const unsigned&                 materialSlot    = hitP->geometry->faceAttributeData[primitiveId].materialSlotId;
 
         const math::vec2f baricenter = optixGetTriangleBarycentrics();
         const float alpha = 1.0f - baricenter.x - baricenter.y;
@@ -102,47 +101,45 @@ namespace vtx {
         // Explicitly include edge-on cases as frontface condition!
         hitP->isFrontFace = 0.0f <= dot(prd.wo, hitP->ngW);
 
-        if(hitP->instance->numberOfMaterials > 0)
+        if(hitP->instance->numberOfSlots > 0)
         {
-        	hitP->material = getData<MaterialData>(hitP->instance->materialsDataId[materialSlot]);
-			hitP->shader = getData<ShaderData>(hitP->material->shaderId);
-            hitP->shaderConfiguration = hitP->shader->shaderConfiguration;
+            const unsigned& materialSlotIndex = hitP->geometry->faceAttributeData[primitiveId].materialSlotId;
+			InstanceData::SlotIds slotIds = hitP->instance->materialSlotsId[materialSlotIndex];
 
-            vtxID meshLightId = hitP->instance->meshLightDataId[materialSlot];
-            if (meshLightId != INVALID_INDEX)
+            if(slotIds.materialId != 0)
             {
-                const LightData* lightData = getData<LightData>(meshLightId);
+        		hitP->material = getData<MaterialData>(slotIds.materialId);
+                hitP->shader = getData<ShaderData>(hitP->material->shaderId);
+                hitP->shaderConfiguration = hitP->shader->shaderConfiguration;
+            }
+            if(slotIds.meshLightId != 0)
+            {
+                const LightData* lightData = getData<LightData>(slotIds.meshLightId);
                 const MeshLightAttributes* attributes = reinterpret_cast<MeshLightAttributes*>(lightData->attributes);
                 hitP->meshLight = lightData;
                 hitP->meshLightAttributes = attributes;
-			}
-			else
-			{
-				hitP->meshLight = nullptr;
-                hitP->meshLightAttributes = nullptr;
-			}
-		}
-		else
-		{
-			hitP->material = nullptr;
-			hitP->shader = nullptr;
-			hitP->shaderConfiguration = nullptr;
-            hitP->meshLight = nullptr;
-            hitP->meshLightAttributes = nullptr;
+            }
 		}
     }
 
     extern "C" __global__ void __closesthit__radiance()
     {
+
         PerRayData* prd = mergePointer(optixGetPayload_0(), optixGetPayload_1());
         const unsigned int instanceId = optixGetInstanceId();
         const unsigned int primitiveId = optixGetPrimitiveIndex();
+        prd->traceEvent = TR_HIT;
 
         HitProperties hitP;
         computeHitProperties(&hitP, *prd, instanceId, primitiveId);
 
         prd->distance = hitP.distance;
         prd->position = hitP.position;
+        if (prd->depth == 0)
+        {
+            prd->colors.trueNormal = 0.5f * (hitP.ngW + 1.0f);
+			prd->colors.orientation = hitP.isFrontFace ? math::vec3f(0.0f, 0.0f, 1.0f) : math::vec3f(1.0f, 0.0f, 0.0f);
+        }
 
         if(hitP.material!=nullptr)
         {
@@ -153,9 +150,6 @@ namespace vtx {
 
             if (prd->depth == 0)
             {
-                prd->colors.trueNormal = 0.5f*(hitP.ngW+1.0f);
-                prd->colors.orientation = hitP.isFrontFace ? math::vec3f(0.0f, 0.0f, 1.0f) : math::vec3f(1.0f, 0.0f, 0.0f);
-
                 mdl::BsdfAuxiliaryData auxiliaryData = mdl::getAuxiliaryData(mdlData, ior, prd->idxStack, prd->stack, hitP.ngW);
 
                 if (auxiliaryData.isValid)
@@ -204,11 +198,6 @@ namespace vtx {
                     //prd->radiance += math::vec3f(100.0f);
                     //printMath("Radiance: ", prd->radiance);
                 }
-                else
-                {
-                    const float a = 0.0f;
-                }
-                
             }
 
             //Importance Sampling the Bsdf
@@ -228,8 +217,21 @@ namespace vtx {
             }
 
 
-            // Fetch Auxiliary Data
-            
+            int numLights = optixLaunchParams.lightMap->size;
+            if (numLights > 0)
+            {
+                //Randomly Selecting a Light
+                //TODO, I think here we can do some better selection by giving more importance to lights with greater power
+                const int indexLight = (1 < numLights) ? gdt::clamp(static_cast<int>(floorf(rng(prd->seed) * numLights)), 0, numLights - 1) : 0;
+
+                LightData lights = optixLaunchParams.lightMap->values[indexLight];
+
+
+
+
+
+
+            }
 
 
 
@@ -278,7 +280,8 @@ namespace vtx {
     extern "C" __global__ void __miss__radiance()
     { /*! for this simple example, this will remain empty */
         PerRayData* prd = mergePointer(optixGetPayload_0(), optixGetPayload_1());
-        prd->colors.debugColor1 = math::vec3f(0.2f, 0.2f, 0.2f);
+        prd->traceEvent = TR_MISS;
+        prd->colors.debugColor1 = math::vec3f(1.0f, 0.2f, 0.2f);
         if (prd->depth == 0)
         {
             prd->colors.diffuse = prd->colors.debugColor1;
@@ -289,6 +292,7 @@ namespace vtx {
             prd->colors.debugColor3 = prd->colors.debugColor1;
 
         }
+        prd->radiance += prd->throughput*math::vec3f(0.2f, 0.2f, 0.2f);
         //printVector(thePrd->color, "MISS COLOR");
     }
 
@@ -310,7 +314,6 @@ namespace vtx {
         prd.stack[0].bias = 0.0f;              // Isotropic volume scattering.
         prd.depth = 0;
 
-        int depth = 0;
         int maxDepth = optixLaunchParams.settings->maxBounces;
         float maxDistance = 1000.0f;
         float minDistance = 0.00001f;
@@ -321,7 +324,7 @@ namespace vtx {
         {
 			prd.wo = -prd.wi;
             prd.distance = maxDistance;
-            prd.flags = 0;
+            prd.traceEvent = TR_UNKNOWN;
 
             optixTrace(optixLaunchParams.topObject,
                        prd.position,
@@ -331,15 +334,15 @@ namespace vtx {
                        0.0f, // tmin, tmax, time
                        static_cast<OptixVisibilityMask>(0xFF),
                        OPTIX_RAY_FLAG_DISABLE_ANYHIT, //OPTIX_RAY_FLAG_NONE,
-                       TYPE_RAY_RADIANCE, //SBT Offset
-                       NUM_RAY_TYPES, // SBT stride
-                       TYPE_RAY_RADIANCE, // missSBTIndex
+                       optixLaunchParams.programs->hit, //SBT Offset
+                       0, // SBT stride
+                       optixLaunchParams.programs->miss, // missSBTIndex
                        payload.x,
                        payload.y);
 
 
             // Path termination by miss shader or sample() routines.
-            if ((prd.eventType == mi::neuraylib::BSDF_EVENT_ABSORB) || (prd.throughput == math::vec3f(0.0f)))
+            if ((prd.eventType == mi::neuraylib::BSDF_EVENT_ABSORB) || (prd.throughput == math::vec3f(0.0f)) || prd.traceEvent ==TR_MISS)
             {
                 break;
             }
@@ -358,7 +361,8 @@ namespace vtx {
     //------------------------------------------------------------------------------
     extern "C" __global__ void __raygen__renderFrame()
     {
-        const FrameBufferData* frameBuffer = getData<FrameBufferData>();
+        const RendererDeviceSettings*   settings = getData<RendererDeviceSettings>();
+        const FrameBufferData*          frameBuffer = getData<FrameBufferData>();
 	    const math::vec2ui& frameSize = frameBuffer->frameSize;
         
 
@@ -375,7 +379,7 @@ namespace vtx {
         const math::vec2f sample = math::vec2f{0.5f, 0.5f};
         const math::vec2f screen{ static_cast<float>(frameSize.x), static_cast<float>(frameSize.y) };
 
-        const LensRay cameraRay = optixDirectCall<LensRay, const math::vec2f, const math::vec2f, const math::vec2f>(0, screen, pixel, sample);
+        const LensRay cameraRay = optixDirectCall<LensRay, const math::vec2f, const math::vec2f, const math::vec2f>(optixLaunchParams.programs->pinhole, screen, pixel, sample);
 
         prd.position = cameraRay.org;
         prd.wi = cameraRay.dir;
@@ -402,58 +406,60 @@ namespace vtx {
         math::vec3f radiance = integrator(prd);
 
         math::vec4f* outputBuffer = reinterpret_cast<math::vec4f*>(frameBuffer->outputBuffer); // This is a per device launch sized buffer in this renderer strategy.
-        const char* accumulate = optixLaunchParams.settings->accumulate ? "true" : "false";
-        //printf("ACCUMULATE : %s \tITERATION : % d\n", accumulate, optixLaunchParams.settings->iteration);
-        switch (frameBuffer->frameBufferType)
+        if (!settings->accumulate || settings->iteration == 0)
         {
-        case(FrameBufferData::FrameBufferType::FB_NOISY) :
+            frameBuffer->radianceBuffer[fbIndex] = radiance;
+        }
+        else
+        {
+            frameBuffer->radianceBuffer[fbIndex] += radiance;
+        }
+        //printf("ACCUMULATE : %s \tITERATION : % d\n", accumulate, optixLaunchParams.settings->iteration);
+        switch (settings->displayBuffer)
+        {
+        case(RendererDeviceSettings::DisplayBuffer::FB_NOISY) :
 	        {
-            //frameBuffer->radianceBuffer[fbIndex] = frameBuffer->radianceBuffer[fbIndex] + ((1.0f / float(getFrameId() + 1)) * (radiance - outputBuffer[fbIndex]));
-            if(!optixLaunchParams.settings->accumulate || optixLaunchParams.settings->iteration == 0)
-            {
-                frameBuffer->radianceBuffer[fbIndex] = radiance;
-            }
-            else
-            {
-				frameBuffer->radianceBuffer[fbIndex] += radiance;
-            }
-            //outputBuffer[fbIndex] = makeColor(frameBuffer->radianceBuffer[fbIndex]);
-            //outputBuffer[fbIndex] = makeColor(prd.radiance);
-            outputBuffer[fbIndex] = math::vec4f(frameBuffer->radianceBuffer[fbIndex] / static_cast<float>(optixLaunchParams.settings->iteration), 1.0f);
-            //outputBuffer[fbIndex] = math::vec4f(frameBuffer->radianceBuffer[fbIndex], 1.0f);
+                if(optixLaunchParams.settings->accumulate)
+                {
+					outputBuffer[fbIndex] = math::vec4f(frameBuffer->radianceBuffer[fbIndex] / static_cast<float>(optixLaunchParams.settings->iteration+1), 1.0f);
+                }
+                else
+                {
+                    outputBuffer[fbIndex] = math::vec4f(frameBuffer->radianceBuffer[fbIndex], 1.0f);
+                }
 	        }
 	        break;
-        case(FrameBufferData::FrameBufferType::FB_DIFFUSE) :
+        case(RendererDeviceSettings::DisplayBuffer::FB_DIFFUSE) :
 	        {
 		        outputBuffer[fbIndex] = math::vec4f(prd.colors.diffuse, 1.0f);
 	        }
 	        break;
-        case(FrameBufferData::FrameBufferType::FB_ORIENTATION) :
+        case(RendererDeviceSettings::DisplayBuffer::FB_ORIENTATION) :
 	        {
 		        outputBuffer[fbIndex] = math::vec4f(prd.colors.orientation, 1.0f);
 	        }
 	        break;
-        case(FrameBufferData::FrameBufferType::FB_TRUE_NORMAL) :
+        case(RendererDeviceSettings::DisplayBuffer::FB_TRUE_NORMAL) :
 	        {
 		        outputBuffer[fbIndex] = math::vec4f(prd.colors.trueNormal, 1.0f);
 	        }
 	        break;
-        case(FrameBufferData::FrameBufferType::FB_SHADING_NORMAL) :
+        case(RendererDeviceSettings::DisplayBuffer::FB_SHADING_NORMAL) :
 	        {
 		        outputBuffer[fbIndex] = math::vec4f(prd.colors.shadingNormal, 1.0f);
 	        }
 	        break;
-        case(FrameBufferData::FrameBufferType::FB_DEBUG_1):
+        case(RendererDeviceSettings::DisplayBuffer::FB_DEBUG_1):
         {
             outputBuffer[fbIndex] = math::vec4f(prd.colors.debugColor1, 1.0f);
         }
         break;
-        case(FrameBufferData::FrameBufferType::FB_DEBUG_2):
+        case(RendererDeviceSettings::DisplayBuffer::FB_DEBUG_2):
         {
             outputBuffer[fbIndex] = math::vec4f(prd.colors.debugColor2, 1.0f);
         }
         break;
-        case(FrameBufferData::FrameBufferType::FB_DEBUG_3):
+        case(RendererDeviceSettings::DisplayBuffer::FB_DEBUG_3):
         {
             outputBuffer[fbIndex] = math::vec4f(prd.colors.debugColor3, 1.0f);
         }
