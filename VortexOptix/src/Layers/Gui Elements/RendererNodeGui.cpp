@@ -23,6 +23,7 @@ namespace vtx::gui
         if (ImGui::Combo("Sampling Technique", &samplingTechniqueItem, RendererDeviceSettings::samplingTechniqueNames, RendererDeviceSettings::SamplingTechnique::S_COUNT))
         {
             renderNode->settings.samplingTechnique = static_cast<RendererDeviceSettings::SamplingTechnique>(samplingTechniqueItem);
+            renderNode->settings.iteration = -1;
             renderNode->settings.isUpdated = true;
         }
 

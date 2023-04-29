@@ -5,6 +5,8 @@
 #include "Scene/Nodes/Renderer.h"
 #include <cudaGL.h>
 
+#include "Scene/SIM.h"
+
 namespace vtx::device
 {
 	InstanceData createInstanceData(std::shared_ptr<graph::Instance> instanceNode, const math::affine3f& transform)
@@ -14,25 +16,27 @@ namespace vtx::device
 		const vtxID& instanceId = instanceNode->getID();
 		VTX_INFO("Device Visitor: Creating Instance {} data", instanceId);
 
-		CudaMap<vtxID, GeometryData>&	geometryDataMap = UPLOAD_DATA->geometryDataMap;
-		CudaMap<vtxID, MaterialData>&	materialDataMap = UPLOAD_DATA->materialDataMap;
-		CudaMap<vtxID, LightData>&		lightDataMap	= UPLOAD_DATA->lightDataMap;
+		CudaMap<vtxID, GeometryData>& geometryDataMap = UPLOAD_DATA->geometryDataMap;
+		CudaMap<vtxID, MaterialData>& materialDataMap = UPLOAD_DATA->materialDataMap;
+		CudaMap<vtxID, LightData>&    lightDataMap    = UPLOAD_DATA->lightDataMap;
 
-		InstanceData data{};
-		data.instanceId = instanceId;
-		data.transform = transform;
+		InstanceData instanceData{};
+		instanceData.instanceId = instanceId;
+		instanceData.transform  = transform;
 
 
 		const vtxID& meshId = instanceNode->getChild()->getID();
 		if (geometryDataMap.contains(meshId))
 		{
-			data.geometryDataId = meshId;
+			instanceData.geometryDataId = meshId;
 		}
 		else
 		{
 			VTX_ERROR("Requesting Mesh device Data of Mesh Node {} but not found!", meshId);
 		}
 
+		instanceData.hasEmission = false;
+		instanceData.hasOpacity  = false;
 		std::vector<InstanceData::SlotIds> materialSlots;
 		for (const graph::MaterialSlot& materialSlot : instanceNode->getMaterialSlots())
 		{
@@ -44,6 +48,18 @@ namespace vtx::device
 
 				if (vtxID lightId = materialSlot.meshLight->getID(); lightDataMap.contains(lightId)) {
 					slotIds.meshLightId = lightId;
+					if(slotIds.meshLightId != 0)
+						instanceData.hasEmission = true;
+				}
+
+				if(!instanceData.hasOpacity)
+				{
+					auto materialNode = graph::SIM::getNode<graph::Material>(materialId);
+					bool hasOpacity = materialNode->shader->getPrograms().hasOpacity;
+					if (hasOpacity)
+					{
+						instanceData.hasOpacity = true;
+					}
 				}
 			}
 			else
@@ -57,15 +73,15 @@ namespace vtx::device
 		{
 			CUDABuffer& materialSlotsBuffer = GET_BUFFER(Buffers::InstanceBuffers, instanceId, materialSlotsBuffer);
 			materialSlotsBuffer.upload(materialSlots);
-			data.materialSlotsId = materialSlotsBuffer.castedPointer<InstanceData::SlotIds>();
-			data.numberOfSlots = materialSlots.size();
+			instanceData.materialSlotsId = materialSlotsBuffer.castedPointer<InstanceData::SlotIds>();
+			instanceData.numberOfSlots   = materialSlots.size();
 		}
 		else
 		{
-			data.materialSlotsId = nullptr;
+			instanceData.materialSlotsId = nullptr;
 		}
 
-		return data;
+		return instanceData;
 	}
 
 	LightData createLightData(std::shared_ptr<graph::Light> lightNode)
@@ -73,7 +89,7 @@ namespace vtx::device
 		LightData lightData{};
 		if (lightNode->attributes->lightType == L_MESH)
 		{
-			MeshLightAttributes meshLightData{};
+			MeshLightAttributesData meshLightData{};
 
 			const auto& attributes = std::dynamic_pointer_cast<graph::MeshLightAttributes>(lightNode->attributes);
 
@@ -83,17 +99,18 @@ namespace vtx::device
 			CUDABuffer& actualTriangleIndices = GET_BUFFER(Buffers::LightBuffers, lightNode->getID(), actualTriangleIndices);
 			actualTriangleIndices.upload(attributes->actualTriangleIndices);
 
-			meshLightData.instanceId			= attributes->parentInstanceId;
-			meshLightData.materialID			= attributes->material->getID();
-			meshLightData.cdfArea				= areaCdfBuffer.castedPointer<float>();
+			meshLightData.instanceId            = attributes->parentInstanceId;
+			meshLightData.meshId                = attributes->mesh->getID();
+			meshLightData.materialId            = attributes->material->getID();
+			meshLightData.cdfArea               = areaCdfBuffer.castedPointer<float>();
 			meshLightData.actualTriangleIndices = actualTriangleIndices.castedPointer<uint32_t>();
-			meshLightData.size					= attributes->cdfAreas.size();
-			meshLightData.totalArea				= attributes->area;
+			meshLightData.size                  = attributes->cdfAreas.size();
+			meshLightData.totalArea             = attributes->area;
 
 			CUDABuffer& attributeBuffer = GET_BUFFER(Buffers::LightBuffers, lightNode->getID(), attributeBuffer);
 			attributeBuffer.upload(meshLightData);
 
-			lightData.type = L_MESH;
+			lightData.type       = L_MESH;
 			lightData.attributes = attributeBuffer.dPointer();
 		}
 
@@ -107,13 +124,13 @@ namespace vtx::device
 		CUDA_SYNC_CHECK();
 
 		OptixDeviceContext& optixContext = optix::getState()->optixContext;
-		CUstream& stream = optix::getState()->stream;
+		CUstream&           stream       = optix::getState()->stream;
 
 		/// Uploading Vertex and Index Buffer ///
 
 		CUDABuffer& vertexBuffer = GET_BUFFER(Buffers::GeometryBuffers, meshNode->getID(), vertexBuffer);
-		CUDABuffer& indexBuffer = GET_BUFFER(Buffers::GeometryBuffers, meshNode->getID(), indexBuffer);
-		CUDABuffer& faceBuffer = GET_BUFFER(Buffers::GeometryBuffers, meshNode->getID(), faceBuffer);
+		CUDABuffer& indexBuffer  = GET_BUFFER(Buffers::GeometryBuffers, meshNode->getID(), indexBuffer);
+		CUDABuffer& faceBuffer   = GET_BUFFER(Buffers::GeometryBuffers, meshNode->getID(), faceBuffer);
 
 		vertexBuffer.upload(meshNode->vertices);
 		indexBuffer.upload(meshNode->indices);
@@ -121,25 +138,25 @@ namespace vtx::device
 
 
 		const CUdeviceptr vertexData = vertexBuffer.dPointer();
-		const CUdeviceptr indexData = indexBuffer.dPointer();
+		const CUdeviceptr indexData  = indexBuffer.dPointer();
 
 		const OptixTraversableHandle traversable = optix::createGeometryAcceleration(vertexData,
-																					 static_cast<uint32_t>(meshNode->vertices.size()),
-																					 sizeof(graph::VertexAttributes),
-																					 indexData,
-																					 static_cast<uint32_t>(meshNode->indices.size()),
-																					 sizeof(vtxID) * 3);
+			static_cast<uint32_t>(meshNode->vertices.size()),
+			sizeof(graph::VertexAttributes),
+			indexData,
+			static_cast<uint32_t>(meshNode->indices.size()),
+			sizeof(vtxID) * 3);
 
 		GeometryData data{};
 
-		data.type = PT_TRIANGLES;
-		data.traversable = traversable;
+		data.type                = PT_TRIANGLES;
+		data.traversable         = traversable;
 		data.vertexAttributeData = vertexBuffer.castedPointer<graph::VertexAttributes>();
-		data.indicesData = indexBuffer.castedPointer<vtxID>();
-		data.faceAttributeData = faceBuffer.castedPointer<graph::FaceAttributes>();
-		data.numVertices = meshNode->vertices.size();
-		data.numIndices = meshNode->indices.size();
-		data.numFaces = meshNode->faceAttributes.size();
+		data.indicesData         = indexBuffer.castedPointer<vtxID>();
+		data.faceAttributeData   = faceBuffer.castedPointer<graph::FaceAttributes>();
+		data.numVertices         = meshNode->vertices.size();
+		data.numIndices          = meshNode->indices.size();
+		data.numFaces            = meshNode->faceAttributes.size();
 
 		return data;
 	}
@@ -147,8 +164,8 @@ namespace vtx::device
 	MaterialData createMaterialData(std::shared_ptr<graph::Material> material)
 	{
 		CUDA_SYNC_CHECK();
-		MaterialData materialData = {}; // Set everything to zero.
-		CUDABuffer& argBlockBuffer = GET_BUFFER(Buffers::MaterialBuffers, material->getID(), argBlockBuffer);
+		MaterialData materialData   = {}; // Set everything to zero.
+		CUDABuffer&  argBlockBuffer = GET_BUFFER(Buffers::MaterialBuffers, material->getID(), argBlockBuffer);
 		// If the material has an argument block, allocate and upload it.
 		if (const size_t sizeArgumentBlock = material->getArgumentBlockSize(); sizeArgumentBlock > 0)
 		{
@@ -163,11 +180,11 @@ namespace vtx::device
 
 	DeviceShaderConfiguration createDeviceShaderConfiguration(std::shared_ptr<graph::Shader> shader)
 	{
-		const graph::Shader::DevicePrograms& dp = shader->getPrograms();
-		const graph::Shader::Configuration& config = shader->getConfiguration();
-		optix::PipelineOptix* rp = optix::getRenderingPipeline();
+		const graph::Shader::DevicePrograms&      dp     = shader->getPrograms();
+		const graph::Shader::Configuration&       config = shader->getConfiguration();
+		optix::PipelineOptix*                     rp     = optix::getRenderingPipeline();
 		const CudaMap<vtxID, optix::sbtPosition>& sbtMap = rp->getSbtMap();
-		DeviceShaderConfiguration dvConfig;
+		DeviceShaderConfiguration                 dvConfig;
 
 		// The constant expression values:
 		//bool thin_walled; // Stored inside flags.
@@ -275,11 +292,11 @@ namespace vtx::device
 	ShaderData createShaderData(std::shared_ptr<graph::Shader> shaderNode)
 	{
 		//uploadData.geometryInstanceDataMap.allocAndUpload();
-		ShaderData shaderData{};
+		ShaderData     shaderData{};
 		TextureHandler textureHandler;
 
-		const CudaMap<vtxID, TextureData>& textureDataMap			= UPLOAD_DATA->textureDataMap;
-		const CudaMap<vtxID, BsdfData>& bsdfDataMap					= UPLOAD_DATA->bsdfDataMap;
+		const CudaMap<vtxID, TextureData>&      textureDataMap      = UPLOAD_DATA->textureDataMap;
+		const CudaMap<vtxID, BsdfData>&         bsdfDataMap         = UPLOAD_DATA->bsdfDataMap;
 		const CudaMap<vtxID, LightProfileData>& lightProfileDataMap = UPLOAD_DATA->lightProfileDataMap;
 
 		// The following code was based on different assumptions on how mdl can access textures, it was probably wrong
@@ -290,8 +307,8 @@ namespace vtx::device
 			std::vector<vtxID> texturesIds(size);
 			for (const std::shared_ptr<graph::Texture> texture : shaderNode->getTextures())
 			{
-				vtxID textureId = texture->getID();
-				const uint32_t mdlIndex = texture->mdlIndex;
+				vtxID          textureId = texture->getID();
+				const uint32_t mdlIndex  = texture->mdlIndex;
 				if (textureDataMap.contains(textureId))
 				{
 					texturesIds[mdlIndex - 1] = textureId;
@@ -304,12 +321,12 @@ namespace vtx::device
 			}
 			CUDABuffer& textureIdBuffer = GET_BUFFER(Buffers::ShaderBuffers, shaderNode->getID(), textureIdBuffer);
 			textureIdBuffer.upload(texturesIds);
-			textureHandler.numTextures = texturesIds.size();
+			textureHandler.numTextures        = texturesIds.size();
 			textureHandler.textureMdlIndexMap = textureIdBuffer.castedPointer<vtxID>();
 		}
 		else
 		{
-			textureHandler.numTextures = 0;
+			textureHandler.numTextures        = 0;
 			textureHandler.textureMdlIndexMap = nullptr;
 		}
 
@@ -319,7 +336,7 @@ namespace vtx::device
 			std::vector<vtxID> bsdfsIds(size);
 			for (const std::shared_ptr<graph::BsdfMeasurement> bsdf : shaderNode->getBsdfs())
 			{
-				vtxID bsdfId = bsdf->getID();
+				vtxID          bsdfId   = bsdf->getID();
 				const uint32_t mdlIndex = bsdf->mdlIndex;
 				if (bsdfDataMap.contains(bsdfId))
 				{
@@ -334,11 +351,11 @@ namespace vtx::device
 			CUDABuffer& bsdfIdBuffer = GET_BUFFER(Buffers::ShaderBuffers, shaderNode->getID(), bsdfIdBuffer);
 			bsdfIdBuffer.upload(bsdfsIds);
 			textureHandler.bsdfMdlIndexMap = bsdfIdBuffer.castedPointer<vtxID>();
-			textureHandler.numBsdfs = bsdfsIds.size();
+			textureHandler.numBsdfs        = bsdfsIds.size();
 		}
 		else
 		{
-			textureHandler.numBsdfs = 0;
+			textureHandler.numBsdfs        = 0;
 			textureHandler.bsdfMdlIndexMap = nullptr;
 		}
 
@@ -347,8 +364,8 @@ namespace vtx::device
 			std::vector<vtxID> lightProfilesIds(size);
 			for (const std::shared_ptr<graph::LightProfile> lightProfile : shaderNode->getLightProfiles())
 			{
-				vtxID lightProfileId = lightProfile->getID();
-				const uint32_t mdlIndex = lightProfile->mdlIndex;
+				vtxID          lightProfileId = lightProfile->getID();
+				const uint32_t mdlIndex       = lightProfile->mdlIndex;
 				if (lightProfileDataMap.contains(lightProfileId))
 				{
 					lightProfilesIds[mdlIndex] = lightProfileId;
@@ -362,11 +379,11 @@ namespace vtx::device
 			CUDABuffer& lightProfileBuffer = GET_BUFFER(Buffers::ShaderBuffers, shaderNode->getID(), lightProfileBuffer);
 			lightProfileBuffer.upload(lightProfilesIds);
 			textureHandler.lightProfileMdlIndexMap = lightProfileBuffer.castedPointer<vtxID>();
-			textureHandler.numLightProfiles = lightProfilesIds.size();
+			textureHandler.numLightProfiles        = lightProfilesIds.size();
 		}
 		else
 		{
-			textureHandler.numLightProfiles = 0;
+			textureHandler.numLightProfiles        = 0;
 			textureHandler.lightProfileMdlIndexMap = nullptr;
 		}
 
@@ -386,12 +403,12 @@ namespace vtx::device
 
 	TextureData createTextureData(std::shared_ptr<vtx::graph::Texture>& textureNode)
 	{
-		CUDA_ARRAY3D_DESCRIPTOR		descArray3D = {};
-		descArray3D.Format = textureNode->format;
-		descArray3D.Width = textureNode->dimension.x;
-		descArray3D.Height = textureNode->dimension.y;
-		descArray3D.Depth = textureNode->dimension.z;
-		descArray3D.NumChannels = textureNode->dimension.w;
+		CUDA_ARRAY3D_DESCRIPTOR descArray3D = {};
+		descArray3D.Format                  = textureNode->format;
+		descArray3D.Width                   = textureNode->dimension.x;
+		descArray3D.Height                  = textureNode->dimension.y;
+		descArray3D.Depth                   = textureNode->dimension.z;
+		descArray3D.NumChannels             = textureNode->dimension.w;
 
 		const CUaddress_mode addrMode = (textureNode->shape == mi::neuraylib::ITarget_code::Texture_shape::Texture_shape_cube) ? CU_TR_ADDRESS_MODE_CLAMP : CU_TR_ADDRESS_MODE_WRAP;
 		// Create filtered textureNode object
@@ -435,7 +452,7 @@ namespace vtx::device
 			textureDescUnfiltered.addressMode[0] = CU_TR_ADDRESS_MODE_BORDER;
 			textureDescUnfiltered.addressMode[1] = CU_TR_ADDRESS_MODE_BORDER;
 			textureDescUnfiltered.addressMode[2] = CU_TR_ADDRESS_MODE_BORDER;
-			textureDescUnfiltered.filterMode = CU_TR_FILTER_MODE_POINT;
+			textureDescUnfiltered.filterMode     = CU_TR_FILTER_MODE_POINT;
 		}
 
 		TextureData textureData;
@@ -464,9 +481,9 @@ namespace vtx::device
 	BsdfSamplingPartData createBsdfPartData(graph::BsdfMeasurement::BsdfPartData& bsdfData, Buffers::BsdfPartBuffer& buffers)
 	{
 		BsdfSamplingPartData bsdfSamplingData{};
-		CUDABuffer& sampleData = buffers.sampleData;
-		CUDABuffer& albedoData = buffers.albedoData;
-		CUtexObject& evalData = buffers.evalData;
+		CUDABuffer&          sampleData = buffers.sampleData;
+		CUDABuffer&          albedoData = buffers.albedoData;
+		CUtexObject&         evalData   = buffers.evalData;
 
 		sampleData.upload(bsdfData.sampleData);
 		albedoData.upload(bsdfData.albedoData);
@@ -486,12 +503,12 @@ namespace vtx::device
 		// Allocate a 3D array on the GPU (phi_delta x theta_out x theta_in)
 		CUDA_ARRAY3D_DESCRIPTOR descArray3D = {};
 
-		descArray3D.Width = bsdfData.angularResolution.y;
-		descArray3D.Height = bsdfData.angularResolution.x;
-		descArray3D.Depth = bsdfData.angularResolution.x;
-		descArray3D.Format = CU_AD_FORMAT_FLOAT;
+		descArray3D.Width       = bsdfData.angularResolution.y;
+		descArray3D.Height      = bsdfData.angularResolution.x;
+		descArray3D.Depth       = bsdfData.angularResolution.x;
+		descArray3D.Format      = CU_AD_FORMAT_FLOAT;
 		descArray3D.NumChannels = (bsdfData.numChannels == 3) ? 4 : 1;
-		descArray3D.Flags = 0;
+		descArray3D.Flags       = 0;
 
 		std::vector<const void*> pointers;
 		pointers.push_back(bsdfData.lookupData.data());
@@ -502,21 +519,21 @@ namespace vtx::device
 
 		CUDA_TEXTURE_DESC textureDescription = {};  // This contains all texture parameters which can be set individually or as a whole.
 		// Possible flags: CU_TRSF_READ_AS_INTEGER, CU_TRSF_NORMALIZED_COORDINATES, CU_TRSF_SRGB
-		textureDescription.flags = CU_TRSF_NORMALIZED_COORDINATES;
-		textureDescription.filterMode = CU_TR_FILTER_MODE_LINEAR; // Bilinear filtering by default.
+		textureDescription.flags          = CU_TRSF_NORMALIZED_COORDINATES;
+		textureDescription.filterMode     = CU_TR_FILTER_MODE_LINEAR; // Bilinear filtering by default.
 		textureDescription.addressMode[0] = CU_TR_ADDRESS_MODE_CLAMP;
 		textureDescription.addressMode[1] = CU_TR_ADDRESS_MODE_CLAMP;
 		textureDescription.addressMode[2] = CU_TR_ADDRESS_MODE_CLAMP;
-		textureDescription.maxAnisotropy = 1;
+		textureDescription.maxAnisotropy  = 1;
 		// DAR The default initialization handled all these. Just for code clarity.
-		textureDescription.mipmapFilterMode = CU_TR_FILTER_MODE_POINT;
-		textureDescription.mipmapLevelBias = 0.0f;
+		textureDescription.mipmapFilterMode    = CU_TR_FILTER_MODE_POINT;
+		textureDescription.mipmapLevelBias     = 0.0f;
 		textureDescription.minMipmapLevelClamp = 0.0f;
 		textureDescription.maxMipmapLevelClamp = 0.0f;
-		textureDescription.borderColor[0] = 0.0f;
-		textureDescription.borderColor[1] = 0.0f;
-		textureDescription.borderColor[2] = 0.0f;
-		textureDescription.borderColor[3] = 0.0f;
+		textureDescription.borderColor[0]      = 0.0f;
+		textureDescription.borderColor[1]      = 0.0f;
+		textureDescription.borderColor[2]      = 0.0f;
+		textureDescription.borderColor[3]      = 0.0f;
 
 		const CUresult result = cuTexObjectCreate(&evalData, &resourceDescription, &textureDescription, nullptr);
 		CU_CHECK(result);
@@ -535,7 +552,7 @@ namespace vtx::device
 
 			CUDABuffer& partBuffer = reflectionPartBuffer.partBuffer;
 			partBuffer.upload(reflectionBsdfDeviceData);
-			bsdfData.reflectionBsdf = partBuffer.castedPointer<BsdfSamplingPartData>();
+			bsdfData.reflectionBsdf    = partBuffer.castedPointer<BsdfSamplingPartData>();
 			bsdfData.hasReflectionBsdf = true;
 
 		}
@@ -546,7 +563,7 @@ namespace vtx::device
 
 			CUDABuffer& partBuffer = transmissionPartBuffer.partBuffer;
 			partBuffer.upload(transmissionBsdfDeviceData);
-			bsdfData.transmissionBsdf = partBuffer.castedPointer<BsdfSamplingPartData>();
+			bsdfData.transmissionBsdf    = partBuffer.castedPointer<BsdfSamplingPartData>();
 			bsdfData.hasTransmissionBsdf = true;
 		}
 		return bsdfData;
@@ -564,12 +581,12 @@ namespace vtx::device
 		// Allocate a 3D array on the GPU (phi_delta x theta_out x theta_in)
 		CUDA_ARRAY3D_DESCRIPTOR descArray3D = {};
 
-		descArray3D.Width = lightProfile->lightProfileData.resolution.x;
-		descArray3D.Height = lightProfile->lightProfileData.resolution.y;
-		descArray3D.Depth = 0; // A 2D array is allocated if only Depth extent is zero.
-		descArray3D.Format = CU_AD_FORMAT_FLOAT;
+		descArray3D.Width       = lightProfile->lightProfileData.resolution.x;
+		descArray3D.Height      = lightProfile->lightProfileData.resolution.y;
+		descArray3D.Depth       = 0; // A 2D array is allocated if only Depth extent is zero.
+		descArray3D.Format      = CU_AD_FORMAT_FLOAT;
 		descArray3D.NumChannels = 1;
-		descArray3D.Flags = 0;
+		descArray3D.Flags       = 0;
 		std::vector<const void*> pointers;
 		pointers.push_back(lightProfile->lightProfileData.sourceData);
 
@@ -579,12 +596,12 @@ namespace vtx::device
 
 		CUDA_TEXTURE_DESC textureDescription = {}; // This contains all texture parameters which can be set individually or as a whole.
 		// Possible flags: CU_TRSF_READ_AS_INTEGER, CU_TRSF_NORMALIZED_COORDINATES, CU_TRSF_SRGB
-		textureDescription.flags = CU_TRSF_NORMALIZED_COORDINATES;
-		textureDescription.filterMode = CU_TR_FILTER_MODE_LINEAR; // Bilinear filtering by default.
+		textureDescription.flags          = CU_TRSF_NORMALIZED_COORDINATES;
+		textureDescription.filterMode     = CU_TR_FILTER_MODE_LINEAR; // Bilinear filtering by default.
 		textureDescription.addressMode[0] = CU_TR_ADDRESS_MODE_CLAMP; // FIXME Shouldn't phi use wrap?
 		textureDescription.addressMode[1] = CU_TR_ADDRESS_MODE_CLAMP;
 		textureDescription.addressMode[2] = CU_TR_ADDRESS_MODE_CLAMP;
-		textureDescription.maxAnisotropy = 1;
+		textureDescription.maxAnisotropy  = 1;
 		// DAR The default initialization handled all these. Just for code clarity.
 		textureDescription.mipmapFilterMode = CU_TR_FILTER_MODE_POINT;
 		textureDescription.mipmapLevelBias = 0.0f;
@@ -638,21 +655,23 @@ namespace vtx::device
 			UPLOAD_DATA->frameBufferData.frameSize.x = rendererNode->width;
 			UPLOAD_DATA->frameBufferData.frameSize.y = rendererNode->height;
 
-			rendererNode->resized = false;
+			rendererNode->resized             = false;
 			UPLOAD_DATA->isFrameBufferUpdated = true;
-			rendererNode->resizeGlBuffer = true;
+			rendererNode->resizeGlBuffer      = true;
 		}
 		
 
 		if(rendererNode->settings.isUpdated)
 		{
-			UPLOAD_DATA->settings.iteration			= rendererNode->settings.iteration;
-			UPLOAD_DATA->settings.accumulate		= rendererNode->settings.accumulate;
-			UPLOAD_DATA->settings.maxBounces		= rendererNode->settings.maxBounces;
-			UPLOAD_DATA->settings.displayBuffer		= rendererNode->settings.displayBuffer;
+			UPLOAD_DATA->settings.iteration         = rendererNode->settings.iteration;
+			UPLOAD_DATA->settings.accumulate        = rendererNode->settings.accumulate;
+			UPLOAD_DATA->settings.maxBounces        = rendererNode->settings.maxBounces;
+			UPLOAD_DATA->settings.displayBuffer     = rendererNode->settings.displayBuffer;
 			UPLOAD_DATA->settings.samplingTechnique = rendererNode->settings.samplingTechnique;
+			UPLOAD_DATA->settings.minClamp          = rendererNode->settings.minClamp;
+			UPLOAD_DATA->settings.maxClamp          = rendererNode->settings.maxClamp;
 
-			UPLOAD_DATA->isSettingsUpdated = true;
+			UPLOAD_DATA->isSettingsUpdated   = true;
 			rendererNode->settings.isUpdated = false;
 		}
 	}
@@ -660,12 +679,12 @@ namespace vtx::device
 	void setCameraData(std::shared_ptr<graph::Camera> cameraNode)
 	{
 		if (cameraNode->updated) {
-			UPLOAD_DATA->cameraData.position = cameraNode->position;
-			UPLOAD_DATA->cameraData.direction = cameraNode->direction;
-			UPLOAD_DATA->cameraData.vertical = cos(cameraNode->fovY) * cameraNode->vertical;
+			UPLOAD_DATA->cameraData.position   = cameraNode->position;
+			UPLOAD_DATA->cameraData.direction  = cameraNode->direction;
+			UPLOAD_DATA->cameraData.vertical   = cos(cameraNode->fovY) * cameraNode->vertical;
 			UPLOAD_DATA->cameraData.horizontal = cos(cameraNode->fovY) * cameraNode->aspect * cameraNode->horizontal;
-			cameraNode->updated = false;
-			UPLOAD_DATA->isCameraUpdated = true;
+			cameraNode->updated                = false;
+			UPLOAD_DATA->isCameraUpdated       = true;
 		}
 	}
 
@@ -673,24 +692,25 @@ namespace vtx::device
 	SbtProgramIdx setProgramsSbt()
 	{
 		// This is hard Coded, I didn't find a better way which didn't have some hardcoded design or some hash map conversion from string on the device
-		SbtProgramIdx pg{};
-		optix::PipelineOptix* rp = optix::getRenderingPipeline();
+		SbtProgramIdx                             pg{};
+		optix::PipelineOptix*                     rp     = optix::getRenderingPipeline();
 		const CudaMap<vtxID, optix::sbtPosition>& sbtMap = rp->getSbtMap();
 
-		pg.raygen = optix::PipelineOptix::getProgramSbt(sbtMap, "raygen");
-		pg.exception = optix::PipelineOptix::getProgramSbt(sbtMap, "exception");
-		pg.miss = optix::PipelineOptix::getProgramSbt(sbtMap, "miss");
-		pg.hit = optix::PipelineOptix::getProgramSbt(sbtMap, "hit");
-		pg.pinhole = optix::PipelineOptix::getProgramSbt(sbtMap, "pinhole");
+		pg.raygen          = optix::PipelineOptix::getProgramSbt(sbtMap, "raygen");
+		pg.exception       = optix::PipelineOptix::getProgramSbt(sbtMap, "exception");
+		pg.miss            = optix::PipelineOptix::getProgramSbt(sbtMap, "miss");
+		pg.hit             = optix::PipelineOptix::getProgramSbt(sbtMap, "hit");
+		pg.pinhole         = optix::PipelineOptix::getProgramSbt(sbtMap, "pinhole");
+		pg.meshLightSample = optix::PipelineOptix::getProgramSbt(sbtMap, "meshLightSample");
 
 		return pg;
 	}
 
 	CUDA_RESOURCE_DESC uploadTexture(
 		const std::vector<const void*>& imageLayers,
-		const CUDA_ARRAY3D_DESCRIPTOR& descArray3D,
-		const size_t& sizeBytesPerElement,
-		CUarray& array)
+		const CUDA_ARRAY3D_DESCRIPTOR&  descArray3D,
+		const size_t&                   sizeBytesPerElement,
+		CUarray&                        array)
 	{
 		CUresult result;
 
@@ -705,31 +725,31 @@ namespace vtx::device
 			CUDA_MEMCPY3D params = {};
 
 			params.srcMemoryType = CU_MEMORYTYPE_HOST;
-			params.srcHost = layerSource;
-			params.srcPitch = descArray3D.Width * sizeBytesPerElement * descArray3D.NumChannels;
-			params.srcHeight = descArray3D.Height;
+			params.srcHost       = layerSource;
+			params.srcPitch      = descArray3D.Width * sizeBytesPerElement * descArray3D.NumChannels;
+			params.srcHeight     = descArray3D.Height;
 
 			params.dstMemoryType = CU_MEMORYTYPE_ARRAY;
-			params.dstArray = array;
+			params.dstArray      = array;
 
 			if (descArray3D.Depth != 0)
 			{
 				params.dstXInBytes = 0;
-				params.dstY = 0;
-				params.dstZ = i;
+				params.dstY        = 0;
+				params.dstZ        = i;
 			}
 
 			params.WidthInBytes = params.srcPitch;
-			params.Height = descArray3D.Height;
-			params.Depth = 1;
+			params.Height       = descArray3D.Height;
+			params.Depth        = 1;
 
 			result = cuMemcpy3D(&params);
 			CU_CHECK(result);
 		}
 
 		CUDA_RESOURCE_DESC resourceDescription = {};
-		resourceDescription.resType = CU_RESOURCE_TYPE_ARRAY;
-		resourceDescription.res.array.hArray = array;
+		resourceDescription.resType            = CU_RESOURCE_TYPE_ARRAY;
+		resourceDescription.res.array.hArray   = array;
 
 		return resourceDescription;
 	}

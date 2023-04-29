@@ -2,15 +2,30 @@
 #ifndef LIGHT_TYPES_H
 #define LIGHT_TYPES_H
 
-enum LightType
-{
-	L_POINT,
-	L_SPOT,
-	L_MESH,
-	L_ENV,
+#include "Core/math.h"
 
-	L_NUM_LIGHT_TYPES
-};
+namespace vtx
+{
+	enum LightType
+	{
+		L_POINT,
+		L_SPOT,
+		L_MESH,
+		L_ENV,
+
+		L_NUM_LIGHT_TYPES
+	};
+
+	struct LightSample
+	{
+		math::vec3f position;
+		math::vec3f direction;
+		math::vec3f radianceOverPdf;
+		float		distance;
+		float		pdf;
+		bool		isValid = false;
+	};
+}
 
 #endif
 

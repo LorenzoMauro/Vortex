@@ -84,6 +84,8 @@ project "OptixApp"
     useMdlDebug = false
     
     filter "configurations:Debug"
+        defines{"GLFW_INCLUDE_NONE"}
+
         if useMdlDebug then
             postbuildcommands {
                 "{COPY} %{wks.location}/VortexOptix/src/data %{cfg.targetdir}/data/",
@@ -112,6 +114,8 @@ project "OptixApp"
         end
 
     filter "configurations:Release"
+        defines{"GLFW_INCLUDE_NONE"}
+
         postbuildcommands {
             "{COPY} %{wks.location}/VortexOptix/src/data %{cfg.targetdir}/data/",
             "{MKDIR} %{cfg.targetdir}/lib",

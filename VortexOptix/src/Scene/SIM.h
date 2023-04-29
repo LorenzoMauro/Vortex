@@ -2,6 +2,7 @@
 #include <set>
 
 #include "Node.h"
+#include "Core/Log.h"
 
 namespace vtx::graph
 {
@@ -50,8 +51,13 @@ namespace vtx::graph
 			const auto sim = Get();
 
 			static_assert(std::is_base_of_v<Node, T>, "Template type is not a subclass of Node!");
-			const std::shared_ptr<Node>& nodePtr = (*sim)[id];
-			return std::static_pointer_cast<T>(nodePtr);
+			const std::shared_ptr<T>& nodePtr = std::dynamic_pointer_cast<T>((*sim)[id]);
+			if(!nodePtr)
+			{
+				VTX_ERROR("The requested Node Id doesn't match it's type!");
+
+			}
+			return nodePtr;
 		}
 
 		static std::vector<std::shared_ptr<Node>> getAllNodeOfType(NodeType nodeType)

@@ -52,7 +52,7 @@ namespace vtx {
         const uint32_t height = ImGui::GetContentRegionAvail().y;
         renderer->resize(width, height);
         GlFrameBuffer& bf = renderer->getFrame();
-        ImGui::Image(reinterpret_cast<void*>(bf.m_ColorAttachment), ImVec2{ static_cast<float>(bf.m_Width), static_cast<float>(bf.m_Height) }, ImVec2{ 0, 1 }, ImVec2{ 1, 0 });
+        ImGui::Image(reinterpret_cast<void*>(bf.colorAttachment), ImVec2{ static_cast<float>(bf.width), static_cast<float>(bf.height) }, ImVec2{ 0, 1 }, ImVec2{ 1, 0 });
         if (!renderer->camera->navigationActive) {
             renderer->camera->navigationActive = ImGui::IsItemHovered();
         }

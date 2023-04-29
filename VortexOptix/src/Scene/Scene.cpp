@@ -109,9 +109,9 @@ namespace vtx::graph
 		camera->transform = std::make_shared<Transform>();
 		camera->transform->rotateDegree(math::xAxis, 90.0f);
 		camera->transform->rotateDegree(camera->horizontal, -45.0f);
-		camera->transform->translate(math::yAxis, -5.0f);
+		camera->transform->translate(math::yAxis, -7.0f);
 		camera->transform->rotateDegree(math::zAxis, 135.0f);
-		camera->transform->translate(math::zAxis, 5.0f);
+		camera->transform->translate(math::zAxis, 7.0f);
 		//camera->transform->rotateAroundPointDegree(math::origin, math::zAxis, 45.0f);
 		camera->updateDirections();
 

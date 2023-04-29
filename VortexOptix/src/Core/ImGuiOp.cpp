@@ -39,7 +39,7 @@ namespace vtx {
         // Upload Fonts
         //LoadFonts();
 
-        ImGui::LoadIniSettingsFromDisk(utl::absolutePath(getOptions()->ImGuiIniFile).data());
+        ImGui::LoadIniSettingsFromDisk(utl::absolutePath(getOptions()->imGuiIniFile).data());
 
         SetAppStyle();
     }
@@ -145,7 +145,7 @@ namespace vtx {
         glfwGetFramebufferSize(window, &display_w, &display_h);
         glViewport(0, 0, display_w, display_h);
 
-        ImVec4 clear_color(getOptions()->ClearColor[1], getOptions()->ClearColor[2], getOptions()->ClearColor[2], getOptions()->ClearColor[4]);
+        ImVec4 clear_color(getOptions()->clearColor[1], getOptions()->clearColor[2], getOptions()->clearColor[2], getOptions()->clearColor[4]);
         glClearColor(clear_color.x * clear_color.w, clear_color.y * clear_color.w, clear_color.z * clear_color.w, clear_color.w);
         glClear(GL_COLOR_BUFFER_BIT);
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
@@ -165,7 +165,7 @@ namespace vtx {
     
     void shutDownImGui() {
         VTX_INFO("ShutDown: ImGui");
-        ImGui::SaveIniSettingsToDisk((utl::absolutePath(getOptions()->ImGuiIniFile)).data());
+        ImGui::SaveIniSettingsToDisk((utl::absolutePath(getOptions()->imGuiIniFile)).data());
         ImGui_ImplOpenGL3_Shutdown();
         ImGui_ImplGlfw_Shutdown();
         ImGui::DestroyContext();

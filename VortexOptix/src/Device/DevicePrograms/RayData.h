@@ -16,6 +16,8 @@ namespace vtx {
 #define MATERIAL_STACK_SIZE 4
 #define FLAG_HIT           0x00000001
 #define FLAG_SHADOW        0x00000002
+// Prevent that division by very small floating point values results in huge values, for example dividing by pdf.
+#define DENOMINATOR_EPSILON 1.0e-6f
 
 	enum TraceEvent
 	{
@@ -28,18 +30,30 @@ namespace vtx {
 
 	struct HitProperties
 	{
+		vtxID				instanceId;
+		vtxID				geometryId;
+
 		const InstanceData* instance = nullptr;
 		const GeometryData* geometry = nullptr;
+
+		graph::VertexAttributes*   vertices[3]{nullptr, nullptr, nullptr};
+
+		// Material Properties
 		const MaterialData* material = nullptr;
 		const ShaderData* shader = nullptr;
 		const DeviceShaderConfiguration* shaderConfiguration = nullptr;
-
 		const LightData* meshLight = nullptr;
-		const MeshLightAttributes* meshLightAttributes = nullptr;
+		const MeshLightAttributesData* meshLightAttributes = nullptr;
 
-		// Ray properties
+		// Hit Point Properties
+		math::vec3f				baricenter;
 		math::vec3f             position;
+		math::vec3f             direction;
 		float                   distance;
+
+		//Transformations
+		math::affine3f        objectToWorld;
+		math::affine3f        worldToObject;
 		// World normals and Tangents
 		math::vec3f           ngW;
 		math::vec3f           nsW;
@@ -54,11 +68,8 @@ namespace vtx {
 		float3 textureBitangents[2];
 		float3 textureTangents[2];
 
-		//Transformations
-		math::affine3f        objectToWorld;
-		math::affine3f        worldToObject;
-
 		bool isFrontFace;
+
 	};
 
 	struct MaterialStack
@@ -86,7 +97,8 @@ namespace vtx {
 		math::vec3f position; //Current Hit Position
 		float		distance; //Distance of hit Position to Ray origin
 		int			depth;
-		TraceEvent	traceEvent; // Bitfield with flags. See FLAG_* defines above for its contents.
+		TraceEvent	traceResult; // Bitfield with flags. See FLAG_* defines above for its contents.
+		TraceEvent	traceOperation = TR_HIT; // Bitfield with flags. See FLAG_* defines above for its contents.
 
 		math::vec3f wo; //Outgoing direction, to observer in world space
 		math::vec3f wi; //Incoming direction, to light, in world space

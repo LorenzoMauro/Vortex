@@ -10,17 +10,20 @@
 #include <condition_variable>
 
 
+
 namespace vtx::graph
 {
 	struct RendererSettings
 	{
-		int					iteration;
-		int					maxBounces;
-		int					maxSamples;
-		bool				accumulate;
-		RendererDeviceSettings::SamplingTechnique	samplingTechnique;
-		RendererDeviceSettings::DisplayBuffer		displayBuffer;
-		bool				isUpdated;
+		int                                       iteration;
+		int                                       maxBounces;
+		int                                       maxSamples;
+		bool                                      accumulate;
+		RendererDeviceSettings::SamplingTechnique samplingTechnique;
+		RendererDeviceSettings::DisplayBuffer     displayBuffer;
+		bool                                      isUpdated;
+		float                                     minClamp;
+		float                                     maxClamp;
 	};
 
 	class Renderer : public Node
@@ -35,9 +38,9 @@ namespace vtx::graph
 
 		GlFrameBuffer getFrame();
 
-		void setCamera(std::shared_ptr<Camera> _camera);
+		void setCamera(const std::shared_ptr<Camera>& cameraNode);
 
-		void setScene(std::shared_ptr<Group> _sceneRoot);
+		void setScene(const std::shared_ptr<Group>& sceneRootNode);
 
 		std::shared_ptr<Camera> getCamera();
 

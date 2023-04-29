@@ -2,40 +2,41 @@
 #include "optix.h"
 #include <string>
 #include <vector>
-
 #include "Device/DevicePrograms/LaunchParams.h"
 
 namespace vtx {
 	struct Options {
-		int width = 2100;
-		int height = 900;
-		std::string WindowName = "Vortex";
-		std::string ImGuiIniFile = "./data/ImGui.ini";
-		std::string dll_path = "./lib/";
-		float ClearColor[4] = { 0.45f, 0.55f, 0.60f, 1.00f };
-#ifdef NDEBUG
+		int         width         = 2100;
+		int         height        = 900;
+		std::string windowName    = "Vortex";
+		std::string imGuiIniFile  = "./data/ImGui.ini";
+		std::string dllPath       = "./lib/";
+		float       clearColor[4] = { 0.45f, 0.55f, 0.60f, 1.00f };
+		#ifdef NDEBUG
 		bool isDebug = false;
 		#else
 		bool isDebug = true;
-#endif
+		#endif
 		////////////////////////////////////////////////////////////////////////////////////
 		/////////////////// Rendering Settings /////////////////////////////////////////////
 		////////////////////////////////////////////////////////////////////////////////////
-		
-		uint32_t									maxBounces = 5;
-		uint32_t									maxSamples = 500;
-		bool										accumulate = true;
-		RendererDeviceSettings::SamplingTechnique   samplingTechnique	= RendererDeviceSettings::SamplingTechnique::S_BSDF;
-		RendererDeviceSettings::DisplayBuffer		displayBuffer		= RendererDeviceSettings::DisplayBuffer::FB_NOISY;
+
+		uint32_t                                  maxBounces        = 5;
+		uint32_t                                  maxSamples        = 500;
+		bool                                      accumulate        = true;
+		RendererDeviceSettings::SamplingTechnique samplingTechnique = RendererDeviceSettings::SamplingTechnique::S_BSDF;
+		RendererDeviceSettings::DisplayBuffer     displayBuffer     = RendererDeviceSettings::DisplayBuffer::FB_NOISY;
+		float                                     maxClamp          = 0.0001f;
+		float                                     minClamp          = 1000.0f;
 		////////////////////////////////////////////////////////////////////////////////////
 		/////////////////// Optix Options //////////////////////////////////////////////////
 		////////////////////////////////////////////////////////////////////////////////////
-		int OptixVersion = OPTIX_VERSION;
-		int deviceID = 0;
-		int maxDcDepth = 2;
-		int maxTraversableGraphDepth = 2;
-		std::string LaunchParamName = "optixLaunchParams";
-		bool enableCache = true;
+		int         OptixVersion             = OPTIX_VERSION;
+		int         deviceID                 = 0;
+		int         maxDcDepth               = 2;
+		int         maxTraversableGraphDepth = 2;
+		std::string LaunchParamName          = "optixLaunchParams";
+		bool        enableCache              = true;
 
 		////////////////////////////////////////////////////////////////////////////////////
 		/////////////////// MDL Options ////////////////////////////////////////////////////
@@ -49,4 +50,3 @@ namespace vtx {
 
 	Options* getOptions();
 }
-

@@ -47,7 +47,7 @@ namespace vtx
 		glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
 		glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 6);
 
-		window = glfwCreateWindow(getOptions()->width, getOptions()->height, getOptions()->WindowName.c_str(), nullptr, nullptr);
+		window = glfwCreateWindow(getOptions()->width, getOptions()->height, getOptions()->windowName.c_str(), nullptr, nullptr);
 		glfwMakeContextCurrent(window);
 		if (!gladLoadGLLoader(reinterpret_cast<GLADloadproc>(glfwGetProcAddress)))
 		{

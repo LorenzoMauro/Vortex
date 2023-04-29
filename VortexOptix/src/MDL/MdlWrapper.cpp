@@ -72,7 +72,7 @@ namespace vtx::mdl
 
 	void loadIneuray()
 	{
-		std::string filename = utl::absolutePath(getOptions()->dll_path + "libmdl_sdk.dll");
+		std::string filename = utl::absolutePath(getOptions()->dllPath + "libmdl_sdk.dll");
 		const HMODULE handle = LoadLibraryA(filename.c_str());
 		VTX_ASSERT_CLOSE(handle, "Error Loading {} with error code {}", filename, GetLastError());
 
@@ -122,12 +122,12 @@ namespace vtx::mdl
 		}
 		// Load plugins.
 
-		std::string freeimagePath = utl::absolutePath(getOptions()->dll_path + "freeimage.dll");
+		std::string freeimagePath = utl::absolutePath(getOptions()->dllPath + "freeimage.dll");
 		const HMODULE handle = LoadLibraryA(freeimagePath.c_str());
 		VTX_ASSERT_CLOSE(handle, "Error Loading {} with error code {}", freeimagePath, GetLastError());
 
-		const std::string ddsPath = getOptions()->dll_path + "dds.dll";
-		const std::string nv_freeimagePath = utl::absolutePath(getOptions()->dll_path + "nv_freeimage.dll");
+		const std::string ddsPath = getOptions()->dllPath + "dds.dll";
+		const std::string nv_freeimagePath = utl::absolutePath(getOptions()->dllPath + "nv_freeimage.dll");
 
 
 		loadPlugin(nv_freeimagePath);

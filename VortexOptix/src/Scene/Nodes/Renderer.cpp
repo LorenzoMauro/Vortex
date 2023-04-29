@@ -8,7 +8,6 @@
 #include "Device/UploadCode/UploadBuffers.h"
 #include "Device/UploadCode/UploadData.h"
 #include "Scene/Traversal.h"
-#include <thread>
 
 namespace vtx::graph
 {
@@ -28,25 +27,28 @@ namespace vtx::graph
 		settings.samplingTechnique = getOptions()->samplingTechnique;
 		settings.displayBuffer = getOptions()->displayBuffer;
 
-		drawFrameBuffer.SetSize(width, height);
-		drawFrameBuffer.Bind();
+		settings.minClamp = getOptions()->maxClamp;
+		settings.maxClamp = getOptions()->minClamp;
+
+		drawFrameBuffer.setSize(width, height);
+		drawFrameBuffer.bind();
 		glClearColor(0.2f, 0.2f, 0.2f, 1.0f);
 		glClear(GL_COLOR_BUFFER_BIT);
-		drawFrameBuffer.Unbind();
+		drawFrameBuffer.unbind();
 
-		displayFrameBuffer.SetSize(width, height);
-		displayFrameBuffer.Bind();
+		displayFrameBuffer.setSize(width, height);
+		displayFrameBuffer.bind();
 		glClearColor(0.2f, 0.2f, 0.2f, 1.0f);
 		glClear(GL_COLOR_BUFFER_BIT);
-		displayFrameBuffer.Unbind();
+		displayFrameBuffer.unbind();
 	}
 
-	void Renderer::setCamera(std::shared_ptr<Camera> _camera) {
-		camera = _camera;
+	void Renderer::setCamera(const std::shared_ptr<Camera>& cameraNode) {
+		camera = cameraNode;
 	}
 
-	void Renderer::setScene(std::shared_ptr<Group> _sceneRoot) {
-		sceneRoot = _sceneRoot;
+	void Renderer::setScene(const std::shared_ptr<Group>& sceneRootNode) {
+		sceneRoot = sceneRootNode;
 	}
 
 	std::shared_ptr<Camera> Renderer::getCamera() {
@@ -69,7 +71,7 @@ namespace vtx::graph
 		visitor->visit(sharedFromBase<Renderer>());
 	}
 
-	bool Renderer::isReady(bool setBusy) {
+	bool Renderer::isReady(const bool setBusy) {
 		if (threadData.renderMutex.try_lock()) {
 			std::unique_lock<std::mutex> lock(threadData.renderMutex, std::adopt_lock);
 			if (!threadData.renderThreadBusy) {
@@ -163,19 +165,19 @@ namespace vtx::graph
 				const CUresult result = cuGraphicsUnregisterResource(cudaGraphicsResource);
 				CU_CHECK(result);
 			}
-			drawFrameBuffer.SetSize(launchParams.frameBuffer.frameSize.x, launchParams.frameBuffer.frameSize.y);
+			drawFrameBuffer.setSize(launchParams.frameBuffer.frameSize.x, launchParams.frameBuffer.frameSize.y);
 
 			const CUresult result = cuGraphicsGLRegisterImage(&cudaGraphicsResource,
-															  drawFrameBuffer.m_ColorAttachment,
+															  drawFrameBuffer.colorAttachment,
 															  GL_TEXTURE_2D, CU_GRAPHICS_REGISTER_FLAGS_WRITE_DISCARD);
 			CU_CHECK(result);
 			resizeGlBuffer = false;
 		}
 
-		drawFrameBuffer.Bind();
+		drawFrameBuffer.bind();
 		glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
 		glClear(GL_COLOR_BUFFER_BIT);
-		drawFrameBuffer.Unbind();
+		drawFrameBuffer.unbind();
 
 		CUresult CUresult = cuGraphicsMapResources(1, &cudaGraphicsResource, state.stream); // This is an implicit cuSynchronizeStream().
 		CU_CHECK(CUresult);

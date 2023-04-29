@@ -78,6 +78,7 @@ namespace vtx::graph
 		const auto attributes             = std::make_shared<graph::MeshLightAttributes>();
 		attributes->material              = newSlot.material;
 		attributes->materialRelativeIndex = materialSlots.size()-1;
+		attributes->parentInstanceId = getID();
 
 		SIM::record(newSlot.meshLight);
 

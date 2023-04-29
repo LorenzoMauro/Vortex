@@ -157,6 +157,11 @@ namespace gdt {
   inline __both__ vec_t<T,3> operator op(const vec_t<T,3> &a,           \
                                          const float3 &b)               \
   { return vec_t<T,3>(a.x op b.x, a.y op b.y, a.z op b.z); }            \
+																		\
+  template<typename T>                                                  \
+  inline __both__ vec_t<T,3> operator op(const float3 &a,               \
+                                         const vec_t<T,3> &b)           \
+  { return vec_t<T,3>(a.x op b.x, a.y op b.y, a.z op b.z); }            \
                                                                         \
   template<typename T>                                                  \
   inline __both__ vec_t<T,4> operator op(const vec_t<T,4> &a,           \

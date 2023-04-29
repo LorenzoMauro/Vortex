@@ -21,6 +21,7 @@ namespace vtx {
         int miss = -1;
         int hit = -1;
         int pinhole = -1;
+        int meshLightSample = -1;
     };
 
     struct TextureHandler : mi::neuraylib::Texture_handler_base
@@ -80,6 +81,8 @@ namespace vtx {
         SlotIds*                    materialSlotsId;
         int                         numberOfSlots;
         math::affine3f              transform;
+        bool                        hasEmission;
+        bool                        hasOpacity;
     };
 
     struct DeviceShaderConfiguration
@@ -142,16 +145,18 @@ namespace vtx {
     };
 
 
-    struct MeshLightAttributes
+    struct MeshLightAttributesData
     {
-        vtxID           instanceId;
-        vtxID           materialID;
+        vtxID           meshId;
+        vtxID           materialId;
+        vtxID           instanceId; //To retrieve the transform
 
         float*          cdfArea;
         uint32_t*       actualTriangleIndices;
         float           totalArea;
         int             size;
     };
+
     struct LightData
     {
         LightType   type;
@@ -222,7 +227,7 @@ namespace vtx {
         enum SamplingTechnique
         {
 	        S_BSDF,
-            S_LIGHT,
+            S_DIRECT_LIGHT,
             S_MIS,
 
             S_COUNT
@@ -264,6 +269,8 @@ namespace vtx {
         bool              accumulate;
         SamplingTechnique samplingTechnique;
 		DisplayBuffer     displayBuffer;
+        float             minClamp;
+        float             maxClamp;
 	};
 
 	struct LaunchParams
