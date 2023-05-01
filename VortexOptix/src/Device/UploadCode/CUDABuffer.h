@@ -94,7 +94,15 @@ namespace vtx {
         /*Internal Function to manage allocation, resize and upload on upload request*/
         __host__ void uploadImplementation(const void* uploadData, const size_t newSize)
         {
-            VTX_ASSERT_CLOSE(newSize != 0, "CudaBuffer: trying to upload a zero size Data?");
+            do
+			{
+				if (!(newSize != 0))
+				{
+					VTX_ERROR("CudaBuffer: trying to upload a zero size Data?");
+					waitAndClose();
+				}
+			}
+			while (0);
             if (d_ptr == nullptr)
             {
                 alloc(newSize);

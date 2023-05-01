@@ -16,13 +16,14 @@ namespace vtx {
 
     struct SbtProgramIdx
     {
-        int raygen = -1;
-        int exception = -1;
-        int miss = -1;
-        int hit = -1;
-        int pinhole = -1;
+        int raygen          = -1;
+        int exception       = -1;
+        int miss            = -1;
+        int hit             = -1;
+        int pinhole         = -1;
         int meshLightSample = -1;
-    };
+		int envLightSample = -1;
+	};
 
     struct TextureHandler : mi::neuraylib::Texture_handler_base
     {
@@ -144,6 +145,16 @@ namespace vtx {
 
     };
 
+
+    struct EnvLightAttributesData
+    {
+		vtxID  textureId;
+		float  invIntegral;
+		float* cdfU;
+		float* cdfV;
+		math::affine3f    transformation;
+        math::affine3f    invTransformation;
+	};
 
     struct MeshLightAttributesData
     {
@@ -279,8 +290,9 @@ namespace vtx {
         FrameBufferData                         frameBuffer;
     	CameraData                              cameraData;
         RendererDeviceSettings*                 settings;
+        vtxID                                   envLightId = 0;
 
-        SbtProgramIdx*                           programs;
+        SbtProgramIdx*                          programs;
 
         OptixTraversableHandle                  topObject;
     	CudaMap<vtxID, InstanceData>*			instanceMap;

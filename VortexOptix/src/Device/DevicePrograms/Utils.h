@@ -6,6 +6,18 @@
 namespace vtx::utl
 {
 
+	__forceinline__ __host__ __device__ float luminance(const math::vec3f& rgb)
+	{
+		const math::vec3f ntscLuminance{ 0.30f, 0.59f, 0.11f };
+		return dot(rgb, ntscLuminance);
+	}
+
+	__forceinline__ __host__ __device__ float intensity(const math::vec3f& rgb)
+	{
+		return (rgb.x + rgb.y + rgb.z) * 0.3333333333f;
+	}
+
+
 	__forceinline__ __device__ uint32_t makeColor(const math::vec3f& radiance)
 	{
 		const auto     r = static_cast<uint8_t>(radiance.x * 255.0f);

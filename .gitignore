@@ -29,3 +29,9 @@ Vortex.sln.nvsettings
 *.user
 VortexOptix/Vortex.lua
 *.DotSettings
+
+VortexOptix/src/data/morning07_EXR.exr
+VortexOptix/src/data/studio_small_03_1k.hdr
+VortexOptix/src/data/16x16-in-1024x1024.png
+VortexOptix/src/data/sunset_in_the_chalk_quarry_1k.hdr
+VortexOptix/src/data/sunset03_EXR.exr

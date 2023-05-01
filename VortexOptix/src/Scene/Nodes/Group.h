@@ -3,6 +3,8 @@
 
 namespace vtx::graph
 {
+	class Light;
+
 	class Group : public Node{
 	public:
 		Group();
@@ -17,6 +19,5 @@ namespace vtx::graph
 
 	private:
 		std::vector<std::shared_ptr<Node>> children;
-
 	};
 }

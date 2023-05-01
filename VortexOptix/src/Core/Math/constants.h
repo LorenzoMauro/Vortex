@@ -25,6 +25,8 @@
 
 #ifndef M_PI
     #define M_PI 3.141593f
+	#define M_1_PI 0.31830988618379067154f
+	#define M_PI_2 1.57079632679489661923f
 #endif
 
 namespace gdt {

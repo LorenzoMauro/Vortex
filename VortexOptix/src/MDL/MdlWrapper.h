@@ -117,6 +117,8 @@ namespace vtx::mdl
 							   std::list<graph::ParamInfo>& params,
 							   std::map<std::string, std::shared_ptr<graph::EnumTypeInfo>>& mapEnumTypes);
 
+	std::shared_ptr<graph::Texture> createTextureFromFile(const std::string& filePath);
+
 	/*Analyze mdl to prepare cuda descriptors for texture*/
 	void fetchTextureData(const std::shared_ptr<graph::Texture>& textureNode);
 

@@ -1132,6 +1132,39 @@ namespace vtx::mdl
 		transaction->commit();
 	}
 
+	std::shared_ptr<graph::Texture> createTextureFromFile(const std::string& filePath)
+	{
+		ITransaction* transaction = getGlobalTransaction();
+		std::shared_ptr<graph::Texture> textureNode;
+		{
+			// Load environment texture
+			const Handle image(transaction->create<IImage>("Image"));
+			const Sint32 result = image->reset_file(filePath.c_str());
+			VTX_ASSERT_BREAK(result == 0, "Error with creating new Texture image {}", filePath);
+			const std::string imageDbName = "Image::" + utl::getFileName(filePath);
+			transaction->store(image.get(), imageDbName.c_str());
+
+			// Create a new texture instance and set its properties
+			Handle texture(transaction->create<ITexture>("Texture"));
+
+			texture->set_image(imageDbName.c_str());
+
+			const std::string textureDbName = "userTexture::" + utl::getFileName(filePath);
+
+			transaction->store(texture.get(), textureDbName.c_str());
+
+			const ITarget_code::Texture_shape shape = ITarget_code::Texture_shape::Texture_shape_2d;
+
+			textureNode					= std::make_shared<graph::Texture>();
+			textureNode->databaseName	= textureDbName;
+			textureNode->filePath		= textureNode->filePath;
+			textureNode->shape			= shape;
+		}
+		transaction->commit();
+		textureNode->init();
+		return textureNode;
+	}
+
 	void fetchTextureData(const std::shared_ptr<graph::Texture>& textureNode)
 	{
 		ITransaction* transaction = getGlobalTransaction();

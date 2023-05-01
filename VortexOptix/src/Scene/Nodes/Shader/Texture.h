@@ -26,6 +26,12 @@ namespace vtx::graph
 		{
 		}
 
+		Texture(std::string filePath) :
+			Node(NT_MDL_TEXTURE)
+		{
+			
+		}
+
 		~Texture() override
 		{
 			for (const auto& ptr : imageLayersPointers)
@@ -41,7 +47,8 @@ namespace vtx::graph
 		void accept(std::shared_ptr<NodeVisitor> visitor) override;
 
 	public:
-		std::string										databaseName;
+		std::string										filePath; // In case the image is loaded from a file
+		std::string										databaseName; // In case the image is loaded from the database
 		ITarget_code::Texture_shape						shape;
 
 		size_t											pixelBytesSize;

@@ -1,11 +1,12 @@
 #include "Operations.h"
+#include "Scene/Graph.h"
 
 namespace vtx::ops
 {
     using namespace graph;
 
     // A simple unit cube built from 12 triangles.
-    std::shared_ptr<Mesh> ops::createBox()
+    std::shared_ptr<Mesh> createBox()
     {
         VTX_INFO("Creating Box");
         std::shared_ptr<Mesh> mesh = createNode<Mesh>();
@@ -210,7 +211,7 @@ namespace vtx::ops
         return mesh;
     }
 
-    void updateMaterialSlots(std::shared_ptr<graph::Mesh> mesh, int removedSlot)
+    void updateMaterialSlots(std::shared_ptr<graph::Mesh> mesh, const int removedSlot)
     {
         for(FaceAttributes& face : mesh->faceAttributes)
         {
@@ -221,6 +222,54 @@ namespace vtx::ops
         }
     }
 
+    float gaussianFilter(const float* rgba, const unsigned int width, const unsigned int height, const unsigned int x, const unsigned int y, const bool isSpherical)
+    {
+        // Lookup is repeated in x and clamped to edge in y.
+        unsigned int left;
+        unsigned int right;
+        unsigned int bottom = (0 < y) ? y - 1 : y; // clamp
+        unsigned int top = (y < height - 1) ? y + 1 : y; // clamp
 
+        // Match the filter to the texture object wrap setup for spherical and rectangular emission textures.
+        if (isSpherical) // Spherical environment light 
+        {
+            left = (0 < x) ? x - 1 : width - 1; // repeat
+            right = (x < width - 1) ? x + 1 : 0;         // repeat
+        }
+        else // Rectangular area light 
+        {
+            left = (0 < x) ? x - 1 : x; // clamp
+            right = (x < width - 1) ? x + 1 : x; // clamp
+        }
+
+
+        // Center
+        const float* p = rgba + (width * y + x) * 4;
+        float intensity = (p[0] + p[1] + p[2]) * 0.619347f;
+
+        // 4-neighbours
+        p = rgba + (width * bottom + x) * 4;
+        float f = p[0] + p[1] + p[2];
+        p = rgba + (width * y + left) * 4;
+        f += p[0] + p[1] + p[2];
+        p = rgba + (width * y + right) * 4;
+        f += p[0] + p[1] + p[2];
+        p = rgba + (width * top + x) * 4;
+        f += p[0] + p[1] + p[2];
+        intensity += f * 0.0838195f;
+
+        // 8-neighbours corners
+        p = rgba + (width * bottom + left) * 4;
+        f = p[0] + p[1] + p[2];
+        p = rgba + (width * bottom + right) * 4;
+        f += p[0] + p[1] + p[2];
+        p = rgba + (width * top + left) * 4;
+        f += p[0] + p[1] + p[2];
+        p = rgba + (width * top + right) * 4;
+        f += p[0] + p[1] + p[2];
+        intensity += f * 0.0113437f;
+
+        return intensity / 3.0f;
+    }
 }
 

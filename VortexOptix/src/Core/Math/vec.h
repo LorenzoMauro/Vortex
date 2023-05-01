@@ -138,6 +138,7 @@ namespace gdt {
         inline __both__ vec_t(const int3& v) : x(v.x), y(v.y), z(v.z) {}
         inline __both__ vec_t(const uint3& v) : x(v.x), y(v.y), z(v.z) {}
         inline __both__ vec_t(const float3& v) : x(v.x), y(v.y), z(v.z) {}
+        inline __both__ vec_t(const float4& v) : x(v.x), y(v.y), z(v.z) {}
         inline __both__ operator float3() const { return make_float3(x, y, z); }
         inline __both__ operator int3() const { return make_int3(x, y, z); }
         inline __both__ operator uint3() const { return make_uint3(x, y, z); }

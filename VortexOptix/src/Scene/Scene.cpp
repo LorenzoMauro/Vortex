@@ -42,8 +42,9 @@ namespace vtx::graph
 		std::shared_ptr<Mesh> plane = ops::createPlane();
 
 		std::shared_ptr<Transform> transformation4 = ops::createNode<Transform>();
+		transformation4->scale(0.5f);
 		transformation4->rotateDegree(math::xAxis, 180.0f);
-		transformation4->translate(math::zAxis, 5.0f);
+		transformation4->translate(math::zAxis, 7.0f);
 
 		std::shared_ptr<Instance> instance4 = ops::createNode<Instance>();
 		instance4->setChild(plane);
@@ -70,6 +71,8 @@ namespace vtx::graph
 			std::shared_ptr<Shader> shader1 = ops::createNode<Shader>();
 			shader1->name = "Stone_Mediterranean";
 			shader1->path = "\\vMaterials_2\\Stone\\Stone_Mediterranean.mdl";
+			//shader1->name = "Aluminum";
+			//shader1->path = "\\vMaterials_2\\Metal\\Aluminum.mdl";
 			//Shader1->name = "bsdf_diffuse_reflection";
 			//Shader1->path = "\\bsdf_diffuse_reflection.mdl";
 			std::shared_ptr<Material> material1 = ops::createNode<Material>();
@@ -101,6 +104,17 @@ namespace vtx::graph
 			instance4->addMaterial(materialEmissive);
 		}
 
+		std::string envMapPath = "data/sunset_in_the_chalk_quarry_1k.hdr";
+		//std::string envMapPath = "data/studio_small_03_1k.hdr";
+		//std::string envMapPath = "data/16x16-in-1024x1024.png";
+		//std::string envMapPath = "data/sunset03_EXR.exr";
+		//std::string envMapPath = "data/morning07_EXR.exr";
+		std::shared_ptr<Light> envLight = ops::createNode<Light>();
+		auto attrib = std::make_shared<EvnLightAttributes>(envMapPath);
+		//attrib->transform->rotateDegree(math::xAxis, 90.0f);
+		envLight->attributes = attrib;
+
+		sceneRoot->addChild(envLight);
 		//////////////////////////////////////////////////////////////////////////
 		//////////////// Graph Root /////////////////////////////////////////////
 		//////////////////////////////////////////////////////////////////////////

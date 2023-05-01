@@ -96,6 +96,7 @@ namespace vtx {
 
 		optix::createDcProgram(cameraFunctionsModule, "__direct_callable__pinhole");
 		optix::createDcProgram(lightSamplingModule, "__direct_callable__meshLightSample");
+		optix::createDcProgram(lightSamplingModule, "__direct_callable__envLightSample");
 	}
 
 }

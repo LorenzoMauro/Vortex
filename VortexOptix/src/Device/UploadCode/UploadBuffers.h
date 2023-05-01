@@ -170,8 +170,21 @@ namespace vtx::device
 
 		struct LightBuffers
 		{
+			////////////////////////////////////////
+			//////////// Mesh Light ////////////////
+			////////////////////////////////////////
 			CUDABuffer areaCdfBuffer;
 			CUDABuffer actualTriangleIndices;
+
+			////////////////////////////////////////
+			//////////// Env Light /////////////////
+			////////////////////////////////////////
+			CUDABuffer cdfUBuffer;
+			CUDABuffer cdfVBuffer;
+
+			////////////////////////////////////////
+			/// General Attributes for all Lights //
+			////////////////////////////////////////
 			CUDABuffer attributeBuffer;
 
 
@@ -182,6 +195,8 @@ namespace vtx::device
 				areaCdfBuffer.free();
 				actualTriangleIndices.free();
 				attributeBuffer.free();
+				cdfUBuffer.free();
+				cdfVBuffer.free();
 			}
 		};
 

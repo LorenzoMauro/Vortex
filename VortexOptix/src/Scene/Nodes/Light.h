@@ -2,13 +2,14 @@
 #include "LightTypes.h"
 #include "Material.h"
 #include "Mesh.h"
+#include "Transform.h"
+#include "MDL/MdlWrapper.h"
 #include "Scene/Node.h"
+#include "Scene/Utility/Operations.h"
 
 
 namespace vtx::graph
 {
-	
-
 	struct LightAttributes
 	{
 		void setType(const LightType lightTp)
@@ -24,16 +25,14 @@ namespace vtx::graph
 
 		virtual void init() = 0;
 
-		LightType lightType;
-		bool								isValid;
+		LightType							lightType;
+		bool								isValid = false;
+		bool								isInitialized = false;
 	};
 
 	struct PointLightAttributes : public LightAttributes
 	{
-		PointLightAttributes() 
-		{
-			setType(L_POINT);
-		}
+		PointLightAttributes();
 
 		void init() override {}
 
@@ -42,20 +41,28 @@ namespace vtx::graph
 
 	struct SpotLightAttributes : public LightAttributes
 	{
-		SpotLightAttributes()
-		{
-			setType(L_SPOT);
-		}
+		SpotLightAttributes();
 		void init() override {}
 	};
 
 	struct EvnLightAttributes : public LightAttributes
 	{
-		EvnLightAttributes()
-		{
-			setType(L_ENV);
-		}
-		void init() override {}
+		EvnLightAttributes();
+
+		EvnLightAttributes(const std::string& filePath);
+		void init() override;
+
+		void setImage(const std::string& filePath);
+
+
+		void computeSphericalCdf();
+
+
+		std::vector<float> cdfU;
+		std::vector<float> cdfV;
+		std::shared_ptr<graph::Texture>					envTexture;
+		std::shared_ptr<graph::Transform>				transform;
+		float invIntegral;
 	};
 
 	struct MeshLightAttributes : public LightAttributes
@@ -161,7 +168,6 @@ namespace vtx::graph
 		std::vector<float>					cdfAreas;
 		std::vector<unsigned int>			actualTriangleIndices;
 		float								area;
-		bool								isInitialized;
 	};
 
 

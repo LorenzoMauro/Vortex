@@ -113,6 +113,31 @@ namespace vtx::device
 			lightData.type       = L_MESH;
 			lightData.attributes = attributeBuffer.dPointer();
 		}
+		else if(lightNode->attributes->lightType == L_ENV)
+		{
+			EnvLightAttributesData envLightData{};
+
+			const auto& attributes = std::dynamic_pointer_cast<graph::EvnLightAttributes>(lightNode->attributes);
+
+			CUDABuffer& cdfUBuffer = GET_BUFFER(Buffers::LightBuffers, lightNode->getID(), cdfUBuffer);
+			cdfUBuffer.upload(attributes->cdfU);
+
+			CUDABuffer& cdfVBuffer = GET_BUFFER(Buffers::LightBuffers, lightNode->getID(), cdfVBuffer);
+			cdfVBuffer.upload(attributes->cdfV);
+
+			envLightData.textureId = attributes->envTexture->getID();
+			envLightData.invIntegral = attributes->invIntegral;
+			envLightData.cdfU = cdfUBuffer.castedPointer<float>();
+			envLightData.cdfV = cdfVBuffer.castedPointer<float>();
+			envLightData.transformation = attributes->transform->transformationAttribute.affineTransform;
+			envLightData.invTransformation = math::affine3f(envLightData.transformation.l.inverse(), envLightData.transformation.p);
+
+			CUDABuffer& attributeBuffer = GET_BUFFER(Buffers::LightBuffers, lightNode->getID(), attributeBuffer);
+			attributeBuffer.upload(envLightData);
+
+			lightData.type = L_ENV;
+			lightData.attributes = attributeBuffer.dPointer();
+		}
 
 		return lightData;
 	}
@@ -403,6 +428,7 @@ namespace vtx::device
 
 	TextureData createTextureData(std::shared_ptr<vtx::graph::Texture>& textureNode)
 	{
+		VTX_INFO("Creating Texture Data for Texture Node ID: {} Name: {}", textureNode->getID(), textureNode->databaseName);
 		CUDA_ARRAY3D_DESCRIPTOR descArray3D = {};
 		descArray3D.Format                  = textureNode->format;
 		descArray3D.Width                   = textureNode->dimension.x;
@@ -702,6 +728,7 @@ namespace vtx::device
 		pg.hit             = optix::PipelineOptix::getProgramSbt(sbtMap, "hit");
 		pg.pinhole         = optix::PipelineOptix::getProgramSbt(sbtMap, "pinhole");
 		pg.meshLightSample = optix::PipelineOptix::getProgramSbt(sbtMap, "meshLightSample");
+		pg.envLightSample  = optix::PipelineOptix::getProgramSbt(sbtMap, "envLightSample");
 
 		return pg;
 	}

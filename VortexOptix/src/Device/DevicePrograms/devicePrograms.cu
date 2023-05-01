@@ -164,6 +164,11 @@ namespace vtx
 						lightSampleProgramIdx = optixLaunchParams.programs->meshLightSample;
 					}
 					break;
+					case L_ENV :
+					{
+						lightSampleProgramIdx = optixLaunchParams.programs->envLightSample;
+					}
+					break;
 					default: break;
 				}
 
@@ -178,6 +183,11 @@ namespace vtx
 						bxdf += evalData.data.bsdf_diffuse;
 						bxdf += evalData.data.bsdf_glossy;
 
+						if (prd->depth == 0)
+						{
+							prd->colors.debugColor1 = bxdf;
+							prd->colors.debugColor2 = lightSample.radianceOverPdf;
+						}
 
 
 						if (0.0f < evalData.data.pdf && bxdf != math::vec3f(0.0f, 0.0f, 0.0f))
@@ -205,9 +215,12 @@ namespace vtx
 							if (prd->traceResult != TR_SHADOW)
 							{
 								float weightMis = 1.0f;
-								if (typeLight == L_MESH)
+								if(samplingTechnique == RendererDeviceSettings::S_MIS)
 								{
-									weightMis = utl::balanceHeuristic(lightSample.pdf, evalData.data.pdf);
+									if (typeLight == L_MESH || typeLight == L_ENV)
+									{
+										weightMis = utl::balanceHeuristic(lightSample.pdf, evalData.data.pdf);
+									}
 								}
 
 								// The sampled emission needs to be scaled by the inverse probability to have selected this light,
@@ -215,6 +228,8 @@ namespace vtx
 								// This is using the path throughput before the sampling modulated it above.
 
 								prd->radiance += throughput * bxdf * lightSample.radianceOverPdf * (float(numLights) * weightMis);
+
+								//prd->radiance += lightSample.radianceOverPdf;
 								
 							}
 						}
@@ -277,17 +292,59 @@ namespace vtx
 		
 		if(prd->traceOperation == TR_HIT)
 		{
-			prd->colors.debugColor1 = math::vec3f(1.0f, 1.0f, 0.0f);
-			if (prd->depth == 0)
+			if(optixLaunchParams.envLightId != 0)
 			{
-				prd->colors.diffuse = prd->colors.debugColor1;
-				prd->colors.orientation = prd->colors.debugColor1;
-				prd->colors.shadingNormal = prd->colors.debugColor1;
-				prd->colors.trueNormal = prd->colors.debugColor1;
-				prd->colors.debugColor2 = prd->colors.debugColor1;
-				prd->colors.debugColor3 = prd->colors.debugColor1;
+				const LightData* envLight              = getData<LightData>(optixLaunchParams.envLightId);
+				EnvLightAttributesData attrib = *reinterpret_cast<EnvLightAttributesData*>(envLight->attributes);
+				auto texture = getData<TextureData>(attrib.textureId);
+
+				math::vec3f R = math::transformNormal3F(attrib.invTransformation, prd->wi);
+
+				float theta = atan2f(R.y, R.x) + M_PI / 2.0f; // azimuth angle (theta)
+				float phi = acosf(R.z); // inclination angle (phi)
+
+				float u = 1.0f - theta / (2.0f * M_PI);
+				float v = 1.0 - phi / M_PI;
+
+				math::vec3f emission = tex2D<float4>(texture->texObj, u, v);
+
+				if (optixLaunchParams.settings->samplingTechnique == RendererDeviceSettings::S_MIS)
+				{
+					// If the last surface intersection was a diffuse event which was directly lit with multiple importance sampling,
+					// then calculate light emission with multiple importance sampling for this implicit light hit as well.
+					if (prd->eventType & (mi::neuraylib::BSDF_EVENT_DIFFUSE | mi::neuraylib::BSDF_EVENT_GLOSSY))
+					{
+						// For simplicity we pretend that we perfectly importance-sampled the actual texture-filtered environment map
+						// and not the Gaussian smoothed one used to actually generate the CDFs.
+						const float pdfLight = utl::intensity(emission) * attrib.invIntegral;
+
+						emission *= utl::balanceHeuristic(prd->pdf, pdfLight);
+					}
+				}
+
+				//prd->radiance += prd->throughput * emission * attrib.emission;
+				prd->radiance += prd->throughput * emission;
+				prd->eventType = mi::neuraylib::BSDF_EVENT_ABSORB;
+				if (prd->depth == 0)
+				{
+					prd->colors.diffuse = math::vec3f(u,v,0.0f);
+					//prd->colors.diffuse = emission;
+					prd->colors.trueNormal = prd->wi;
+					prd->colors.shadingNormal = prd->wi;
+				}
 			}
-			prd->radiance += prd->throughput * math::vec3f(0.2f, 0.2f, 0.2f);
+			else
+			{
+				prd->colors.debugColor1 = math::vec3f(1.0f, 1.0f, 0.0f);
+				if (prd->depth == 0)
+				{
+					prd->colors.diffuse = prd->colors.debugColor1;
+					prd->colors.orientation = prd->colors.debugColor1;
+					prd->colors.shadingNormal = prd->colors.debugColor1;
+					prd->colors.trueNormal = prd->colors.debugColor1;
+				}
+			}
+			//prd->radiance += prd->throughput * math::vec3f(0.2f, 0.2f, 0.2f);
 		}
 	}
 
@@ -309,11 +366,11 @@ namespace vtx
 		prd.stack[0].bias       = 0.0f;              // Isotropic volume scattering.
 		prd.depth               = 0;
 
-		int maxDepth = (optixLaunchParams.settings->samplingTechnique== RendererDeviceSettings::SamplingTechnique::S_DIRECT_LIGHT) ? 1 :optixLaunchParams.settings->maxBounces;
+		int maxDepth = (optixLaunchParams.settings->samplingTechnique== RendererDeviceSettings::SamplingTechnique::S_DIRECT_LIGHT) ? 0 :optixLaunchParams.settings->maxBounces;
 
 		math::vec2ui payload = splitPointer(&prd);
 
-		while (prd.depth < maxDepth)
+		while (prd.depth <= maxDepth)
 		{
 			prd.wo         = -prd.wi;
 			prd.distance   = optixLaunchParams.settings->maxClamp;

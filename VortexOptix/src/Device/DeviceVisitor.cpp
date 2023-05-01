@@ -113,6 +113,11 @@ namespace vtx::device
 		if (const vtxID lightId = lightNode->getID(); !UPLOAD_DATA->lightDataMap.contains(lightId)) {
 			LightData lightData = createLightData(lightNode);
 			UPLOAD_DATA->lightDataMap.insert(lightId, lightData);
+			if(lightData.type == LightType::L_ENV)
+			{
+				// TODO : How do we handle the presence of another env Light?
+				UPLOAD_DATA->launchParams.envLightId = lightId;
+			}
 		}
 	}
 
