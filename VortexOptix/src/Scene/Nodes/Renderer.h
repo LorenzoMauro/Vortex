@@ -55,6 +55,8 @@ namespace vtx::graph
 		void threadedRender();
 
 		void copyToGl();
+		void  setWindow(GLFWwindow* window);
+
 	public:
 		//GL Interop
 		GlFrameBuffer									drawFrameBuffer;
@@ -90,6 +92,7 @@ namespace vtx::graph
 						if (exitRenderThread) {
 							break;
 						}
+						glfwMakeContextCurrent(instance->sharedContext); // Make the shared context current in this thread
 						std::invoke(renderFunction, instance); // Use std::invoke to call the member function pointer
 						renderThreadBusy = false;
 						bufferUpdateReady = true;
@@ -115,6 +118,7 @@ namespace vtx::graph
 		} threadData;
 
 		bool resizeGlBuffer;
+		GLFWwindow* sharedContext;
 	};
 
 }

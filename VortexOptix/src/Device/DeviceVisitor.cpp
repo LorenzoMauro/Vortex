@@ -10,7 +10,6 @@
 
 namespace vtx::device
 {
-
 	void DeviceVisitor::visit(const std::shared_ptr<graph::Instance> instance)
 	{
 		// If the child node is a mesh, then it's leaf therefore we can safely create the instance.
@@ -23,25 +22,31 @@ namespace vtx::device
 
 				const OptixTraversableHandle& traversable = UPLOAD_DATA->geometryDataMap[meshId].traversable;
 
-				const OptixInstance optixInstance = optix::createInstance(instanceId, currentTransform, traversable);
-				const InstanceData instanceData = createInstanceData(instance, currentTransform);
+				if (isTransformStackUpdated() || !(instance->finalTransformStack==transformIndexStack))
+				{
+					instance->finalTransform = getFinalTransform();
+					instance->finalTransformStack = transformIndexStack;
+				}
+
+				const OptixInstance optixInstance = optix::createInstance(instanceId, instance->finalTransform, traversable);
+				const InstanceData instanceData = createInstanceData(instance, instance->finalTransform);
 
 				UPLOAD_DATA->instanceDataMap.insert(instanceId, instanceData);
 				UPLOAD_DATA->optixInstances.push_back(optixInstance);
 
-				currentTransform = previousTransform;
 			}
 		}
+		popTransform();
 	}
 
 	void DeviceVisitor::visit(const std::shared_ptr<graph::Transform> transform)
 	{
-		currentTransform = currentTransform * transform->transformationAttribute.affineTransform;
+		pushTransform(transform->getID(), transform->isUpdated);
 	}
 
 	void DeviceVisitor::visit(std::shared_ptr<graph::Group> group)
 	{
-		previousTransform = currentTransform;
+		popTransform();
 	}
 
 	void DeviceVisitor::visit(const std::shared_ptr<graph::Mesh> mesh)

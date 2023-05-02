@@ -1,10 +1,14 @@
 #include "Group.h"
 #include <memory>
 #include "Scene/Traversal.h"
+#include "Scene/Utility/Operations.h"
 
 namespace vtx::graph
 {
-	Group::Group() : Node(NT_GROUP) {}
+	Group::Group() : Node(NT_GROUP)
+	{
+		transform = ops::createNode<Transform>();
+	}
 
 	std::vector<std::shared_ptr<Node>>& Group::getChildren() {
 		return children;
@@ -16,10 +20,11 @@ namespace vtx::graph
 
 	void Group::traverse(const std::vector<std::shared_ptr<NodeVisitor>>& orderedVisitors)
 	{
-		ACCEPT(visitors)
+		transform->traverse(orderedVisitors);
 		for (const auto& child : children) {
 			child->traverse(orderedVisitors);
 		}
+		ACCEPT(visitors)
 	}
 
 	void Group::accept(std::shared_ptr<NodeVisitor> visitor)

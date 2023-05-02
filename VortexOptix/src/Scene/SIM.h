@@ -60,6 +60,15 @@ namespace vtx::graph
 			return nodePtr;
 		}
 
+		template<typename T>
+		static bool hasNode(vtxID id)
+		{
+			const auto sim = Get();
+			static_assert(std::is_base_of_v<Node, T>, "Template type is not a subclass of Node!");
+			const std::shared_ptr<T>& nodePtr = std::dynamic_pointer_cast<T>((*sim)[id]);
+			return nodePtr != nullptr;
+		}
+
 		static std::vector<std::shared_ptr<Node>> getAllNodeOfType(NodeType nodeType)
 		{
 			const auto sim = Get();

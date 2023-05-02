@@ -60,12 +60,13 @@ project "OptixApp"
         "%{IncludeDir.OPTIX}",
         "%{IncludeDir.CUDA}",
         "%{IncludeDir.gdt}",
-        "%{IncludeDir.MDL}"
+        "%{IncludeDir.MDL}",
+        "%{IncludeDir.ASSIMP}"
     }
     
     libdirs {
         "%{LibDir.CUDA}",
-        "%{LibDir.MDL}"
+        "%{LibDir.ASSIMP}"
     }
 
     links {
@@ -78,7 +79,12 @@ project "OptixApp"
         "mdl_sdk.lib",
         "mdl_core.lib",
         "nv_freeimage.lib",
-        "dds.lib"
+        "dds.lib",
+        "assimp-vc143-mt"
+    }
+
+    linkoptions {
+        "/NODEFAULTLIB:LIBCMT"
     }
 
     useMdlDebug = false
@@ -88,7 +94,7 @@ project "OptixApp"
 
         if useMdlDebug then
             postbuildcommands {
-                "{COPY} %{wks.location}/VortexOptix/src/data %{cfg.targetdir}/data/",
+                --"{COPY} %{wks.location}/VortexOptix/src/data %{cfg.targetdir}/data/",
                 "{MKDIR} %{cfg.targetdir}/lib",
                 "{COPY} %{wks.location}ext/MDL/debug/bin/libmdl_sdk.dll %{cfg.targetdir}/lib",
                 "{COPY} %{wks.location}ext/MDL/debug/bin/nv_freeimage.dll %{cfg.targetdir}/lib",
@@ -100,7 +106,7 @@ project "OptixApp"
             }
         else
             postbuildcommands {
-                "{COPY} %{wks.location}/VortexOptix/src/data %{cfg.targetdir}/data/",
+                --"{COPY} %{wks.location}/VortexOptix/src/data %{cfg.targetdir}/data/",
                 "{MKDIR} %{cfg.targetdir}/lib",
                 "{COPY} %{wks.location}ext/MDL/release/bin/libmdl_sdk.dll %{cfg.targetdir}/lib",
                 "{COPY} %{wks.location}ext/MDL/release/bin/nv_freeimage.dll %{cfg.targetdir}/lib",
@@ -109,6 +115,7 @@ project "OptixApp"
             }
     
             libdirs {
+                "%{LibDir.ASSIMP}",
                 "%{LibDir.MDL_Release}"
             }
         end
@@ -126,11 +133,12 @@ project "OptixApp"
         }
 
         libdirs {
+            "%{LibDir.ASSIMP}",
             "%{LibDir.MDL_Release}"
         }
     
     local cu_file = "%{file.relpath}"
-    local ptx_file = "%{cfg.targetdir}/data/ptx/%{file.basename}.optixir"
+    local ptx_file = "%{cfg.targetdir}/ptx/%{file.basename}.optixir"
 
     -- include dirs for the compilation of ptx files
     local include_dirs = {

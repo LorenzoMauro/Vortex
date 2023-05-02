@@ -10,7 +10,6 @@ namespace vtx::graph
 		math::vec3f normal;
 		math::vec3f tangent;
 		math::vec3f texCoord;
-		int         instanceMaterialIndex;
 	};
 
 	struct FaceAttributes

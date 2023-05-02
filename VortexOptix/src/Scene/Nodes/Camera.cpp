@@ -1,5 +1,6 @@
 ﻿#include "Camera.h"
 #include "Scene/Traversal.h"
+#include "Scene/Utility/Operations.h"
 
 namespace vtx::graph
 {
@@ -19,7 +20,9 @@ namespace vtx::graph
 		rotationSensibility(3.0f),
 		zoomSensibility(0.01f),
 		updated(true)
-	{}
+	{
+		transform = ops::createNode<Transform>();
+	}
 
 	void Camera::updateDirections() {
 		//horizontal = transform->transformationAttribute.AffineTransform.l.vx;

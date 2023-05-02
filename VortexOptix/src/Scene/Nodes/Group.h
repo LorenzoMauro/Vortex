@@ -1,4 +1,5 @@
 #pragma once
+#include "Transform.h"
 #include "Scene/Node.h"
 
 namespace vtx::graph
@@ -17,6 +18,8 @@ namespace vtx::graph
 
 		void accept(std::shared_ptr<NodeVisitor> visitor) override;
 
+	public:
+		std::shared_ptr<Transform>		   transform;
 	private:
 		std::vector<std::shared_ptr<Node>> children;
 	};

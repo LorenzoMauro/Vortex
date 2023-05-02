@@ -11,15 +11,15 @@ namespace vtx {
 
 		auto deviceProgramModule = std::make_shared<optix::ModuleOptix>();
 		deviceProgramModule->name = "deviceProgram";
-		deviceProgramModule->path = "./data/ptx/devicePrograms.optixir";
+		deviceProgramModule->path = "./ptx/devicePrograms.optixir";
 
 		auto cameraFunctionsModule = std::make_shared<optix::ModuleOptix>();
 		cameraFunctionsModule->name = "cameraFunctions";
-		cameraFunctionsModule->path = "./data/ptx/CameraFunctions.optixir";
+		cameraFunctionsModule->path = "./ptx/CameraFunctions.optixir";
 
 		auto lightSamplingModule = std::make_shared<optix::ModuleOptix>();
 		lightSamplingModule->name = "lightSampling";
-		lightSamplingModule->path = "./data/ptx/lightSampling.optixir";
+		lightSamplingModule->path = "./ptx/lightSampling.optixir";
 
 		///////////////////////////////////////////////////////////////////
 		/////////////////////// Functions /////////////////////////////////

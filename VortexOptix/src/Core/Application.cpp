@@ -25,6 +25,7 @@ namespace vtx
 		createLayer<AppLayer>();
 
 		scene.start();
+		scene.renderer->setWindow(window);
 		createLayer<ViewportLayer>(scene.renderer);
 		//m_scene.renderer->ElaborateScene();
 	}

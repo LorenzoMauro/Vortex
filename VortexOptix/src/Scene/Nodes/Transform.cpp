@@ -17,6 +17,12 @@ namespace vtx::graph
 		return transformPoint3F(transformationAttribute.affineTransform, vector);
 	}
 
+	void Transform::setAffine(const math::affine3f& affine)
+	{
+		transformationAttribute.affineTransform = affine;
+		transformationAttribute.updateFromAffine();
+	}
+
 	/* Translation utility given vector */
 
 	void Transform::scale(float scale)

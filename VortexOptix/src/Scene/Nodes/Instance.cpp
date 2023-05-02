@@ -5,7 +5,10 @@
 
 namespace vtx::graph
 {
-	Instance::Instance() : Node(NT_INSTANCE) {}
+	Instance::Instance() : Node(NT_INSTANCE)
+	{
+		transform = ops::createNode<Transform>();
+	}
 
 	void Instance::traverse(const std::vector<std::shared_ptr<NodeVisitor>>& orderedVisitors)
 	{

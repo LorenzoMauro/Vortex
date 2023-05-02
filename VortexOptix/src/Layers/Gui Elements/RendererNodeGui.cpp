@@ -40,6 +40,14 @@ namespace vtx::gui
             renderNode->settings.iteration = -1;
             renderNode->settings.isUpdated = true;
         };
+        if (ImGui::SliderFloat("Min Clip", &(renderNode->settings.minClamp), 0, 1000, "%.3f")) {
+            renderNode->settings.iteration = -1;
+            renderNode->settings.isUpdated = true;
+        };
+        if (ImGui::SliderFloat("Max Clip", &(renderNode->settings.maxClamp), 0, 10000, "%.3f")) {
+            renderNode->settings.iteration = -1;
+            renderNode->settings.isUpdated = true;
+        };
 
         ///////// INFO /////////////
         ////////////////////////////

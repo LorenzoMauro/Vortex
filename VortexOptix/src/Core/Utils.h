@@ -4,6 +4,7 @@
 #include <fstream>
 #include "Core/Log.h"
 #include <sstream>
+#include <stack>
 
 namespace utl{
 
@@ -16,5 +17,4 @@ namespace utl{
 	bool saveString(const std::string& filename, const std::string& text);
 
 	std::string getDateTime();
-
 }

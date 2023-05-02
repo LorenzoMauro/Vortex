@@ -4,6 +4,8 @@
 
 namespace vtx::graph
 {
+	struct VertexAttributes;
+	class Group;
 	class Node;
 	class Mesh;
 	class TransformAttribute;
@@ -35,4 +37,14 @@ namespace vtx::ops {
                          const unsigned int y,
                          const bool isSpherical);
 
+    void computeTangents(std::vector<graph::VertexAttributes>& vertices, const std::vector<unsigned int>& indices);
+
+
+    /////////////////////////////////////////////////////////////////////////////////////////////////////
+    ///////////////////////// Some Comodity Functions for hard coded scenes /////////////////////////////
+    /////////////////////////////////////////////////////////////////////////////////////////////////////
+
+    std::shared_ptr<graph::Group> simpleScene01();
+
+    std::shared_ptr<graph::Group> importedScene();
 }

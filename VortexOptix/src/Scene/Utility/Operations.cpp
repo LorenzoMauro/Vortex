@@ -1,4 +1,6 @@
 #include "Operations.h"
+
+#include "ModelLoader.h"
 #include "Scene/Graph.h"
 
 namespace vtx::ops
@@ -271,5 +273,140 @@ namespace vtx::ops
 
         return intensity / 3.0f;
     }
+    void computeTangents(std::vector<graph::VertexAttributes>& vertices, const std::vector<unsigned int>& indices)
+    {
+        for (size_t i = 0; i < indices.size(); i += 3)
+        {
+            const graph::VertexAttributes& v0 = vertices[indices[i]];
+            const graph::VertexAttributes& v1 = vertices[indices[i + 1]];
+            const graph::VertexAttributes& v2 = vertices[indices[i + 2]];
+
+            const math::vec3f edge1 = v1.position - v0.position;
+            const math::vec3f edge2 = v2.position - v0.position;
+
+            const math::vec3f uv1 = v1.texCoord - v0.texCoord;
+            const math::vec3f uv2 = v2.texCoord - v0.texCoord;
+
+            float r = 1.0f / (uv1.x * uv2.y - uv1.y * uv2.x);
+
+            math::vec3f tangent = (edge1 * uv2.y - edge2 * uv1.y) * r;
+
+            vertices[indices[i]].tangent += tangent;
+            vertices[indices[i + 1]].tangent += tangent;
+            vertices[indices[i + 2]].tangent += tangent;
+        }
+
+        for (auto& vertex : vertices)
+        {
+            vertex.tangent = math::normalize(vertex.tangent);
+        }
+    }
+    std::shared_ptr<graph::Group> simpleScene01()
+    {
+        auto sceneRoot = ops::createNode<Group>();
+        VTX_INFO("Starting Scene");
+
+        std::shared_ptr<Material> material1 = ops::createNode<Material>();
+        material1->shader->name = "Stone_Mediterranean";
+        material1->shader->path = "\\vMaterials_2\\Stone\\Stone_Mediterranean.mdl";
+        //material1->shader->name = "Aluminum";
+        //material1->shader->path = "\\vMaterials_2\\Metal\\Aluminum.mdl";
+        //material1->shader->name = "bsdf_diffuse_reflection";
+        //material1->shader->path = "\\bsdf_diffuse_reflection.mdl";
+
+        std::shared_ptr<Material> materialEmissive = ops::createNode<Material>();
+        materialEmissive->shader->name = "naturalwhite_4000k";
+        materialEmissive->shader->path = "\\nvidia\\vMaterials\\AEC\\Lights\\Lights_Emitter.mdl";
+
+        std::shared_ptr<Mesh> cube = ops::createBox();
+
+        std::shared_ptr<Instance> Cube1 = ops::createNode<Instance>();
+        Cube1->setChild(cube);
+        Cube1->transform->translate(math::xAxis, 2.0f);
+        Cube1->addMaterial(material1);
+
+        std::shared_ptr<Instance> Cube2 = ops::createNode<Instance>();
+        Cube2->setChild(cube);
+        Cube2->transform->translate(math::yAxis, 2.0f);
+        Cube2->addMaterial(material1);
+
+        std::shared_ptr<Instance> Cube3 = ops::createNode<Instance>();
+        Cube3->setChild(cube);
+        Cube3->transform->rotateDegree(math::xAxis, 45.0f);
+        Cube3->transform->translate(math::zAxis, 2.0f);
+        Cube3->addMaterial(material1);
+
+        std::shared_ptr<Mesh> plane = ops::createPlane();
+
+        std::shared_ptr<Instance> GroundPlane = ops::createNode<Instance>();
+        GroundPlane->setChild(plane);
+        GroundPlane->transform->scale(100.0f);
+        GroundPlane->transform->translate(math::zAxis, -1.0f);
+        GroundPlane->addMaterial(material1);
+
+        std::shared_ptr<Instance> AreaLight = ops::createNode<Instance>();
+        AreaLight->setChild(plane);
+        AreaLight->transform->rotateDegree(math::xAxis, 180.0f);
+        AreaLight->transform->translate(math::zAxis, 7.0f);
+        AreaLight->transform->scale(0.5f);
+        AreaLight->addMaterial(materialEmissive);
+
+
+        std::string envMapPath = getOptions()->dataFolder + "sunset_in_the_chalk_quarry_1k.hdr";
+        //std::string envMapPath =  getOptions()->dataFolder  + "studio_small_03_1k.hdr";
+        //std::string envMapPath =  getOptions()->dataFolder  + "16x16-in-1024x1024.png";
+        //std::string envMapPath =  getOptions()->dataFolder  + "sunset03_EXR.exr";
+        //std::string envMapPath =  getOptions()->dataFolder  + "morning07_EXR.exr";
+        std::shared_ptr<Light> envLight = ops::createNode<Light>();
+        auto attrib = std::make_shared<EvnLightAttributes>(envMapPath);
+        envLight->attributes = attrib;
+
+        sceneRoot->addChild(Cube1);
+        sceneRoot->addChild(Cube2);
+        sceneRoot->addChild(Cube3);
+        sceneRoot->addChild(GroundPlane);
+        sceneRoot->addChild(AreaLight);
+        sceneRoot->addChild(envLight);
+
+        return sceneRoot;
+    }
+
+    std::shared_ptr<graph::Group> importedScene()
+    {
+        const std::string                   scenePath = getOptions()->dataFolder + "models/blenderTest2.fbx";
+        //const std::string                   scenePath = getOptions()->dataFolder + "models/sponza2/sponza.obj";
+        //const std::string                   scenePath = getOptions()->dataFolder + "models/blenderTest.obj";
+        //const std::string                   scenePath = getOptions()->dataFolder  + "models/blenderTest.fbx";
+		const std::shared_ptr<graph::Group> sceneRoot = importer::importSceneFile(scenePath);
+
+		const std::vector<std::shared_ptr<Node>> instances = SIM::getAllNodeOfType(NT_INSTANCE);
+
+		const std::shared_ptr<Material> material1 = ops::createNode<Material>();
+        //material1->shader->name = "Stone_Mediterranean";
+        //material1->shader->path = "\\vMaterials_2\\Stone\\Stone_Mediterranean.mdl";
+        material1->shader->name = "bsdf_diffuse_reflection";
+        material1->shader->path = "\\bsdf_diffuse_reflection.mdl";
+
+        for(const std::shared_ptr<Node>& node : instances)
+        {
+			const std::shared_ptr<Instance> instance = std::dynamic_pointer_cast<Instance>(node);
+            instance->addMaterial(material1);
+		}
+
+        //std::string envMapPath = getOptions()->dataFolder + "sunset_in_the_chalk_quarry_1k.hdr";
+        std::string envMapPath = getOptions()->dataFolder + "blouberg_sunrise_2_1k.hdr";
+        //std::string envMapPath =  getOptions()->dataFolder  + "studio_small_03_1k.hdr";
+        //std::string envMapPath =  getOptions()->dataFolder  + "16x16-in-1024x1024.png";
+        //std::string envMapPath =  getOptions()->dataFolder  + "sunset03_EXR.exr";
+        //std::string envMapPath =  getOptions()->dataFolder  + "morning07_EXR.exr";
+		const std::shared_ptr<Light> envLight = ops::createNode<Light>();
+		const auto                   attrib   = std::make_shared<EvnLightAttributes>(envMapPath);
+        envLight->attributes                  = attrib;
+
+        sceneRoot->addChild(envLight);
+
+        return sceneRoot;
+    }
+
 }
 

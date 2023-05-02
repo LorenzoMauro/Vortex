@@ -15,6 +15,12 @@ namespace vtx
 	};
 
 	void HostVisitor::visit(std::shared_ptr<graph::Mesh> mesh) {
+		if(!mesh->status.hasTangents)
+		{
+			VTX_INFO("Computing tangents for mesh: {}", mesh->getID());
+			ops::computeTangents(mesh->vertices, mesh->indices);
+			mesh->status.hasTangents = true;
+		}
 	};
 
 	void HostVisitor::visit(std::shared_ptr<graph::Material> material) {

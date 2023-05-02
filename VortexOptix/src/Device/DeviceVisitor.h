@@ -10,10 +10,6 @@ namespace vtx::device
 
 	class DeviceVisitor : public NodeVisitor {
 	public:
-		DeviceVisitor():
-			currentTransform(math::Identity),
-			previousTransform(math::Identity)
-		{};
 		void visit(std::shared_ptr<graph::Instance> instance) override;
 		void visit(std::shared_ptr<graph::Transform> transform) override;
 		void visit(std::shared_ptr<graph::Group> group) override;
@@ -26,11 +22,6 @@ namespace vtx::device
 		void visit(std::shared_ptr<graph::BsdfMeasurement> bsdfMeasurementNode) override;
 		void visit(std::shared_ptr<graph::LightProfile> lightProfile) override;
 		void visit(std::shared_ptr<graph::Light> lightNode) override;
-
-		//InstanceData instanceData;
-
-		math::affine3f currentTransform;
-		math::affine3f previousTransform;
 	};
 
 	void finalizeUpload();

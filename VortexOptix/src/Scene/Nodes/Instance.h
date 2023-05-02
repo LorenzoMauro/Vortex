@@ -65,9 +65,12 @@ namespace vtx::graph
 		std::vector<MaterialSlot>&     getMaterialSlots();
 
 	public:
+		std::shared_ptr<Transform>		transform;
+		std::vector<vtxID>				finalTransformStack;
+		math::affine3f                  finalTransform;
+
 	private:
 		std::shared_ptr<Node>							child;
-		std::shared_ptr<Transform>						transform;
 		std::vector<MaterialSlot>                       materialSlots;
 		bool											childIsMesh = false;
 	};

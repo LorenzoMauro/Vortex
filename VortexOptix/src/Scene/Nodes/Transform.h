@@ -32,6 +32,8 @@ namespace vtx::graph
 
 		math::vec3f transformPoint(const math::vec3f& vector);
 
+		void setAffine(const math::affine3f& affine);
+
 		/* Scale utility given float */
 		void scale(float scale);
 

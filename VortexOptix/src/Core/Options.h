@@ -9,7 +9,8 @@ namespace vtx {
 		int         width         = 2100;
 		int         height        = 900;
 		std::string windowName    = "Vortex";
-		std::string imGuiIniFile  = "./data/ImGui.ini";
+		std::string dataFolder	= "E:/Dev/VortexOptix/data/";
+		std::string imGuiIniFile  = dataFolder + "ImGui.ini";
 		std::string dllPath       = "./lib/";
 		float       clearColor[4] = { 0.45f, 0.55f, 0.60f, 1.00f };
 		#ifdef NDEBUG
@@ -24,9 +25,9 @@ namespace vtx {
 		uint32_t                                  maxBounces        = 5;
 		uint32_t                                  maxSamples        = 500;
 		bool                                      accumulate        = true;
-		RendererDeviceSettings::SamplingTechnique samplingTechnique = RendererDeviceSettings::SamplingTechnique::S_BSDF;
+		RendererDeviceSettings::SamplingTechnique samplingTechnique = RendererDeviceSettings::SamplingTechnique::S_MIS;
 		RendererDeviceSettings::DisplayBuffer     displayBuffer     = RendererDeviceSettings::DisplayBuffer::FB_NOISY;
-		float                                     maxClamp          = 0.0001f;
+		float                                     maxClamp          = 0.01f;
 		float                                     minClamp          = 1000.0f;
 		////////////////////////////////////////////////////////////////////////////////////
 		/////////////////// Optix Options //////////////////////////////////////////////////
@@ -41,7 +42,7 @@ namespace vtx {
 		////////////////////////////////////////////////////////////////////////////////////
 		/////////////////// MDL Options ////////////////////////////////////////////////////
 		////////////////////////////////////////////////////////////////////////////////////
-		std::vector<std::string> mdlSearchPath      = { "./data/", "./" , "E:/Dev/OptixTut/bin/Debug-windows-x86_64/OptixApp/mdl"};
+		std::vector<std::string> mdlSearchPath      = { dataFolder, "./" , "E:/Dev/OptixTut/bin/Debug-windows-x86_64/OptixApp/mdl"};
 		int                      numTextureSpaces   = 1; //should be set to 1 for performance reasons If you do not use the hair BSDF.
 		int                      numTextureResults  = 16;
 		bool                     enable_derivatives = false;

@@ -2,6 +2,7 @@
 #include "Scene/Node.h"
 #include "Shader/Shader.h"
 #include "Scene/DataStructs/VertexAttribute.h"
+#include "Scene/Utility/Operations.h"
 
 namespace vtx::graph
 {
@@ -194,7 +195,10 @@ namespace vtx::graph
 
 	class Material : public Node {
 	public:
-		Material() : Node(NT_MATERIAL) {}
+		Material() : Node(NT_MATERIAL)
+		{
+			shader = ops::createNode<Shader>();
+		}
 
 		void setShader(std::shared_ptr<graph::Shader> _shader) {
 			shader = _shader;

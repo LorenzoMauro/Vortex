@@ -62,6 +62,7 @@ namespace vtx
 		{
 			prd->colors.trueNormal  = 0.5f * (hitP.ngW + 1.0f);
 			prd->colors.orientation = hitP.isFrontFace ? math::vec3f(0.0f, 0.0f, 1.0f) : math::vec3f(1.0f, 0.0f, 0.0f);
+			prd->colors.debugColor1 = hitP.tgW;
 		}
 
 		if (hitP.material != nullptr)
@@ -182,13 +183,6 @@ namespace vtx
 						auto bxdf = math::vec3f(0.0f, 0.0f, 0.0f);
 						bxdf += evalData.data.bsdf_diffuse;
 						bxdf += evalData.data.bsdf_glossy;
-
-						if (prd->depth == 0)
-						{
-							prd->colors.debugColor1 = bxdf;
-							prd->colors.debugColor2 = lightSample.radianceOverPdf;
-						}
-
 
 						if (0.0f < evalData.data.pdf && bxdf != math::vec3f(0.0f, 0.0f, 0.0f))
 						{

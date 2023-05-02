@@ -19,6 +19,8 @@ namespace vtx::graph
 		height(getOptions()->height),
 		threadData(&Renderer::render, this)
 	{
+		
+
 		settings = RendererSettings();
 		settings.iteration = 0;
 		settings.maxBounces = getOptions()->maxBounces;
@@ -127,20 +129,20 @@ namespace vtx::graph
 			1
 		);
 		OPTIX_CHECK(result);
-		CUDA_SYNC_CHECK();
+		copyToGl();
 		frameTime = timer.elapsedMillis();
-		if(settings.iteration == 0)
+		if (settings.iteration == 0)
 		{
 			totalTimeSeconds = 0;
 		}
 		else
 		{
-			totalTimeSeconds += frameTime/1000.0f;
+			totalTimeSeconds += frameTime / 1000.0f;
 		}
 
 		fps = (float)(settings.iteration + 1) / totalTimeSeconds;
-		sppS = ((float)width*(float)height*((float)settings.iteration + 1))/totalTimeSeconds;
-		averageFrameTime = (float)(settings.iteration + 1) / (totalTimeSeconds *1000.0f);
+		sppS = ((float)width * (float)height * ((float)settings.iteration + 1)) / totalTimeSeconds;
+		averageFrameTime = (float)(settings.iteration + 1) / (totalTimeSeconds * 1000.0f);
 	}
 
 	void Renderer::resize(uint32_t _width, uint32_t _height) {
@@ -155,7 +157,7 @@ namespace vtx::graph
 
 	void Renderer::copyToGl() {
 		// Update the GL buffer here
-
+		CUDA_SYNC_CHECK();
 		optix::State& state = *(optix::getState());
 		const LaunchParams& launchParams = UPLOAD_DATA->launchParams;
 
@@ -207,13 +209,20 @@ namespace vtx::graph
 		//currentFrameBuffer = tempBuffer;
 	}
 
+	void Renderer::setWindow(GLFWwindow* window)
+	{
+		// Create a shared OpenGL context for the separate thread
+		glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE);
+		sharedContext = glfwCreateWindow(1, 1, "Shared Context", nullptr, window);
+	}
+
 	GlFrameBuffer Renderer::getFrame() {
-		if(threadData.bufferUpdateReady)
-		{
-			// This section is helpfull when the renderer update is slow, else it's better not to have it!
-			copyToGl();
-			threadData.bufferUpdateReady = false;
-		}
+		//if(threadData.bufferUpdateReady)
+		//{
+		//	// This section is helpfull when the renderer update is slow, else it's better not to have it!
+		//	copyToGl();
+		//	threadData.bufferUpdateReady = false;
+		//}
 		return displayFrameBuffer;
 		
 	}
