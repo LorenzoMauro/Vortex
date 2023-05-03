@@ -3,6 +3,7 @@
 #include "randomNumberGenerator.h"
 #include "RayData.h"
 #include "Utils.h"
+#include "Scene/Nodes/Light.h"
 
 namespace vtx
 {
@@ -90,69 +91,59 @@ namespace vtx
     extern "C" __device__ LightSample __direct_callable__envLightSample(const LightData & light, PerRayData * prd)
     {
         EnvLightAttributesData attrib = *reinterpret_cast<EnvLightAttributesData*>(light.attributes);
-		auto texture = getData<TextureData>(attrib.textureId);
+		auto texture = attrib.texture;
 
         unsigned width = texture->dimension.x;
         unsigned height = texture->dimension.y;
 
 		LightSample            lightSample;
 
-        lightSample.pdf = 0.0f;
+        // importance sample an envmap pixel using an alias map
+        const float3       sample = rng3(prd->seed);
+        const unsigned int size   = width * height;
+        const auto         idx    = math::min<unsigned>((unsigned int)(sample.x * (float)size), size - 1);
+        unsigned int       envIdx;
+        float              sampleY = sample.y;
+        if (sampleY < attrib.aliasMap[idx].q) {
+            envIdx = idx;
+            sampleY /= attrib.aliasMap[idx].q;
+        }
+        else {
+            envIdx = attrib.aliasMap[idx].alias;
+            sampleY = (sampleY - attrib.aliasMap[idx].q) / (1.0f - attrib.aliasMap[idx].q);
+        }
 
-        // Importance-sample the spherical environment light direction in object space.
-        // TODO The binary searches are generating a lot of memory traffic. Replace this with an alias-map lookup.
-        const float2 sample = rng2(prd->seed);
+        const unsigned int py   = envIdx / width;
+        const unsigned int px   = envIdx % width;
+        lightSample.pdf         = attrib.aliasMap[envIdx].pdf;
 
-        // Note that the marginal CDF is one bigger than the texture height. As index this is the 1.0f at the end of the CDF.
-        const float*       cdfV = attrib.cdfV;
-        const unsigned int idxV = utl::binarySearchCdf(cdfV, height, sample.y);
+        const float u = (float)(px + sampleY) / (float)width;
+        const float phi = u * (float)(2.0 * M_PI) - (float)M_PI;
+        float sinPhi, cosPhi;
+        sincosf(phi > float(-M_PI) ? phi : (phi + (float)(2.0 * M_PI)), &sinPhi, &cosPhi);
+        const float stepTheta = (float)M_PI / (float)height;
+        const float theta0 = (float)(py)*stepTheta;
+        const float cosTheta = cosf(theta0) * (1.0f - sample.z) + cosf(theta0 + stepTheta) * sample.z;
+        const float theta = acosf(cosTheta);
+        const float sinTheta = sinf(theta);
+        const float v = theta * (float)(1.0 / M_PI);
 
-        const float* cdfU = attrib.cdfU;
-        cdfU += (width + 1) * idxV; // Horizontal CDF is one bigger than the texture width!
-        const unsigned int idxU = utl::binarySearchCdf(cdfU, width, sample.x);
-
-        // Continuous sampling of the CDF.
-        const float cdfLowerU = cdfU[idxU];
-        const float cdfUpperU = cdfU[idxU + 1];
-        const float du = (sample.x - cdfLowerU) / (cdfUpperU - cdfLowerU);
-        float u = (float(idxU) + du) / float(width);
-
-        const float cdfLowerV = cdfV[idxV];
-        const float cdfUpperV = cdfV[idxV + 1];
-        const float dv = (sample.y - cdfLowerV) / (cdfUpperV - cdfLowerV);
-        float v = (float(idxV) + dv) / float(height);
-
-        // Light sample direction vector in object space polar coordinates.
-        //float theta = 2.0f * M_PI * u - M_PI / 2.0f; // azimuth angle (theta)
-        //float phi = M_PI * (1.0f - v); // inclination angle (phi)
-        //
-        //float x = cosf(theta) * sinf(phi);
-        //float y = sinf(theta) * sinf(phi);
-        //float z = cosf(phi);
-        float theta = (1.0f - u) * (2.0f * M_PI) - M_PI / 2.0f;
-        float phi = (1.0f - v) * M_PI;
-
-        float x = sinf(phi) * cosf(theta);
-        float y = sinf(phi) * sinf(theta);
-        float z = cosf(phi);
+        float x = cosPhi * sinTheta;
+        float y = sinPhi * sinTheta;
+        float z = -cosTheta;
 
         math::vec3f dir{ x,y,z };
         
         // Now rotate that normalized object space direction into world space. 
         lightSample.direction = math::transformNormal3F(attrib.transformation, dir);
 
-
         lightSample.distance = optixLaunchParams.settings->maxClamp; // Environment light.
 
         // Get the emission from the spherical environment texture.
-        //float4 emissionLookUp = tex2D<float4>(texture->texObj, u, v);
-        //const math::vec3f emission{ emissionLookUp.x, emissionLookUp.y, emissionLookUp.z };
         math::vec3f emission = tex2D<float4>(texture->texObj, u, v);
         // For simplicity we pretend that we perfectly importance-sampled the actual texture-filtered environment map
         // and not the Gaussian-smoothed one used to actually generate the CDFs and uniform sampling in the texel.
         // (Note that this does not contain the light.emission which just modulates the texture.)
-        lightSample.pdf = utl::intensity(emission) * attrib.invIntegral;
-
         if (DENOMINATOR_EPSILON < lightSample.pdf)
         {
             //lightSample.radianceOverPdf = light.emission * emission / lightSample.pdf;

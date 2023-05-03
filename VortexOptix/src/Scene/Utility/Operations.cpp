@@ -373,8 +373,8 @@ namespace vtx::ops
 
     std::shared_ptr<graph::Group> importedScene()
     {
-        const std::string                   scenePath = getOptions()->dataFolder + "models/blenderTest2.fbx";
-        //const std::string                   scenePath = getOptions()->dataFolder + "models/sponza2/sponza.obj";
+        //const std::string                   scenePath = getOptions()->dataFolder + "models/blenderTest2.fbx";
+        const std::string                   scenePath = getOptions()->dataFolder + "models/sponza2/sponza.obj";
         //const std::string                   scenePath = getOptions()->dataFolder + "models/blenderTest.obj";
         //const std::string                   scenePath = getOptions()->dataFolder  + "models/blenderTest.fbx";
 		const std::shared_ptr<graph::Group> sceneRoot = importer::importSceneFile(scenePath);
@@ -393,8 +393,10 @@ namespace vtx::ops
             instance->addMaterial(material1);
 		}
 
-        //std::string envMapPath = getOptions()->dataFolder + "sunset_in_the_chalk_quarry_1k.hdr";
-        std::string envMapPath = getOptions()->dataFolder + "blouberg_sunrise_2_1k.hdr";
+        std::string envMapPath = getOptions()->dataFolder + "sunset_in_the_chalk_quarry_1k.hdr";
+        //std::string envMapPath = getOptions()->dataFolder + "blouberg_sunrise_2_1k.hdr";
+        //std::string envMapPath = getOptions()->dataFolder + "qwantani_1k.hdr";
+        
         //std::string envMapPath =  getOptions()->dataFolder  + "studio_small_03_1k.hdr";
         //std::string envMapPath =  getOptions()->dataFolder  + "16x16-in-1024x1024.png";
         //std::string envMapPath =  getOptions()->dataFolder  + "sunset03_EXR.exr";

@@ -15,6 +15,8 @@ function genNvccCommand(cu_file, ptx_file, cuda_path, include_dirs, debug)
     CudaCompileCommand = CudaCompileCommand .. " --generate-line-info"
     if(debug) then 
         CudaCompileCommand = CudaCompileCommand .. " -G"
+    else
+        CudaCompileCommand = CudaCompileCommand .. " -O3"
     end
     CudaCompileCommand = CudaCompileCommand .. " -o " .. ptx_file
     

@@ -32,6 +32,7 @@ namespace vtx::device
 			launchParamsBuffer.free();
 			rendererSettingsBuffer.free();
 			sbtProgramIdxBuffer.free();
+			instancesBuffer.free();
 		}
 
 
@@ -40,6 +41,7 @@ namespace vtx::device
 			CUDABuffer vertexBuffer;
 			CUDABuffer indexBuffer;
 			CUDABuffer faceBuffer;
+			CUDABuffer geometryDataBuffer;
 
 			GeometryBuffers() = default;
 			~GeometryBuffers()
@@ -54,24 +56,28 @@ namespace vtx::device
 		struct InstanceBuffers
 		{
 			CUDABuffer materialSlotsBuffer;
+			CUDABuffer instanceDataBuffer;
 
 			InstanceBuffers() = default;
 			~InstanceBuffers()
 			{
 				VTX_INFO("ShutDown: Destroying Instance Buffers");
 				materialSlotsBuffer.free();
+				instanceDataBuffer.free();
 			}
 		};
 
 		struct MaterialBuffers
 		{
 			CUDABuffer argBlockBuffer;
+			CUDABuffer materialDataBuffer;
 
 			MaterialBuffers() = default;
 			~MaterialBuffers()
 			{
 				VTX_INFO("ShutDown: Material Buffers");
 				argBlockBuffer.free();
+				materialDataBuffer.free();
 			}
 		};
 
@@ -82,6 +88,7 @@ namespace vtx::device
 			CUDABuffer bsdfIdBuffer;
 			CUDABuffer lightProfileBuffer;
 			CUDABuffer TextureHandlerBuffer;
+			CUDABuffer shaderDataBuffer;
 
 			ShaderBuffers() = default;
 			~ShaderBuffers()
@@ -92,6 +99,26 @@ namespace vtx::device
 				bsdfIdBuffer.free();
 				lightProfileBuffer.free();
 				TextureHandlerBuffer.free();
+				shaderDataBuffer.free();
+			}
+		};
+
+		struct TextureBuffers
+		{
+			CUarray					textureArray;
+			cudaTextureObject_t		texObj;
+			cudaTextureObject_t		texObjUnfiltered;
+			CUDABuffer				textureDataBuffer;
+
+			TextureBuffers() = default;
+			~TextureBuffers()
+			{
+				VTX_INFO("ShutDown: Texture Buffers");
+				CU_CHECK_CONTINUE(cuArrayDestroy(textureArray));
+				CU_CHECK_CONTINUE(cuTexObjectDestroy(texObj));
+				CU_CHECK_CONTINUE(cuTexObjectDestroy(texObjUnfiltered));
+				textureDataBuffer.free();
+
 			}
 		};
 
@@ -120,6 +147,13 @@ namespace vtx::device
 		{
 			BsdfPartBuffer	reflectionPartBuffer;
 			BsdfPartBuffer	transmissionPartBuffer;
+			CUDABuffer		bsdfDataBuffer;
+
+			~BsdfBuffers()
+			{
+				VTX_INFO("ShutDown: Destroying BSDF Buffers");
+				bsdfDataBuffer.free();
+			}
 		};
 
 		struct LightProfileBuffers
@@ -127,12 +161,14 @@ namespace vtx::device
 			CUDABuffer cdfBuffer;
 			CUarray	   lightProfileSourceArray;
 			CUtexObject	evalData;
+			CUDABuffer	lightProfileDataBuffer;
 
 			LightProfileBuffers() = default;
 			~LightProfileBuffers()
 			{
 				VTX_INFO("ShutDown: Light Buffers");
 				cdfBuffer.free();
+				lightProfileDataBuffer.free();
 				CU_CHECK_CONTINUE(cuArrayDestroy(lightProfileSourceArray));
 				CU_CHECK_CONTINUE(cuTexObjectDestroy(evalData));
 			}
@@ -152,21 +188,6 @@ namespace vtx::device
 			}
 		};
 
-		struct TextureBuffers
-		{
-			CUarray					textureArray;
-			cudaTextureObject_t		texObj;
-			cudaTextureObject_t		texObjUnfiltered;
-
-			TextureBuffers() = default;
-			~TextureBuffers()
-			{
-				VTX_INFO("ShutDown: Texture Buffers");
-				CU_CHECK_CONTINUE(cuArrayDestroy(textureArray));
-				CU_CHECK_CONTINUE(cuTexObjectDestroy(texObj));
-				CU_CHECK_CONTINUE(cuTexObjectDestroy(texObjUnfiltered));
-			}
-		};
 
 		struct LightBuffers
 		{
@@ -181,12 +202,13 @@ namespace vtx::device
 			////////////////////////////////////////
 			CUDABuffer cdfUBuffer;
 			CUDABuffer cdfVBuffer;
+			CUDABuffer aliasBuffer;
 
 			////////////////////////////////////////
 			/// General Attributes for all Lights //
 			////////////////////////////////////////
 			CUDABuffer attributeBuffer;
-
+			CUDABuffer lightDataBuffer;
 
 			LightBuffers() = default;
 			~LightBuffers()
@@ -197,6 +219,7 @@ namespace vtx::device
 				attributeBuffer.free();
 				cdfUBuffer.free();
 				cdfVBuffer.free();
+				aliasBuffer.free();
 			}
 		};
 
@@ -275,6 +298,8 @@ namespace vtx::device
 		CUDABuffer                           launchParamsBuffer;
 		CUDABuffer                           rendererSettingsBuffer;
 		CUDABuffer                           sbtProgramIdxBuffer;
+		CUDABuffer                           lightsDataBuffer;
+		CUDABuffer                           instancesBuffer;
 
 	private:
 		~Buffers() = default;

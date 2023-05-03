@@ -4,6 +4,8 @@
 
 namespace vtx::graph
 {
+	
+
 	void Light::traverse(const std::vector<std::shared_ptr<NodeVisitor>>& orderedVisitors)
 	{
 		if(!attributes->isInitialized)
@@ -37,7 +39,8 @@ namespace vtx::graph
 
 	void EvnLightAttributes::init()
 	{
-		computeSphericalCdf();
+		//computeSphericalCdf();
+		computeCdfAliasMaps();
 		isInitialized = true;
 	}
 
@@ -150,6 +153,82 @@ namespace vtx::graph
 
 		isValid = true;
 		VTX_INFO("Finished Computing Env Area Light for Texture {}", envTexture->databaseName);
+	}
+
+	float buildAliasMap(
+		const std::vector<float>& data,
+		const unsigned int size,
+		std::vector<AliasData>& aliasMap)
+	{
+		// create qs (normalized)
+		float sum = 0.0f;
+		for (unsigned int i = 0; i < size; ++i)
+			sum += data[i];
+
+		for (unsigned int i = 0; i < size; ++i)
+			aliasMap[i].q = (static_cast<float>(size) * data[i] / sum);
+
+		// create partition table
+		std::vector<unsigned> partitionTable(size);
+		unsigned int s = 0u, large = size;
+		for (unsigned int i = 0; i < size; ++i)
+			partitionTable[(aliasMap[i].q < 1.0f) ? (s++) : (--large)] = aliasMap[i].alias = i;
+
+		// create alias map
+		for (s = 0; s < large && large < size; ++s)
+		{
+			const unsigned int j = partitionTable[s], k = partitionTable[large];
+			aliasMap[j].alias = k;
+			aliasMap[k].q += aliasMap[j].q - 1.0f;
+			large = (aliasMap[k].q < 1.0f) ? (large + 1u) : large;
+		}
+		return sum;
+	}
+
+	void EvnLightAttributes::computeCdfAliasMaps()
+	{
+		const unsigned int width     = envTexture->dimension[0];
+		const unsigned int height     = envTexture->dimension[1];
+		const math::vec3f ntscLuminance{ 0.30f, 0.59f, 0.11f };
+
+		const auto         pixels = static_cast<const float*>(envTexture->imageLayersPointers[0]);
+		importanceData.resize(width * height);
+		aliasMap.resize(width * height);
+		// Create importance sampling data
+		float cosTheta0 = 1.0f;
+		const float stepPhi = float(2.0 * M_PI) / float(width);
+		const float stepTheta = float(M_PI) / float(height);
+		for (unsigned int y = 0; y < height; ++y)
+		{
+			const float theta1 = float(y + 1) * stepTheta;
+			const float cosTheta1 = std::cos(theta1);
+			const float area = (cosTheta0 - cosTheta1) * stepPhi;
+			cosTheta0 = cosTheta1;
+
+			for (unsigned int x = 0; x < width; ++x) {
+				const unsigned int idx = y * width + x;
+				const unsigned int idx4 = idx * 4;
+				//importanceData[idx] = area * std::max(pixels[idx4], std::max(pixels[idx4 + 1], pixels[idx4 + 2]));
+				//importanceData[idx] = area * (pixels[idx4] + pixels[idx4 + 1] + pixels[idx4 + 2]) * 0.3333333333f;
+				const float       luminance =dot(math::vec3f(pixels[idx4],pixels[idx4 + 1],pixels[idx4 + 2]), ntscLuminance);
+				const float value = vtx::ops::gaussianFilter(pixels, width, height, x, y, true);
+				importanceData[idx] = area * (value);
+			}
+		}
+		
+		const float invEnvIntegral = 1.0f / buildAliasMap(importanceData, width * height, aliasMap);
+		for (unsigned int y = 0; y < height; ++y) {
+			for (unsigned int x = 0; x < width; ++x) {
+				const unsigned int idx = y * width + x;
+				const unsigned int idx4 = idx * 4;
+				//aliasMap[i].pdf = std::max(pixels[idx4], std::max(pixels[idx4 + 1], pixels[idx4 + 2])) * invEnvIntegral;
+				const float       luminance = dot(math::vec3f(pixels[idx4], pixels[idx4 + 1], pixels[idx4 + 2]), ntscLuminance);
+
+				const float value = vtx::ops::gaussianFilter(pixels, width, height, x, y, true);
+
+				aliasMap[idx].pdf = value * invEnvIntegral;
+			}
+		}
 	}
 
 	SpotLightAttributes::SpotLightAttributes()

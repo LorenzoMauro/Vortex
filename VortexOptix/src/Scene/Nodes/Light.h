@@ -10,6 +10,8 @@
 
 namespace vtx::graph
 {
+	
+
 	struct LightAttributes
 	{
 		void setType(const LightType lightTp)
@@ -57,11 +59,16 @@ namespace vtx::graph
 
 		void computeSphericalCdf();
 
+		void computeCdfAliasMaps();
+
 
 		std::vector<float> cdfU;
 		std::vector<float> cdfV;
 		std::shared_ptr<graph::Texture>					envTexture;
 		std::shared_ptr<graph::Transform>				transform;
+		std::vector<AliasData>							aliasMap;
+		std::vector<float>								importanceData;
+
 		float invIntegral;
 	};
 

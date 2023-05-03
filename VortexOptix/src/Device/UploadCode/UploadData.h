@@ -33,14 +33,14 @@ namespace vtx::device
 		// The following maps will be uploaded to the device
 		// the launch params will contain the pointers to the maps
 		// data is reference by ids;
-		CudaMap<vtxID, InstanceData>			instanceDataMap;
-		CudaMap<vtxID, GeometryData>			geometryDataMap;
-		CudaMap<vtxID, MaterialData>			materialDataMap;
-		CudaMap<vtxID, ShaderData>				shaderDataMap;
-		CudaMap<vtxID, TextureData>				textureDataMap;
-		CudaMap<vtxID, BsdfData>				bsdfDataMap;
-		CudaMap<vtxID, LightProfileData>		lightProfileDataMap;
-		CudaMap<vtxID, LightData>				lightDataMap;
+		CudaMap<vtxID, std::tuple<InstanceData,		InstanceData*>>				instanceDataMap;
+		CudaMap<vtxID, std::tuple<GeometryData,		GeometryData*>>				geometryDataMap;
+		CudaMap<vtxID, std::tuple<MaterialData,		MaterialData*>>				materialDataMap;
+		CudaMap<vtxID, std::tuple<ShaderData,		ShaderData*>>				shaderDataMap;
+		CudaMap<vtxID, std::tuple<TextureData,		TextureData*>>				textureDataMap;
+		CudaMap<vtxID, std::tuple<BsdfData,			BsdfData*>>					bsdfDataMap;
+		CudaMap<vtxID, std::tuple<LightProfileData, LightProfileData*>>			lightProfileDataMap;
+		CudaMap<vtxID, std::tuple<LightData,		LightData*>>				lightDataMap;
 
 		CameraData								cameraData;
 		bool									isCameraUpdated;
@@ -53,8 +53,8 @@ namespace vtx::device
 
 		SbtProgramIdx							programs;
 
-		std::vector<OptixInstance>				optixInstances;
-		LaunchParams							launchParams;
+		std::vector<OptixInstance> optixInstances;
+		LaunchParams               launchParams;
 
 	private:
 		~UploadData() = default;

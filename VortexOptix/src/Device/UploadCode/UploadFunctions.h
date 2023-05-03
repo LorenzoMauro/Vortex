@@ -21,20 +21,20 @@ namespace vtx
 
 namespace vtx::device
 {
-	InstanceData createInstanceData(std::shared_ptr<graph::Instance> instanceNode, const math::affine3f& transform);
+	std::tuple<InstanceData, InstanceData*> createInstanceData(std::shared_ptr<graph::Instance> instanceNode, const math::affine3f& transform);
 
-	LightData createLightData(std::shared_ptr<graph::Light> lightNode);
+	std::tuple<LightData, LightData*> createLightData(std::shared_ptr<graph::Light> lightNode);
 
 	/*Create BLAS and GeometryDataStruct given vertices attributes and indices*/
-	GeometryData createGeometryData(std::shared_ptr<graph::Mesh> meshNode);
+	std::tuple<GeometryData, GeometryData*> createGeometryData(std::shared_ptr<graph::Mesh> meshNode);
 
 	void uploadMaps();
 
-	MaterialData createMaterialData(std::shared_ptr<graph::Material> material);
+	std::tuple<MaterialData, MaterialData*>createMaterialData(std::shared_ptr<graph::Material> material);
 
 	DeviceShaderConfiguration createDeviceShaderConfiguration(std::shared_ptr<graph::Shader> shader);
 
-	ShaderData createShaderData(std::shared_ptr<graph::Shader> shaderNode);
+	std::tuple<ShaderData, ShaderData*> createShaderData(std::shared_ptr<graph::Shader> shaderNode);
 
 	CUDA_RESOURCE_DESC uploadTexture(
 		const std::vector<const void*>& imageLayers,
@@ -42,13 +42,13 @@ namespace vtx::device
 		const size_t& sizeBytesPerElement,
 		CUarray& array);
 
-	TextureData createTextureData(std::shared_ptr<vtx::graph::Texture>& textureNode);
+	std::tuple< TextureData, TextureData*> createTextureData(std::shared_ptr<vtx::graph::Texture>& textureNode);
 
 	BsdfSamplingPartData createBsdfPartData(graph::BsdfMeasurement::BsdfPartData& bsdfData, Buffers::BsdfPartBuffer& buffers);
 
-	BsdfData createBsdfData(std::shared_ptr<graph::BsdfMeasurement> bsdfMeasurement);
+	std::tuple < BsdfData, BsdfData*> createBsdfData(std::shared_ptr<graph::BsdfMeasurement> bsdfMeasurement);
 
-	LightProfileData createLightProfileData(std::shared_ptr<graph::LightProfile> lightProfile);
+	std::tuple < LightProfileData, LightProfileData*> createLightProfileData(std::shared_ptr<graph::LightProfile> lightProfile);
 
 	void setRendererData(std::shared_ptr<graph::Renderer> rendererNode);
 

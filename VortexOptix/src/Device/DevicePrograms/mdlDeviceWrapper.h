@@ -177,7 +177,7 @@ namespace vtx::mdl
         mdlData->state.ro_data_segment = nullptr;
         mdlData->state.world_to_object = hitP.worldToObject;
         mdlData->state.object_to_world = hitP.objectToWorld;
-        mdlData->state.object_id = hitP.instance->geometryDataId; // idObject, this is the sg::Instance node ID.
+        mdlData->state.object_id = hitP.instance->instanceId; // idObject, this is the sg::Instance node ID.
         mdlData->state.meters_per_scene_unit = 1.0f;
 
         mdlData->resourceData.shared_data = nullptr;

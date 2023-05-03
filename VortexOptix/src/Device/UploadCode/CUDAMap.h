@@ -161,6 +161,11 @@ namespace vtx {
             return iterator(keys + size, values + size);
         }
 
+        __host__ void finalize() {
+            if (size < capacity) {
+                resize(size);
+            }
+        }
     private:
         __host__ void resize(int new_capacity) {
             TKey* new_keys = new TKey[new_capacity];
@@ -190,11 +195,6 @@ namespace vtx {
             return -1;
         }
 
-        __host__ void finalize() {
-            if (size < capacity) {
-                resize(size);
-            }
-        }
     };
 
 }

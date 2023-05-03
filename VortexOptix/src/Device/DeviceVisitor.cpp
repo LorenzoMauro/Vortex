@@ -20,7 +20,7 @@ namespace vtx::device
 
 				const vtxID meshId = meshNode->getID();
 
-				const OptixTraversableHandle& traversable = UPLOAD_DATA->geometryDataMap[meshId].traversable;
+				const OptixTraversableHandle& traversable = std::get<0>(UPLOAD_DATA->geometryDataMap[meshId]).traversable;
 
 				if (isTransformStackUpdated() || !(instance->finalTransformStack==transformIndexStack))
 				{
@@ -28,8 +28,8 @@ namespace vtx::device
 					instance->finalTransformStack = transformIndexStack;
 				}
 
-				const OptixInstance optixInstance = optix::createInstance(instanceId, instance->finalTransform, traversable);
-				const InstanceData instanceData = createInstanceData(instance, instance->finalTransform);
+				const OptixInstance                           optixInstance = optix::createInstance(instanceId, instance->finalTransform, traversable);
+				const std::tuple<InstanceData, InstanceData*> instanceData = createInstanceData(instance, instance->finalTransform);
 
 				UPLOAD_DATA->instanceDataMap.insert(instanceId, instanceData);
 				UPLOAD_DATA->optixInstances.push_back(optixInstance);
@@ -53,8 +53,8 @@ namespace vtx::device
 	{
 		//TODO : Check if the mesh has been updated
 		if (const vtxID meshId = mesh->getID(); !UPLOAD_DATA->geometryDataMap.contains(meshId)) {
-			const GeometryData geometryData = createGeometryData(mesh);
-			UPLOAD_DATA->geometryDataMap.insert(meshId, geometryData);
+			const std::tuple<GeometryData, GeometryData*> geo = createGeometryData(mesh);
+			UPLOAD_DATA->geometryDataMap.insert(meshId, geo);
 		}
 	}
 
@@ -62,8 +62,8 @@ namespace vtx::device
 	{
 		//TODO : Check if the texture has been updated
 		if (const vtxID materialId = material->getID(); !UPLOAD_DATA->materialDataMap.contains(materialId)) {
-			const MaterialData materialData = createMaterialData(material);
-			UPLOAD_DATA->materialDataMap.insert(materialId, materialData);
+			const std::tuple<MaterialData, MaterialData*> mat = createMaterialData(material);
+			UPLOAD_DATA->materialDataMap.insert(materialId, mat);
 		}
 	}
 
@@ -80,7 +80,7 @@ namespace vtx::device
 	void DeviceVisitor::visit(std::shared_ptr<graph::Shader> shader)
 	{
 		if (const vtxID shaderId = shader->getID(); !UPLOAD_DATA->shaderDataMap.contains(shaderId)) {
-			const ShaderData shaderData = createShaderData(shader);
+			const std::tuple<ShaderData, ShaderData*> shaderData = createShaderData(shader);
 			UPLOAD_DATA->shaderDataMap.insert(shaderId, shaderData);
 		}
 	}
@@ -89,7 +89,7 @@ namespace vtx::device
 	{
 		//TODO : Check if the texture has been updated
 		if (const vtxID textureId = textureNode->getID(); !UPLOAD_DATA->textureDataMap.contains(textureId)) {
-			const TextureData textureData = createTextureData(textureNode);
+			const std::tuple<TextureData, TextureData*> textureData = createTextureData(textureNode);
 			UPLOAD_DATA->textureDataMap.insert(textureNode->getID(), textureData);
 		}
 	}
@@ -98,7 +98,7 @@ namespace vtx::device
 	{
 		///TODO : Check if the texture has been updated
 		if (const vtxID bsdfId = bsdfMeasurementNode->getID(); !UPLOAD_DATA->bsdfDataMap.contains(bsdfId)) {
-			const BsdfData bsdfData = createBsdfData(bsdfMeasurementNode);
+			const std::tuple<BsdfData, BsdfData*> bsdfData = createBsdfData(bsdfMeasurementNode);
 			UPLOAD_DATA->bsdfDataMap.insert(bsdfId, bsdfData);
 		}
 	}
@@ -107,7 +107,7 @@ namespace vtx::device
 	{
 		///TODO : Check if the light Profile has been updated
 		if (const vtxID lightProfileId = lightProfile->getID(); !UPLOAD_DATA->lightProfileDataMap.contains(lightProfileId)) {
-			const LightProfileData lightProfileData = createLightProfileData(lightProfile);
+			const std::tuple<LightProfileData, LightProfileData*> lightProfileData = createLightProfileData(lightProfile);
 			UPLOAD_DATA->lightProfileDataMap.insert(lightProfileId, lightProfileData);
 		}
 	}
@@ -116,61 +116,53 @@ namespace vtx::device
 	{
 		//TODO : Check if the mesh has been updated
 		if (const vtxID lightId = lightNode->getID(); !UPLOAD_DATA->lightDataMap.contains(lightId)) {
-			LightData lightData = createLightData(lightNode);
+			const std::tuple<LightData, LightData*> lightData = createLightData(lightNode);
 			UPLOAD_DATA->lightDataMap.insert(lightId, lightData);
-			if(lightData.type == LightType::L_ENV)
-			{
+			if(std::get<0>(lightData).type == L_ENV){
 				// TODO : How do we handle the presence of another env Light?
-				UPLOAD_DATA->launchParams.envLightId = lightId;
+				UPLOAD_DATA->launchParams.envLight = std::get<1>(lightData);
 			}
 		}
 	}
 
 	void finalizeUpload()
 	{
-		UploadData* uploadData = UPLOAD_DATA;
-		Buffers* uploadBuffers = UPLOAD_BUFFERS;
+		UploadData* uploadData    = UPLOAD_DATA;
+		Buffers*    uploadBuffers = UPLOAD_BUFFERS;
 
 		bool isLaunchParamsUpdated = false;
 		if (uploadData->instanceDataMap.isUpdated)
 		{
-			uploadData->launchParams.topObject = optix::createInstanceAcceleration(uploadData->optixInstances);
-			uploadData->launchParams.instanceMap = uploadData->instanceDataMap.upload();
-			isLaunchParamsUpdated = true;
-		}
-		if (uploadData->geometryDataMap.isUpdated)
-		{
-			uploadData->launchParams.geometryMap = uploadData->geometryDataMap.upload();
-			isLaunchParamsUpdated = true;
-		}
-		if (uploadData->materialDataMap.isUpdated)
-		{
-			uploadData->launchParams.materialMap = uploadData->materialDataMap.upload();
-			isLaunchParamsUpdated = true;
+			std::vector<InstanceData*> instances;
+			uploadData->instanceDataMap.finalize();
+			uploadData->instanceDataMap.isUpdated = false;
+			for(std::pair<vtxID, std::tuple<InstanceData, InstanceData*>> it : uploadData->instanceDataMap)
+			{
+				InstanceData* instanceData = std::get<1>(it.second);
+				vtxID&        instanceId   = it.first;
+				if(instanceId >= instances.size())
+				{
+					instances.resize(instanceId + 1);
+				}
+				instances[instanceId] = instanceData;
+			}
+			uploadBuffers->instancesBuffer.upload(instances);
+
+			uploadData->launchParams.topObject   = optix::createInstanceAcceleration(uploadData->optixInstances);
+			uploadData->launchParams.instances	 = uploadBuffers->instancesBuffer.castedPointer<InstanceData*>();
+			isLaunchParamsUpdated                = true;
 		}
 		if (uploadData->lightDataMap.isUpdated)
 		{
-			uploadData->launchParams.lightMap = uploadData->lightDataMap.upload();
-			isLaunchParamsUpdated = true;
-		}
-		if (uploadData->shaderDataMap.isUpdated)
-		{
-			uploadData->launchParams.shaderMap = uploadData->shaderDataMap.upload();
-			isLaunchParamsUpdated = true;
-		}
-		if (uploadData->textureDataMap.isUpdated)
-		{
-			uploadData->launchParams.textureMap = uploadData->textureDataMap.upload();
-			isLaunchParamsUpdated = true;
-		}
-		if (uploadData->bsdfDataMap.isUpdated)
-		{
-			uploadData->launchParams.bsdfMap = uploadData->bsdfDataMap.upload();
-			isLaunchParamsUpdated = true;
-		}
-		if (uploadData->lightProfileDataMap.isUpdated)
-		{
-			uploadData->launchParams.lightProfileMap = uploadData->lightProfileDataMap.upload();
+			std::vector<LightData*> lightData;
+			for (auto lightEntry : uploadData->lightDataMap)
+			{
+				LightData* light = std::get<1>(lightEntry.second);
+				lightData.push_back(light);
+			}
+			uploadBuffers->lightsDataBuffer.upload(lightData);
+			uploadData->launchParams.lights = uploadBuffers->lightsDataBuffer.castedPointer<LightData*>();
+			uploadData->launchParams.numberOfLights = lightData.size();
 			isLaunchParamsUpdated = true;
 		}
 		if(uploadData->isCameraUpdated)
@@ -201,7 +193,8 @@ namespace vtx::device
 		if(uploadData->isSettingsUpdated)
 		{
 			uploadBuffers->rendererSettingsBuffer.upload(uploadData->settings);
-			if (!uploadData->launchParams.settings || uploadData->launchParams.settings != uploadBuffers->frameIdBuffer.castedPointer<RendererDeviceSettings>())
+			if (!uploadData->launchParams.settings || uploadData->launchParams.settings != uploadBuffers->frameIdBuffer.castedPointer<
+				RendererDeviceSettings>())
 			{
 				uploadData->launchParams.settings = uploadBuffers->rendererSettingsBuffer.castedPointer<RendererDeviceSettings>();
 				isLaunchParamsUpdated = true;

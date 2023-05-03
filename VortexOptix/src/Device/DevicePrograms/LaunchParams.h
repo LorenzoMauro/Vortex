@@ -25,15 +25,6 @@ namespace vtx {
 		int envLightSample = -1;
 	};
 
-    struct TextureHandler : mi::neuraylib::Texture_handler_base
-    {
-        vtxID* textureMdlIndexMap;
-        uint32_t numTextures;
-        vtxID* bsdfMdlIndexMap;
-        uint32_t numBsdfs;
-        vtxID* lightProfileMdlIndexMap;
-        uint32_t numLightProfiles;
-    };
 
     enum DataType
     {
@@ -70,21 +61,6 @@ namespace vtx {
         size_t                      numFaces;
     };
 
-    struct InstanceData
-    {
-        struct SlotIds
-        {
-            vtxID materialId;
-            vtxID meshLightId;
-        };
-	    vtxID						instanceId;
-        vtxID                       geometryDataId;
-        SlotIds*                    materialSlotsId;
-        int                         numberOfSlots;
-        math::affine3f              transform;
-        bool                        hasEmission;
-        bool                        hasOpacity;
-    };
 
     struct DeviceShaderConfiguration
     {
@@ -145,36 +121,6 @@ namespace vtx {
 
     };
 
-
-    struct EnvLightAttributesData
-    {
-		vtxID  textureId;
-		float  invIntegral;
-		float* cdfU;
-		float* cdfV;
-		math::affine3f    transformation;
-        math::affine3f    invTransformation;
-	};
-
-    struct MeshLightAttributesData
-    {
-        vtxID           meshId;
-        vtxID           materialId;
-        vtxID           instanceId; //To retrieve the transform
-
-        float*          cdfArea;
-        uint32_t*       actualTriangleIndices;
-        float           totalArea;
-        int             size;
-    };
-
-    struct LightData
-    {
-        LightType   type;
-        CUdeviceptr attributes;
-        
-    };
-
     struct BsdfSamplingPartData
     {
         math::vec2ui    angularResolution;
@@ -210,6 +156,17 @@ namespace vtx {
         float               totalPower;
     };
 
+    struct TextureHandler : mi::neuraylib::Texture_handler_base
+    {
+        // All indexed by the mdl indices
+        TextureData** textures;
+        uint32_t numTextures;
+        BsdfData** bsdfs;
+        uint32_t numBsdfs;
+        LightProfileData** lightProfiles;
+        uint32_t numLightProfiles;
+    };
+
 
     struct ShaderData
     {
@@ -220,10 +177,63 @@ namespace vtx {
         //vtxID*                      texturesId;
     };
 
+
     struct MaterialData
     {
         CUdeviceptr                 argBlock;
-        vtxID                       shaderId;
+        ShaderData*                 shader;
+    };
+
+    struct AliasData {
+        unsigned int alias;
+        float q;
+        float pdf;
+    };
+
+    struct EnvLightAttributesData
+    {
+        TextureData* texture;
+        //float  invIntegral;
+        //float* cdfU;
+        //float* cdfV;
+        AliasData* aliasMap;
+        math::affine3f    transformation;
+        math::affine3f    invTransformation;
+    };
+
+    struct MeshLightAttributesData
+    {
+        vtxID           instanceId; //To retrieve the transform
+        GeometryData* geometryData;
+        MaterialData* materialId;
+
+        float* cdfArea;
+        uint32_t* actualTriangleIndices;
+        float           totalArea;
+        int             size;
+    };
+
+    struct LightData
+    {
+        LightType   type;
+        CUdeviceptr attributes;
+
+    };
+
+    struct InstanceData
+    {
+        struct SlotIds
+        {
+            MaterialData*   material;
+            LightData*      meshLight;
+        };
+        vtxID						instanceId;
+        GeometryData*               geometryData;
+        SlotIds*                    materialSlots;
+        int                         numberOfSlots;
+        math::affine3f              transform;
+        bool                        hasEmission;
+        bool                        hasOpacity;
     };
 
     struct FrameBufferData
@@ -286,26 +296,17 @@ namespace vtx {
 
 	struct LaunchParams
     {
-        int*                                    frameID;
-        FrameBufferData                         frameBuffer;
-    	CameraData                              cameraData;
-        RendererDeviceSettings*                 settings;
-        vtxID                                   envLightId = 0;
-
-        SbtProgramIdx*                          programs;
-
-        OptixTraversableHandle                  topObject;
-    	CudaMap<vtxID, InstanceData>*			instanceMap;
-
-        CudaMap<vtxID, GeometryData>*			geometryMap;
-
-        CudaMap<vtxID, MaterialData>*			materialMap;
-        CudaMap<vtxID, ShaderData>*				shaderMap;
-		CudaMap<vtxID, TextureData>*			textureMap;
-        CudaMap<vtxID, BsdfData>*				bsdfMap;
-        CudaMap<vtxID, LightProfileData>*		lightProfileMap;
-        CudaMap<vtxID, LightData>*              lightMap;
-    };
+		int*                          frameID;
+		FrameBufferData               frameBuffer;
+		CameraData                    cameraData;
+		RendererDeviceSettings*       settings;
+		SbtProgramIdx*                programs;
+		OptixTraversableHandle        topObject;
+		InstanceData**                instances;
+		LightData*                    envLight = nullptr;
+		LightData**                   lights;
+		int                           numberOfLights;
+	};
 
     enum TypeRay
     {

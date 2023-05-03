@@ -151,7 +151,7 @@ __forceinline__ __device__ const TextureData* getTextureData(Texture_handler_bas
         // invalid texture returns zero
         return nullptr;
     }
-    return getData<TextureData>(textureHandler->textureMdlIndexMap[mdlIndex - 1]);
+    return textureHandler->textures[mdlIndex - 1];
 }
 
 
@@ -165,7 +165,7 @@ __forceinline__ __device__ const LightProfileData* getLightProfile(Texture_handl
         // invalid texture returns zero
         return nullptr;
     }
-    return getData<LightProfileData>(textureHandler->lightProfileMdlIndexMap[mdlIndex - 1]);
+    return textureHandler->lightProfiles[mdlIndex];
 }
 
 __forceinline__ __device__ const BsdfData* getBsdf(Texture_handler_base const* selfBase, const uint32_t mdlIndex)
@@ -178,7 +178,7 @@ __forceinline__ __device__ const BsdfData* getBsdf(Texture_handler_base const* s
         // invalid texture returns zero
         return nullptr;
     }
-    return getData<BsdfData>(textureHandler->bsdfMdlIndexMap[mdlIndex - 1]);
+    return textureHandler->bsdfs[mdlIndex - 1];
 }
 
 __forceinline__ __device__ const BsdfSamplingPartData* getBsdfPart(Texture_handler_base const* selfBase, const uint32_t mdlIndex, const int part)
@@ -190,7 +190,7 @@ __forceinline__ __device__ const BsdfSamplingPartData* getBsdfPart(Texture_handl
         // invalid texture returns zero
         return nullptr;
     }
-    return getBsdfPart(textureHandler->bsdfMdlIndexMap[mdlIndex - 1], part);
+    return getBsdfPart(textureHandler->bsdfs[mdlIndex - 1], part);
     
 }
 

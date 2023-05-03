@@ -135,6 +135,13 @@ namespace gdt {
   } ulp MAYBE_UNUSED;
 
 
+#define ZERO_TY ZeroTy()
+#define ONE_TY OneTy()
+#define NEG_INF_TY NegInfTy()
+#define POS_INF_TY PosInfTy()
+#define INF_TY PosInfTy()
+#define NAN_TY NaNTy()
+#define ULP_TY UlpTy()
 
   template<bool is_integer>
   struct limits_traits;

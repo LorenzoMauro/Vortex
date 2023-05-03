@@ -12,7 +12,7 @@ namespace vtx
     extern "C" __constant__ LaunchParams optixLaunchParams;
 
     
-    template<typename T>
+    /*template<typename T>
     __forceinline__ __device__ const T* getData(const CudaMap<vtxID, T>* dataMap, const vtxID index, const char* dataName)
     {
         if (dataMap == nullptr)
@@ -31,79 +31,18 @@ namespace vtx
             CUDA_ERROR_PRINT("%s Data with Vortex Id %d not found!\n", dataName, index);
 			return nullptr;
         }
-    }
+    }*/
 
 
-    template<typename T>
-    const T* getData(const vtxID nodeId);
+    /*template<typename T>
+    const T* getData(const vtxID nodeId);*/
 
 
-    template<>
+    /*template<>
     __forceinline__ __device__ const InstanceData* getData(const vtxID nodeId) {
-        return getData(optixLaunchParams.instanceMap, nodeId, "Instance");
-    }
-
-    template<>
-    __forceinline__ __device__ const GeometryData* getData(const vtxID nodeId)
-    {
-        return getData(optixLaunchParams.geometryMap, nodeId, "geometry");
-    }
-
-    template<>
-    __forceinline__ __device__ const MaterialData* getData(const vtxID nodeId)
-    {
-        return getData(optixLaunchParams.materialMap, nodeId, "Material");
-    }
-
-    template<>
-    __forceinline__ __device__ const ShaderData* getData(const vtxID nodeId)
-    {
-        return getData(optixLaunchParams.shaderMap, nodeId, "Shader");
-    }
-
-    template<>
-    __forceinline__ __device__ const TextureData* getData(const vtxID nodeId)
-    {
-        return getData(optixLaunchParams.textureMap, nodeId, "Texture");
-    }
-
-    template<>
-    __forceinline__ __device__ const BsdfData* getData(const vtxID nodeId) {
-        return getData(optixLaunchParams.bsdfMap, nodeId, "Bsdf");
-    }
-
-    __forceinline__ __device__ const BsdfSamplingPartData* getBsdfPart(const vtxID nodeId, const int part)
-    {
-    	const BsdfData* bsdfData = getData<BsdfData>(nodeId);
-    	switch(part) {
-    		case 0:
-                if(bsdfData->hasReflectionBsdf)
-                {
-	                return bsdfData->reflectionBsdf;
-                }
-                break;
-            case 1:
-				if(bsdfData->hasTransmissionBsdf)
-				{
-					return bsdfData->transmissionBsdf;
-				}
-				break;
-			default: return nullptr;
-        }
-        return nullptr;
-	}
-
-    template<>
-    __forceinline__ __device__ const LightProfileData* getData(const vtxID nodeId) {
-        return getData(optixLaunchParams.lightProfileMap, nodeId, "Light Profile");
-    }
-
-
-    template<>
-    __forceinline__ __device__ const LightData* getData(const vtxID nodeId) {
-        return getData(optixLaunchParams.lightMap, nodeId, "Light");
-    }
-
+        return getData(optixLaunchParams.instances, nodeId, "Instance");
+    }*/
+    
     template<typename T>
     const T* getData();
 
@@ -149,6 +88,26 @@ namespace vtx
             CUDA_ERROR_PRINT("OptixTraversableHandle top Traversal is not set(0)?\n");
         }
         return *optixLaunchParams.frameID;
+    }
+
+    __forceinline__ __device__ const BsdfSamplingPartData* getBsdfPart(const BsdfData* bsdfData, const int part)
+    {
+        switch (part) {
+            case 0:
+                if (bsdfData->hasReflectionBsdf)
+                {
+                    return bsdfData->reflectionBsdf;
+                }
+                break;
+            case 1:
+                if (bsdfData->hasTransmissionBsdf)
+                {
+                    return bsdfData->transmissionBsdf;
+                }
+                break;
+            default: return nullptr;
+        }
+        return nullptr;
     }
 
 }

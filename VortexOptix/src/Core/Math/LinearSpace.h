@@ -88,8 +88,8 @@ namespace gdt {
     /// Constants
     ////////////////////////////////////////////////////////////////////////////////
 
-    inline LinearSpace2( ZeroTy ) : vx(zero), vy(zero) {}
-    inline LinearSpace2( OneTy ) : vx(one, zero), vy(zero, one) {}
+    inline LinearSpace2( ZeroTy ) : vx(ZERO_TY), vy(ZERO_TY) {}
+    inline LinearSpace2( OneTy ) : vx(ONE_TY, ZERO_TY), vy(ZERO_TY, ONE_TY) {}
 
     /*! return matrix for scaling */
     static inline LinearSpace2 scale(const vector_t& s) {
@@ -109,8 +109,8 @@ namespace gdt {
       LinearSpace2 m = *this;
 
       // mirrored?
-      scalar_t mirror(one);
-      if (m.det() < scalar_t(zero)) {
+      scalar_t mirror(ONE_TY);
+      if (m.det() < scalar_t(ZERO_TY)) {
         m.vx = -m.vx;
         mirror = -mirror;
       }
@@ -235,8 +235,8 @@ namespace gdt {
     /// Constants
     ////////////////////////////////////////////////////////////////////////////////
 
-    inline __both__ LinearSpace3( ZeroTy ) : vx(zero), vy(zero), vz(zero) {}
-    inline __both__ LinearSpace3( OneTy ) : vx(one, zero, zero), vy(zero, one, zero), vz(zero, zero, one) {}
+    inline __both__ LinearSpace3( ZeroTy ) : vx(ZERO_TY), vy(ZERO_TY), vz(ZERO_TY) {}
+    inline __both__ LinearSpace3( OneTy ) : vx(ONE_TY, ZERO_TY, ZERO_TY), vy(ZERO_TY, ONE_TY, ZERO_TY), vz(ZERO_TY, ZERO_TY, ONE_TY) {}
 
     /*! return matrix for scaling */
     static inline __both__ LinearSpace3 scale(const vector_t& s) {
@@ -271,8 +271,8 @@ namespace gdt {
   /* constructs a coordinate frame form a normalized normal */
   template<typename T> inline __both__ LinearSpace3<T> frame(const T& N) 
   {
-    const T dx0 = cross(T(one,zero,zero),N);
-    const T dx1 = cross(T(zero,one,zero),N);
+    const T dx0 = cross(T(ONE_TY,ZERO_TY,ZERO_TY),N);
+    const T dx1 = cross(T(ZERO_TY,ONE_TY,ZERO_TY),N);
     const T dx = normalize(select(dot(dx0,dx0) > dot(dx1,dx1),dx0,dx1));
     const T dy = normalize(cross(N,dx));
     return LinearSpace3<T>(dx,dy,N);

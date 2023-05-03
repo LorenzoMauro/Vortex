@@ -147,13 +147,13 @@ namespace vtx
 			}
 
 			//Direct Light Sampling
-			if (int numLights = optixLaunchParams.lightMap->size; numLights > 0 && (samplingTechnique == RendererDeviceSettings::S_MIS | samplingTechnique == RendererDeviceSettings::S_DIRECT_LIGHT))
+			if (int numLights = optixLaunchParams.numberOfLights; numLights > 0 && (samplingTechnique == RendererDeviceSettings::S_MIS | samplingTechnique == RendererDeviceSettings::S_DIRECT_LIGHT))
 			{
 				//Randomly Selecting a Light
 				//TODO, I think here we can do some better selection by giving more importance to lights with greater power
 				const int indexLight = (1 < numLights) ? gdt::clamp(static_cast<int>(floorf(rng(prd->seed) * numLights)), 0,numLights - 1): 0;
 
-				LightData light = optixLaunchParams.lightMap->values[indexLight];
+				LightData light = *(optixLaunchParams.lights[indexLight]);
 
 				LightType typeLight = light.type;
 
@@ -176,7 +176,8 @@ namespace vtx
 				if (lightSampleProgramIdx != -1)
 				{
 					LightSample lightSample = optixDirectCall<LightSample, const LightData&, PerRayData*>(lightSampleProgramIdx, light, prd);
-					if (lightSample.isValid)
+
+					if (lightSample.isValid && dot(lightSample.direction, prd->wo) > 0.0f)
 					{
 						mdl::BsdfEvaluateData evalData = mdl::evaluateBsdf(mdlData, ior, prd->idxStack, prd->stack, lightSample.direction, prd->wo);
 
@@ -286,11 +287,11 @@ namespace vtx
 		
 		if(prd->traceOperation == TR_HIT)
 		{
-			if(optixLaunchParams.envLightId != 0)
+			if(optixLaunchParams.envLight != nullptr)
 			{
-				const LightData* envLight              = getData<LightData>(optixLaunchParams.envLightId);
+				const LightData* envLight              = optixLaunchParams.envLight;
 				EnvLightAttributesData attrib = *reinterpret_cast<EnvLightAttributesData*>(envLight->attributes);
-				auto texture = getData<TextureData>(attrib.textureId);
+				auto texture = attrib.texture;
 
 				math::vec3f R = math::transformNormal3F(attrib.invTransformation, prd->wi);
 
@@ -298,7 +299,7 @@ namespace vtx
 				float phi = acosf(R.z); // inclination angle (phi)
 
 				float u = 1.0f - theta / (2.0f * M_PI);
-				float v = 1.0 - phi / M_PI;
+				float v = 1.0f - phi / M_PI;
 
 				math::vec3f emission = tex2D<float4>(texture->texObj, u, v);
 
@@ -310,7 +311,9 @@ namespace vtx
 					{
 						// For simplicity we pretend that we perfectly importance-sampled the actual texture-filtered environment map
 						// and not the Gaussian smoothed one used to actually generate the CDFs.
-						const float pdfLight = utl::intensity(emission) * attrib.invIntegral;
+						//const float pdfLight = utl::intensity(emission) * attrib.invIntegral;
+						const unsigned int idx = texture->dimension.x * (v*texture->dimension.y + u);
+						const float pdfLight = attrib.aliasMap[idx].pdf;
 
 						emission *= utl::balanceHeuristic(prd->pdf, pdfLight);
 					}

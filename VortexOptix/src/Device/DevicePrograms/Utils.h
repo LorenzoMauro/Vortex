@@ -42,6 +42,7 @@ namespace vtx::utl
 
 	__forceinline__ __host__ __device__ float balanceHeuristic(const float a, const float b)
 	{
+		//return __fdiv_rn(a,__fadd_rn(a,b));
 		return a / (a + b);
 	}
 
@@ -71,8 +72,8 @@ namespace vtx::utl
 
 	__forceinline__ __device__ void getInstanceAndGeometry(HitProperties* hitP, const vtxID& instanceId)
 	{
-		hitP->instance = getData<InstanceData>(instanceId);
-		hitP->geometry = getData<GeometryData>(hitP->instance->geometryDataId);
+		hitP->instance = optixLaunchParams.instances[instanceId];
+		hitP->geometry = (hitP->instance->geometryData);
 	}
 
 	__forceinline__ __device__ void getVertices(HitProperties* hitP, const unsigned int triangleId)
@@ -167,20 +168,21 @@ namespace vtx::utl
 		if (hitP->instance->numberOfSlots > 0)
 		{
 			const unsigned&       materialSlotIndex = hitP->geometry->faceAttributeData[triangleId].materialSlotId;
-			InstanceData::SlotIds slotIds           = hitP->instance->materialSlotsId[materialSlotIndex];
+			InstanceData::SlotIds slotIds           = hitP->instance->materialSlots[materialSlotIndex];
 
-			if (slotIds.materialId != 0)
+			if (slotIds.material != nullptr)
 			{
-				hitP->material            = getData<MaterialData>(slotIds.materialId);
-				hitP->shader              = getData<ShaderData>(hitP->material->shaderId);
+				hitP->material            = slotIds.material;
+				hitP->shader              = hitP->material->shader;
 				hitP->shaderConfiguration = hitP->shader->shaderConfiguration;
 			}
-			if (slotIds.meshLightId != 0)
+			if (slotIds.meshLight != nullptr)
 			{
-				const LightData*           lightData  = getData<LightData>(slotIds.meshLightId);
-				const MeshLightAttributesData* attributes = reinterpret_cast<MeshLightAttributesData*>(lightData->attributes);
-				hitP->meshLight                       = lightData;
-				hitP->meshLightAttributes             = attributes;
+				const LightData*               lightData  = slotIds.meshLight;
+				const MeshLightAttributesData* attributes = reinterpret_cast<MeshLightAttributesData*>(lightData->
+					attributes);
+				hitP->meshLight           = lightData;
+				hitP->meshLightAttributes = attributes;
 			}
 		}
 	}

@@ -21,18 +21,15 @@ namespace vtx {
     void ViewportLayer::OnUpdate(float ts)
     {
         renderer->camera->onUpdate(ts);
-        if (renderer->isReady())
+        if (renderer->camera->updated)
         {
-            if (renderer->camera->updated)
-            {
-                renderer->settings.iteration = 0;
-                renderer->settings.isUpdated = true;
-            }
-            else
-            {
-                renderer->settings.iteration++;
-                renderer->settings.isUpdated = true;
-            }
+            renderer->settings.iteration = -1;
+            renderer->settings.isUpdated = true;
+        }
+        if (renderer->isReady() && renderer->settings.iteration<= renderer->settings.maxSamples)
+        {
+            renderer->settings.iteration++;
+            renderer->settings.isUpdated = true;
             renderer->traverse({ std::dynamic_pointer_cast<NodeVisitor>(hostVisitor) });
             renderer->traverse({ std::dynamic_pointer_cast<NodeVisitor>(deviceVisitor) });
             device::incrementFrame();
