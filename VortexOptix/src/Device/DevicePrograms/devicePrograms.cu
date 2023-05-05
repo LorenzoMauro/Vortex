@@ -62,7 +62,6 @@ namespace vtx
 		{
 			prd->colors.trueNormal  = 0.5f * (hitP.ngW + 1.0f);
 			prd->colors.orientation = hitP.isFrontFace ? math::vec3f(0.0f, 0.0f, 1.0f) : math::vec3f(1.0f, 0.0f, 0.0f);
-			prd->colors.debugColor1 = hitP.tgW;
 		}
 
 		if (hitP.material != nullptr)
@@ -144,6 +143,11 @@ namespace vtx
 					return;
 					// None of the following code will have any effect in that case.
 				}
+				if(prd->depth == 0)
+				{
+					prd->colors.debugColor2 = prd->pdf;
+					prd->colors.debugColor3 = prd->wi;
+				}
 			}
 
 			//Direct Light Sampling
@@ -177,7 +181,7 @@ namespace vtx
 				{
 					LightSample lightSample = optixDirectCall<LightSample, const LightData&, PerRayData*>(lightSampleProgramIdx, light, prd);
 
-					if (lightSample.isValid && dot(lightSample.direction, prd->wo) > 0.0f)
+					if (lightSample.isValid && dot(lightSample.direction, hitP.ngW) >= -0.05f)
 					{
 						mdl::BsdfEvaluateData evalData = mdl::evaluateBsdf(mdlData, ior, prd->idxStack, prd->stack, lightSample.direction, prd->wo);
 
@@ -295,14 +299,23 @@ namespace vtx
 
 				math::vec3f R = math::transformNormal3F(attrib.invTransformation, prd->wi);
 
-				float theta = atan2f(R.y, R.x) + M_PI / 2.0f; // azimuth angle (theta)
-				float phi = acosf(R.z); // inclination angle (phi)
+				// Calculate phi, theta, sinTheta, and cosTheta
+				//float phi = atan2f(R.y, R.x);
+				float theta = acosf(-R.z);
+				//
+				//// Calculate u and v
+				float v = theta / (float)M_PI;
 
-				float u = 1.0f - theta / (2.0f * M_PI);
-				float v = 1.0f - phi / M_PI;
+				float phi = atan2f(R.y, R.x);// + M_PI / 2.0f; // azimuth angle (theta)
+				//float theta = acosf(R.z); // inclination angle (phi)
+
+				float u = (phi + (float)M_PI) / (float)(2.0f * M_PI);
+				//float u = 1.0f - phi / (2.0f * M_PI);
+				//float v = 1.0f - theta / M_PI; 
 
 				math::vec3f emission = tex2D<float4>(texture->texObj, u, v);
 
+				float factor = 1.0f;
 				if (optixLaunchParams.settings->samplingTechnique == RendererDeviceSettings::S_MIS)
 				{
 					// If the last surface intersection was a diffuse event which was directly lit with multiple importance sampling,
@@ -315,12 +328,12 @@ namespace vtx
 						const unsigned int idx = texture->dimension.x * (v*texture->dimension.y + u);
 						const float pdfLight = attrib.aliasMap[idx].pdf;
 
-						emission *= utl::balanceHeuristic(prd->pdf, pdfLight);
+						factor = utl::balanceHeuristic(prd->pdf, pdfLight);
 					}
 				}
 
 				//prd->radiance += prd->throughput * emission * attrib.emission;
-				prd->radiance += prd->throughput * emission;
+				prd->radiance += prd->throughput * emission* factor;
 				prd->eventType = mi::neuraylib::BSDF_EVENT_ABSORB;
 				if (prd->depth == 0)
 				{
@@ -329,6 +342,8 @@ namespace vtx
 					prd->colors.trueNormal = prd->wi;
 					prd->colors.shadingNormal = prd->wi;
 				}
+				prd->colors.debugColor1 = factor;
+				prd->colors.debugColor3 = emission;
 			}
 			else
 			{
@@ -439,6 +454,20 @@ namespace vtx
 
 		math::vec3f radiance = integrator(prd);
 
+		// DEBUG Highlight numerical errors.
+		if (isnan(radiance.x) || isnan(radiance.y) || isnan(radiance.z))
+		{
+			radiance = make_float3(0.0f, 1000000.0f, 0.0f); // super green
+		}
+		else if (isinf(radiance.x) || isinf(radiance.y) || isinf(radiance.z))
+		{
+			radiance = make_float3(1000000.0f, 0.0f, 0.0f); // super red
+		}
+		else if (radiance.x < 0.0f || radiance.y < 0.0f || radiance.z < 0.0f)
+		{
+			radiance = make_float3(0.0f, 0.0f, 1000000.0f); // super blue
+		}
+
 		math::vec4f* outputBuffer = reinterpret_cast<math::vec4f*>(frameBuffer->outputBuffer);
 		// This is a per device launch sized buffer in this renderer strategy.
 		if (!settings->accumulate || settings->iteration == 0)
@@ -453,8 +482,10 @@ namespace vtx
 		{
 		case(RendererDeviceSettings::DisplayBuffer::FB_NOISY):
 			{
-				if (optixLaunchParams.settings->accumulate)
+				if (optixLaunchParams.settings->accumulate && (!(isnan(radiance.x) || isnan(radiance.y) || isnan(radiance.z))))
 				{
+					//const math::vec3f dst = outputBuffer[fbIndex] ; // RGBA32F
+					//outputBuffer[fbIndex] = math::vec4f(dst + 1.0f / float(optixLaunchParams.settings->iteration + 1) * (radiance - dst), 1.0f);
 					outputBuffer[fbIndex] = math::vec4f(frameBuffer->radianceBuffer[fbIndex] / static_cast<float>(optixLaunchParams.settings->iteration+ 1), 1.0f);
 				}
 				else

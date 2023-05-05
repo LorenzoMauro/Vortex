@@ -89,7 +89,7 @@ project "OptixApp"
         "/NODEFAULTLIB:LIBCMT"
     }
 
-    useMdlDebug = false
+    useMdlDebug = true
     
     filter "configurations:Debug"
         defines{"GLFW_INCLUDE_NONE"}

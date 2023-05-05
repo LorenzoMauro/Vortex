@@ -1,0 +1,49 @@
+ mdl 1.7;
+
+import ::state::normal;
+import ::base::file_texture;
+import ::base::mono_mode;
+import ::base::texture_coordinate_info;
+import ::base::texture_return;
+import ::df::diffuse_reflection_bsdf;
+import ::state::texture_coordinate;
+import ::state::texture_tangent_u;
+import ::state::texture_tangent_v;
+import ::tex::gamma_mode;
+import ::tex::wrap_mode;
+
+export material CustomMaterial(
+    uniform int2 animation_crop = int2(0),
+    uniform float animation_fps = 30.f,
+    uniform float animation_start_time = 0.f,
+    uniform tex::wrap_mode animation_wrap = tex::wrap_repeat,
+    uniform bool clip = false,
+    color color_offset = color(0.f, 0.f, 0.f),
+    color color_scale = color(1.f, 1.f, 1.f),
+    uniform float2 crop_u = float2(0.f, 1.f),
+    uniform float2 crop_v = float2(0.f, 1.f),
+    uniform base::mono_mode mono_source = base::mono_alpha,
+    uniform texture_2d texture = texture_2d("//CheckerBoard.png", ::tex::gamma_default, ""),
+    base::texture_coordinate_info uvw = base::texture_coordinate_info(state::texture_coordinate(0), state::texture_tangent_u(0), state::texture_tangent_v(0)),
+    uniform tex::wrap_mode wrap_u = tex::wrap_repeat,
+    uniform tex::wrap_mode wrap_v = tex::wrap_repeat,
+    uniform string handle = "",
+    float roughness = 0.f)
+ =
+    let {
+        bool tmp0 = false;
+        material_surface tmp1(df::diffuse_reflection_bsdf(base::file_texture(texture, color_offset, color_scale, mono_source, uvw, crop_u, crop_v, wrap_u, wrap_v, clip, animation_start_time, animation_crop, animation_wrap, animation_fps).tint, roughness, handle), material_emission(emission: edf(), intensity: color(0.f, 0.f, 0.f), mode: intensity_radiant_exitance));
+        material_surface tmp2 = material_surface(scattering: bsdf(), emission: material_emission(emission: edf(), intensity: color(0.f, 0.f, 0.f), mode: intensity_radiant_exitance));
+        color tmp3 = color(1.f, 1.f, 1.f);
+        material_volume tmp4 = material_volume(scattering: vdf(), absorption_coefficient: color(0.f, 0.f, 0.f), scattering_coefficient: color(0.f, 0.f, 0.f), emission_intensity: color(0.f, 0.f, 0.f));
+        material_geometry tmp5(float3(0.f), 1.f, state::normal());
+        hair_bsdf tmp6 = hair_bsdf();
+    } in
+        material(
+            thin_walled: tmp0,
+            surface: tmp1,
+            backface: tmp2,
+            ior: tmp3,
+            volume: tmp4,
+            geometry: tmp5,
+            hair: tmp6);

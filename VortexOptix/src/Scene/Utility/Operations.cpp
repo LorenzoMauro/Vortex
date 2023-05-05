@@ -1,6 +1,7 @@
 #include "Operations.h"
 
 #include "ModelLoader.h"
+#include "MDL/materialEditor.h"
 #include "Scene/Graph.h"
 
 namespace vtx::ops
@@ -374,18 +375,35 @@ namespace vtx::ops
     std::shared_ptr<graph::Group> importedScene()
     {
         //const std::string                   scenePath = getOptions()->dataFolder + "models/blenderTest2.fbx";
-        const std::string                   scenePath = getOptions()->dataFolder + "models/sponza2/sponza.obj";
+        const std::string                   scenePath = getOptions()->dataFolder + "models/blenderTest3.fbx";
+        //const std::string                   scenePath = getOptions()->dataFolder + "models/sponza2/sponza.obj";
         //const std::string                   scenePath = getOptions()->dataFolder + "models/blenderTest.obj";
         //const std::string                   scenePath = getOptions()->dataFolder  + "models/blenderTest.fbx";
 		const std::shared_ptr<graph::Group> sceneRoot = importer::importSceneFile(scenePath);
 
 		const std::vector<std::shared_ptr<Node>> instances = SIM::getAllNodeOfType(NT_INSTANCE);
 
+		const std::string moduleName   = "::CustomModule";
+		const std::string materialName = "CustomMaterial";
+        graph::createNewModule(moduleName, materialName);
 		const std::shared_ptr<Material> material1 = ops::createNode<Material>();
         //material1->shader->name = "Stone_Mediterranean";
         //material1->shader->path = "\\vMaterials_2\\Stone\\Stone_Mediterranean.mdl";
-        material1->shader->name = "bsdf_diffuse_reflection";
-        material1->shader->path = "\\bsdf_diffuse_reflection.mdl";
+        if(true)
+        {
+            //material1->shader->name = "bsdf_diffuse_reflection";
+			//material1->shader->path = "\\bsdf_diffuse_reflection.mdl";
+            //material1->shader->name = "Aluminum";
+            //material1->shader->path = "\\vMaterials_2\\Metal\\Aluminum.mdl";
+            material1->shader->name = "Stone_Mediterranean";
+            material1->shader->path = "\\vMaterials_2\\Stone\\Stone_Mediterranean.mdl";
+        }
+        else
+        {
+            material1->shader->name = materialName;
+            material1->shader->path = moduleName;
+        }
+        
 
         for(const std::shared_ptr<Node>& node : instances)
         {
@@ -393,12 +411,14 @@ namespace vtx::ops
             instance->addMaterial(material1);
 		}
 
-        std::string envMapPath = getOptions()->dataFolder + "sunset_in_the_chalk_quarry_1k.hdr";
+        //std::string envMapPath = getOptions()->dataFolder + "sunset_in_the_chalk_quarry_1k.hdr";
+        //std::string envMapPath = getOptions()->dataFolder + "belfast_sunset_puresky_4k.hdr";
+        std::string envMapPath = getOptions()->dataFolder + "mpumalanga_veld_puresky_4k.hdr";
         //std::string envMapPath = getOptions()->dataFolder + "blouberg_sunrise_2_1k.hdr";
         //std::string envMapPath = getOptions()->dataFolder + "qwantani_1k.hdr";
         
         //std::string envMapPath =  getOptions()->dataFolder  + "studio_small_03_1k.hdr";
-        //std::string envMapPath =  getOptions()->dataFolder  + "16x16-in-1024x1024.png";
+        //std::string envMapPath =  getOptions()->dataFolder  + "CheckerBoard.png";
         //std::string envMapPath =  getOptions()->dataFolder  + "sunset03_EXR.exr";
         //std::string envMapPath =  getOptions()->dataFolder  + "morning07_EXR.exr";
 		const std::shared_ptr<Light> envLight = ops::createNode<Light>();

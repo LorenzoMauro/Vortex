@@ -118,6 +118,9 @@ namespace vtx
         lightSample.pdf         = attrib.aliasMap[envIdx].pdf;
 
         const float u = (float)(px + sampleY) / (float)width;
+        //const float phi = (M_PI_2)*(1.0f-u);
+
+        //const float phi = (float)M_PI  -u * (float)(2.0 * M_PI);
         const float phi = u * (float)(2.0 * M_PI) - (float)M_PI;
         float sinPhi, cosPhi;
         sincosf(phi > float(-M_PI) ? phi : (phi + (float)(2.0 * M_PI)), &sinPhi, &cosPhi);

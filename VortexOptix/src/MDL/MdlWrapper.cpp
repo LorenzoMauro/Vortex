@@ -39,7 +39,7 @@ namespace vtx::mdl
 	bool logMessage(IMdl_execution_context* context)
 	{
 		state.lastError = "";
-		for (mi::Size i = 0; i < context->get_messages_count(); ++i)
+		for (Size i = 0; i < context->get_messages_count(); ++i)
 		{
 			const Handle<const IMessage> message(context->get_message(i));
 			state.lastError += messageKindToString(message->get_kind());
@@ -316,6 +316,16 @@ namespace vtx::mdl
 		return output;
 	};
 
+	std::string removeMdlPrefix(const std::string& name)
+	{
+		std::string       result = name;
+		if (const std::string prefix = "mdl"; result.substr(0, prefix.size()) == prefix)
+		{
+			result.erase(0, prefix.size());
+		}
+		return result;
+	}
+
 	std::string getMaterialDatabaseName(const IModule* module, const IString* moduleDatabaseName, const std::string& materialName) {
 		std::string materialDatabaseName = std::string(moduleDatabaseName->get_c_str()) + "::" + materialName;
 
@@ -325,7 +335,7 @@ namespace vtx::mdl
 			return materialDatabaseName;
 		}
 
-		const Handle<const mi::IArray> result(module->get_function_overloads(materialDatabaseName.c_str()));
+		const Handle<const IArray> result(module->get_function_overloads(materialDatabaseName.c_str()));
 
 		// Not supporting multiple function overloads with the same name but different signatures.
 		if (!result || result->get_length() != 1)
@@ -333,7 +343,7 @@ namespace vtx::mdl
 			return std::string();
 		}
 
-		const Handle<const mi::IString> overloads(result->get_element<mi::IString>(static_cast<mi::Size>(0)));
+		const Handle<const IString> overloads(result->get_element<IString>(static_cast<Size>(0)));
 
 		return overloads->get_c_str();
 
@@ -347,9 +357,10 @@ namespace vtx::mdl
 		std::string moduleName = pathToModuleName(path);
 
 		result = state.impExpApi->load_module(transaction, moduleName.c_str(), state.context.get());
+		//result = state.impExpApi->load_module(transaction,"::df", state.context.get());
+		//VTX_ASSERT_RETURN((result >= 0 && logMessage(state.context.get())), state.lastError);
 
 		do {
-			VTX_ASSERT_RETURN((result >= 0 && logMessage(state.context.get())), state.lastError);
 			const Handle<const IString> moduleDatabaseName(state.factory->get_db_module_name(moduleName.c_str()));
 			// access module
 			const Handle<const IModule> module(transaction->access<IModule>(moduleDatabaseName.get()->get_c_str()));
@@ -363,11 +374,11 @@ namespace vtx::mdl
 			VTX_ASSERT_BREAK(!materialDatabaseName.empty(), "Error with retrieving material {} in the module {}, material might have overload", materialName, moduleName);
 
 			// Create material Definition
-			const Handle<const IFunction_definition> material_definition(transaction->access<IFunction_definition>(materialDatabaseName.c_str()));
-			VTX_ASSERT_BREAK((material_definition.is_valid_interface()), "Error with material definition creation for material {} in module {}", materialName, moduleName);
+			const Handle<const IFunction_definition> materialDefinition(transaction->access<IFunction_definition>(materialDatabaseName.c_str()));
+			VTX_ASSERT_BREAK((materialDefinition.is_valid_interface()), "Error with material definition creation for material {} in module {}", materialName, moduleName);
 
 			//Create material Call
-			const Handle<IFunction_call> materialCall(material_definition->create_function_call(0, &result));
+			const Handle<IFunction_call> materialCall(materialDefinition->create_function_call(0, &result));
 			VTX_ASSERT_BREAK((materialCall.is_valid_interface() && !(result != 0)), "Error with material instance creation for material {} in module {}", materialName, moduleName);
 
 			//Create material Instance
@@ -1165,6 +1176,110 @@ namespace vtx::mdl
 		return textureNode;
 	}
 
+	std::string createTextureExpression(const std::string& filePath)
+	{
+		ITransaction*                        transaction = getGlobalTransaction();
+		const Handle<IMdl_execution_context> context     = state.context;
+		const Handle<IMdl_impexp_api>        impExp      = state.impExpApi;
+		const Handle<IValue_factory>         vf          = state.valueFactory;
+		const Handle<IExpression_factory>    ef          = state.expressionFactory;
+		Sint32                               result;
+
+		std::string imageDbName;
+		std::string textureDbName;
+		std::string imageName               = utl::getFileName(filePath);
+		std::string textureCallFunction     = "callTexture" + imageName;
+		std::string textureTintCallFunction = "callTextureTint" + imageName;
+		{
+			// Load environment texture
+			const Handle image(transaction->create<IImage>("Image"));
+			VTX_ASSERT_CONTINUE(image.is_valid_interface(), "image invalid Interface!");
+			result = image->reset_file(filePath.c_str());
+			VTX_ASSERT_BREAK(result == 0, "Error with creating new Texture image {}", filePath);
+			imageDbName = "Image_" + imageName;
+			transaction->store(image.get(), imageDbName.c_str());
+
+			// Create a new texture instance and set its properties
+			Handle texture(transaction->create<ITexture>("Texture"));
+			VTX_ASSERT_CONTINUE(texture.is_valid_interface(), "texture invalid Interface!");
+
+			texture->set_image(imageDbName.c_str());
+
+			textureDbName = "userTexture_" + imageName;
+
+			result = transaction->store(texture.get(), textureDbName.c_str());
+			VTX_ASSERT_CONTINUE((result >= 0), "failed texture store");
+		}
+		{
+			result = impExp->load_module(transaction, "::base", context.get());
+			VTX_ASSERT_CONTINUE((result >= 0 && logMessage(context.get())), state.lastError);
+		}
+		{
+			Handle baseModule(transaction->access<IModule>("mdl::base"));
+			VTX_ASSERT_CONTINUE(baseModule.is_valid_interface(), "baseModule invalid Interface!");
+			Handle overloads(baseModule->get_function_overloads("mdl::base::file_texture"));
+			VTX_ASSERT_CONTINUE(overloads->get_length() == 1, "More than one overload");
+			VTX_ASSERT_CONTINUE(overloads.is_valid_interface(), "overloads invalid Interface!");
+			Handle<const IString> fileTextureName(overloads->get_element<IString>(0));
+			VTX_ASSERT_CONTINUE(fileTextureName.is_valid_interface(), "fileTextureName invalid Interface!");
+			// Prepare the arguments of the function call for "mdl::base::file_texture": set the
+			// "texture" argument to the "nvidia_texture" texture.
+			Handle<const IFunction_definition> functionDefinition(transaction->access<IFunction_definition>(fileTextureName->get_c_str()));
+			VTX_ASSERT_CONTINUE(functionDefinition.is_valid_interface(), "functionDefinition invalid Interface!");
+			Handle<const IType_list> types(functionDefinition->get_parameter_types());
+			VTX_ASSERT_CONTINUE(types.is_valid_interface(), "types invalid Interface!");
+			Handle<const IType> argType(types->get_type("texture"));
+			VTX_ASSERT_CONTINUE(argType.is_valid_interface(), "argType invalid Interface!");
+			Handle<IValue_texture> argValue(vf->create<IValue_texture>(argType.get()));
+			VTX_ASSERT_CONTINUE(argValue.is_valid_interface(), "argValue invalid Interface!");
+			argValue->set_value(textureDbName.c_str());
+			Handle<IExpression> argExpr(ef->create_constant(argValue.get()));
+			VTX_ASSERT_CONTINUE(argExpr.is_valid_interface(), "argExpr invalid Interface!");
+			Handle<IExpression_list> arguments(ef->create_expression_list());
+			VTX_ASSERT_CONTINUE(arguments.is_valid_interface(), "arguments invalid Interface!");
+			arguments->add_expression("texture", argExpr.get());
+
+			// Create a function call from the function definition "mdl::base::file_texture" with the
+			// just prepared arguments.
+			Handle<IFunction_call> functionCall(functionDefinition->create_function_call(arguments.get(), &result));
+			VTX_ASSERT_CONTINUE(functionCall.is_valid_interface(), "functionCall invalid Interface!");
+			result = transaction->store(functionCall.get(), textureCallFunction.c_str());
+			VTX_ASSERT_CONTINUE((result >= 0), "failed functionCall store");
+
+
+			// Dump the created material instance and function calls.
+			Handle<const IFunction_call> call(transaction->access<IFunction_call>(textureCallFunction.c_str()));
+			dumpInstance(ef.get(), call.get(), textureCallFunction);
+		}
+		{
+			// Prepare the arguments of the function call for "mdl::base::texture_return.tint": set the
+			// "s" argument to the "call of file_texture" function call.
+			Handle<IExpression> argExpr(ef->create_call(textureCallFunction.c_str()));
+
+			
+
+
+			VTX_ASSERT_CONTINUE(argExpr.is_valid_interface(), "argExpr invalid Interface!");
+			Handle<IExpression_list> arguments(ef->create_expression_list());
+			VTX_ASSERT_CONTINUE(arguments.is_valid_interface(), "arguments invalid Interface!");
+			arguments->add_expression("s", argExpr.get());
+
+			// Create a function call from the function definition "mdl::base::file_texture" with the
+			// just prepared arguments.
+			Handle<const IFunction_definition> functionDefinition(transaction->access<IFunction_definition>("mdl::base::texture_return.tint(::base::texture_return)"));
+			VTX_ASSERT_CONTINUE(functionDefinition.is_valid_interface(), "functionDefinition invalid Interface!");
+			Handle<IFunction_call> functionCall(functionDefinition->create_function_call(arguments.get(), &result));
+			VTX_ASSERT_CONTINUE(functionCall.is_valid_interface(), "functionCall invalid Interface!");
+			result = transaction->store(functionCall.get(), textureTintCallFunction.c_str());
+			VTX_ASSERT_CONTINUE((result >= 0), "failed functionCall store");
+
+			// Dump the created material instance and function calls.
+			Handle<const IFunction_call> call(transaction->access<IFunction_call>(textureTintCallFunction.c_str()));
+			dumpInstance(ef.get(), call.get(), textureTintCallFunction);
+		}
+		return textureTintCallFunction;
+	}
+
 	void fetchTextureData(const std::shared_ptr<graph::Texture>& textureNode)
 	{
 		ITransaction* transaction = getGlobalTransaction();
@@ -1214,8 +1329,10 @@ namespace vtx::mdl
 			if (imageType == "Rgb")
 			{
 				canvas = imageApi->convert(canvas.get(), "Rgba"); // Append an alpha channel with 0xFF.
+				format = CU_AD_FORMAT_UNSIGNED_INT8;
+				pixelBytesSize = sizeof(Uint8);
 			}
-			if (imageType == "Rgba")
+			else if (imageType == "Rgba")
 			{
 				format = CU_AD_FORMAT_UNSIGNED_INT8;
 				pixelBytesSize = sizeof(Uint8);
@@ -1241,9 +1358,9 @@ namespace vtx::mdl
 			dimension.x = canvas->get_resolution_x();
 			dimension.y = canvas->get_resolution_y();
 			// Copy image data to GPU array depending on texture shape
-			if (shape == mi::neuraylib::ITarget_code::Texture_shape_cube ||
-				shape == mi::neuraylib::ITarget_code::Texture_shape_3d ||
-				shape == mi::neuraylib::ITarget_code::Texture_shape_bsdf_data)
+			if (shape == ITarget_code::Texture_shape_cube ||
+				shape == ITarget_code::Texture_shape_3d ||
+				shape == ITarget_code::Texture_shape_bsdf_data)
 			{
 				dimension.z = canvas->get_layers_size();
 				// Cubemap and 3D texture objects require 3D CUDA arrays.
@@ -1331,78 +1448,6 @@ namespace vtx::mdl
 		}
 		transaction->commit();
 		return data;
-	}
-
-	// Utility function to dump the arguments of a material instance or function call.
-	template <class T>
-	void dumpInstance(IExpression_factory* expression_factory, const T* instance)
-	{
-		std::stringstream s;
-		s << "Dumping material/function instance \"" << instance->get_mdl_function_definition() << "\":" << "\n";
-
-		const mi::Size count = instance->get_parameter_count();
-		const Handle<const IExpression_list> arguments(instance->get_arguments());
-
-		for (mi::Size index = 0; index < count; index++) {
-
-			Handle<const IExpression> argument(arguments->get_expression(index));
-			std::string name = instance->get_parameter_name(index);
-			const Handle<const mi::IString> argument_text(expression_factory->dump(argument.get(), name.c_str(), 1));
-			s << "    argument " << argument_text->get_c_str() << "\n";
-
-		}
-		s << "\n";
-		VTX_INFO("{}", s.str());
-	}
-
-	template <class T>
-	std::string dumpDefinition(ITransaction* transaction, IMdl_factory* mdl_factory, const T* definition, Size depth)
-	{
-		std::stringstream ss;
-		Handle<IType_factory> type_factory(mdl_factory->create_type_factory(transaction));
-		Handle<IExpression_factory> expression_factory(mdl_factory->create_expression_factory(transaction));
-
-		mi::Size count = definition->get_parameter_count();
-		Handle<const IType_list> types(definition->get_parameter_types());
-		Handle<const IExpression_list> defaults(definition->get_defaults());
-
-		for (mi::Size index = 0; index < count; index++) {
-
-			Handle<const IType> type(types->get_type(index));
-			Handle<const mi::IString> type_text(type_factory->dump(type.get(), depth + 1));
-			std::string name = definition->get_parameter_name(index);
-			ss << "    parameter " << type_text->get_c_str() << " " << name;
-
-			Handle<const IExpression> default_(defaults->get_expression(name.c_str()));
-			if (default_.is_valid_interface()) {
-				Handle<const mi::IString> default_text(expression_factory->dump(default_.get(), 0, depth + 1));
-				ss << ", default = " << default_text->get_c_str() << "\n";
-			}
-			else {
-				ss << " (no default)" << "\n";
-			}
-
-		}
-
-		mi::Size temporary_count = definition->get_temporary_count();
-		for (mi::Size i = 0; i < temporary_count; ++i) {
-			Handle<const IExpression> temporary(definition->get_temporary(i));
-			std::stringstream name;
-			name << i;
-			Handle<const mi::IString> result(expression_factory->dump(temporary.get(), name.str().c_str(), 1));
-			ss << "    temporary " << result->get_c_str() << "\n";
-		}
-
-		Handle<const IExpression> body(definition->get_body());
-		Handle<const mi::IString> result(expression_factory->dump(body.get(), 0, 1));
-		if (result)
-			ss << "    body " << result->get_c_str() << "\n";
-		else
-			ss << "    body not available for this function" << "\n";
-
-		ss << "\n";
-
-		return ss.str();
 	}
 
 	void dumpModuleInfo(const IModule* module, IMdl_factory* factory, ITransaction* transaction, bool dumpDefinitions = false) {

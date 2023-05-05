@@ -270,6 +270,7 @@ namespace vtx::mdl
             // If there is no valid scattering BSDF, it's the black bsdf() which ends the path.
             // This is usually happening with arbitrary mesh lights when only specifying emission.
             sampleData.isValid = false;
+            sampleData.data.event_type = mi::neuraylib::BSDF_EVENT_ABSORB;
         }
 
         return sampleData;

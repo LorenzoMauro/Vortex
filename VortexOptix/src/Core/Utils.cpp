@@ -4,17 +4,39 @@
 namespace utl{
 
 	std::string absolutePath(const std::string& relative_path) {
-		std::filesystem::path path = relative_path;
-		std::filesystem::path absPath = std::filesystem::absolute(path);
+		const std::filesystem::path path    = relative_path;
+		const std::filesystem::path absPath = std::filesystem::absolute(path);
 		return absPath.string();
+	}
+
+	std::string getFolder(const std::string& path)
+	{
+		std::string folder = absolutePath(path);
+		const std::filesystem::path p(path);
+		folder = p.parent_path().string();
+		return folder;
+	}
+
+	std::string getFile(const std::string& path)
+	{
+		std::string fileName = absolutePath(path);
+		// Remove the path
+		const std::filesystem::path p(path);
+		fileName = p.filename().string();
+
+		std::string result = fileName;
+
+		if (!result.empty() && (result.back() == '/' || result.back() == '\\'))
+		{
+			result.pop_back();
+		}
+
+		return result;
 	}
 
 	std::string getFileName(const std::string& path)
 	{
-		std::string fileName = absolutePath(path);
-		// Remove the path
-		std::filesystem::path p(path);
-		fileName = p.filename().string();
+		std::string fileName = getFile(path);
 
 		// Remove the file extension
 		const std::size_t last_dot = fileName.find_last_of('.');

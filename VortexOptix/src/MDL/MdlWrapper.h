@@ -12,6 +12,7 @@
 
 namespace vtx::mdl
 {
+	bool logMessage(mi::neuraylib::IMdl_execution_context* context);
 
 	class MdlLogger : public mi::base::Interface_implement<mi::base::ILogger> {
 	public:
@@ -119,6 +120,9 @@ namespace vtx::mdl
 
 	std::shared_ptr<graph::Texture> createTextureFromFile(const std::string& filePath);
 
+	std::string removeMdlPrefix(const std::string& name);
+
+	std::string createTextureExpression(const std::string & filePath);
 	/*Analyze mdl to prepare cuda descriptors for texture*/
 	void fetchTextureData(const std::shared_ptr<graph::Texture>& textureNode);
 
@@ -127,6 +131,85 @@ namespace vtx::mdl
 
 	/*fetch data to create light profile sampling*/
 	graph::LightProfile::LightProfileData fetchLightProfileData(const std::string& lightDbName);
+
+	// Utility function to dump the arguments of a material instance or function call.
+	template <class T>
+	void dumpInstance(mi::neuraylib::IExpression_factory* expression_factory, const T* instance, std::string name)
+	{
+		using namespace mi::neuraylib;
+		using namespace mi::base;
+		using namespace mi;
+		std::stringstream s;
+		s << "Dumping material/function instance \""<<name<<" " << instance->get_mdl_function_definition() << "\":" << "\n";
+
+		const Size                           count = instance->get_parameter_count();
+		const Handle<const IExpression_list> arguments(instance->get_arguments());
+
+		for (Size index = 0; index < count; index++) {
+
+			Handle<const IExpression>   argument(arguments->get_expression(index));
+			std::string                 name = instance->get_parameter_name(index);
+			const Handle<const IString> argument_text(expression_factory->dump(argument.get(), name.c_str(), 1));
+			s << "    argument " << argument_text->get_c_str() << "\n";
+
+		}
+		s << "\n";
+		VTX_INFO("{}", s.str());
+	}
+
+	template <class T>
+	std::string dumpDefinition(mi::neuraylib::ITransaction* transaction, mi::neuraylib::IMdl_factory* mdl_factory, const T* definition, mi::Size depth)
+	{
+		using namespace mi::neuraylib;
+		using namespace mi::base;
+		using namespace mi;
+		std::stringstream ss;
+		Handle<IType_factory> type_factory(mdl_factory->create_type_factory(transaction));
+		Handle<IExpression_factory> expression_factory(mdl_factory->create_expression_factory(transaction));
+
+		Size                           count = definition->get_parameter_count();
+		Handle<const IType_list>       types(definition->get_parameter_types());
+		Handle<const IExpression_list> defaults(definition->get_defaults());
+
+		for (Size index = 0; index < count; index++) {
+
+			Handle<const IType>   type(types->get_type(index));
+			Handle<const IString> type_text(type_factory->dump(type.get(), depth + 1));
+			std::string           name = definition->get_parameter_name(index);
+			ss << "    parameter " << type_text->get_c_str() << " " << name;
+
+			Handle<const IExpression> default_(defaults->get_expression(name.c_str()));
+			if (default_.is_valid_interface()) {
+				Handle<const IString> default_text(expression_factory->dump(default_.get(), 0, depth + 1));
+				ss << ", default = " << default_text->get_c_str() << "\n";
+			}
+			else {
+				ss << " (no default)" << "\n";
+			}
+
+		}
+
+		Size temporary_count = definition->get_temporary_count();
+		for (Size i = 0; i < temporary_count; ++i) {
+			Handle<const IExpression> temporary(definition->get_temporary(i));
+			std::stringstream name;
+			name << i;
+			Handle<const IString> result(expression_factory->dump(temporary.get(), name.str().c_str(), 1));
+			ss << "    temporary " << result->get_c_str() << "\n";
+		}
+
+		Handle<const IExpression> body(definition->get_body());
+		Handle<const IString>     result(expression_factory->dump(body.get(), 0, 1));
+		if (result)
+			ss << "    body " << result->get_c_str() << "\n";
+		else
+			ss << "    body not available for this function" << "\n";
+
+		ss << "\n";
+
+		return ss.str();
+	}
+
 
 }
 

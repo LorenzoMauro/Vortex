@@ -17,4 +17,8 @@ namespace utl{
 	bool saveString(const std::string& filename, const std::string& text);
 
 	std::string getDateTime();
+
+	std::string getFolder(const std::string& path);
+
+	std::string         getFile(const std::string& path);
 }
