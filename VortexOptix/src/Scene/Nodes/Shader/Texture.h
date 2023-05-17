@@ -1,7 +1,7 @@
 ﻿#pragma once
 #include "Scene/Node.h"
 #include <mi/mdl_sdk.h>
-
+#include "Core/Math.h"
 #include "Device/UploadCode/CUDABuffer.h"
 
 namespace vtx::graph
@@ -44,7 +44,7 @@ namespace vtx::graph
 
 		void traverse(const std::vector<std::shared_ptr<NodeVisitor>>& orderedVisitors) override;
 
-		void accept(std::shared_ptr<NodeVisitor> visitor) override;
+		//void accept(std::shared_ptr<NodeVisitor> visitor) override;
 
 	public:
 		std::string										filePath; // In case the image is loaded from a file

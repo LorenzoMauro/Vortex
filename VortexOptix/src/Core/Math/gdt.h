@@ -35,17 +35,17 @@
 #endif
 #include <stdexcept>
 
-#ifdef _WIN32
-    #ifndef WIN32_LEAN_AND_MEAN
-        #define WIN32_LEAN_AND_MEAN
-    #endif
-    #include <Windows.h>
-    #ifdef min
-        #undef min
-    #endif
-    #ifdef max
-        #undef max
-    #endif
+#if defined(_WIN32)
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+//#include <Windows.h>
+#ifdef min
+#undef min
+#endif
+#ifdef max
+#undef max
+#endif
 #endif
 
 
@@ -215,16 +215,16 @@ namespace gdt {
     return buf;
   }
   
-  inline double getCurrentTime()
-  {
-#ifdef _WIN32
-    SYSTEMTIME tp; GetSystemTime(&tp);
-    return double(tp.wSecond) + double(tp.wMilliseconds) / 1E3;
-#else
-    struct timeval tp; gettimeofday(&tp,nullptr);
-    return double(tp.tv_sec) + double(tp.tv_usec)/1E6;
-#endif
-  }
+//  inline double getCurrentTime()
+//  {
+//#ifdef _WIN32
+//    SYSTEMTIME tp; GetSystemTime(&tp);
+//    return double(tp.wSecond) + double(tp.wMilliseconds) / 1E3;
+//#else
+//    struct timeval tp; gettimeofday(&tp,nullptr);
+//    return double(tp.tv_sec) + double(tp.tv_usec)/1E6;
+//#endif
+//  }
 
   inline bool hasSuffix(const std::string &s, const std::string &suffix)
   {

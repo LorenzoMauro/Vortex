@@ -1,8 +1,8 @@
 #pragma once
 #ifndef H_MATH
 #define H_MATH
-#include "math/vec.h"
-#include "math/AffineSpace.h"
+#include "Math/vec.h"
+#include "Math/AffineSpace.h"
 #include <tuple>
 #include <cuda_runtime.h>
 
@@ -28,6 +28,8 @@ namespace vtx::math
 	{
 		return a < b ? a : b;
 	}
+
+
 	
 
 	using OneTy = gdt::OneTy;
@@ -116,6 +118,12 @@ namespace vtx::math
 
 	/// NB : AffineSpace to float[12] assignment performed added in gdt/AffineSpace.h
 
+
+	struct rowLinearSpace
+	{
+		float4 l[3];
+	};
+
 #define Scalar_t typename T::vector_t::scalar_t
 
 	template<typename T>
@@ -123,21 +131,34 @@ namespace vtx::math
 
 		using gdt::AffineSpaceT<T>::AffineSpaceT; // Inherit all constructors
 
-		/* Assign values to a transform matrix expressed as float[12] with a conversion operator*/
-		inline __both__  operator Scalar_t* () const {
-			auto* m = (Scalar_t*)alloca(12 * sizeof(Scalar_t));
-			m[0] = (Scalar_t)l.vx.x; m[1] = (Scalar_t)l.vy.x; m[2] = (Scalar_t)l.vz.x; m[3] = (Scalar_t)p.x;
-			m[4] = (Scalar_t)l.vx.y; m[5] = (Scalar_t)l.vy.y; m[6] = (Scalar_t)l.vz.y; m[7] = (Scalar_t)p.y;
-			m[8] = (Scalar_t)l.vx.z; m[9] = (Scalar_t)l.vy.z; m[10] = (Scalar_t)l.vz.z; m[11] = (Scalar_t)p.z;
-			return m;
+		///* Assign values to a transform matrix expressed as float[12] with a conversion operator*/
+		//inline __both__  operator Scalar_t* () const {
+		//	auto* m = (Scalar_t*)alloca(12 * sizeof(Scalar_t));
+		//	m[0] = (Scalar_t)l.vx.x; m[1] = (Scalar_t)l.vy.x; m[2] = (Scalar_t)l.vz.x; m[3] = (Scalar_t)p.x;
+		//	m[4] = (Scalar_t)l.vx.y; m[5] = (Scalar_t)l.vy.y; m[6] = (Scalar_t)l.vz.y; m[7] = (Scalar_t)p.y;
+		//	m[8] = (Scalar_t)l.vx.z; m[9] = (Scalar_t)l.vy.z; m[10] = (Scalar_t)l.vz.z; m[11] = (Scalar_t)p.z;
+		//	return m;
+		//}
+
+		//inline __both__ operator float4* () const {
+		//	auto* m = (float4*)alloca(3 * sizeof(float4));
+		//	m[0].x = (float)l.vx.x; m[0].y = (float)l.vx.y; m[0].z = (float)l.vx.z; m[0].w = 0.0f;
+		//	m[1].x = (float)l.vy.x; m[1].y = (float)l.vy.y; m[1].z = (float)l.vy.z; m[1].w = 0.0f;
+		//	m[2].x = (float)l.vz.x; m[2].y = (float)l.vz.y; m[2].z = (float)l.vz.z; m[2].w = 0.0f;
+		//	return m;
+		//}
+
+		inline __host__ __device__ void toFloat(float* out) const
+		{
+			out[0] = (float)l.vx.x; out[1] = (float)l.vy.x; out[2] = (float)l.vz.x; out[3] = (float)p.x;
+			out[4] = (float)l.vx.y; out[5] = (float)l.vy.y; out[6] = (float)l.vz.y; out[7] = (float)p.y;
+			out[8] = (float)l.vx.z; out[9] = (float)l.vy.z; out[10] = (float)l.vz.z; out[11] = (float)p.z;
 		}
 
-		inline __both__ operator float4* () const {
-			auto* m = (float4*)alloca(3 * sizeof(float4));
-			m[0].x = (float)l.vx.x; m[0].y = (float)l.vx.y; m[0].z = (float)l.vx.z; m[0].w = 0.0f;
-			m[1].x = (float)l.vy.x; m[1].y = (float)l.vy.y; m[1].z = (float)l.vy.z; m[1].w = 0.0f;
-			m[2].x = (float)l.vz.x; m[2].y = (float)l.vz.y; m[2].z = (float)l.vz.z; m[2].w = 0.0f;
-			return m;
+		inline __host__ __device__ void toFloat4(float4* out) const {
+			out[0].x = (float)l.vx.x; out[0].y = (float)l.vx.y; out[0].z = (float)l.vx.z; out[0].w = 0.0f;
+			out[1].x = (float)l.vy.x; out[1].y = (float)l.vy.y; out[1].z = (float)l.vy.z; out[1].w = 0.0f;
+			out[2].x = (float)l.vz.x; out[2].y = (float)l.vz.y; out[2].z = (float)l.vz.z; out[2].w = 0.0f;
 		}
 
 		//Constructor from Scalar_t[12] array in row major order

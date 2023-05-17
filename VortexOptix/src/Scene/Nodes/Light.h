@@ -81,7 +81,7 @@ namespace vtx::graph
 
 		void init() override
 		{
-			if(material->shader->isEmissive())
+			if(material->shader->useEmission())
 			{
 				computeAreaCdf();
 				isValid = (cdfAreas.size() > 1);
@@ -185,7 +185,7 @@ namespace vtx::graph
 
 		void traverse(const std::vector<std::shared_ptr<NodeVisitor>>& orderedVisitors) override;
 
-		void accept(std::shared_ptr<NodeVisitor> visitor) override;
+		//void accept(std::shared_ptr<NodeVisitor> visitor) override;
 
 	public:
 		std::shared_ptr<LightAttributes> attributes;

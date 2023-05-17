@@ -1,4 +1,6 @@
 #pragma once
+#include <string>
+
 #include "GLFW/glfw3.h"
 
 
@@ -12,4 +14,6 @@ namespace vtx {
 	void ImGuiRenderStart();
 
 	void ImGuiDraw(GLFWwindow* window);
+
+	std::string labelPrefix(const char* const label);
 }

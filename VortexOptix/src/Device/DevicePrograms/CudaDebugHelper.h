@@ -1,7 +1,8 @@
 ﻿#pragma once
 #ifndef CUDADEBUGHELPER_H
 #define CUDADEBUGHELPER_H
-#ifdef __CUDACC__
+
+#if defined(__CUDACC__) || defined(__CUDA__)
 	#ifdef PRINT_ALL
 		#define CUDA_DEBUG_PRINT(message, ...) printf(message, __VA_ARGS__)
 	#else
@@ -11,7 +12,7 @@
 	#define CUDA_ERROR_PRINT(message, ...) \
 		printf("Error in line %d, file %s, function %s.\n", __LINE__, __FILE__, __FUNCTION__);\
 		printf(message, __VA_ARGS__);\
-		assert(false);
+		//assert(0);
 
 
 #else

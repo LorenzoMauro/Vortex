@@ -1,6 +1,6 @@
 ﻿#pragma once
 #include <mi/base/types.h>
-
+#include "Core/Math.h"
 #include "Scene/Node.h"
 
 namespace vtx::graph
@@ -33,7 +33,7 @@ namespace vtx::graph
 
 		void traverse(const std::vector<std::shared_ptr<NodeVisitor>>& orderedVisitors) override;
 
-		void accept(std::shared_ptr<NodeVisitor> visitor) override;
+		//void accept(std::shared_ptr<NodeVisitor> visitor) override;
 
 		void prepareSampling(BsdfPartData bsdfData);
 

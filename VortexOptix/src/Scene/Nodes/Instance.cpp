@@ -28,13 +28,13 @@ namespace vtx::graph
 				materialSlot.meshLight->traverse(orderedVisitors);
 			}
 		}
-		ACCEPT(orderedVisitors);
+		ACCEPT(Instance,orderedVisitors);
 	}
 
-	void Instance::accept(std::shared_ptr<NodeVisitor> visitor)
+	/*void Instance::accept(std::shared_ptr<NodeVisitor> visitor)
 	{
 		visitor->visit(sharedFromBase<Instance>());
-	}
+	}*/
 
 	std::shared_ptr<Node> Instance::getChild() {
 		return child;
@@ -71,30 +71,41 @@ namespace vtx::graph
 		transform = _transform;
 	}
 
-	void Instance::addMaterial(const std::shared_ptr<Material>& _material) {
-		materialSlots.emplace_back();
+	void Instance::addMaterial(const std::shared_ptr<Material>& _material, const int slot) {
 
-		MaterialSlot& newSlot             = materialSlots.back();
-		newSlot.material                  = _material;
-		newSlot.meshLight                 = std::make_shared<graph::Light>();
-		newSlot.isMeshLightEvaluated      = false;
-		const auto attributes             = std::make_shared<graph::MeshLightAttributes>();
-		attributes->material              = newSlot.material;
-		attributes->materialRelativeIndex = materialSlots.size()-1;
+		MaterialSlot* matSlot;
+		if(slot <= materialSlots.size()-1 && slot!= -1)
+		{
+			const vtxID matId = materialSlots[slot].material->getID();
+			removeMaterial(matId);
+			matSlot = &materialSlots[slot];
+		}
+		else
+		{
+			materialSlots.emplace_back();
+			matSlot = &materialSlots.back();
+		}
+
+		matSlot->material = _material;
+		matSlot->meshLight = ops::createNode<graph::Light>();
+		matSlot->isMeshLightEvaluated = false;
+		const auto attributes = std::make_shared<graph::MeshLightAttributes>();
+		attributes->material = matSlot->material;
+		attributes->materialRelativeIndex = materialSlots.size() - 1;
 		attributes->parentInstanceId = getID();
 
-		SIM::record(newSlot.meshLight);
+		SIM::record(matSlot->meshLight);
 
-		if(childIsMesh)
+		if (childIsMesh)
 		{
 			attributes->mesh = std::dynamic_pointer_cast<graph::Mesh>(getChild());
 		}
-		newSlot.meshLight->attributes = attributes;
+		matSlot->meshLight->attributes = attributes;
 	} 
 
-	void Instance::removeMaterial(vtxID matID) {
+	void Instance::removeMaterial(const vtxID matID) {
 
-		clearMeshLight(matID);
+		//clearMeshLight(matID);
 
 		for (auto& [slotIndex, material, meshLight, isMeshLightEvaluated] : materialSlots)
 		{

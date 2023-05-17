@@ -1,6 +1,7 @@
 #include "ViewportLayer.h"
 #include "imgui.h"
-#include "Gui Elements/RendererNodeGui.h"
+#include "GuiElements/RendererNodeGui.h"
+#include "GuiElements/MaterialNodeGui.h"
 
 namespace vtx {
 	ViewportLayer::ViewportLayer(std::shared_ptr<graph::Renderer> _Renderer)
@@ -8,6 +9,7 @@ namespace vtx {
         renderer = _Renderer;
         deviceVisitor = std::make_shared<device::DeviceVisitor>();
         hostVisitor = std::make_shared<HostVisitor>();
+        materialGui = gui::MaterialGui();
     }
 
     void ViewportLayer::OnAttach()
@@ -43,7 +45,7 @@ namespace vtx {
     void ViewportLayer::OnUIRender() {
 
 		gui::rendererNodeGui(renderer);
-
+        materialGui.materialGui();
         ImGui::Begin("Viewport");
         const uint32_t width = ImGui::GetContentRegionAvail().x;
         const uint32_t height = ImGui::GetContentRegionAvail().y;

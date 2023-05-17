@@ -11,20 +11,9 @@ void vtx::shutDownOperations()
 {
 	// Wait for all rendering threads to finish
 	VTX_INFO("ShutDown: Waiting For Render Threads");
-	const std::vector<std::shared_ptr<graph::Node>> nodes = graph::SIM::getAllNodeOfType(graph::NT_RENDERER);
-	std::vector<std::shared_ptr<graph::Renderer>> rendererNodes;
+	const std::vector<std::shared_ptr<graph::Renderer>> rendererNodes = graph::SIM::getAllNodeOfType<graph::Renderer>(graph::NT_RENDERER);
 
 	bool renderingConcluded = true;
-	for (const std::shared_ptr<graph::Renderer>& node : rendererNodes)
-	{
-		auto renderer = std::dynamic_pointer_cast<graph::Renderer>(node);
-		rendererNodes.push_back(renderer);
-
-		if (!renderer->isReady())
-		{
-			renderingConcluded = false;
-		}
-	}
 
 	while(renderingConcluded!=true)
 	{

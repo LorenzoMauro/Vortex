@@ -1,17 +1,13 @@
 #pragma once
 #include "Core/VortexID.h"
-#include "Core/math.h"
 #include <vector>
 #include <memory>
-#include <map>
 
-
-
-#define ACCEPT(visitors) \
+#define ACCEPT(derived, visitors) \
 		for (const std::shared_ptr<vtx::NodeVisitor> visitor : orderedVisitors)\
 		{\
-			accept(visitor);\
-		};
+			visitor->visit(sharedFromBase<derived>()); \
+		};\
 
 namespace vtx
 {
@@ -40,6 +36,13 @@ namespace vtx::graph
 		NT_MDL_BSDF,
 		NT_MDL_LIGHTPROFILE,
 
+		NT_SHADER_TEXTURE,
+		NT_SHADER_DIFFUSE_REFLECTION,
+		NT_SHADER_MATERIAL,
+		NT_SHADER_SURFACE,
+		NT_SHADER_IMPORTED,
+
+
 		NT_NUM_NODE_TYPES,
 	};
         
@@ -56,12 +59,12 @@ namespace vtx::graph
 
 		virtual void traverse(const std::vector<std::shared_ptr<NodeVisitor>>& orderedVisitors) = 0;
 
-		virtual void accept(std::shared_ptr<NodeVisitor> visitor) = 0;
+		//virtual void accept(std::shared_ptr<NodeVisitor> visitor) = 0;
 
 		void          updateMaterialSlots(int removedSlot);
 
 	public:
-		bool isUpdated;
+		bool isUpdated = true;
 	protected:
 		template <class Derived>
 		std::shared_ptr<Derived> sharedFromBase()
@@ -73,4 +76,28 @@ namespace vtx::graph
 		NodeType type;
 		vtxID id;
 	};
+
+	namespace shader {
+		class TextureFile;
+		class TextureReturn;
+		class ShaderNode;
+		class Material;
+		class DiffuseReflection;
+		class MaterialSurface;
+		class ImportedNode;
+	}
+
+	class Light;
+	class Node;
+	class Transform;
+	class Instance;
+	class Group;
+	class Mesh;
+	class Material;
+	class Camera;
+	class Renderer;
+	class Shader;
+	class Texture;
+	class BsdfMeasurement;
+	class LightProfile;
 }

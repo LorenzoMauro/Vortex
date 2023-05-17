@@ -2,7 +2,7 @@
 #define OPTIXCODE
 #endif
 
-#include "LaunchParams.h"
+#include "../LaunchParams.h"
 #include "Core/Math.h"
 
 

@@ -78,131 +78,131 @@ namespace vtx::graph
 		auto module = std::make_shared<optix::ModuleOptix>();
 		module->name = name;
 		module->code = targetCode->get_code();
-
-		const auto fNames = graph::Shader::FunctionNames(std::to_string(getID()));
-
-		devicePrograms.pgInit = optix::createDcProgram(module, fNames.init);
-
-		if (!config.isThinWalledConstant)
+		if(getOptions()->directCallable)
 		{
-			devicePrograms.pgThinWalled = optix::createDcProgram(module, (fNames.thinWalled));
-		}
+			const auto fNames = graph::Shader::FunctionNames(std::to_string(getID()));
 
-		if (config.isSurfaceBsdfValid)
-		{
-			devicePrograms.pgSurfaceScatteringSample = optix::createDcProgram(module, fNames.surfaceScattering + "_sample");
-			devicePrograms.pgSurfaceScatteringEval = optix::createDcProgram(module, fNames.surfaceScattering + "_evaluate");
-			devicePrograms.pgSurfaceScatteringAuxiliary = optix::createDcProgram(module, fNames.surfaceScattering + "_auxiliary");
-		}
+			devicePrograms.pgInit = optix::createDcProgram(module, fNames.init);
 
-		if (config.isBackfaceBsdfValid)
-		{
-			devicePrograms.pgBackfaceScatteringSample = optix::createDcProgram(module, fNames.backfaceScattering + "_sample");
-			devicePrograms.pgBackfaceScatteringEval = optix::createDcProgram(module, fNames.backfaceScattering + "_evaluate");
-			devicePrograms.pgBackfaceScatteringAuxiliary = optix::createDcProgram(module, fNames.backfaceScattering + "_auxiliary");
-		}
-
-		if (config.isSurfaceEdfValid)
-		{
-			devicePrograms.pgSurfaceEmissionEval = optix::createDcProgram(module, fNames.surfaceEmissionEmission + "_evaluate");
-
-			if (!config.isSurfaceIntensityConstant)
+			if (!config.isThinWalledConstant)
 			{
-				devicePrograms.pgSurfaceEmissionIntensity = optix::createDcProgram(module, fNames.surfaceEmissionIntensity);
+				devicePrograms.pgThinWalled = optix::createDcProgram(module, (fNames.thinWalled));
 			}
 
-			if (!config.isSurfaceIntensityModeConstant)
+			if (config.isSurfaceBsdfValid)
 			{
-				devicePrograms.pgSurfaceEmissionIntensityMode = optix::createDcProgram(module, fNames.surfaceEmissionMode);
-			}
-		}
-
-		if (config.isBackfaceEdfValid)
-		{
-			if (config.useBackfaceEdf)
-			{
-				devicePrograms.pgBackfaceEmissionEval = optix::createDcProgram(module, fNames.backfaceEmissionEmission + "_evaluate");
-			}
-			else // Surface and backface expressions were identical. Reuse the code of the surface expression.
-			{
-				devicePrograms.pgBackfaceEmissionEval = devicePrograms.pgSurfaceEmissionEval;
+				devicePrograms.pgSurfaceScatteringSample = optix::createDcProgram(module, fNames.surfaceScattering + "_sample");
+				devicePrograms.pgSurfaceScatteringEval = optix::createDcProgram(module, fNames.surfaceScattering + "_evaluate");
+				devicePrograms.pgSurfaceScatteringAuxiliary = optix::createDcProgram(module, fNames.surfaceScattering + "_auxiliary");
 			}
 
-			if (config.useBackfaceIntensity)
+			if (config.isBackfaceBsdfValid)
 			{
-				if (!config.isBackfaceIntensityConstant)
+				devicePrograms.pgBackfaceScatteringSample = optix::createDcProgram(module, fNames.backfaceScattering + "_sample");
+				devicePrograms.pgBackfaceScatteringEval = optix::createDcProgram(module, fNames.backfaceScattering + "_evaluate");
+				devicePrograms.pgBackfaceScatteringAuxiliary = optix::createDcProgram(module, fNames.backfaceScattering + "_auxiliary");
+			}
+
+			if (config.isSurfaceEdfValid)
+			{
+				devicePrograms.pgSurfaceEmissionEval = optix::createDcProgram(module, fNames.surfaceEmissionEmission + "_evaluate");
+
+				if (!config.isSurfaceIntensityConstant)
 				{
-					devicePrograms.pgBackfaceEmissionIntensity = optix::createDcProgram(module, fNames.backfaceEmissionIntensity);
+					devicePrograms.pgSurfaceEmissionIntensity = optix::createDcProgram(module, fNames.surfaceEmissionIntensity);
+				}
+
+				if (!config.isSurfaceIntensityModeConstant)
+				{
+					devicePrograms.pgSurfaceEmissionIntensityMode = optix::createDcProgram(module, fNames.surfaceEmissionMode);
 				}
 			}
-			else // Surface and backface expressions were identical. Reuse the code of the surface expression.
-			{
-				devicePrograms.pgBackfaceEmissionIntensity = devicePrograms.pgSurfaceEmissionIntensity;
-			}
 
-			if (config.useBackfaceIntensityMode)
+			if (config.isBackfaceEdfValid)
 			{
-				if (!config.isBackfaceIntensityModeConstant)
+				if (config.useBackfaceEdf)
 				{
-					devicePrograms.pgBackfaceEmissionIntensityMode = optix::createDcProgram(module, fNames.backfaceEmissionMode);
+					devicePrograms.pgBackfaceEmissionEval = optix::createDcProgram(module, fNames.backfaceEmissionEmission + "_evaluate");
+				}
+				else // Surface and backface expressions were identical. Reuse the code of the surface expression.
+				{
+					devicePrograms.pgBackfaceEmissionEval = devicePrograms.pgSurfaceEmissionEval;
+				}
+
+				if (config.useBackfaceIntensity)
+				{
+					if (!config.isBackfaceIntensityConstant)
+					{
+						devicePrograms.pgBackfaceEmissionIntensity = optix::createDcProgram(module, fNames.backfaceEmissionIntensity);
+					}
+				}
+				else // Surface and backface expressions were identical. Reuse the code of the surface expression.
+				{
+					devicePrograms.pgBackfaceEmissionIntensity = devicePrograms.pgSurfaceEmissionIntensity;
+				}
+
+				if (config.useBackfaceIntensityMode)
+				{
+					if (!config.isBackfaceIntensityModeConstant)
+					{
+						devicePrograms.pgBackfaceEmissionIntensityMode = optix::createDcProgram(module, fNames.backfaceEmissionMode);
+					}
+				}
+				else // Surface and backface expressions were identical. Reuse the code of the surface expression.
+				{
+					devicePrograms.pgBackfaceEmissionIntensityMode = devicePrograms.pgSurfaceEmissionIntensityMode;
 				}
 			}
-			else // Surface and backface expressions were identical. Reuse the code of the surface expression.
+
+			if (!config.isIorConstant)
 			{
-				devicePrograms.pgBackfaceEmissionIntensityMode = devicePrograms.pgSurfaceEmissionIntensityMode;
-			}
-		}
-
-		if (config.isEmissive)
-		{
-			devicePrograms.isEmissive = true;
-		}
-
-		if (!config.isIorConstant)
-		{
-			devicePrograms.pgIor = optix::createDcProgram(module, fNames.ior);
-		}
-
-		if (!config.isAbsorptionCoefficientConstant)
-		{
-			devicePrograms.pgVolumeAbsorptionCoefficient = optix::createDcProgram(module, fNames.volumeAbsorptionCoefficient);
-		}
-
-		if (config.isVdfValid)
-		{
-			// The MDL SDK doesn't generate code for the volume.scattering expression.
-			// Means volume scattering must be implemented by the renderer and only the parameter expresssions can be generated.
-
-			// The volume scattering coefficient and direction bias are only used when there is a valid VDF. 
-			if (!config.isScatteringCoefficientConstant)
-			{
-				devicePrograms.pgVolumeScatteringCoefficient = optix::createDcProgram(module, fNames.volumeScatteringCoefficient);
+				devicePrograms.pgIor = optix::createDcProgram(module, fNames.ior);
 			}
 
-			if (!config.isDirectionalBiasConstant)
+			if (!config.isAbsorptionCoefficientConstant)
 			{
-				devicePrograms.pgVolumeDirectionalBias = optix::createDcProgram(module, fNames.volumeDirectionalBias);
+				devicePrograms.pgVolumeAbsorptionCoefficient = optix::createDcProgram(module, fNames.volumeAbsorptionCoefficient);
 			}
 
-			// volume.scattering.emission_intensity not implemented.
-		}
-
-		if (config.useCutoutOpacity)
-		{
-			devicePrograms.hasOpacity = true;
-
-			if (!config.isCutoutOpacityConstant)
+			if (config.isVdfValid)
 			{
-				devicePrograms.pgGeometryCutoutOpacity = optix::createDcProgram(module, fNames.geometryCutoutOpacity);
+				// The MDL SDK doesn't generate code for the volume.scattering expression.
+				// Means volume scattering must be implemented by the renderer and only the parameter expresssions can be generated.
+
+				// The volume scattering coefficient and direction bias are only used when there is a valid VDF. 
+				if (!config.isScatteringCoefficientConstant)
+				{
+					devicePrograms.pgVolumeScatteringCoefficient = optix::createDcProgram(module, fNames.volumeScatteringCoefficient);
+				}
+
+				if (!config.isDirectionalBiasConstant)
+				{
+					devicePrograms.pgVolumeDirectionalBias = optix::createDcProgram(module, fNames.volumeDirectionalBias);
+				}
+
+				// volume.scattering.emission_intensity not implemented.
+			}
+
+			if (config.useCutoutOpacity)
+			{
+				//devicePrograms.hasOpacity = true;
+
+				if (!config.isCutoutOpacityConstant)
+				{
+					devicePrograms.pgGeometryCutoutOpacity = optix::createDcProgram(module, fNames.geometryCutoutOpacity);
+				}
+			}
+
+			if (config.isHairBsdfValid)
+			{
+				devicePrograms.pgHairSample = optix::createDcProgram(module, (fNames.hairBsdf + "_sample"));
+				devicePrograms.pgHairEval = optix::createDcProgram(module, (fNames.hairBsdf + "_evaluate"));
 			}
 		}
-
-		if (config.isHairBsdfValid)
+		else
 		{
-			devicePrograms.pgHairSample = optix::createDcProgram(module, (fNames.hairBsdf + "_sample"));
-			devicePrograms.pgHairEval = optix::createDcProgram(module, (fNames.hairBsdf + "_evaluate"));
+			devicePrograms.pgEvaluateMaterial = optix::createDcProgram(module, "__direct_callable__EvaluateMaterial");
 		}
-
 	}
 
 	const Shader::DevicePrograms& Shader::getPrograms()
@@ -232,13 +232,13 @@ namespace vtx::graph
 		{
 			bsdfMeasurement->traverse(orderedVisitors);
 		}
-		ACCEPT(orderedVisitors);
+		ACCEPT(Shader,orderedVisitors);
 	}
 
-	void Shader::accept(std::shared_ptr<NodeVisitor> visitor)
+	/*void Shader::accept(std::shared_ptr<NodeVisitor> visitor)
 	{
 		visitor->visit(sharedFromBase<Shader>());
-	}
+	}*/
 
 	std::string Shader::getMaterialDbName()
 	{
@@ -249,14 +249,73 @@ namespace vtx::graph
 		return materialDbName;
 	}
 
-	bool Shader::isEmissive()
+	bool Shader::isThinWalled()
+	{
+		if (!config.isThinWalledConstant || (config.isThinWalledConstant && config.isThinWalled)) { 
+			return true;
+		}
+		return false;
+	}
+
+	bool Shader::useEmission()
 	{
 		if(!isInitialized)
 		{
 			init();
 		}
-		return config.isEmissive;
+		bool thinWalled = isThinWalled();
+
+		bool isSurfaceEmissive = false;
+		if (config.isSurfaceEdfValid) {
+			if (!config.isSurfaceIntensityConstant) {
+				isSurfaceEmissive = true;
+			}
+			else if (config.surfaceIntensity != math::vec3f(0.0f)) {
+				isSurfaceEmissive = true;
+			}
+		}
+
+
+		bool isBackfaceEmissive = false;
+		if (config.isBackfaceEdfValid) {
+			if (!config.isBackfaceIntensityConstant) {
+				isBackfaceEmissive = true;
+			}
+			else if (config.backfaceIntensity != math::vec3f(0.0f)) {
+				isBackfaceEmissive = true;
+			}
+		}
+		isBackfaceEmissive = (thinWalled && isBackfaceEmissive);
+		bool isEmissive = isSurfaceEmissive || isBackfaceEmissive;// To be emissive on the backface it needs to be isThinWalled
+
+		if(config.emissivityToggle) //The material has a enable emission option
+		{
+			if(*(config.emissivityToggle))
+			{
+				return isEmissive;
+			}
+			return false;
+		}
+		return isEmissive;
 	}
+
+	bool Shader::useOpacity()
+	{
+		if (!isInitialized)
+		{
+			init();
+		}
+		if (config.opacityToggle) //The material has a enable emission option
+		{
+			if (*(config.opacityToggle))
+			{
+				return config.useCutoutOpacity;
+			}
+			return false;
+		}
+		return config.useCutoutOpacity;
+	};
+
 
 	std::vector<std::shared_ptr<graph::Texture>>  Shader::getTextures()
 	{

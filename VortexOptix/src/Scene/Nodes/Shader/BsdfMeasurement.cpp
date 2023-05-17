@@ -24,13 +24,13 @@ namespace vtx::graph {
 		{
 			init();
 		}
-		ACCEPT(orderedVisitors)
+		ACCEPT(BsdfMeasurement, orderedVisitors)
 	}
 
-	void BsdfMeasurement::accept(std::shared_ptr<NodeVisitor> visitor)
+	/*void BsdfMeasurement::accept(std::shared_ptr<NodeVisitor> visitor)
 	{
 		visitor->visit(sharedFromBase<BsdfMeasurement>());
-	}
+	}*/
 	void BsdfMeasurement::prepareSampling(BsdfPartData bsdfData)
 	{
 		// CDF of the probability to select a certain theta_out for a given theta_in.

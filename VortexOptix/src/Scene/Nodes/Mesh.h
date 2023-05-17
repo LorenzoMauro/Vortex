@@ -8,6 +8,8 @@ namespace vtx::graph
 	struct MeshStatus
 	{
 		bool hasTangents = false;
+		bool hasNormals = false;
+		bool hasFaceAttributes = false;
 	};
 
 	class Mesh : public Node {
@@ -16,7 +18,7 @@ namespace vtx::graph
 
 		void traverse(const std::vector<std::shared_ptr<NodeVisitor>>& orderedVisitors) override;
 
-		void accept(std::shared_ptr<NodeVisitor> visitor) override;
+		//void accept(std::shared_ptr<NodeVisitor> visitor) override;
 
 	public:
 		std::vector<VertexAttributes> vertices;

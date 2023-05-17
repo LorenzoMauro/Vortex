@@ -5,6 +5,8 @@ bin-int/
 .vs/
 ext/MDL/
 old/
+VortexOptix/x64/
+nsightProfile/
 
 # Ignore object files and libraries
 *.o
@@ -32,5 +34,3 @@ VortexOptix/Vortex.lua
 
 data/*.*
 data/*
-
-nsightProfile/

@@ -88,11 +88,11 @@ namespace vtx::graph
 	}
 	void Transform::traverse(const std::vector<std::shared_ptr<NodeVisitor>>& orderedVisitors)
 	{
-		ACCEPT(visitors)
+		ACCEPT(Transform,visitors)
 	}
-	void Transform::accept(const std::shared_ptr<NodeVisitor> visitor)
+	/*void Transform::accept(const std::shared_ptr<NodeVisitor> visitor)
 	{
 		visitor->visit(sharedFromBase<Transform>());
-	}
+	}*/
 }
 

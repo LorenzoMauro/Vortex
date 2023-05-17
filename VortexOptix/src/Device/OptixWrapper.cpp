@@ -82,7 +82,7 @@ namespace vtx::optix
 
 		OPTIX_CHECK(optixDeviceContextCreate(state.cudaContext, nullptr, &state.optixContext));
 		OPTIX_CHECK(optixDeviceContextSetLogCallback(state.optixContext, context_log_cb, nullptr, 4));
-		if(getOptions()->isDebug && !(getOptions()->enableCache))
+		if((getOptions()->isDebug && !(getOptions()->enableCache)) || !getOptions()->enableCache)
 		{
 			OPTIX_CHECK(optixDeviceContextSetCacheEnabled(state.optixContext, 0));
 		}
@@ -626,8 +626,9 @@ namespace vtx::optix
 
 		OptixInstance optixInstance = {};
 
-		float* matrix = transform;
-		memcpy(optixInstance.transform, (float*)transform, sizeof(float) * 12);
+		float matrix[12];
+		transform.toFloat(matrix);
+		memcpy(optixInstance.transform, matrix, sizeof(float) * 12);
 
 		//++m_SequentialInstanceID;
 		//OptixInstance.instanceId = m_SequentialInstanceID; // User defined instance index, queried with optixGetInstanceId().

@@ -8,7 +8,7 @@
 
 namespace utl{
 
-	std::string absolutePath(const std::string& relative_path);
+	std::string absolutePath(const std::string& relativePath, const std::string& folderPath = "");
 
 	std::string getFileName(const std::string& path);
 

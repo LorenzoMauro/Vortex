@@ -14,13 +14,13 @@ namespace vtx::graph {
 		{
 			init();
 		}
-		ACCEPT(orderedVisitors);
+		ACCEPT(LightProfile, orderedVisitors);
 	}
 
-	void LightProfile::accept(std::shared_ptr<NodeVisitor> visitor)
+	/*void LightProfile::accept(std::shared_ptr<NodeVisitor> visitor)
 	{
 		visitor->visit(sharedFromBase<LightProfile>());
-	}
+	}*/
 	void LightProfile::prepareSampling()
 	{
 		const math::vec2ui& res		= lightProfileData.resolution;

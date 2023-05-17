@@ -10,8 +10,20 @@
 #include "Scene/Nodes/Shader/Shader.h"
 #include "Scene/Nodes/Material.h"
 
+namespace vtx
+{
+	namespace graph
+	{
+		namespace shader
+		{
+			struct ShaderNodeSocket;
+		}
+	}
+}
+
 namespace vtx::mdl
 {
+	
 	bool logMessage(mi::neuraylib::IMdl_execution_context* context);
 
 	class MdlLogger : public mi::base::Interface_implement<mi::base::ILogger> {
@@ -63,7 +75,45 @@ namespace vtx::mdl
 		}
 	};
 
-	struct State {
+	struct TransactionInterfaces
+	{
+
+		mi::base::Handle<mi::neuraylib::ITransaction>           transaction;
+		mi::base::Handle<mi::neuraylib::IValue_factory>         valueFactory;
+		mi::base::Handle<mi::neuraylib::IType_factory>          typeFactory;
+		mi::base::Handle<mi::neuraylib::IExpression_factory>    expressionFactory;
+	};
+
+	struct ModuleCreationParameters
+	{
+		void reset();
+
+		std::string                                   moduleName;
+		std::string                                   functionName;
+		mi::base::Handle <mi::neuraylib::IExpression> body;
+
+		mi::base::Handle<mi::neuraylib::IType_list>			parameters;
+		int paramCount = 0;
+		int potentialParameterCount = 0;
+		mi::base::Handle<mi::neuraylib::IExpression_list>	defaults;
+		mi::base::Handle<mi::neuraylib::IAnnotation_list>	parameterAnnotations;
+		mi::base::Handle<mi::neuraylib::IAnnotation_block>	annotations;
+		mi::base::Handle<mi::neuraylib::IAnnotation_block>	returnAnnotations;
+
+		
+		
+	};
+
+	struct MdlState {
+
+		TransactionInterfaces* getTransactionInterfaces(const bool openFactories = true)
+		{
+			openTransaction(openFactories);
+			return &tI;
+		}
+
+		void commitTransaction();
+
 		mi::base::Handle<mi::neuraylib::INeuray>                neuray;
 		mi::base::Handle<mi::neuraylib::IMdl_compiler>          compiler;
 		mi::base::Handle<mi::neuraylib::IMdl_configuration>     config;
@@ -71,24 +121,22 @@ namespace vtx::mdl
 		mi::base::Handle<mi::neuraylib::IDatabase>              database;
 		mi::base::Handle<mi::neuraylib::IScope>                 globalScope;
 		mi::base::Handle<mi::neuraylib::IMdl_factory>           factory;
-		mi::base::Handle<mi::neuraylib::IExpression_factory>    expressionFactory;
-		mi::base::Handle<mi::neuraylib::IValue_factory>         valueFactory;
-		mi::base::Handle<mi::neuraylib::IType_factory>          typeFactory;
 		mi::base::Handle<mi::neuraylib::IMdl_execution_context> context;
 		mi::base::Handle<mi::neuraylib::IMdl_backend>           backend;
 		mi::base::Handle<mi::neuraylib::IImage_api>             imageApi;
-		mi::base::Handle<mi::neuraylib::ITransaction>           transaction;
 		mi::base::Handle<mi::neuraylib::IMdl_impexp_api>        impExpApi;
 		std::vector<std::string>                                searchStartupPaths;
 		std::string                                             lastError;
 		mi::Sint32                                              result;
-		State(): result(0)
-		{
-			printf("INITIALIZING STATE MDL!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
-		}
+		ModuleCreationParameters								moduleCreationParameter;
+
+	private:
+		void openTransaction(const bool openFactories);
+		TransactionInterfaces									tI;
 	};
 
-	State* getState();
+	
+	MdlState* getState();
 
 	/*ShutDown the MDL SDK*/
 	void shutDown();
@@ -99,8 +147,7 @@ namespace vtx::mdl
 	/*Add a search path to the MDL SDK*/
 	void addSearchPath(std::string path);
 
-	/*Get the global transaction if it exists, create a new one if it doesn't*/
-	mi::neuraylib::ITransaction* getGlobalTransaction();
+	std::string pathToModuleName(const std::string& materialPath);
 
 	/*Compile a material from a given path*/
 	void compileMaterial(const std::string& path, std::string materialName, std::string* materialDbName=nullptr);
@@ -131,6 +178,41 @@ namespace vtx::mdl
 
 	/*fetch data to create light profile sampling*/
 	graph::LightProfile::LightProfileData fetchLightProfileData(const std::string& lightDbName);
+
+	struct MdlFunctionInfo
+	{
+		std::string                             module;
+		std::string                             name;
+		std::string                             signature;
+		mi::base::Handle<const mi::neuraylib::IType> returnType;
+	};
+
+	struct ParameterInfo
+	{
+		std::string                                        argumentName;
+		std::string                                        actualName;
+		mi::base::Handle<const mi::neuraylib::IType>       type;
+		mi::base::Handle<const mi::neuraylib::IExpression> defaultValue;
+		mi::neuraylib::IType::Kind                         kind;
+		int                                                index;
+	};
+
+	void getFunctionSignature(MdlFunctionInfo* functionInfo);
+
+	std::vector<ParameterInfo> getFunctionParameters(const MdlFunctionInfo& functionInfo, vtxID callingNodeId);
+
+	mi::base::Handle<mi::neuraylib::IExpression> generateFunctionExpression(const std::string& functionSignature, std::map<std::string, graph::shader::ShaderNodeSocket>& sockets);
+
+	void setRendererModule(const std::string& rendererModule, const std::string& visibleFunction);
+
+	std::tuple<std::string, std::string> createNewFunctionInModule(std::shared_ptr<graph::shader::ShaderNode> shaderGraph);
+
+	mi::base::Handle<mi::neuraylib::IExpression> createConstantColor(const math::vec3f& color);
+
+	mi::base::Handle<mi::neuraylib::IExpression> createConstantFloat(const float value);
+
+	mi::base::Handle<mi::neuraylib::IExpression> createTextureConstant(const std::string& texturePath, const mi::neuraylib::IType_texture::Shape shape = mi::neuraylib::IType_texture::TS_2D, const float gamma = 2.2f);
+	
 
 	// Utility function to dump the arguments of a material instance or function call.
 	template <class T>

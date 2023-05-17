@@ -24,12 +24,12 @@ namespace vtx::graph
 		for (const auto& child : children) {
 			child->traverse(orderedVisitors);
 		}
-		ACCEPT(visitors)
+		ACCEPT(Group,visitors)
 	}
 
-	void Group::accept(std::shared_ptr<NodeVisitor> visitor)
+	/*void Group::accept(std::shared_ptr<NodeVisitor> visitor)
 	{
 		visitor->visit(sharedFromBase<Group>());
-	}
+	}*/
 }
 

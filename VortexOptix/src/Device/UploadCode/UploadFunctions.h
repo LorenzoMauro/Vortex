@@ -50,6 +50,8 @@ namespace vtx::device
 
 	std::tuple < LightProfileData, LightProfileData*> createLightProfileData(std::shared_ptr<graph::LightProfile> lightProfile);
 
+	void computeNoiseInfo(std::shared_ptr<graph::Renderer> rendererNode);
+
 	void setRendererData(std::shared_ptr<graph::Renderer> rendererNode);
 
 	void setCameraData(std::shared_ptr<graph::Camera> cameraNode);

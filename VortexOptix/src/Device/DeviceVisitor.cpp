@@ -7,7 +7,7 @@
 #include "UploadCode/UploadBuffers.h"
 #include "UploadCode/UploadData.h"
 #include "UploadCode/UploadFunctions.h"
-
+#include "UploadCode/CUDAMap.h"
 namespace vtx::device
 {
 	void DeviceVisitor::visit(const std::shared_ptr<graph::Instance> instance)
@@ -61,7 +61,7 @@ namespace vtx::device
 	void DeviceVisitor::visit(const std::shared_ptr<graph::Material> material)
 	{
 		//TODO : Check if the texture has been updated
-		if (const vtxID materialId = material->getID(); !UPLOAD_DATA->materialDataMap.contains(materialId)) {
+		if (const vtxID materialId = material->getID(); (!UPLOAD_DATA->materialDataMap.contains(materialId) || material->isUpdated)) {
 			const std::tuple<MaterialData, MaterialData*> mat = createMaterialData(material);
 			UPLOAD_DATA->materialDataMap.insert(materialId, mat);
 		}
@@ -131,16 +131,16 @@ namespace vtx::device
 		Buffers*    uploadBuffers = UPLOAD_BUFFERS;
 
 		bool isLaunchParamsUpdated = false;
-		if (uploadData->instanceDataMap.isUpdated)
+		if (uploadData->instanceDataMap.isUpdated && uploadData->instanceDataMap.size != 0)
 		{
 			std::vector<InstanceData*> instances;
 			uploadData->instanceDataMap.finalize();
 			uploadData->instanceDataMap.isUpdated = false;
-			for(std::pair<vtxID, std::tuple<InstanceData, InstanceData*>> it : uploadData->instanceDataMap)
+			for (std::pair<vtxID, std::tuple<InstanceData, InstanceData*>> it : uploadData->instanceDataMap)
 			{
 				InstanceData* instanceData = std::get<1>(it.second);
-				vtxID&        instanceId   = it.first;
-				if(instanceId >= instances.size())
+				vtxID& instanceId = it.first;
+				if (instanceId >= instances.size())
 				{
 					instances.resize(instanceId + 1);
 				}
@@ -148,11 +148,11 @@ namespace vtx::device
 			}
 			uploadBuffers->instancesBuffer.upload(instances);
 
-			uploadData->launchParams.topObject   = optix::createInstanceAcceleration(uploadData->optixInstances);
-			uploadData->launchParams.instances	 = uploadBuffers->instancesBuffer.castedPointer<InstanceData*>();
-			isLaunchParamsUpdated                = true;
+			uploadData->launchParams.topObject = optix::createInstanceAcceleration(uploadData->optixInstances);
+			uploadData->launchParams.instances = uploadBuffers->instancesBuffer.castedPointer<InstanceData*>();
+			isLaunchParamsUpdated = true;
 		}
-		if (uploadData->lightDataMap.isUpdated)
+		if (uploadData->lightDataMap.isUpdated && uploadData->lightDataMap.size != 0)
 		{
 			std::vector<LightData*> lightData;
 			for (auto lightEntry : uploadData->lightDataMap)
@@ -197,6 +197,16 @@ namespace vtx::device
 				RendererDeviceSettings>())
 			{
 				uploadData->launchParams.settings = uploadBuffers->rendererSettingsBuffer.castedPointer<RendererDeviceSettings>();
+				isLaunchParamsUpdated = true;
+			}
+		}
+
+		if (uploadData->isToneMapperSettingsUpdated)
+		{
+			uploadBuffers->toneMapperSettingsBuffer.upload(uploadData->toneMapperSettings);
+			if (!uploadData->launchParams.toneMapperSettings || uploadData->launchParams.toneMapperSettings != uploadBuffers->frameIdBuffer.castedPointer<ToneMapperSettings>())
+			{
+				uploadData->launchParams.toneMapperSettings = uploadBuffers->toneMapperSettingsBuffer.castedPointer<ToneMapperSettings>();
 				isLaunchParamsUpdated = true;
 			}
 		}

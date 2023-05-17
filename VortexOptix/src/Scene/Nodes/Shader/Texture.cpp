@@ -16,11 +16,11 @@ namespace vtx::graph
 		{
 			init();
 		}
-		ACCEPT(orderedVisitors);
+		ACCEPT(Texture,orderedVisitors);
 	}
 
-	void Texture::accept(std::shared_ptr<NodeVisitor> visitor)
-	{
-		visitor->visit(sharedFromBase<Texture>());
-	}
+	//void Texture::accept(std::shared_ptr<NodeVisitor> visitor)
+	//{
+	//	visitor->visit(sharedFromBase<Texture>());
+	//}
 }

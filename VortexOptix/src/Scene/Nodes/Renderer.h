@@ -24,6 +24,24 @@ namespace vtx::graph
 		bool                                      isUpdated;
 		float                                     minClamp;
 		float                                     maxClamp;
+		int                                       noiseKernelSize;
+		bool                                      adaptiveSampling;
+		int                                       minAdaptiveSamples;
+		int										  minPixelSamples;
+		int										  maxPixelSamples;
+		float									albedoNormalNoiseInfluence;
+		float									noiseCutOff;
+	};
+
+	struct ToneMapperSettings
+	{
+		math::vec3f whitePoint;
+		math::vec3f colorBalance;
+		float       burnHighlights;
+		float       crushBlacks;
+		float       saturation;
+		float       gamma;
+		bool         isUpdated;
 	};
 
 	class Renderer : public Node
@@ -48,7 +66,7 @@ namespace vtx::graph
 
 		void traverse(const std::vector<std::shared_ptr<NodeVisitor>>& orderedVisitors) override;
 
-		void accept(std::shared_ptr<NodeVisitor> visitor) override;
+		//void accept(std::shared_ptr<NodeVisitor> visitor) override;
 
 		bool isReady(bool setBusy = false);
 
@@ -70,6 +88,7 @@ namespace vtx::graph
 		uint32_t										width;
 		uint32_t										height;
 		RendererSettings								settings;
+		ToneMapperSettings								toneMapperSettings;
 		bool											resized = true;
 
 		vtx::Timer timer;

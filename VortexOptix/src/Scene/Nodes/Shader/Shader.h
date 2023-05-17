@@ -7,13 +7,28 @@
 #include "Texture.h"
 #include "LightProfile.h"
 #include "BsdfMeasurement.h"
+#include "Device/DevicePrograms/LaunchParams.h"
 
 namespace vtx::graph
 {
 	using namespace mi;
 	using namespace base;
 	using namespace neuraylib;
-        
+
+	enum EmissivityStatus
+	{
+		EDF_CONSTANT,
+		EDF_INVALID,
+		EDF_PARAMETRIC
+	};
+
+	enum OpacityStatus
+	{
+		OPACITY_CONSTANT,
+		OPACITY_INVALID,
+		OPACITY_PARAMETRIC
+	};
+
 	class Shader : public Node {
 	public:
 		Shader() : Node(NT_MDL_SHADER) {};
@@ -21,41 +36,43 @@ namespace vtx::graph
 		struct Configuration {
 			// The state of the expressions :
 			bool isThinWalledConstant = false;
+			bool isThinWalled = false;
 			bool isSurfaceBsdfValid = false;
 			bool isBackfaceBsdfValid = false;
 			bool isSurfaceEdfValid = false;
-			bool isSurfaceIntensityConstant = false;
-			bool isSurfaceIntensityModeConstant = false;
+			bool isSurfaceIntensityConstant = true;
+			bool isSurfaceIntensityModeConstant = true;
 			bool isBackfaceEdfValid = false;
-			bool isBackfaceIntensityConstant = false;
-			bool isBackfaceIntensityModeConstant = false;
+			bool isBackfaceIntensityConstant = true;
+			bool isBackfaceIntensityModeConstant = true;
 			bool useBackfaceEdf = false;
 			bool useBackfaceIntensity = false;
 			bool useBackfaceIntensityMode = false;
-			bool isIorConstant = false;
+			bool isIorConstant = true;
 			bool isVdfValid = false;
-			bool isAbsorptionCoefficientConstant = false;
+			bool isAbsorptionCoefficientConstant = true;
 			bool useVolumeAbsorption = false;
-			bool isScatteringCoefficientConstant = false;
-			bool isDirectionalBiasConstant = false;
+			bool isScatteringCoefficientConstant = true;
+			bool isDirectionalBiasConstant = true;
 			bool useVolumeScattering = false;
 			bool isCutoutOpacityConstant = false;
 			bool useCutoutOpacity = false;
 			bool isHairBsdfValid = false;
 
 			// The constant expression values:
-			bool            thinWalled = false;
-			mi::math::Color surfaceIntensity;
-			Sint32			surfaceIntensityMode{};
-			mi::math::Color backfaceIntensity;
-			Sint32			backfaceIntensityMode{};
-			mi::math::Color ior;
-			mi::math::Color absorptionCoefficient;
-			mi::math::Color scatteringCoefficient;
-			Float32			directionalBias{};
-			Float32			cutoutOpacity{};
-			bool            isEmissive = false;
+			math::vec3f		surfaceIntensity{0.0f};
+			int				surfaceIntensityMode{0};
+			math::vec3f		backfaceIntensity{ 0.0f };
+			int				backfaceIntensityMode{0};
+			math::vec3f		ior{ 1.0f };
+			math::vec3f		absorptionCoefficient{ 0.0f };
+			math::vec3f		scatteringCoefficient{ 0.0f };
+			float			directionalBias{ 0.0f };
+			float			cutoutOpacity{1.0f};
 
+			// These parameters are added to manage PBR shaders
+			bool* emissivityToggle;
+			bool* opacityToggle;
 		};
 
 		struct FunctionNames {
@@ -110,6 +127,7 @@ namespace vtx::graph
 		struct DevicePrograms
 		{
 			std::shared_ptr<optix::ProgramOptix> pgInit;
+			std::shared_ptr<optix::ProgramOptix> pgEvaluateMaterial;
 			std::shared_ptr<optix::ProgramOptix> pgThinWalled;
 
 			std::shared_ptr<optix::ProgramOptix> pgSurfaceScatteringSample;
@@ -139,9 +157,9 @@ namespace vtx::graph
 			std::shared_ptr<optix::ProgramOptix> pgHairSample;
 			std::shared_ptr<optix::ProgramOptix> pgHairEval;
 
-			bool isEmissive = false;
-			bool isThinWalled = true;
-			bool hasOpacity = false;
+			//bool isEmissive = false;
+			//bool isThinWalled = true;
+			//bool hasOpacity = false;
 			//unsigned int  flags;
 		};
 
@@ -161,14 +179,16 @@ namespace vtx::graph
 
 		void traverse(const std::vector<std::shared_ptr<NodeVisitor>>& orderedVisitors) override;
 
-		void accept(std::shared_ptr<NodeVisitor> visitor) override;
+		//void accept(std::shared_ptr<NodeVisitor> visitor) override;
 		std::string getMaterialDbName();
 
-		bool isEmissive();
+		bool											useEmission();
+		bool											useOpacity();
+		bool                                            isThinWalled();
 
-		std::vector<std::shared_ptr<graph::Texture>>  getTextures();
-		std::vector<std::shared_ptr<graph::BsdfMeasurement>>  getBsdfs();
-		std::vector<std::shared_ptr<graph::LightProfile>>  getLightProfiles();
+		std::vector<std::shared_ptr<graph::Texture>>         getTextures();
+		std::vector<std::shared_ptr<graph::BsdfMeasurement>> getBsdfs();
+		std::vector<std::shared_ptr<graph::LightProfile>>    getLightProfiles();
 
 		std::string                                                         name;			// example : "bsdf_diffuse_reflection"
 		std::string                                                         materialDbName;	// example : "bsdf_diffuse_reflection"

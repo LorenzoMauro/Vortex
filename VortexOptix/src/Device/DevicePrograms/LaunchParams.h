@@ -3,14 +3,14 @@
 #ifndef LAUNCH_PARAMS_H
 #define LAUNCH_PARAMS_H
 
-#include "Core/math.h"
+#include "Core/Math.h"
 #include "Core/VortexID.h"
 #include "cuda.h"
-#include "Device/UploadCode/CUDAmap.h"
 #include <mi/neuraylib/target_code_types.h>
+#include "NoiseData.h"
 #include "Scene/DataStructs/VertexAttribute.h"
 #include "Scene/Nodes/LightTypes.h"
-//#include "Scene/Nodes/Renderer.h"
+#include <optix.h>
 
 namespace vtx {
 
@@ -67,6 +67,9 @@ namespace vtx {
         bool isEmissive = false;
         bool isThinWalled = true;
         bool hasOpacity = false;
+        bool directCallable;
+
+        int idxCallEvaluateMaterial = -1;
 
         int idxCallInit = -1; // The material global init function.
 
@@ -110,7 +113,7 @@ namespace vtx {
         math::vec3f scatteringCoefficient;
         float       directionalBias;
         float       cutoutOpacity;
-    };
+	};
 
     struct TextureData
     {
@@ -180,7 +183,7 @@ namespace vtx {
 
     struct MaterialData
     {
-        CUdeviceptr                 argBlock;
+        char*                       argBlock;
         ShaderData*                 shader;
     };
 
@@ -236,11 +239,16 @@ namespace vtx {
         bool                        hasOpacity;
     };
 
+
     struct FrameBufferData
     {
-        math::vec3f*                                radianceBuffer;
-        CUdeviceptr                                 outputBuffer{};
-        math::vec2ui                                frameSize;
+        math::vec3f* radianceBuffer;
+        math::vec3f* toneMappedRadiance;
+        math::vec3f* albedo;
+        math::vec3f* normal;
+        NoiseData*   noiseBuffer;
+        CUdeviceptr  outputBuffer{};
+        math::vec2ui frameSize;
     };
 
     struct RendererDeviceSettings
@@ -267,9 +275,11 @@ namespace vtx {
             FB_ORIENTATION,
             FB_TRUE_NORMAL,
             FB_SHADING_NORMAL,
+            FB_TANGENT,
+            FB_UV,
+            FB_NOISE,
+            FB_SAMPLES,
             FB_DEBUG_1,
-            FB_DEBUG_2,
-            FB_DEBUG_3,
 
             FB_COUNT
         };
@@ -280,19 +290,37 @@ namespace vtx {
                 "Orientation",
                 "True Normal",
                 "Shading Normal",
-                "Debug1",
-                "Debug2",
-                "Debug3"
+				"Tangent",
+                "Uv",
+				"Noise",
+				"Samples",
+                "Debug1"
         };
 
-        int               iteration;
-        int               maxBounces;
-        bool              accumulate;
-        SamplingTechnique samplingTechnique;
-		DisplayBuffer     displayBuffer;
-        float             minClamp;
-        float             maxClamp;
+        int                 iteration;
+        int                 maxBounces;
+        bool                accumulate;
+        SamplingTechnique   samplingTechnique;
+		DisplayBuffer       displayBuffer;
+        float               minClamp;
+        float               maxClamp;
+
+        bool                adaptiveSampling;
+        int                 minAdaptiveSamples;
+        int                 minPixelSamples;
+        int                 maxPixelSamples;
+        float               noiseCutOff;
 	};
+
+    struct ToneMapperSettings
+    {
+	    math::vec3f invWhitePoint;
+        math::vec3f colorBalance;
+        float 	 burnHighlights;
+        float 	 crushBlacks;
+        float 	 saturation;
+        float 	 invGamma;
+    };
 
 	struct LaunchParams
     {
@@ -300,6 +328,7 @@ namespace vtx {
 		FrameBufferData               frameBuffer;
 		CameraData                    cameraData;
 		RendererDeviceSettings*       settings;
+        ToneMapperSettings*           toneMapperSettings;
 		SbtProgramIdx*                programs;
 		OptixTraversableHandle        topObject;
 		InstanceData**                instances;

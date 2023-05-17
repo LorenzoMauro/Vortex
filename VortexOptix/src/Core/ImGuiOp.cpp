@@ -162,6 +162,22 @@ namespace vtx {
             glfwMakeContextCurrent(backup_current_context);
         }
     }
+
+    std::string labelPrefix(const char* const label)
+    {
+		const float width = ImGui::CalcItemWidth();
+
+		const float x = ImGui::GetCursorPosX();
+        ImGui::Text(label);
+        ImGui::SameLine();
+        ImGui::SetCursorPosX(x + width * 0.5f + ImGui::GetStyle().ItemInnerSpacing.x);
+        ImGui::SetNextItemWidth(-1);
+
+        std::string labelID = "##";
+        labelID += label;
+
+        return labelID;
+    }
     
     void shutDownImGui() {
         VTX_INFO("ShutDown: ImGui");

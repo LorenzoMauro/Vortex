@@ -3,9 +3,26 @@
 
 namespace utl{
 
-	std::string absolutePath(const std::string& relative_path) {
-		const std::filesystem::path path    = relative_path;
-		const std::filesystem::path absPath = std::filesystem::absolute(path);
+	std::string absolutePath(const std::string& relativePath, const std::string& folderPath) {
+
+		const std::filesystem::path path = relativePath;
+		std::filesystem::path absPath;
+		if (path.is_relative())
+		{
+			if (folderPath.empty())
+			{
+				absPath = std::filesystem::absolute(path);
+			}
+			else
+			{
+				const std::filesystem::path folder(folderPath);
+				absPath = folder / relativePath;
+			}
+		}
+		else
+		{
+			absPath = std::filesystem::absolute(path);
+		}
 		return absPath.string();
 	}
 

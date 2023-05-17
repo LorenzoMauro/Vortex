@@ -54,22 +54,28 @@ namespace vtx {
 		//Transformations
 		math::affine3f        objectToWorld;
 		math::affine3f        worldToObject;
+
 		// World normals and Tangents
 		math::vec3f           ngW;
 		math::vec3f           nsW;
 		math::vec3f           tgW;
+		math::vec3f           btW;
 
 		// Object normals and Tangents
 		math::vec3f           ngO;
 		math::vec3f           nsO;
 		math::vec3f           tgO;
+		math::vec3f           btO;
 
 		float3 textureCoordinates[2];
 		float3 textureBitangents[2];
 		float3 textureTangents[2];
 
 		bool isFrontFace;
+		unsigned  seed;
 
+		float4					oTwF4[3];
+		float4					wToF4[3];
 	};
 
 	struct MaterialStack
@@ -86,36 +92,36 @@ namespace vtx {
 		math::vec3f shadingNormal;
 		math::vec3f trueNormal;
 		math::vec3f orientation;
+		math::vec3f tangent;
+		math::vec3f uv;
 		math::vec3f debugColor1;
-		math::vec3f debugColor2;
-		math::vec3f debugColor3;
 	};
 
 
 	struct PerRayData {
+		math::vec3f						position;					//Current Hit Position
+		float							distance;					//Distance of hit Position to Ray origin
+		int								depth;
+		TraceEvent						traceResult;				// Bitfield with flags. See FLAG_* defines above for its contents.
+		TraceEvent						traceOperation = TR_HIT;	// Bitfield with flags. See FLAG_* defines above for its contents.
 
-		math::vec3f position; //Current Hit Position
-		float		distance; //Distance of hit Position to Ray origin
-		int			depth;
-		TraceEvent	traceResult; // Bitfield with flags. See FLAG_* defines above for its contents.
-		TraceEvent	traceOperation = TR_HIT; // Bitfield with flags. See FLAG_* defines above for its contents.
+		math::vec3f						wo;							//Outgoing direction, to observer in world space
+		math::vec3f						wi;							//Incoming direction, to light, in world space
 
-		math::vec3f wo; //Outgoing direction, to observer in world space
-		math::vec3f wi; //Incoming direction, to light, in world space
+		math::vec3f						radiance;					//Radiance along the current path segment
 
-		math::vec3f	radiance; //Radiance along the current path segment
-		float pdf; //last Bdsf smaple, tracked for multiple importance sampling
-		math::vec3f throughput; //Throughput of the current path segment, starts white and gets modulated with bsdf_over_pdf with each sample.
-		mi::neuraylib::Bsdf_event_type eventType; // The type of events created by BSDF importance sampling.
+		float							pdf;						//last Bdsf smaple, tracked for multiple importance sampling
+		math::vec3f						throughput;					//Throughput of the current path segment, starts white and gets modulated with bsdf_over_pdf with each sample.
+		mi::neuraylib::Bsdf_event_type	eventType;					// The type of events created by BSDF importance sampling.
 
 
-		math::vec3f sigmaT;     // Extinction coefficient in a homogeneous medium.
-		int			walk;        // Number of random walk steps done through scattering volume.
-		math::vec3f pdfVolume;   // Volume extinction sample pdf. Used to adjust the throughput along the random walk.
+		math::vec3f sigmaT;											// Extinction coefficient in a homogeneous medium.
+		int         walk;											// Number of random walk steps done through scattering volume.
+		math::vec3f pdfVolume;										// Volume extinction sample pdf. Used to adjust the throughput along the random walk.
 
-		unsigned int seed;  // Random number generator input.
+		unsigned int seed;											// Random number generator input.
 
-		// Small material stack tracking IOR, absorption ansd scattering coefficients of the entered materials. Entry 0 is vacuum.
+		// Small material stack tracking IOR, absorption and scattering coefficients of the entered materials. Entry 0 is vacuum.
 		int           idxStack;
 		MaterialStack stack[MATERIAL_STACK_SIZE];
 

@@ -15,11 +15,17 @@ namespace vtx
 	};
 
 	void HostVisitor::visit(std::shared_ptr<graph::Mesh> mesh) {
+		if(!mesh->status.hasFaceAttributes)
+		{
+			ops::computeFaceAttributes(mesh);
+		}
+		if(!mesh->status.hasNormals)
+		{
+			ops::computeVertexNormals(mesh);
+		}
 		if(!mesh->status.hasTangents)
 		{
-			VTX_INFO("Computing tangents for mesh: {}", mesh->getID());
-			ops::computeTangents(mesh->vertices, mesh->indices);
-			mesh->status.hasTangents = true;
+			ops::computeVertexTangentSpace(mesh);
 		}
 	};
 

@@ -1,8 +1,8 @@
-#include "DataFetcher.h"
-#include "mdlDeviceWrapper.h"
-#include "randomNumberGenerator.h"
-#include "RayData.h"
-#include "Utils.h"
+#include "../DataFetcher.h"
+#include "../randomNumberGenerator.h"
+#include "../RayData.h"
+#include "../Utils.h"
+#include "Device/DevicePrograms/Mdl/directMdlWrapper.h"
 #include "Scene/Nodes/Light.h"
 
 namespace vtx
@@ -52,37 +52,41 @@ namespace vtx
         utl::determineMaterialHitProperties(&hitP, idxTriangle);
 
 
-        mdl::MdlData mdlData;
-        mdl::InitConfig mdlConfig;
-        mdlConfig.evaluateOpacity = true;
-        mdlConfig.evaluateEmission = true;
+        mdl::MdlRequest request;
+        request.edf = true;
+        request.opacity = true;
+        request.lastRayDirection = -lightSample.direction;
 
-        mdl::initMdl(hitP, &mdlData, mdlConfig);
+        mdl::MaterialEvaluation matEval;
+        if (hitP.shaderConfiguration->directCallable)
+        {
+            const int sbtIndex = hitP.shaderConfiguration->idxCallEvaluateMaterial;
+            matEval = optixDirectCall<mdl::MaterialEvaluation, mdl::MdlRequest*>(sbtIndex, &request);
+        }
+        else
+        {
+            matEval = mdl::evaluateMdlMaterial(&request);
+        }
 
-        if(mdlData.opacity <= 0.0f)
+        if(matEval.opacity <= 0.0f)
         {
             return lightSample;
 		}
       
-        //Evauluate Sampled Point Emission
-        if (mdlData.emissionFunctions.hasEmission)
+        if (matEval.edf.isValid)
         {
-            mdl::EmissionEvaluateData evalData = mdl::evaluateEmission(mdlData, -lightSample.direction);
-            if (evalData.isValid)
-            {
-                const float totArea = meshLightAttributes.totalArea;
+            const float totArea = meshLightAttributes.totalArea;
 
-                // Modulate the emission with the cutout opacity value to get the correct value.
-                // The opacity value must not be greater than one here, which could happen for HDR textures.
-                float opacity = math::min(mdlData.opacity, 1.0f);
+            // Modulate the emission with the cutout opacity value to get the correct value.
+            // The opacity value must not be greater than one here, which could happen for HDR textures.
+            float opacity = math::min(matEval.opacity, 1.0f);
 
-                // Power (flux) [W] divided by light area gives radiant exitance [W/m^2].
-                const float factor = (mdlData.emissionFunctions.mode == 0) ? mdlData.opacity : mdlData.opacity / totArea;
+            // Power (flux) [W] divided by light area gives radiant exitance [W/m^2].
+            const float factor = (matEval.edf.mode == 0) ? matEval.opacity : matEval.opacity / totArea;
 
-                lightSample.pdf = lightSample.distance * lightSample.distance / (totArea * evalData.data.cos); // Solid angle measure.
-                lightSample.radianceOverPdf = mdlData.emissionFunctions.intensity * evalData.data.edf * (factor / lightSample.pdf);
-                lightSample.isValid = true;
-            }
+            lightSample.pdf = lightSample.distance * lightSample.distance / (totArea * matEval.edf.cos); // Solid angle measure.
+            lightSample.radianceOverPdf = matEval.edf.intensity * matEval.edf.edf * (factor / lightSample.pdf);
+            lightSample.isValid = true;
         }
 
         return lightSample;
@@ -136,7 +140,6 @@ namespace vtx
         float z = -cosTheta;
 
         math::vec3f dir{ x,y,z };
-        
         // Now rotate that normalized object space direction into world space. 
         lightSample.direction = math::transformNormal3F(attrib.transformation, dir);
 

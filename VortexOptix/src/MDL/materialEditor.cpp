@@ -10,7 +10,7 @@ namespace vtx::graph
 
 	void createNewModule(const std::string& moduleName, const std::string& materialName)
 	{
-		const std::string				diffuseTexture = "E:/Dev/VortexOptix/data/Textures/xboibga_2K_Albedo.jpg";
+		/*const std::string				diffuseTexture = "E:/Dev/VortexOptix/data/Textures/xboibga_2K_Albedo.jpg";
 		const std::string				roughnessTexture = "E:/Dev/VortexOptix/data/Textures/xboibga_2K_Roughness.jpg";
 
 		{
@@ -57,7 +57,7 @@ namespace vtx::graph
 			}
 
 			mdl::createNewFunctionInModule(moduleInfo);
-		}
+		}*/
 
 	}
 

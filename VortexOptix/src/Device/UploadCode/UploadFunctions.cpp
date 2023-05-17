@@ -6,6 +6,7 @@
 #include <cudaGL.h>
 
 #include "Scene/SIM.h"
+#include "Device/DevicePrograms/NoiseKernel.h"
 
 namespace vtx::device
 {
@@ -54,7 +55,7 @@ namespace vtx::device
 				if(!instanceData.hasOpacity)
 				{
 					auto materialNode = graph::SIM::getNode<graph::Material>(materialId);
-					if (bool hasOpacity = materialNode->shader->getPrograms().hasOpacity)
+					if (bool hasOpacity = materialNode->shader->useOpacity())
 					{
 						instanceData.hasOpacity = true;
 					}
@@ -215,7 +216,7 @@ namespace vtx::device
 			argBlockBuffer.upload(material->getArgumentBlockData(), sizeArgumentBlock);
 		}
 
-		materialData.argBlock = argBlockBuffer.dPointer();
+		materialData.argBlock = argBlockBuffer.castedPointer<char>();
 		ShaderData* shaderData = std::get<1>(UPLOAD_DATA->shaderDataMap[material->getShader()->getID()]);
 		materialData.shader = shaderData;
 
@@ -237,101 +238,114 @@ namespace vtx::device
 		// The constant expression values:
 		//bool thin_walled; // Stored inside flags.
 		// Simplify the conditions by translating all constants unconditionally.
-		dvConfig.isThinWalled = dp.isThinWalled;
-		dvConfig.hasOpacity = dp.hasOpacity;
-		dvConfig.isEmissive = dp.isEmissive;
-		dvConfig.surfaceIntensity = math::vec3f(config.surfaceIntensity[0], config.surfaceIntensity[1], config.surfaceIntensity[2]);
-		dvConfig.surfaceIntensityMode = config.surfaceIntensityMode;
-		dvConfig.backfaceIntensity = math::vec3f(config.backfaceIntensity[0], config.backfaceIntensity[1], config.backfaceIntensity[2]);
-		dvConfig.backfaceIntensityMode = config.backfaceIntensityMode;
-		dvConfig.ior = math::vec3f(config.ior[0], config.ior[1], config.ior[2]);
-		dvConfig.absorptionCoefficient = math::vec3f(config.absorptionCoefficient[0], config.absorptionCoefficient[1], config.absorptionCoefficient[2]);
-		dvConfig.scatteringCoefficient = math::vec3f(config.scatteringCoefficient[0], config.scatteringCoefficient[1], config.scatteringCoefficient[2]);
-		dvConfig.cutoutOpacity = config.cutoutOpacity;
 
-		if (dp.pgInit) {
-			dvConfig.idxCallInit = optix::PipelineOptix::getProgramSbt(sbtMap, dp.pgInit->name);
-		}
+		dvConfig.isThinWalled = shader->isThinWalled();
+		dvConfig.hasOpacity = shader->useOpacity();
+		dvConfig.isEmissive = shader->useEmission();
+		dvConfig.directCallable = getOptions()->directCallable;
 
-		if (dp.pgThinWalled) {
-			dvConfig.idxCallThinWalled = optix::PipelineOptix::getProgramSbt(sbtMap, dp.pgThinWalled->name);
-		}
+		if(getOptions()->directCallable)
+		{
+			dvConfig.surfaceIntensity = math::vec3f(config.surfaceIntensity[0], config.surfaceIntensity[1], config.surfaceIntensity[2]);
+			dvConfig.surfaceIntensityMode = config.surfaceIntensityMode;
+			dvConfig.backfaceIntensity = math::vec3f(config.backfaceIntensity[0], config.backfaceIntensity[1], config.backfaceIntensity[2]);
+			dvConfig.backfaceIntensityMode = config.backfaceIntensityMode;
+			dvConfig.ior = math::vec3f(config.ior[0], config.ior[1], config.ior[2]);
+			dvConfig.absorptionCoefficient = math::vec3f(config.absorptionCoefficient[0], config.absorptionCoefficient[1], config.absorptionCoefficient[2]);
+			dvConfig.scatteringCoefficient = math::vec3f(config.scatteringCoefficient[0], config.scatteringCoefficient[1], config.scatteringCoefficient[2]);
+			dvConfig.cutoutOpacity = config.cutoutOpacity;
 
-		if (dp.pgSurfaceScatteringSample) {
-			dvConfig.idxCallSurfaceScatteringSample = optix::PipelineOptix::getProgramSbt(sbtMap, dp.pgSurfaceScatteringSample->name);
-		}
+			if (dp.pgInit) {
+				dvConfig.idxCallInit = optix::PipelineOptix::getProgramSbt(sbtMap, dp.pgInit->name);
+			}
 
-		if (dp.pgSurfaceScatteringEval) {
-			dvConfig.idxCallSurfaceScatteringEval = optix::PipelineOptix::getProgramSbt(sbtMap, dp.pgSurfaceScatteringEval->name);
-		}
+			if (dp.pgThinWalled) {
+				dvConfig.idxCallThinWalled = optix::PipelineOptix::getProgramSbt(sbtMap, dp.pgThinWalled->name);
+			}
 
-		if (dp.pgSurfaceScatteringAuxiliary) {
-			dvConfig.idxCallSurfaceScatteringAuxiliary = optix::PipelineOptix::getProgramSbt(sbtMap, dp.pgSurfaceScatteringAuxiliary->name);
-		}
+			if (dp.pgSurfaceScatteringSample) {
+				dvConfig.idxCallSurfaceScatteringSample = optix::PipelineOptix::getProgramSbt(sbtMap, dp.pgSurfaceScatteringSample->name);
+			}
 
-		if (dp.pgBackfaceScatteringSample) {
-			dvConfig.idxCallBackfaceScatteringSample = optix::PipelineOptix::getProgramSbt(sbtMap, dp.pgBackfaceScatteringSample->name);
-		}
+			if (dp.pgSurfaceScatteringEval) {
+				dvConfig.idxCallSurfaceScatteringEval = optix::PipelineOptix::getProgramSbt(sbtMap, dp.pgSurfaceScatteringEval->name);
+			}
 
-		if (dp.pgBackfaceScatteringEval) {
-			dvConfig.idxCallBackfaceScatteringEval = optix::PipelineOptix::getProgramSbt(sbtMap, dp.pgBackfaceScatteringEval->name);
-		}
+			if (dp.pgSurfaceScatteringAuxiliary) {
+				dvConfig.idxCallSurfaceScatteringAuxiliary = optix::PipelineOptix::getProgramSbt(sbtMap, dp.pgSurfaceScatteringAuxiliary->name);
+			}
 
-		if (dp.pgBackfaceScatteringAuxiliary) {
-			dvConfig.idxCallBackfaceScatteringAuxiliary = optix::PipelineOptix::getProgramSbt(sbtMap, dp.pgBackfaceScatteringAuxiliary->name);
-		}
+			if (dp.pgBackfaceScatteringSample) {
+				dvConfig.idxCallBackfaceScatteringSample = optix::PipelineOptix::getProgramSbt(sbtMap, dp.pgBackfaceScatteringSample->name);
+			}
 
-		if (dp.pgSurfaceEmissionEval) {
-			dvConfig.idxCallSurfaceEmissionEval = optix::PipelineOptix::getProgramSbt(sbtMap, dp.pgSurfaceEmissionEval->name);
-		}
+			if (dp.pgBackfaceScatteringEval) {
+				dvConfig.idxCallBackfaceScatteringEval = optix::PipelineOptix::getProgramSbt(sbtMap, dp.pgBackfaceScatteringEval->name);
+			}
 
-		if (dp.pgSurfaceEmissionIntensity) {
-			dvConfig.idxCallSurfaceEmissionIntensity = optix::PipelineOptix::getProgramSbt(sbtMap, dp.pgSurfaceEmissionIntensity->name);
-		}
+			if (dp.pgBackfaceScatteringAuxiliary) {
+				dvConfig.idxCallBackfaceScatteringAuxiliary = optix::PipelineOptix::getProgramSbt(sbtMap, dp.pgBackfaceScatteringAuxiliary->name);
+			}
 
-		if (dp.pgSurfaceEmissionIntensityMode) {
-			dvConfig.idxCallSurfaceEmissionIntensityMode = optix::PipelineOptix::getProgramSbt(sbtMap, dp.pgSurfaceEmissionIntensityMode->name);
-		}
+			if (dp.pgSurfaceEmissionEval) {
+				dvConfig.idxCallSurfaceEmissionEval = optix::PipelineOptix::getProgramSbt(sbtMap, dp.pgSurfaceEmissionEval->name);
+			}
 
-		if (dp.pgBackfaceEmissionEval) {
-			dvConfig.idxCallBackfaceEmissionEval = optix::PipelineOptix::getProgramSbt(sbtMap, dp.pgBackfaceEmissionEval->name);
-		}
+			if (dp.pgSurfaceEmissionIntensity) {
+				dvConfig.idxCallSurfaceEmissionIntensity = optix::PipelineOptix::getProgramSbt(sbtMap, dp.pgSurfaceEmissionIntensity->name);
+			}
 
-		if (dp.pgBackfaceEmissionIntensity) {
-			dvConfig.idxCallBackfaceEmissionIntensity = optix::PipelineOptix::getProgramSbt(sbtMap, dp.pgBackfaceEmissionIntensity->name);
-		}
+			if (dp.pgSurfaceEmissionIntensityMode) {
+				dvConfig.idxCallSurfaceEmissionIntensityMode = optix::PipelineOptix::getProgramSbt(sbtMap, dp.pgSurfaceEmissionIntensityMode->name);
+			}
 
-		if (dp.pgBackfaceEmissionIntensityMode) {
-			dvConfig.idxCallBackfaceEmissionIntensityMode = optix::PipelineOptix::getProgramSbt(sbtMap, dp.pgBackfaceEmissionIntensityMode->name);
-		}
+			if (dp.pgBackfaceEmissionEval) {
+				dvConfig.idxCallBackfaceEmissionEval = optix::PipelineOptix::getProgramSbt(sbtMap, dp.pgBackfaceEmissionEval->name);
+			}
 
-		if (dp.pgIor) {
-			dvConfig.idxCallIor = optix::PipelineOptix::getProgramSbt(sbtMap, dp.pgIor->name);
-		}
+			if (dp.pgBackfaceEmissionIntensity) {
+				dvConfig.idxCallBackfaceEmissionIntensity = optix::PipelineOptix::getProgramSbt(sbtMap, dp.pgBackfaceEmissionIntensity->name);
+			}
 
-		if (dp.pgVolumeAbsorptionCoefficient) {
-			dvConfig.idxCallVolumeAbsorptionCoefficient = optix::PipelineOptix::getProgramSbt(sbtMap, dp.pgVolumeAbsorptionCoefficient->name);
-		}
+			if (dp.pgBackfaceEmissionIntensityMode) {
+				dvConfig.idxCallBackfaceEmissionIntensityMode = optix::PipelineOptix::getProgramSbt(sbtMap, dp.pgBackfaceEmissionIntensityMode->name);
+			}
 
-		if (dp.pgVolumeScatteringCoefficient) {
-			dvConfig.idxCallVolumeScatteringCoefficient = optix::PipelineOptix::getProgramSbt(sbtMap, dp.pgVolumeScatteringCoefficient->name);
-		}
+			if (dp.pgIor) {
+				dvConfig.idxCallIor = optix::PipelineOptix::getProgramSbt(sbtMap, dp.pgIor->name);
+			}
 
-		if (dp.pgVolumeDirectionalBias) {
-			dvConfig.idxCallVolumeDirectionalBias = optix::PipelineOptix::getProgramSbt(sbtMap, dp.pgVolumeDirectionalBias->name);
-		}
+			if (dp.pgVolumeAbsorptionCoefficient) {
+				dvConfig.idxCallVolumeAbsorptionCoefficient = optix::PipelineOptix::getProgramSbt(sbtMap, dp.pgVolumeAbsorptionCoefficient->name);
+			}
 
-		if (dp.pgGeometryCutoutOpacity) {
-			dvConfig.idxCallGeometryCutoutOpacity = optix::PipelineOptix::getProgramSbt(sbtMap, dp.pgGeometryCutoutOpacity->name);
-		}
+			if (dp.pgVolumeScatteringCoefficient) {
+				dvConfig.idxCallVolumeScatteringCoefficient = optix::PipelineOptix::getProgramSbt(sbtMap, dp.pgVolumeScatteringCoefficient->name);
+			}
 
-		if (dp.pgHairSample) {
-			dvConfig.idxCallHairSample = optix::PipelineOptix::getProgramSbt(sbtMap, dp.pgHairSample->name);
-		}
+			if (dp.pgVolumeDirectionalBias) {
+				dvConfig.idxCallVolumeDirectionalBias = optix::PipelineOptix::getProgramSbt(sbtMap, dp.pgVolumeDirectionalBias->name);
+			}
 
-		if (dp.pgHairEval) {
-			dvConfig.idxCallHairEval = optix::PipelineOptix::getProgramSbt(sbtMap, dp.pgHairEval->name);
+			if (dp.pgGeometryCutoutOpacity) {
+				dvConfig.idxCallGeometryCutoutOpacity = optix::PipelineOptix::getProgramSbt(sbtMap, dp.pgGeometryCutoutOpacity->name);
+			}
+
+			if (dp.pgHairSample) {
+				dvConfig.idxCallHairSample = optix::PipelineOptix::getProgramSbt(sbtMap, dp.pgHairSample->name);
+			}
+
+			if (dp.pgHairEval) {
+				dvConfig.idxCallHairEval = optix::PipelineOptix::getProgramSbt(sbtMap, dp.pgHairEval->name);
+			}
 		}
+		else
+		{
+			if (dp.pgEvaluateMaterial) {
+				dvConfig.idxCallEvaluateMaterial = optix::PipelineOptix::getProgramSbt(sbtMap, dp.pgEvaluateMaterial->name);
+			}
+		}
+		
 
 
 		return dvConfig;
@@ -690,6 +704,26 @@ namespace vtx::device
 		return { lightProfileData, bsdfDataBuffer.castedPointer<LightProfileData>() };
 	}
 
+	void computeNoiseInfo(std::shared_ptr<graph::Renderer> rendererNode)
+	{
+
+		if (rendererNode->settings.adaptiveSampling && rendererNode->settings.iteration >= rendererNode->settings.minAdaptiveSamples)
+		{
+			math::vec3f* radianceBuffer = GET_BUFFER(Buffers::FrameBufferBuffers, rendererNode->getID(), toneMappedRadianceBuffer).castedPointer<math::vec3f>();
+			math::vec3f* normalBuffer = GET_BUFFER(Buffers::FrameBufferBuffers, rendererNode->getID(), normalBuffer).castedPointer<math::vec3f>();
+			math::vec3f* albedoBuffer = GET_BUFFER(Buffers::FrameBufferBuffers, rendererNode->getID(), albedoBuffer).castedPointer<math::vec3f>();
+			NoiseData* noiseBuffer = GET_BUFFER(Buffers::FrameBufferBuffers, rendererNode->getID(), noiseDataBuffer).castedPointer<NoiseData>();
+			math::vec2f* radianceRangeBuffer = GET_BUFFER(Buffers::FrameBufferBuffers, rendererNode->getID(), radianceRangeBuffer).castedPointer<math::vec2f>();
+			math::vec2f* albedoRangeBuffer = GET_BUFFER(Buffers::FrameBufferBuffers, rendererNode->getID(), albedoRangeBuffer).castedPointer<math::vec2f>();
+			math::vec2f* normalRangeBuffer = GET_BUFFER(Buffers::FrameBufferBuffers, rendererNode->getID(), normalRangeBuffer).castedPointer<math::vec2f>();
+
+			noiseComputation(noiseBuffer,
+							 radianceBuffer, albedoBuffer, normalBuffer,
+							 radianceRangeBuffer, albedoRangeBuffer, normalRangeBuffer,
+							 rendererNode->width, rendererNode->height, rendererNode->settings.noiseKernelSize, rendererNode->settings.albedoNormalNoiseInfluence);
+		}
+	}
+
 	void setRendererData(std::shared_ptr<graph::Renderer> rendererNode)
 	{
 		//auto* tW = new float4[3];
@@ -712,6 +746,42 @@ namespace vtx::device
 			radianceBuffer.resize((size_t)rendererNode->width * (size_t)rendererNode->height * sizeof(math::vec3f));
 			UPLOAD_DATA->frameBufferData.radianceBuffer = radianceBuffer.castedPointer<math::vec3f>();
 
+			//TODO Smarter way to set these value, I don't want to waste memory if we are not using adaptive samplig
+			{
+				CUDABuffer& toneMappedRadianceBuffer = GET_BUFFER(Buffers::FrameBufferBuffers, rendererNode->getID(), toneMappedRadianceBuffer);
+				toneMappedRadianceBuffer.resize((size_t)rendererNode->width * (size_t)rendererNode->height * sizeof(math::vec3f));
+				UPLOAD_DATA->frameBufferData.toneMappedRadiance = toneMappedRadianceBuffer.castedPointer<math::vec3f>();
+
+				CUDABuffer& albedoBuffer = GET_BUFFER(Buffers::FrameBufferBuffers, rendererNode->getID(), albedoBuffer);
+				albedoBuffer.resize((size_t)rendererNode->width * (size_t)rendererNode->height * sizeof(math::vec3f));
+				UPLOAD_DATA->frameBufferData.albedo = albedoBuffer.castedPointer<math::vec3f>();
+
+				CUDABuffer& NormalBuffer = GET_BUFFER(Buffers::FrameBufferBuffers, rendererNode->getID(), normalBuffer);
+				NormalBuffer.resize((size_t)rendererNode->width * (size_t)rendererNode->height * sizeof(math::vec3f));
+				UPLOAD_DATA->frameBufferData.normal = NormalBuffer.castedPointer<math::vec3f>();
+
+
+				CUDABuffer& noiseBuffer = GET_BUFFER(Buffers::FrameBufferBuffers, rendererNode->getID(), noiseDataBuffer);
+				noiseBuffer.resize((size_t)rendererNode->width * (size_t)rendererNode->height * sizeof(NoiseData));
+				UPLOAD_DATA->frameBufferData.noiseBuffer = noiseBuffer.castedPointer<NoiseData>();
+
+				const int size = rendererNode->width * rendererNode->height;
+				constexpr int threadsPerBlock = 256;
+				const int numBlocks = (size + threadsPerBlock - 1) / threadsPerBlock;
+
+				CUDABuffer& radianceRangeBuffer = GET_BUFFER(Buffers::FrameBufferBuffers, rendererNode->getID(), radianceRangeBuffer);
+				radianceRangeBuffer.resize(numBlocks * sizeof(math::vec2f));
+
+
+				CUDABuffer& albedoRangeBuffer = GET_BUFFER(Buffers::FrameBufferBuffers, rendererNode->getID(), albedoRangeBuffer);
+				albedoRangeBuffer.resize(numBlocks * sizeof(math::vec2f));
+
+
+				CUDABuffer& normalRangeBuffer = GET_BUFFER(Buffers::FrameBufferBuffers, rendererNode->getID(), normalRangeBuffer);
+				normalRangeBuffer.resize(numBlocks * sizeof(math::vec2f));
+
+			}
+
 			UPLOAD_DATA->frameBufferData.frameSize.x = rendererNode->width;
 			UPLOAD_DATA->frameBufferData.frameSize.y = rendererNode->height;
 
@@ -719,6 +789,8 @@ namespace vtx::device
 			UPLOAD_DATA->isFrameBufferUpdated = true;
 			rendererNode->resizeGlBuffer      = true;
 		}
+
+
 		
 
 		if(rendererNode->settings.isUpdated)
@@ -731,9 +803,30 @@ namespace vtx::device
 			UPLOAD_DATA->settings.minClamp          = rendererNode->settings.minClamp;
 			UPLOAD_DATA->settings.maxClamp          = rendererNode->settings.maxClamp;
 
+			UPLOAD_DATA->settings.adaptiveSampling = rendererNode->settings.adaptiveSampling;
+			UPLOAD_DATA->settings.minAdaptiveSamples = rendererNode->settings.minAdaptiveSamples;
+			UPLOAD_DATA->settings.minPixelSamples = rendererNode->settings.minPixelSamples;
+			UPLOAD_DATA->settings.maxPixelSamples = rendererNode->settings.maxPixelSamples;
+			UPLOAD_DATA->settings.noiseCutOff = rendererNode->settings.noiseCutOff;
+
 			UPLOAD_DATA->isSettingsUpdated   = true;
 			rendererNode->settings.isUpdated = false;
 		}
+
+		if (rendererNode->toneMapperSettings.isUpdated)
+		{
+			UPLOAD_DATA->toneMapperSettings.invWhitePoint = 1.0f/ rendererNode->toneMapperSettings.whitePoint;
+			UPLOAD_DATA->toneMapperSettings.colorBalance = rendererNode->toneMapperSettings.colorBalance;
+			UPLOAD_DATA->toneMapperSettings.burnHighlights = rendererNode->toneMapperSettings.burnHighlights;
+			UPLOAD_DATA->toneMapperSettings.crushBlacks = rendererNode->toneMapperSettings.crushBlacks;
+			UPLOAD_DATA->toneMapperSettings.saturation = rendererNode->toneMapperSettings.saturation;
+			UPLOAD_DATA->toneMapperSettings.invGamma = 1.0f/ rendererNode->toneMapperSettings.gamma;
+
+			UPLOAD_DATA->isToneMapperSettingsUpdated = true;
+			rendererNode->toneMapperSettings.isUpdated = false;
+		}
+
+
 	}
 
 	void setCameraData(std::shared_ptr<graph::Camera> cameraNode)

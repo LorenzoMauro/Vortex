@@ -44,7 +44,7 @@ namespace vtx
     }*/
     
     template<typename T>
-    const T* getData();
+    __forceinline__ __device__ const T* getData();
 
     template<>
     __forceinline__ __device__ const CameraData* getData() {

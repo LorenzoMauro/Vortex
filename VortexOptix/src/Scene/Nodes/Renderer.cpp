@@ -8,6 +8,9 @@
 #include "Device/UploadCode/UploadBuffers.h"
 #include "Device/UploadCode/UploadData.h"
 #include "Scene/Traversal.h"
+#include "device_launch_parameters.h"
+#include "cuda_runtime.h"
+#include "Device/UploadCode/UploadFunctions.h"
 
 namespace vtx::graph
 {
@@ -31,6 +34,24 @@ namespace vtx::graph
 
 		settings.minClamp = getOptions()->maxClamp;
 		settings.maxClamp = getOptions()->minClamp;
+		settings.isUpdated = true;
+
+
+		settings.noiseKernelSize = getOptions()->noiseKernelSize;
+		settings.adaptiveSampling = getOptions()->adaptiveSampling;
+		settings.minAdaptiveSamples = getOptions()->minAdaptiveSamples;
+		settings.minPixelSamples = getOptions()->minPixelSamples;
+		settings.maxPixelSamples = getOptions()->maxPixelSamples;
+		settings.albedoNormalNoiseInfluence = getOptions()->albedoNormalNoiseInfluence;
+		settings.noiseCutOff = getOptions()->noiseCutOff;
+
+		toneMapperSettings.whitePoint = getOptions()->whitePoint;
+		toneMapperSettings.colorBalance = getOptions()->colorBalance;
+		toneMapperSettings.burnHighlights = getOptions()->burnHighlights;
+		toneMapperSettings.crushBlacks = getOptions()->crushBlacks;
+		toneMapperSettings.saturation = getOptions()->saturation;
+		toneMapperSettings.gamma = getOptions()->gamma;
+		toneMapperSettings.isUpdated = true;
 
 		drawFrameBuffer.setSize(width, height);
 		drawFrameBuffer.bind();
@@ -65,13 +86,13 @@ namespace vtx::graph
 	{
 		camera->traverse(orderedVisitors);
 		sceneRoot->traverse(orderedVisitors);
-		ACCEPT(orderedVisitors)
+		ACCEPT(Renderer,orderedVisitors)
 	}
 
-	void Renderer::accept(std::shared_ptr<NodeVisitor> visitor)
+	/*void Renderer::accept(std::shared_ptr<NodeVisitor> visitor)
 	{
 		visitor->visit(sharedFromBase<Renderer>());
-	}
+	}*/
 
 	bool Renderer::isReady(const bool setBusy) {
 		if (threadData.renderMutex.try_lock()) {
@@ -100,7 +121,8 @@ namespace vtx::graph
 
 	void Renderer::render()
 	{
-		//std::this_thread::sleep_for(std::chrono::milliseconds(4000));
+		timer.reset();
+
 		const LaunchParams& launchParams = UPLOAD_DATA->launchParams;
 		const CUDABuffer& launchParamsBuffer = UPLOAD_BUFFERS->launchParamsBuffer;
 
@@ -108,7 +130,12 @@ namespace vtx::graph
 		if (launchParams.frameBuffer.frameSize.x == 0)
 		{
 			return;
-		};
+		}
+
+		if (settings.adaptiveSampling && settings.minAdaptiveSamples <= settings.iteration)
+		{
+			device::computeNoiseInfo(sharedFromBase<Renderer>());
+		}
 
 		device::incrementFrame();
 
@@ -116,7 +143,7 @@ namespace vtx::graph
 		const OptixPipeline& pipeline = optix::getRenderingPipeline()->getPipeline();
 		const OptixShaderBindingTable& sbt = optix::getRenderingPipeline()->getSbt();
 
-		timer.reset();
+		CUDA_SYNC_CHECK();
 		const auto result = optixLaunch(/*! pipeline we're launching launch: */
 			pipeline, state.stream,
 			/*! parameters and SBT */

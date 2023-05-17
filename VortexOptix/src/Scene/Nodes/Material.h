@@ -6,6 +6,11 @@
 
 namespace vtx::graph
 {
+	namespace shader
+	{
+		class ShaderNode;
+	}
+
 	// Possible enum values if any.
 	struct EnumValue
 	{
@@ -214,9 +219,10 @@ namespace vtx::graph
 
 		void traverse(const std::vector<std::shared_ptr<NodeVisitor>>& orderedVisitors) override;
 
-		void accept(std::shared_ptr<NodeVisitor> visitor) override;
+		//void accept(std::shared_ptr<NodeVisitor> visitor) override;
 
 	public:
+		std::shared_ptr<graph::shader::ShaderNode> 				materialGraph;
 		std::shared_ptr<graph::Shader>							shader;
 		Handle<ITarget_argument_block>							argBlock;
 		std::list<ParamInfo>									params;

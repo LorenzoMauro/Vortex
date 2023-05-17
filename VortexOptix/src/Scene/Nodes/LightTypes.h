@@ -2,7 +2,7 @@
 #ifndef LIGHT_TYPES_H
 #define LIGHT_TYPES_H
 
-#include "Core/math.h"
+#include "Core/Math.h"
 
 namespace vtx
 {
@@ -21,9 +21,10 @@ namespace vtx
 		math::vec3f position;
 		math::vec3f direction;
 		math::vec3f radianceOverPdf;
-		float		distance;
-		float		pdf;
-		bool		isValid = false;
+		float       distance;
+		float       pdf;
+		bool        isValid = false;
+		LightType         typeLight;
 	};
 }
 

@@ -18,6 +18,8 @@ namespace vtx {
 		cameraFunctionsModule->path = "./ptx/CameraFunctions.optixir";
 
 		auto lightSamplingModule = std::make_shared<optix::ModuleOptix>();
+		lightSamplingModule->name = "deviceProgram";
+		lightSamplingModule->path = "./ptx/devicePrograms.optixir";
 		lightSamplingModule->name = "lightSampling";
 		lightSamplingModule->path = "./ptx/lightSampling.optixir";
 
@@ -95,8 +97,8 @@ namespace vtx {
 		//pipeline->registerProgram(pinholeProgram);
 
 		optix::createDcProgram(cameraFunctionsModule, "__direct_callable__pinhole");
-		optix::createDcProgram(lightSamplingModule, "__direct_callable__meshLightSample");
-		optix::createDcProgram(lightSamplingModule, "__direct_callable__envLightSample");
+		optix::createDcProgram(deviceProgramModule, "__direct_callable__meshLightSample");
+		optix::createDcProgram(deviceProgramModule, "__direct_callable__envLightSample");
 	}
 
 }

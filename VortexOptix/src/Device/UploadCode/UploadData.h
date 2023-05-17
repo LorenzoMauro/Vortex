@@ -45,11 +45,13 @@ namespace vtx::device
 		CameraData								cameraData;
 		bool									isCameraUpdated;
 		FrameBufferData							frameBufferData;
-		bool									isFrameBufferUpdated;
+		bool									isFrameBufferUpdated = false;
 		int										frameId = 0;
-		bool									isFrameIdUpdated;
+		bool									isFrameIdUpdated = false;
 		RendererDeviceSettings					settings;
-		bool									isSettingsUpdated;
+		bool									isSettingsUpdated = false;
+		ToneMapperSettings						toneMapperSettings;
+		bool									isToneMapperSettingsUpdated = false;			
 
 		SbtProgramIdx							programs;
 

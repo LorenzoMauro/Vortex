@@ -5,6 +5,13 @@
 
 namespace vtx::utl
 {
+	
+
+	template<typename T>
+	__device__ T lerp(T a, T b, float t)
+	{
+		return a * (1.0f - t) + b * t;
+	}
 
 	__forceinline__ __host__ __device__ float luminance(const math::vec3f& rgb)
 	{
@@ -15,6 +22,86 @@ namespace vtx::utl
 	__forceinline__ __host__ __device__ float intensity(const math::vec3f& rgb)
 	{
 		return (rgb.x + rgb.y + rgb.z) * 0.3333333333f;
+	}
+
+	template<typename T>
+	__device__ T pow(const T& a, const T& b);
+
+
+	template<>
+	__forceinline__ __device__ float pow(const float& a, const float& b) {
+		return powf(a, b);
+	}
+
+
+	template<>
+	__forceinline__ __device__ math::vec3f pow(const math::vec3f& a, const math::vec3f& b)
+	{
+		return { pow(a.x, b.x), pow(a.y, b.y), pow(a.z, b.z) };
+	}
+
+
+	template<typename T>
+	__device__ T max(const T& a, const T& b);
+
+
+	template<>
+	__forceinline__ __device__ float max(const float& a, const float& b) {
+		return a>b? a: b;
+	}
+
+	template<>
+	__forceinline__ __device__ math::vec3f max(const math::vec3f& a, const math::vec3f& b)
+	{
+		return { max(a.x, b.x), max(a.y, b.y), max(a.z, b.z) };
+	}
+
+	//-------------------------------------------------------------------------------------------------
+		// Avoiding self intersections (see Ray Tracing Gems, Ch. 6)
+		//-------------------------------------------------------------------------------------------------
+	__forceinline__ __device__ float intAsFloat(const uint32_t v)
+	{
+		union
+		{
+			uint32_t bit;
+			float    value;
+		} temp;
+
+		temp.bit = v;
+		return temp.value;
+	}
+
+	__forceinline__ __device__ uint32_t floatAsInt(const float v)
+	{
+		union
+		{
+			uint32_t bit;
+			float    value;
+		} temp;
+
+		temp.value = v;
+		return temp.bit;
+	}
+
+	__forceinline__ __device__ void offsetRay(math::vec3f hitPosition, const math::vec3f& normal)
+	{
+		constexpr float origin = 1.0f / 32.0f;
+		constexpr float floatScale = 1.0f / 65536.0f;
+		constexpr float intScale = 256.0f;
+
+		const math::vec3ui ofI(
+			static_cast<int>(intScale * normal.x),
+			static_cast<int>(intScale * normal.y),
+			static_cast<int>(intScale * normal.z));
+
+		math::vec3f pI(
+			intAsFloat(floatAsInt(hitPosition.x) + ((hitPosition.x < 0.0f) ? -ofI.x : ofI.x)),
+			intAsFloat(floatAsInt(hitPosition.y) + ((hitPosition.y < 0.0f) ? -ofI.y : ofI.y)),
+			intAsFloat(floatAsInt(hitPosition.z) + ((hitPosition.z < 0.0f) ? -ofI.z : ofI.z)));
+
+		hitPosition.x = abs(hitPosition.x) < origin ? hitPosition.x + floatScale * normal.x : pI.x;
+		hitPosition.y = abs(hitPosition.y) < origin ? hitPosition.y + floatScale * normal.y : pI.y;
+		hitPosition.z = abs(hitPosition.z) < origin ? hitPosition.z + floatScale * normal.z : pI.z;
 	}
 
 
@@ -40,10 +127,23 @@ namespace vtx::utl
 		return (v.x == 0.0f && v.y == 0.0f && v.z == 0.0f);
 	}
 
+
 	__forceinline__ __host__ __device__ float balanceHeuristic(const float a, const float b)
 	{
 		//return __fdiv_rn(a,__fadd_rn(a,b));
 		return a / (a + b);
+	}
+
+	__forceinline__ __host__ __device__ float powerHeuristic(const float a, const float b)
+	{
+		//return __fdiv_rn(a,__fadd_rn(a,b));
+		return a*a / (a*a + b*b);
+	}
+
+	__forceinline__ __host__ __device__ float heuristic(const float a, const float b)
+	{
+		//return __fdiv_rn(a,__fadd_rn(a,b));
+		return powerHeuristic(a, b);
 	}
 
 	// Binary-search and return the highest cell index with CDF value <= sample.
@@ -117,15 +217,25 @@ namespace vtx::utl
 		hitP->objectToWorld = math::affine3f(oTw);
 		hitP->worldToObject = math::affine3f(wTo);
 
+		hitP->objectToWorld.toFloat4(hitP->oTwF4);
+		hitP->worldToObject.toFloat4(hitP->wToF4);
+		//printMath("wTo", wTo);
+		//printMath("oTw", oTw);
+		//printMath("objectToWorld", hitP->objectToWorld);
+		//printMath("worldToObject", hitP->worldToObject);
+		//printMath("oTwF4", hitP->oTwF4);
+		//printMath("oTwF4", hitP->wToF4);
 	}
 
 	__forceinline__ __device__ void fetchTransformsFromInstance(HitProperties* hitP)
 	{
 		hitP->objectToWorld = hitP->instance->transform;
 		hitP->worldToObject = math::affine3f(hitP->objectToWorld.l.inverse(), hitP->objectToWorld.p);
+		hitP->objectToWorld.toFloat4(hitP->oTwF4);
+		hitP->worldToObject.toFloat4(hitP->wToF4);
 	}
 
-	__forceinline__ __device__ void computeGeometricHitProperties(HitProperties* hitP, const bool useInstanceData =false)
+	__forceinline__ __device__ void computeGeometricHitProperties(HitProperties* hitP, const unsigned int triangleId, const bool useInstanceData =false)
 	{
 		if (hitP->geometry == nullptr)
 		{
@@ -135,24 +245,43 @@ namespace vtx::utl
 		{
 			CUDA_ERROR_PRINT("Trying to access vertices in hit properties computeHit Function but vertices is null! You need to call getVertices First")
 		}
-		hitP->nsO = hitP->vertices[0]->normal * hitP->baricenter.x + hitP->vertices[1]->normal * hitP->baricenter.y + hitP->vertices[2]->normal * hitP->baricenter.z;
-		hitP->ngO = cross(hitP->vertices[1]->position - hitP->vertices[0]->position, hitP->vertices[2]->position - hitP->vertices[0]->position);
-		hitP->tgO = hitP->vertices[0]->tangent * hitP->baricenter.x + hitP->vertices[1]->tangent * hitP->baricenter.y + hitP->vertices[2]->tangent * hitP->baricenter.z;
-		
+		//hitP->ngO = hitP->geometry->faceAttributeData[triangleId].normal;
+		hitP->ngO = math::normalize(cross(hitP->vertices[1]->position - hitP->vertices[0]->position, hitP->vertices[2]->position - hitP->vertices[0]->position));
+
+		hitP->nsO = math::normalize(hitP->vertices[0]->normal * hitP->baricenter.x + hitP->vertices[1]->normal * hitP->baricenter.y + hitP->vertices[2]->normal * hitP->baricenter.z);
+		hitP->tgO = math::normalize(hitP->vertices[0]->tangent * hitP->baricenter.x + hitP->vertices[1]->tangent * hitP->baricenter.y + hitP->vertices[2]->tangent * hitP->baricenter.z);
+		hitP->btO = math::normalize(hitP->vertices[0]->bitangent * hitP->baricenter.x + hitP->vertices[1]->bitangent * hitP->baricenter.y + hitP->vertices[2]->bitangent * hitP->baricenter.z);
+
+		if (dot(hitP->ngO, hitP->nsO) < 0.0f) // make sure that shading and geometry normal agree on sideness
+		{
+			hitP->ngO = -hitP->ngO;
+		}
+
 		// TODO we already have the inverse so there can be some OPTIMIZATION here
 		hitP->nsW = math::normalize(transformNormal3F(hitP->objectToWorld, hitP->nsO));
 		hitP->ngW = math::normalize(transformNormal3F(hitP->objectToWorld, hitP->ngO));
 		hitP->tgW = math::normalize(transformVector3F(hitP->objectToWorld, hitP->tgO));
+		hitP->btW = math::normalize(transformVector3F(hitP->objectToWorld, hitP->btO));
+		//hitP->tgW = hitP->tgO;
+		//hitP->btW = hitP->btO;
 
-		math::vec3f bt = math::normalize(cross(hitP->nsW, hitP->tgW));
-		hitP->tgW      = cross(bt, hitP->nsW);
+
+		// Calculate an ortho-normal system respective to the shading normal.
+		// Expanding the TBN tbn(tg, ns) constructor because TBN members can't be used as pointers for the Mdl_state with NUM_TEXTURE_SPACES > 1.
+		hitP->btW = math::normalize(cross(hitP->nsW, hitP->tgW));
+		hitP->tgW = cross(hitP->btW, hitP->nsW); // Now the tangent is orthogonal to the shading normal.
+
+
+
+		//math::vec3f bt = math::normalize(cross(hitP->nsW, hitP->tgW));
+		//hitP->tgW      = cross(bt, hitP->nsW);
 
 		hitP->textureCoordinates[0] = hitP->vertices[0]->texCoord * hitP->baricenter.x + hitP->vertices[1]->texCoord * hitP->baricenter.y + hitP->vertices[2]->texCoord * hitP->baricenter.z;
-		hitP->textureBitangents[0] = bt;
+		hitP->textureBitangents[0] = hitP->btW;
 		hitP->textureTangents[0] = hitP->tgW;
 
 		hitP->textureCoordinates[1] = hitP->textureCoordinates[0];
-		hitP->textureBitangents[1]  = bt;
+		hitP->textureBitangents[1] = hitP->btW;
 		hitP->textureTangents[1]    = hitP->tgW;
 
 		// Explicitly include edge-on cases as frontface condition!
@@ -201,7 +330,7 @@ namespace vtx::utl
 			computeHit(hitP, originPosition);
 		}
 
-		computeGeometricHitProperties(hitP);
+		computeGeometricHitProperties(hitP, triangleId);
         
 		determineMaterialHitProperties(hitP, triangleId);
 	}

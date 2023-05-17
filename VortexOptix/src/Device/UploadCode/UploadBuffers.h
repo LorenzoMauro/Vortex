@@ -33,6 +33,7 @@ namespace vtx::device
 			rendererSettingsBuffer.free();
 			sbtProgramIdxBuffer.free();
 			instancesBuffer.free();
+			toneMapperSettingsBuffer.free();
 		}
 
 
@@ -178,13 +179,27 @@ namespace vtx::device
 		{
 			CUDABuffer cudaOutputBuffer;
 			CUDABuffer radianceBuffer;
-
+			CUDABuffer toneMappedRadianceBuffer;
+			CUDABuffer albedoBuffer;
+			CUDABuffer normalBuffer;
+			CUDABuffer noiseDataBuffer;
+			CUDABuffer radianceRangeBuffer;
+			CUDABuffer normalRangeBuffer;
+			CUDABuffer albedoRangeBuffer;
 			FrameBufferBuffers() = default;
 			~FrameBufferBuffers()
 			{
 				VTX_INFO("ShutDown: Frame Buffers");
 				cudaOutputBuffer.free();
 				radianceBuffer.free();
+				toneMappedRadianceBuffer.free();
+				albedoBuffer.free();
+				normalBuffer.free();
+				noiseDataBuffer.free();
+				noiseDataBuffer.free();
+				radianceRangeBuffer.free();
+				normalRangeBuffer.free();
+				albedoRangeBuffer.free();
 			}
 		};
 
@@ -300,6 +315,7 @@ namespace vtx::device
 		CUDABuffer                           sbtProgramIdxBuffer;
 		CUDABuffer                           lightsDataBuffer;
 		CUDABuffer                           instancesBuffer;
+		CUDABuffer                           toneMapperSettingsBuffer;
 
 	private:
 		~Buffers() = default;

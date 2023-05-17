@@ -121,11 +121,11 @@ namespace vtx::graph
 
 	void Camera::traverse(const std::vector<std::shared_ptr<NodeVisitor>>& orderedVisitors)
 	{
-		ACCEPT(orderedVisitors)
+		ACCEPT(Camera,orderedVisitors)
 	}
 
-	void Camera::accept(std::shared_ptr<NodeVisitor> visitor)
+	/*void Camera::accept(std::shared_ptr<NodeVisitor> visitor)
 	{
 		visitor->visit(sharedFromBase<Camera>());
-	}
+	}*/
 }

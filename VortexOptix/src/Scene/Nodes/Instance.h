@@ -44,7 +44,7 @@ namespace vtx::graph
 
 		//TODO Slot addition and removal, currently we can add or remove materials
 		//Removing Material won't delete the slot
-		void addMaterial(const std::shared_ptr<Material>& _material);
+		void Instance::addMaterial(const std::shared_ptr<Material>& _material, int slot=-1);
 
 		void removeMaterial(vtxID matID);
 
@@ -52,7 +52,7 @@ namespace vtx::graph
 
 		void traverse(const std::vector<std::shared_ptr<NodeVisitor>>& orderedVisitors) override;
 
-		void accept(std::shared_ptr<NodeVisitor> visitor) override;
+		//void accept(std::shared_ptr<NodeVisitor> visitor) override;
 
 		void createMeshLight();
 

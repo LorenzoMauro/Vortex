@@ -1,11 +1,188 @@
 ﻿#include "ModelLoader.h"
 #include "Scene/Nodes/Group.h"
 #include "Scene/Nodes/Instance.h"
+#include "Scene/Nodes/Shader/mdl/ShaderNodes.h"
 
 namespace vtx::importer
 {
+    // Types sorted by preferences
+    void getTexturePath(const aiMaterial* material, const std::vector<aiTextureType>& potentialTypes, std::string& returnPath, std::string& scenePath)
+    {
+        aiString path;
+        for(const auto type : potentialTypes)
+	    {
+		    if(material->GetTexture(type, 0, &path) == AI_SUCCESS)
+		    {
+                returnPath = utl::absolutePath(path.C_Str(), scenePath);
+		    	return;
+		    }
+	    }
+    }
+
+    struct GetValueInput {
+        const char* pKey;
+        int type;
+        int index;
+    };
+
+    void getColorValue(const aiMaterial* material, const std::vector<GetValueInput>& potentialTypes, math::vec3f& color)
+    {
+	    aiColor4D aiColor;
+		for(const auto type : potentialTypes)
+		{
+			if(material->Get(type.pKey, type.type, type.index, aiColor) == AI_SUCCESS)
+			{
+                color = math::vec3f(aiColor.r, aiColor.g, aiColor.b);
+		    	return;
+		    }
+	    }
+    }
+
+
+    void getFloatValue(const aiMaterial* material, const std::vector<GetValueInput>& potentialTypes, float& color)
+    {
+        ai_real value;
+        for (const auto type : potentialTypes)
+        {
+            if (material->Get(type.pKey, type.type, type.index, value) == AI_SUCCESS)
+            {
+                color = value;
+                return;
+            }
+        }
+    }
+
+    std::shared_ptr<graph::shader::ImportedNode> createPrincipledMaterial(AssimpMaterialProperties properties)
+    {
+        auto principled = ops::createPbsdfGraph();
+
+        // Diffuse
+        if(!properties.diffuse.path.empty())
+        {
+            principled->setSocketDefault(DIFFUSE_TEXTURE_SOCKET, mdl::createTextureConstant(properties.diffuse.path));
+        }
+        if(properties.diffuse.value != math::vec3f(-1.0f))
+        {
+            principled->setSocketDefault(DIFFUSE_COLOR_SOCKET, mdl::createConstantColor(properties.diffuse.value));
+        }
+
+        // Ambient Occlusion
+        if (!properties.ambientOcclusion.path.empty())
+        {
+            principled->setSocketDefault(AO_TEXTURE_SOCKET, mdl::createTextureConstant(properties.ambientOcclusion.path, mi::neuraylib::IType_texture::TS_2D, 1.0f));
+            principled->setSocketDefault(AO_TO_DIFFUSE_SOCKET, mdl::createConstantFloat(0.5f));
+        }
+
+        // MetallNess
+        if (!properties.metallic.path.empty())
+        {
+            principled->setSocketDefault(METALLIC_TEXTURE_SOCKET, mdl::createTextureConstant(properties.metallic.path, mi::neuraylib::IType_texture::TS_2D, 1.0f));
+        	principled->setSocketDefault(METALLIC_TEXTURE_INFLUENCE_SOCKET, mdl::createConstantFloat(1.0f));
+        }
+        if (properties.metallic.value >= 0.0f)
+        {
+            principled->setSocketDefault(METALLIC_CONSTANT_SOCKET, mdl::createConstantFloat(properties.metallic.value));
+        }
+
+        // Roughness
+        if (!properties.roughness.path.empty())
+        {
+            principled->setSocketDefault(ROUGHNESS_TEXTURE_SOCKET, mdl::createTextureConstant(properties.roughness.path, mi::neuraylib::IType_texture::TS_2D, 1.0f));
+            principled->setSocketDefault(ROUGHNESS_TEXTURE_INFLUENCE_SOCKET, mdl::createConstantFloat(1.0f));
+        }
+        if (properties.roughness.value >= 0.0f)
+        {
+            principled->setSocketDefault(ROUGHNESS_CONSTANT_SOCKET, mdl::createConstantFloat(properties.roughness.value));
+        }
+
+        //Normal
+        if (!properties.normal.path.empty())
+        {
+            principled->setSocketDefault(NORMALMAP_TEXTURE_SOCKET, mdl::createTextureConstant(properties.normal.path, mi::neuraylib::IType_texture::TS_2D, 1.0f));
+            principled->setSocketDefault(NORMALMAP_FACTOR_SOCKET, mdl::createConstantFloat(0.7f));
+        }
+        if (properties.normal.value >= 0.0f)
+        {
+            principled->setSocketDefault(NORMALMAP_FACTOR_SOCKET, mdl::createConstantFloat(properties.normal.value));
+        }
+
+        //Bump
+        if (!properties.bump.path.empty())
+        {
+            principled->setSocketDefault(BUMPMAP_TEXTURE_SOCKET, mdl::createTextureConstant(properties.bump.path, mi::neuraylib::IType_texture::TS_2D, 1.0f));
+        }
+
+        //Specular Level
+        if (properties.specular.value >= 0.0f)
+        {
+            principled->setSocketDefault(SPECULAR_LEVEL_SOCKET, mdl::createConstantFloat(properties.specular.value));
+        }
+
+        return principled;
+    }
+
+
+    void AssimpMaterialProperties::determineProperties(const aiMaterial* material, std::string scenePath)
+    {
+		// Diffuse texture and color
+        getTexturePath(material, { aiTextureType_DIFFUSE, aiTextureType_BASE_COLOR }, diffuse.path, scenePath);
+        getColorValue(material, { { AI_MATKEY_COLOR_DIFFUSE}, {AI_MATKEY_COLOR_SPECULAR} }, diffuse.value);
+
+        // Ambient Occlusion texture and color
+        getTexturePath(material, { aiTextureType_AMBIENT_OCCLUSION }, ambientOcclusion.path, scenePath);
+
+        // Roughness texture and value
+        getTexturePath(material, { aiTextureType_DIFFUSE_ROUGHNESS, aiTextureType_SHININESS }, roughness.path, scenePath);
+        getFloatValue(material, { { AI_MATKEY_ROUGHNESS_FACTOR} }, roughness.value); //, {AI_MATKEY_SHININESS}
+
+        // Specular texture and value
+        getTexturePath(material, { aiTextureType_SPECULAR }, specular.path, scenePath);
+        getFloatValue(material, { {AI_MATKEY_GLOSSINESS_FACTOR}, {AI_MATKEY_SPECULAR_FACTOR} }, specular.value);
+        if (specular.value == -1.0f)
+        {
+            math::vec3f shininessColor = -1.0f;
+            getColorValue(material, { { AI_MATKEY_COLOR_SPECULAR} }, shininessColor);
+            if (shininessColor != diffuse.value && shininessColor.x == shininessColor.y && shininessColor.x == shininessColor.z)
+            {
+                if (shininessColor.x != -1.0f)
+                {
+                    specular.value = shininessColor.x;
+                }
+            }
+        }
+
+        // Metallic texture and value
+        getTexturePath(material, { aiTextureType_METALNESS }, metallic.path, scenePath);
+        getFloatValue(material, { { AI_MATKEY_METALLIC_FACTOR}, { AI_MATKEY_REFLECTIVITY } }, metallic.value);
+
+        // Normal texture
+        getTexturePath(material, { aiTextureType_NORMAL_CAMERA, aiTextureType_NORMALS }, normal.path, scenePath);
+        getFloatValue(material, { { AI_MATKEY_BUMPSCALING} }, normal.value);
+        // Bump texture
+        getTexturePath(material, { aiTextureType_HEIGHT }, bump.path, scenePath);
+
+        //float glossinessFactor = -1.0f;
+        //getFloatValue(material, { { AI_MATKEY_GLOSSINESS_FACTOR} }, glossinessFactor);
+        //
+        //math::vec3f shininessColor = -1.0f;
+        //getColorValue(material, { { AI_MATKEY_COLOR_SPECULAR} }, shininessColor);
+        //float specularFactor = -1.0f;
+        //getFloatValue(material, { { AI_MATKEY_SPECULAR_FACTOR} }, specularFactor);
+        //float reflectivity = -1.0f;
+        //getFloatValue(material, { { AI_MATKEY_REFLECTIVITY} }, reflectivity);
+        //float roughnessfactor = -1.0f;
+        //getFloatValue(material, { { AI_MATKEY_ROUGHNESS_FACTOR} }, roughnessfactor);
+        //float metallicFactor = -1.0f;
+        //getFloatValue(material, { { AI_MATKEY_METALLIC_FACTOR} }, metallicFactor);
+
+        //float shininessStrenght = -1.0f;
+        //getFloatValue(material, { { AI_MATKEY_SHININESS_STRENGTH} }, shininessStrenght);
+        //float shininess = -1.0f;
+        //getFloatValue(material, { { AI_MATKEY_SHININESS} }, shininess);
+
+    }
     // Process materials in the aiScene
-    std::vector<std::shared_ptr<graph::Material>> processMaterials(const aiScene* scene)
+    std::vector<std::shared_ptr<graph::Material>> processMaterials(const aiScene* scene, std::string scenePath)
     {
         std::vector<std::shared_ptr<graph::Material>> materials;
 
@@ -14,10 +191,15 @@ namespace vtx::importer
             aiMaterial* aiMat = scene->mMaterials[i];
 
             // Create a new material in your renderer and set its properties based on aiMat
-            auto material = std::make_shared<graph::Material>();
+            auto material = ops::createNode<graph::Material>();
             // Set material properties, e.g., diffuse color, specular color, textures, etc.
             // ...
 
+            AssimpMaterialProperties properties;
+            properties.determineProperties(aiMat, scenePath);
+            const auto principled = createPrincipledMaterial(properties);
+            // You can now use the extracted variables within the function
+            material->materialGraph = principled;
             materials.push_back(material);
         }
 
@@ -28,6 +210,9 @@ namespace vtx::importer
     {
         // Process vertices
         meshNode->vertices.resize(aiMesh->mNumVertices);
+        meshNode->status.hasNormals = false;
+        meshNode->status.hasTangents = true;
+        meshNode->status.hasFaceAttributes = true;
         for (unsigned int i = 0; i < aiMesh->mNumVertices; ++i)
         {
             auto& vertex = meshNode->vertices[i];
@@ -39,11 +224,14 @@ namespace vtx::importer
             {
                 vertex.normal = math::vec3f(aiMesh->mNormals[i].x, aiMesh->mNormals[i].y, aiMesh->mNormals[i].z);
             }
+            else
+            {
+                meshNode->status.hasNormals = false;
+            }
 
             // Tangents
             if (aiMesh->HasTangentsAndBitangents())
             {
-                meshNode->status.hasTangents = true;
                 vertex.tangent = math::vec3f(aiMesh->mTangents[i].x, aiMesh->mTangents[i].y, aiMesh->mTangents[i].z);
             }
             else
@@ -89,7 +277,7 @@ namespace vtx::importer
         return matrix;
     }
 
-    std::shared_ptr<graph::Instance> processAssimpNode(aiMesh* node, const unsigned assimpMeshId, std::map<unsigned, vtxID>& meshMap)
+    std::shared_ptr<graph::Instance> processAssimpNode(aiMesh* node, const unsigned assimpMeshId, std::map<unsigned, vtxID>& meshMap, const std::vector<std::shared_ptr<graph::Material>>& importedMaterials)
     {
         std::shared_ptr<graph::Mesh> meshNode;
         if (meshMap.find(assimpMeshId) != meshMap.end())
@@ -102,13 +290,15 @@ namespace vtx::importer
             meshMap.insert({ assimpMeshId, meshNode->getID() });
             convertAssimpMeshToMeshNode(node, meshNode);
         }
+
         std::shared_ptr<graph::Instance> instanceNode = ops::createNode<graph::Instance>();
         // Set the meshNode as a child of the instanceNode
         instanceNode->setChild(meshNode);
+        instanceNode->addMaterial(importedMaterials[node->mMaterialIndex]);
         return instanceNode;
     }
 
-    std::shared_ptr<graph::Group> processAssimpNode(const aiNode* node, const aiScene* scene, std::map<unsigned, vtxID>& meshMap) {
+    std::shared_ptr<graph::Group> processAssimpNode(const aiNode* node, const aiScene* scene, std::map<unsigned, vtxID>& meshMap, const std::vector<std::shared_ptr<graph::Material>>& importedMaterials) {
         auto groupNode = ops::createNode<graph::Group>();
 
         // Process node transformation
@@ -116,13 +306,13 @@ namespace vtx::importer
 
         // Process node children
         for (unsigned int i = 0; i < node->mNumChildren; ++i) {
-            groupNode->addChild(processAssimpNode(node->mChildren[i], scene, meshMap));
+            groupNode->addChild(processAssimpNode(node->mChildren[i], scene, meshMap, importedMaterials));
         }
 
         // Process node meshes
         for (unsigned int i = 0; i < node->mNumMeshes; ++i) {
             aiMesh* aiMesh = scene->mMeshes[node->mMeshes[i]];
-            groupNode->addChild(processAssimpNode(aiMesh, node->mMeshes[i], meshMap));
+            groupNode->addChild(processAssimpNode(aiMesh, node->mMeshes[i], meshMap, importedMaterials));
         }
 
         return groupNode;
@@ -200,7 +390,24 @@ namespace vtx::importer
         VTX_INFO("Loading scene file: {}", filePath);
         Assimp::Importer importer;
         const aiScene* scene = importer.ReadFile(filePath,
-                                                 aiProcess_Triangulate | aiProcess_JoinIdenticalVertices | aiProcess_SortByPType);
+                                                 aiProcess_Triangulate |
+                                                 aiProcess_JoinIdenticalVertices |
+                                                 aiProcess_SortByPType |
+                                                 aiProcess_GenSmoothNormals |
+                                                 //aiProcess_CalcTangentSpace |
+                                                 //aiProcess_RemoveComponent (remove colors) |
+                                                 //aiProcess_LimitBoneWeights |
+                                                 aiProcess_ImproveCacheLocality |
+                                                 aiProcess_RemoveRedundantMaterials |
+                                                 //aiProcess_GenUVCoords |
+                                                 aiProcess_FindDegenerates |
+                                                 aiProcess_FindInvalidData |
+                                                 aiProcess_FindInstances |
+                                                 //aiProcess_ValidateDataStructure |
+                                                 aiProcess_OptimizeMeshes |
+                                                 //aiProcess_OptimizeGraph |
+                                                 //aiProcess_Debone |
+                                                 0);
 
         const bool successCondition = (scene && !(scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE) && scene->mRootNode);
         VTX_ASSERT_CONTINUE(successCondition, "Assimp Importer Errror: {}", importer.GetErrorString());
@@ -208,8 +415,10 @@ namespace vtx::importer
         processMetadata(scene);
         std::map<unsigned, vtxID> meshMap;
         VTX_INFO("Creating Scene Graph");
-        return processAssimpNode(scene->mRootNode, scene, meshMap);
+		const std::vector<std::shared_ptr<graph::Material>> importedMaterials = processMaterials(scene, utl::getFolder(filePath));
+        return processAssimpNode(scene->mRootNode, scene, meshMap, importedMaterials);
 
     }
+
 
 }

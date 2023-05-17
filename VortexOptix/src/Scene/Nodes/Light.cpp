@@ -16,13 +16,13 @@ namespace vtx::graph
 		{
 			std::dynamic_pointer_cast<EvnLightAttributes>(attributes)->envTexture->traverse(orderedVisitors);
 		}
-		ACCEPT(orderedVisitors);
+		ACCEPT(Light,orderedVisitors);
 	}
 
-	void Light::accept(std::shared_ptr<NodeVisitor> visitor)
+	/*void Light::accept(std::shared_ptr<NodeVisitor> visitor)
 	{
 		visitor->visit(sharedFromBase<Light>());
-	}
+	}*/
 
 	EvnLightAttributes::EvnLightAttributes()
 	{
@@ -211,7 +211,8 @@ namespace vtx::graph
 				//importanceData[idx] = area * std::max(pixels[idx4], std::max(pixels[idx4 + 1], pixels[idx4 + 2]));
 				//importanceData[idx] = area * (pixels[idx4] + pixels[idx4 + 1] + pixels[idx4 + 2]) * 0.3333333333f;
 				const float       luminance =dot(math::vec3f(pixels[idx4],pixels[idx4 + 1],pixels[idx4 + 2]), ntscLuminance);
-				const float value = vtx::ops::gaussianFilter(pixels, width, height, x, y, true);
+				float value = vtx::ops::gaussianFilter(pixels, width, height, x, y, true);
+				value = luminance;
 				importanceData[idx] = area * (value);
 			}
 		}
@@ -224,8 +225,9 @@ namespace vtx::graph
 				//aliasMap[i].pdf = std::max(pixels[idx4], std::max(pixels[idx4 + 1], pixels[idx4 + 2])) * invEnvIntegral;
 				const float       luminance = dot(math::vec3f(pixels[idx4], pixels[idx4 + 1], pixels[idx4 + 2]), ntscLuminance);
 
-				const float value = vtx::ops::gaussianFilter(pixels, width, height, x, y, true);
+				float value = vtx::ops::gaussianFilter(pixels, width, height, x, y, true);
 
+				value = luminance;
 				aliasMap[idx].pdf = value * invEnvIntegral;
 			}
 		}

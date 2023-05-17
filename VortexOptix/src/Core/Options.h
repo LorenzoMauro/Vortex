@@ -4,49 +4,66 @@
 #include <vector>
 #include "Device/DevicePrograms/LaunchParams.h"
 
-namespace vtx {
-	struct Options {
-		int         width         = 2100;
-		int         height        = 900;
-		std::string windowName    = "Vortex";
-		std::string dataFolder	= "E:/Dev/VortexOptix/data/";
-		std::string imGuiIniFile  = dataFolder + "ImGui.ini";
-		std::string dllPath       = "./lib/";
-		float       clearColor[4] = { 0.45f, 0.55f, 0.60f, 1.00f };
-		#ifdef NDEBUG
-		bool isDebug = false;
-		#else
-		bool isDebug = true;
-		#endif
+namespace vtx
+{
+	struct Options
+	{
+		bool        initialized = false;
+		int         width;
+		int         height;
+		std::string windowName;
+		std::string dataFolder;
+		std::string imGuiIniFile;
+		std::string dllPath;
+		float       clearColor[4];
+		bool isDebug;
 		////////////////////////////////////////////////////////////////////////////////////
 		/////////////////// Rendering Settings /////////////////////////////////////////////
 		////////////////////////////////////////////////////////////////////////////////////
 
-		uint32_t                                  maxBounces        = 5;
-		uint32_t                                  maxSamples        = 500;
-		bool                                      accumulate        = true;
-		RendererDeviceSettings::SamplingTechnique samplingTechnique = RendererDeviceSettings::SamplingTechnique::S_MIS;
-		RendererDeviceSettings::DisplayBuffer     displayBuffer     = RendererDeviceSettings::DisplayBuffer::FB_NOISY;
-		float                                     maxClamp          = 0.01f;
-		float                                     minClamp          = 1000.0f;
+		uint32_t                                  maxBounces;
+		uint32_t                                  maxSamples;
+		bool                                      accumulate;
+		RendererDeviceSettings::SamplingTechnique samplingTechnique;
+		RendererDeviceSettings::DisplayBuffer     displayBuffer;
+		float                                     maxClamp;
+		float                                     minClamp;
+
+		int   noiseKernelSize;
+		int   adaptiveSampling;
+		int   minAdaptiveSamples;
+		int   minPixelSamples;
+		int   maxPixelSamples;
+		float albedoNormalNoiseInfluence;
+		float noiseCutOff;
+
+
+		math::vec3f whitePoint;
+		math::vec3f colorBalance;
+		float       burnHighlights;
+		float       crushBlacks;
+		float       saturation;
+		float       gamma;
+
 		////////////////////////////////////////////////////////////////////////////////////
 		/////////////////// Optix Options //////////////////////////////////////////////////
 		////////////////////////////////////////////////////////////////////////////////////
-		int         OptixVersion             = OPTIX_VERSION;
-		int         deviceID                 = 0;
-		int         maxDcDepth               = 2;
-		int         maxTraversableGraphDepth = 2;
-		std::string LaunchParamName          = "optixLaunchParams";
-		bool        enableCache              = true;
+		int         OptixVersion;
+		int         deviceID;
+		int         maxDcDepth;
+		int         maxTraversableGraphDepth;
+		std::string LaunchParamName;
+		bool        enableCache;
 
 		////////////////////////////////////////////////////////////////////////////////////
 		/////////////////// MDL Options ////////////////////////////////////////////////////
 		////////////////////////////////////////////////////////////////////////////////////
-		std::vector<std::string> mdlSearchPath      = { dataFolder, "./" , "E:/Dev/OptixTut/bin/Debug-windows-x86_64/OptixApp/mdl"};
-		int                      numTextureSpaces   = 1; //should be set to 1 for performance reasons If you do not use the hair BSDF.
-		int                      numTextureResults  = 16;
-		bool                     enable_derivatives = false;
-		const char*              mdlOptLevel        = "2";
+		std::vector<std::string> mdlSearchPath;
+		int                      numTextureSpaces;
+		int                      numTextureResults;
+		bool                     enable_derivatives;
+		const char*              mdlOptLevel;
+		bool                     directCallable;
 	};
 
 	Options* getOptions();

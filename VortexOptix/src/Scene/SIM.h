@@ -1,4 +1,5 @@
 #pragma once
+#include <map>
 #include <set>
 
 #include "Node.h"
@@ -54,7 +55,7 @@ namespace vtx::graph
 			const std::shared_ptr<T>& nodePtr = std::dynamic_pointer_cast<T>((*sim)[id]);
 			if(!nodePtr)
 			{
-				VTX_ERROR("The requested Node Id doesn't match it's type!");
+				VTX_WARN("The requested Node Id doesn't match it's type!");
 
 			}
 			return nodePtr;
@@ -69,10 +70,20 @@ namespace vtx::graph
 			return nodePtr != nullptr;
 		}
 
-		static std::vector<std::shared_ptr<Node>> getAllNodeOfType(NodeType nodeType)
+		template<typename T>
+		static std::vector<std::shared_ptr<T>> getAllNodeOfType(NodeType nodeType)
 		{
 			const auto sim = Get();
-			return sim->vectorsOfNodes[nodeType];
+
+			std::vector<std::shared_ptr<T>> nodes;
+			for(std::shared_ptr<Node> node : sim->vectorsOfNodes[nodeType])
+			{
+				if(std::shared_ptr<T> tNode = std::dynamic_pointer_cast<T>(node))
+				{
+					nodes.push_back(tNode);
+				}
+			}
+			return nodes;
 
 		}
 
