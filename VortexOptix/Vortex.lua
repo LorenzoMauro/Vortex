@@ -60,7 +60,7 @@ function genClangCommand(cu_file, bc_file,d_file, clang_path, cuda_path, include
     ClangCompileCommand = ClangCompileCommand .. " -std=c++17"
     ClangCompileCommand = ClangCompileCommand .. " -emit-llvm"
     ClangCompileCommand = ClangCompileCommand .. " -c"
-    ClangCompileCommand = ClangCompileCommand .. " -w"
+    --ClangCompileCommand = ClangCompileCommand .. " -w"
     ClangCompileCommand = ClangCompileCommand .. " -O3"
     ClangCompileCommand = ClangCompileCommand .. " -ffast-math"
     ClangCompileCommand = ClangCompileCommand .. " -fcuda-flush-denormals-to-zero"
@@ -90,7 +90,8 @@ project "OptixApp"
         "%{IncludeDir.gdt}/**.cpp",
         "src/**.h",
         "src/**.cpp",
-        "src/Device/DevicePrograms/**.cu"
+        "src/**.cu",
+        "src/Device/DevicePrograms/**.cu",
         "src/Device/DevicePrograms/Cuda/**.cu"
     }
 
@@ -230,7 +231,7 @@ project "OptixApp"
 
     clang12 = "C:/Program Files (x86)/LLVM/bin/clang.exe"
     clang15 = "C:/Program Files/LLVM-15/bin/clang.exe"
-    clangCudaPath = CUDA_TOOLKIT_PATH
+    clangCudaPath = CUDA_TOOLKIT_PATH_11
     -- Custom build step to compile .cu files to .bc files
     filter {"files:src/Device/DevicePrograms/Clang/**.cu"}
 

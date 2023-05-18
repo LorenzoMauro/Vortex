@@ -129,13 +129,35 @@ namespace vtx {
 	};
 
 	// Alias the PerRayData pointer and an math::vec2f for the payload split and merge operations. This generates only move instructions.
+	
+
+	//// Split the pointer
+	//__forceinline__ __device__ math::vec2ui splitPointer(PerRayData* ptr)
+	//{
+	//	const auto     ptrValue = reinterpret_cast<uint64_t>(ptr);
+	//	const uint32_t high      = ptrValue >> 32;        // shift right to get the high-order bits
+	//	const uint32_t low       = ptrValue & 0xFFFFFFFF; // mask to get the low-order bits
+	//	return math::vec2ui{ low, high };
+	//}
+
+	//// Merge the pointer
+
+	//static __forceinline__ __device__ void* unpackPointer(unsigned p0, unsigned p1)
+	//{
+	//	const uint64_t ptr_value = static_cast<uint64_t>(p0) << 32 | p1;
+	//	return reinterpret_cast<void*>(ptr_value);
+	//}
+
+	//static __forceinline__ __device__ PerRayData* mergePointer(unsigned p0, unsigned p1)
+	//{
+	//	return reinterpret_cast<PerRayData*>(unpackPointer(p0, p1));
+	//}
 	typedef union
 	{
 		PerRayData* ptr;
-		math::vec2ui dat{0,0};
+		uint2 dat;
 	} Payload;
-
-	__forceinline__ __device__ math::vec2ui splitPointer(PerRayData* ptr)
+	__forceinline__ __device__ uint2 splitPointer(PerRayData* ptr)
 	{
 		Payload payload;
 
@@ -153,6 +175,30 @@ namespace vtx {
 
 		return payload.ptr;
 	}
+
+
+	//static __forceinline__ __device__ void* unpack_pointer(uint32_t i0, uint32_t i1)
+	//{
+	//	const uint64_t uptr = static_cast<uint64_t>(i0) << 32 | i1;
+	//	void* ptr = reinterpret_cast<void*>(uptr);
+	//	return ptr;
+	//}
+	//
+	//
+	//static __forceinline__ __device__ void pack_pointer(void* ptr, uint32_t& i0, uint32_t& i1)
+	//{
+	//	const uint64_t uptr = reinterpret_cast<uint64_t>(ptr);
+	//	i0 = uptr >> 32;
+	//	i1 = uptr & 0x00000000ffffffff;
+	//}
+	//
+	//
+	//static __forceinline__ __device__ PerRayData* getPrd()
+	//{
+	//	const uint32_t u0 = optixGetPayload_0();
+	//	const uint32_t u1 = optixGetPayload_1();
+	//	return reinterpret_cast<PerRayData*>(unpack_pointer(u0, u1));
+	//}
 
 
 }

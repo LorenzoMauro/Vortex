@@ -60,6 +60,9 @@ namespace vtx::graph
 
 		void clearMeshLight(vtxID matID);
 
+		//TODO : This is a temporary solution, since we are creating a hit program per material we will have to split instances according to the used materials
+		unsigned getHitSbt(const size_t slot) const;
+
 		std::shared_ptr<graph::Light> getMeshLight(vtxID materialID);
 
 		std::vector<MaterialSlot>&     getMaterialSlots();

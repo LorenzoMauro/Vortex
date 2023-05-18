@@ -17,6 +17,7 @@ OPTIX_SDK_PATH = "C:/ProgramData/NVIDIA Corporation/OptiX SDK 7.7.0"
 CUDA_TOOLKIT_PATH = "C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v12.1"
 CUDA_TOOLKIT_PATH_8 = "C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v8.0"
 CUDA_TOOLKIT_PATH_12 = "C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v12.0"
+CUDA_TOOLKIT_PATH_10 = "C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v10.1"
 CUDA_TOOLKIT_PATH_11 = "C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v11.5"
 ASSIMP_SDK_PATH = "C:/Program Files/Assimp"
 

@@ -2,10 +2,12 @@
 #ifndef MDL_DECLARATIONS_H
 #define MDL_DECLARATIONS_H
 
+
 #include "MdlStructs.h"
 //
 // Functions needed by texture runtime when this file is compiled with Clang
 //
+
 
 extern "C" __device__ __inline__ void __itex2D_float(
     float* retVal, cudaTextureObject_t texObject, float x, float y)
@@ -24,8 +26,6 @@ extern "C" __device__ __inline__ void __itex2D_float4(
     asm volatile ("tex.2d.v4.f32.f32 {%0, %1, %2, %3}, [%4, {%5, %6}];"
                   : "=f"(tmp.x), "=f"(tmp.y), "=f"(tmp.z), "=f"(tmp.w)
                   : "l"(texObject), "f"(x), "f"(y));
-    //printf("tex.2d.v4.f32.f32 {%f, %f, %f, %f} UV {%f, %f};\n", tmp.x, tmp.y, tmp.z, tmp.w, x, y);
-    //printf("HERE!");
     *retVal = make_float4(tmp.x, tmp.y, tmp.z, tmp.w);
 }
 
@@ -112,6 +112,7 @@ extern "C" __device__ MatExprFunc     frontEdfMode;
 extern "C" __device__ EdfEvaluateFunc backEdf_evaluate;
 extern "C" __device__ MatExprFunc     backEdfIntensity;
 extern "C" __device__ MatExprFunc     backEdfMode;
+
 
 //extern "C" __device__ MatExprFunc volumeAbsorptionCoefficient;
 //extern "C" __device__ MatExprFunc volumeScatteringCoefficient;

@@ -17,6 +17,7 @@ nsightProfile/
 *.dylib
 *.ii
 *.ii.res
+*.ptx
 
 # Ignore generated project files
 *.sln

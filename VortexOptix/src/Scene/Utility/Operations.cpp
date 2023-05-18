@@ -809,7 +809,7 @@ namespace vtx::ops
 		{
 			case BLENDER_TEST:
 			{
-				scenePath = getOptions()->dataFolder + "models/Blender/blenderTest5.fbx";
+				scenePath = getOptions()->dataFolder + "models/Blender/blenderTest6.fbx";
 			}break;
 			case SPONZA_OBJ:
 			{

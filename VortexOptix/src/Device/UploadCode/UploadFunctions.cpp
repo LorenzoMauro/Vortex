@@ -344,6 +344,9 @@ namespace vtx::device
 			if (dp.pgEvaluateMaterial) {
 				dvConfig.idxCallEvaluateMaterial = optix::PipelineOptix::getProgramSbt(sbtMap, dp.pgEvaluateMaterial->name);
 			}
+			if (dp.pgHit) {
+				dvConfig.idxCallHitProgram = optix::PipelineOptix::getProgramSbt(sbtMap, dp.pgHit->name);
+			}
 		}
 		
 
@@ -852,10 +855,10 @@ namespace vtx::device
 		pg.raygen          = optix::PipelineOptix::getProgramSbt(sbtMap, "raygen");
 		pg.exception       = optix::PipelineOptix::getProgramSbt(sbtMap, "exception");
 		pg.miss            = optix::PipelineOptix::getProgramSbt(sbtMap, "miss");
-		pg.hit             = optix::PipelineOptix::getProgramSbt(sbtMap, "hit");
+		//pg.hit             = optix::PipelineOptix::getProgramSbt(sbtMap, "hit");
 		pg.pinhole         = optix::PipelineOptix::getProgramSbt(sbtMap, "pinhole");
-		pg.meshLightSample = optix::PipelineOptix::getProgramSbt(sbtMap, "meshLightSample");
-		pg.envLightSample  = optix::PipelineOptix::getProgramSbt(sbtMap, "envLightSample");
+		//pg.meshLightSample = optix::PipelineOptix::getProgramSbt(sbtMap, "meshLightSample");
+		//pg.envLightSample  = optix::PipelineOptix::getProgramSbt(sbtMap, "envLightSample");
 
 		return pg;
 	}

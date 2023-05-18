@@ -70,6 +70,7 @@ namespace vtx {
         bool directCallable;
 
         int idxCallEvaluateMaterial = -1;
+        int         idxCallHitProgram = -1;
 
         int idxCallInit = -1; // The material global init function.
 

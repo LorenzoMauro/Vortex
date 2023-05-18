@@ -2,10 +2,15 @@
 #ifndef UTILS_H
 #define UTILS_H
 #include <optix_device.h>
+#include "Core/Math.h"
+#include "RayData.h"
+#include "CudaDebugHelper.h"
+#include "LaunchParams.h"
 
 namespace vtx::utl
 {
 	
+	extern "C" __constant__ LaunchParams optixLaunchParams;
 
 	template<typename T>
 	__device__ T lerp(T a, T b, float t)
@@ -241,10 +246,10 @@ namespace vtx::utl
 		{
 			CUDA_ERROR_PRINT("Trying to access geometry in hit properties getVertices Function but geometry is null! You need to call getInstanceAndGeometry First")
 		}
-		if (hitP->vertices[0] == nullptr)
+		/*if (hitP->vertices[0] == nullptr)
 		{
 			CUDA_ERROR_PRINT("Trying to access vertices in hit properties computeHit Function but vertices is null! You need to call getVertices First")
-		}
+		}*/
 		//hitP->ngO = hitP->geometry->faceAttributeData[triangleId].normal;
 		hitP->ngO = math::normalize(cross(hitP->vertices[1]->position - hitP->vertices[0]->position, hitP->vertices[2]->position - hitP->vertices[0]->position));
 

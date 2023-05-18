@@ -28,7 +28,9 @@ namespace vtx::device
 					instance->finalTransformStack = transformIndexStack;
 				}
 
-				const OptixInstance                           optixInstance = optix::createInstance(instanceId, instance->finalTransform, traversable);
+
+				//TODO: We are just selecting the first material slot, so we will have to split instances with multiple materials
+				const OptixInstance                           optixInstance = optix::createInstance(instanceId, instance->finalTransform, traversable, instance->getHitSbt(0));
 				const std::tuple<InstanceData, InstanceData*> instanceData = createInstanceData(instance, instance->finalTransform);
 
 				UPLOAD_DATA->instanceDataMap.insert(instanceId, instanceData);

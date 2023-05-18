@@ -125,12 +125,16 @@ namespace vtx::optix
 				OPTIX_EXCEPTION_FLAG_DEBUG;
 		}
 		else
+		{
 			state.pipelineCompileOptions.exceptionFlags = OPTIX_EXCEPTION_FLAG_NONE;
+		}
 		state.pipelineCompileOptions.pipelineLaunchParamsVariableName = getOptions()->LaunchParamName.c_str();
 		if (getOptions()->OptixVersion != 70000)
+		{
 			state.pipelineCompileOptions.usesPrimitiveTypeFlags =
 				OPTIX_PRIMITIVE_TYPE_FLAGS_TRIANGLE |
 				OPTIX_PRIMITIVE_TYPE_FLAGS_ROUND_CUBIC_BSPLINE;
+		}
 	}
 
 	void setPipelineLinkOptions()
@@ -618,11 +622,9 @@ namespace vtx::optix
 		return traversable;
 	}
 
-	OptixInstance createInstance(uint32_t instanceId, math::affine3f transform, OptixTraversableHandle traversable)
+	OptixInstance createInstance(uint32_t instanceId, math::affine3f transform, OptixTraversableHandle traversable, unsigned sbtOffset)
 	{
 		// First check if there is a valid material assigned to this instance.
-
-		
 
 		OptixInstance optixInstance = {};
 
@@ -634,9 +636,11 @@ namespace vtx::optix
 		//OptixInstance.instanceId = m_SequentialInstanceID; // User defined instance index, queried with optixGetInstanceId().
 		optixInstance.instanceId = instanceId; // User defined instance index, queried with optixGetInstanceId().
 		optixInstance.visibilityMask = 255;
-		optixInstance.sbtOffset = 0;
+		optixInstance.sbtOffset = sbtOffset;
 		optixInstance.flags = OPTIX_INSTANCE_FLAG_NONE;
 		optixInstance.traversableHandle = traversable;
+
+		VTX_INFO("Optix Wrapper: Instance created with sbt {}", sbtOffset);
 
 		return optixInstance;
 	}

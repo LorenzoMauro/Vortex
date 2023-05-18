@@ -168,5 +168,14 @@ namespace vtx::graph
 		return materialSlots;
 	}
 
+	unsigned Instance::getHitSbt(const size_t slot) const
+	{
+		const graph::Shader::DevicePrograms& dp = materialSlots[slot].material->getShader()->getPrograms();
+		optix::PipelineOptix* rp = optix::getRenderingPipeline();
+		const CudaMap<vtxID, optix::sbtPosition>& sbtMap = rp->getSbtMap();
+		const unsigned                            hitSbtIndex = optix::PipelineOptix::getProgramSbt(sbtMap, dp.pgHit->name);
+		return hitSbtIndex;
+	}
+
 }
 

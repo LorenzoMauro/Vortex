@@ -126,8 +126,10 @@ namespace vtx::graph
 
 		struct DevicePrograms
 		{
-			std::shared_ptr<optix::ProgramOptix> pgInit;
 			std::shared_ptr<optix::ProgramOptix> pgEvaluateMaterial;
+			std::shared_ptr<optix::ProgramOptix> pgHit;
+
+			std::shared_ptr<optix::ProgramOptix> pgInit;
 			std::shared_ptr<optix::ProgramOptix> pgThinWalled;
 
 			std::shared_ptr<optix::ProgramOptix> pgSurfaceScatteringSample;

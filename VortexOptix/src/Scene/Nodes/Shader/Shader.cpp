@@ -202,6 +202,27 @@ namespace vtx::graph
 		else
 		{
 			devicePrograms.pgEvaluateMaterial = optix::createDcProgram(module, "__direct_callable__EvaluateMaterial");
+
+			auto closestHitFunction = std::make_shared<optix::FunctionOptix>();
+			closestHitFunction->name = "__closesthit__radiance";
+			closestHitFunction->module = module;
+			closestHitFunction->type = optix::OptixFunctionType::F_ClosestHit;
+
+			auto anyHitFunction = std::make_shared<optix::FunctionOptix>();
+			anyHitFunction->name = "__anyhit__radiance";
+			anyHitFunction->module = module;
+			anyHitFunction->type = optix::OptixFunctionType::F_AnyHit;
+
+			auto hitProgram = std::make_shared<optix::ProgramOptix>();
+			hitProgram->name = "hit_" + std::to_string(getID());
+			hitProgram->type = optix::OptixProgramType::P_Hit;
+			hitProgram->closestHitFunction = closestHitFunction;
+			hitProgram->anyHitFunction = anyHitFunction;
+
+			optix::PipelineOptix* pipeline = optix::getRenderingPipeline();
+			pipeline->registerProgram(hitProgram);
+
+			devicePrograms.pgHit = hitProgram;
 		}
 	}
 

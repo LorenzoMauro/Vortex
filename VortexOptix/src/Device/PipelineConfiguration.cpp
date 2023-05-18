@@ -17,11 +17,11 @@ namespace vtx {
 		cameraFunctionsModule->name = "cameraFunctions";
 		cameraFunctionsModule->path = "./ptx/CameraFunctions.optixir";
 
-		auto lightSamplingModule = std::make_shared<optix::ModuleOptix>();
+		/*auto lightSamplingModule = std::make_shared<optix::ModuleOptix>();
 		lightSamplingModule->name = "deviceProgram";
 		lightSamplingModule->path = "./ptx/devicePrograms.optixir";
 		lightSamplingModule->name = "lightSampling";
-		lightSamplingModule->path = "./ptx/lightSampling.optixir";
+		lightSamplingModule->path = "./ptx/lightSampling.optixir";*/
 
 		///////////////////////////////////////////////////////////////////
 		/////////////////////// Functions /////////////////////////////////
@@ -42,15 +42,15 @@ namespace vtx {
 		missFunction->module = deviceProgramModule;
 		missFunction->type = optix::OptixFunctionType::F_Miss;
 
-		auto closestHitFunction = std::make_shared<optix::FunctionOptix>();
-		closestHitFunction->name = "__closesthit__radiance";
-		closestHitFunction->module = deviceProgramModule;
-		closestHitFunction->type = optix::OptixFunctionType::F_ClosestHit;
-
-		auto anyHitFunction = std::make_shared<optix::FunctionOptix>();
-		anyHitFunction->name = "__anyhit__radiance";
-		anyHitFunction->module = deviceProgramModule;
-		anyHitFunction->type = optix::OptixFunctionType::F_AnyHit;
+		//auto closestHitFunction = std::make_shared<optix::FunctionOptix>();
+		//closestHitFunction->name = "__closesthit__radiance";
+		//closestHitFunction->module = deviceProgramModule;
+		//closestHitFunction->type = optix::OptixFunctionType::F_ClosestHit;
+		//
+		//auto anyHitFunction = std::make_shared<optix::FunctionOptix>();
+		//anyHitFunction->name = "__anyhit__radiance";
+		//anyHitFunction->module = deviceProgramModule;
+		//anyHitFunction->type = optix::OptixFunctionType::F_AnyHit;
 
 		//auto pinholeFunction = std::make_shared<optix::FunctionOptix>();
 		//pinholeFunction->name = "__direct_callable__pinhole";
@@ -76,11 +76,11 @@ namespace vtx {
 		missProgram->type = optix::OptixProgramType::P_Miss;
 		missProgram->missFunction = missFunction;
 
-		auto hitProgram = std::make_shared<optix::ProgramOptix>();
+		/*auto hitProgram = std::make_shared<optix::ProgramOptix>();
 		hitProgram->name = "hit";
 		hitProgram->type = optix::OptixProgramType::P_Hit;
 		hitProgram->closestHitFunction = closestHitFunction;
-		hitProgram->anyHitFunction = anyHitFunction;
+		hitProgram->anyHitFunction = anyHitFunction;*/
 
 
 		//auto pinholeProgram = std::make_shared<optix::ProgramOptix>();
@@ -93,12 +93,12 @@ namespace vtx {
 		pipeline->registerProgram(rayGenProgram);
 		pipeline->registerProgram(exceptionProgram);
 		pipeline->registerProgram(missProgram);
-		pipeline->registerProgram(hitProgram);
+		//pipeline->registerProgram(hitProgram);
 		//pipeline->registerProgram(pinholeProgram);
 
 		optix::createDcProgram(cameraFunctionsModule, "__direct_callable__pinhole");
-		optix::createDcProgram(deviceProgramModule, "__direct_callable__meshLightSample");
-		optix::createDcProgram(deviceProgramModule, "__direct_callable__envLightSample");
+		//optix::createDcProgram(deviceProgramModule, "__direct_callable__meshLightSample");
+		//optix::createDcProgram(deviceProgramModule, "__direct_callable__envLightSample");
 	}
 
 }

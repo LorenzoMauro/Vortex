@@ -264,7 +264,8 @@ namespace vtx::mdl
 		startInterfaces();
 		if(!getOptions()->directCallable)
 		{
-			setRendererModule("./bc/MaterialDirectCallable.bc", "__direct_callable__EvaluateMaterial");
+			setRendererModule("./bc/MaterialDirectCallable.bc", "__closesthit__radiance,__direct_callable__EvaluateMaterial,__anyhit__radiance");
+			//setRendererModule("./bc/MaterialDirectCallable.bc", "");
 		}
 	}
 
@@ -302,9 +303,12 @@ namespace vtx::mdl
 		Sint32 result = getState()->backend->set_option_binary("llvm_renderer_module", binary.data(), binary.size());
 		VTX_ASSERT_CLOSE(result == 0, "ERROR: Setting PTX option llvm_renderer_module failed");
 
+		result = getState()->backend->set_option("link_libdevice", "on");
+
 		// limit functions for which PTX code is generated to the entry functions
 		result = getState()->backend->set_option("visible_functions", visibleFunction.c_str());
 		VTX_ASSERT_CLOSE(result == 0, "ERROR: Setting PTX option visible_functions failed");
+		
 	};
 
 	void MdlState::openTransaction(const bool openFactories) {

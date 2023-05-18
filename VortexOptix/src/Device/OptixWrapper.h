@@ -164,7 +164,7 @@ namespace vtx::optix
 	OptixTraversableHandle createGeometryAcceleration(CUdeviceptr vertexData, uint32_t verticesNumber, uint32_t verticesStride, 
 													  CUdeviceptr indexData, uint32_t indexNumber, uint32_t indicesStride);
 
-	OptixInstance createInstance(uint32_t instanceId, math::affine3f transform, OptixTraversableHandle traversable);
+	OptixInstance createInstance(uint32_t instanceId, math::affine3f transform, OptixTraversableHandle traversable, unsigned sbtOffset = 0);
 
 	OptixTraversableHandle createInstanceAcceleration(const std::vector<OptixInstance>& optixInstances);
 
