@@ -7,6 +7,8 @@ ext/MDL/
 old/
 VortexOptix/x64/
 nsightProfile/
+data/*.*
+data/*
 
 # Ignore object files and libraries
 *.o
@@ -17,6 +19,7 @@ nsightProfile/
 *.dylib
 *.ii
 *.ii.res
+*.ptx
 
 # Ignore generated project files
 *.sln
@@ -31,6 +34,3 @@ Vortex.sln.nvsettings
 *.user
 VortexOptix/Vortex.lua
 *.DotSettings
-
-data/*.*
-data/*

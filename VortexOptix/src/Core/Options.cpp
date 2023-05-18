@@ -55,7 +55,7 @@ namespace vtx {
 		options.maxDcDepth = 2;
 		options.maxTraversableGraphDepth = 2;
 		options.LaunchParamName = "optixLaunchParams";
-		options.enableCache = false;
+		options.enableCache = true;
 
 		////////////////////////////////////////////////////////////////////////////////////
 		/////////////////// MDL Options ////////////////////////////////////////////////////

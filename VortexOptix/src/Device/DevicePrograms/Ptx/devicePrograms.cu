@@ -652,6 +652,18 @@ namespace vtx
 			{
 				break;
 			}
+			// Unbiased Russian Roulette path termination.
+			if (2 <= prd.depth) // Start termination after a minimum number of bounces.
+			{
+				const float probability = fmaxf(fmaxf(prd.throughput.x, prd.throughput.y), prd.throughput.z);
+
+				if (probability < rng(prd.seed)) // Paths with lower probability to continue are terminated earlier.
+				{
+					break;
+				}
+
+				prd.throughput /= probability; // Path isn't terminated. Adjust the throughput so that the average is right again.
+			}
 
 			++prd.depth; // Next path segment.
 		}
