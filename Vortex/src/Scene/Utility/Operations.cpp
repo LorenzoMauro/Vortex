@@ -2,7 +2,6 @@
 
 #include "ModelLoader.h"
 #include "Core/Math.h"
-#include "MDL/materialEditor.h"
 #include "MDL/ShaderVisitor.h"
 #include "Scene/Graph.h"
 #include "Scene/Nodes/Shader/mdl/ShaderNodes.h"
@@ -445,11 +444,6 @@ namespace vtx::ops
 		return intensity / 3.0f;
 	}
 
-	std::shared_ptr<graph::shader::ImportedNode> createPbsdfGraph()
-	{
-		return ops::createNode<shader::ImportedNode>(PBSDF_MODULE, PBSDF_FUNCTION);
-	}
-
 	void computeFaceAttributes(const std::shared_ptr<Mesh>& mesh)
 	{
 		//const std::vector<VertexAttributes>& vertices = mesh->vertices;
@@ -693,6 +687,7 @@ namespace vtx::ops
 		principled->sockets["normalmap_texture"].parameterInfo.defaultValue = mdl::createTextureConstant(
 			"E:/Dev/VortexOptix/data/Textures/xboibga_2K_Normal.jpg");
 		//principled->sockets["metallic_texture"].parameterInfo.defaultValue = mdl::createTextureConstant("E:/Dev/VortexOptix/data/Textures/xboibga_2K_Normal.jpg");
+
 		const std::shared_ptr<Material> material1 = ops::createNode<Material>();
 		material1->materialGraph                  = principled;
 
@@ -704,8 +699,8 @@ namespace vtx::ops
 		Cube1->addMaterial(material1);
 		sceneRoot->addChild(Cube1);
 		std::shared_ptr<Material> materialEmissive = ops::createNode<Material>();
-		materialEmissive->shader->name             = "naturalwhite_4000k";
-		materialEmissive->shader->path             = "\\nvidia\\vMaterials\\AEC\\Lights\\Lights_Emitter.mdl";
+		const std::shared_ptr<graph::shader::ImportedNode> materialGraph = ops::createNode<graph::shader::ImportedNode>("\\nvidia\\vMaterials\\AEC\\Lights\\Lights_Emitter.mdl", "naturalwhite_4000k", true);
+		materialEmissive->materialGraph = materialGraph;
 
 
 		std::shared_ptr<Instance> Cube2 = ops::createNode<Instance>();
@@ -769,7 +764,7 @@ namespace vtx::ops
 		enum TestType
 		{
 			IMPORTED_MATERIALS,
-			CREATED_PBRDF,
+			CREATED_PRINCIPLED,
 			IMPORTED_MDL,
 			CREATED_MDL
 		};
@@ -800,7 +795,7 @@ namespace vtx::ops
 
 		MdlMaterials mdlMaterial = ALLUMINIUM;
 		TestType     testType    = IMPORTED_MATERIALS;
-		ImportedScene importedScene = SPONZA_OBJ;
+		ImportedScene importedScene = BLENDER_TEST;
 		EnvironmentMap envMap = PURE_SKY_VELD;
 
 
@@ -809,7 +804,7 @@ namespace vtx::ops
 		{
 			case BLENDER_TEST:
 			{
-				scenePath = getOptions()->dataFolder + "models/Blender/blenderTest5.fbx";
+				scenePath = getOptions()->dataFolder + "models/Blender/blenderTest5.gltf";
 			}break;
 			case SPONZA_OBJ:
 			{
@@ -826,29 +821,53 @@ namespace vtx::ops
 		switch (testType)
 		{
 			case IMPORTED_MATERIALS: break;
-			case CREATED_PBRDF:
+			case CREATED_PRINCIPLED:
 			{
 				const std::vector<std::shared_ptr<Instance>> instances     = SIM::getAllNodeOfType<graph::Instance>(NT_INSTANCE);
-				const std::shared_ptr<Material>          pBsdfMaterial = ops::createNode<Material>();
 
-				auto principledGraph = createPbsdfGraph();
-				principledGraph->setSocketDefault(DIFFUSE_TEXTURE_SOCKET, mdl::createTextureConstant("E:/Dev/VortexOptix/data/Textures/xboibga_2K_Albedo.jpg"));
-				principledGraph->setSocketDefault(AO_TEXTURE_SOCKET, mdl::createTextureConstant("E:/Dev/VortexOptix/data/Textures/xboibga_2K_AO.jpg", IType_texture::TS_2D, 1.0f));
-				principledGraph->setSocketDefault(AO_TO_DIFFUSE_SOCKET, mdl::createConstantFloat(0.5f));
-				
-				principledGraph->setSocketDefault(ROUGHNESS_TEXTURE_SOCKET, mdl::createTextureConstant("E:/Dev/VortexOptix/data/Textures/xboibga_2K_Roughness.jpg", IType_texture::TS_2D, 1.0f));
-				principledGraph->setSocketDefault(ROUGHNESS_TEXTURE_INFLUENCE_SOCKET, mdl::createConstantFloat(0.5f));
-				
-				principledGraph->setSocketDefault(NORMALMAP_TEXTURE_SOCKET, mdl::createTextureConstant("E:/Dev/VortexOptix/data/Textures/xboibga_2K_Normal.jpg", IType_texture::TS_2D, 1.0f));
-				principledGraph->setSocketDefault(NORMALMAP_FACTOR_SOCKET, mdl::createConstantFloat(0.3f));
-				principledGraph->setSocketDefault(BUMPMAP_TEXTURE_SOCKET, mdl::createTextureConstant("E:/Dev/VortexOptix/data/Textures/xboibga_2K_Bump.jpg", IType_texture::TS_2D, 1.0f));
-				principledGraph->setSocketDefault(BUMPMAP_FACTOR_SOCKET, mdl::createConstantFloat(0.1f));
+				const std::shared_ptr<Material>          pBsdfMaterial1 = ops::createNode<Material>();
+				auto principledGraph1 = ops::createNode<graph::shader::PrincipledMaterial>();
+				//principledGraph1->connectInput(ALBEDO_SOCKET, ops::createNode<graph::shader::ColorTexture>("E:/Dev/VortexOptix/data/models/Blender/textures/schvfgwp_2K_Albedo.jpg"));
+				//principledGraph1->connectInput(ROUGHNESS_SOCKET, ops::createNode<graph::shader::MonoTexture>("E:/Dev/VortexOptix/data/models/Blender/textures/schvfgwp_2K_Roughness.jpg"));
+				//principledGraph1->connectInput(METALLIC_SOCKET, ops::createNode<graph::shader::MonoTexture>("E:/Dev/VortexOptix/data/models/Blender/textures/schvfgwp_2K_Metalness.jpg"));
+				pBsdfMaterial1->materialGraph = principledGraph1;
 
-				pBsdfMaterial->materialGraph = principledGraph;
 
+				const std::shared_ptr<Material>          pBsdfMaterial2 = ops::createNode<Material>();
+				auto principledGraph2 = ops::createNode<graph::shader::PrincipledMaterial>();
+				principledGraph2->connectInput(ALBEDO_SOCKET, ops::createNode<graph::shader::ColorTexture>("E:/Dev/VortexOptix/data/models/Blender/textures/wlhkfhqv_2K_Albedo.jpg"));
+				principledGraph2->connectInput(ROUGHNESS_SOCKET, ops::createNode<graph::shader::MonoTexture>("E:/Dev/VortexOptix/data/models/Blender/textures/wlhkfhqv_2K_Roughness.jpg"));
+				principledGraph2->connectInput(NORMALMAP_SOCKET, ops::createNode<graph::shader::NormalTexture>("E:/Dev/VortexOptix/data/models/Blender/textures/wdelddp_2K_Normal.jpg"));
+
+				pBsdfMaterial2->materialGraph = principledGraph2;
+				//
+				//principledGraph->connectInput(ROUGHNESS_SOCKET, ops::createNode<graph::shader::MonoTexture>("E:/Dev/VortexOptix/data/Textures/xboibga_2K_Roughness.jpg"));
+				//
+				//const auto normalMap = ops::createNode<graph::shader::NormalTexture>("E:/Dev/VortexOptix/data/Textures/xboibga_2K_Normal.jpg");
+				//normalMap->setSocketDefault(VF_NORMAL_TEXTURE_FACTOR_SOCKET, mdl::createConstantFloat(0.3f));
+				//const auto bumpMap = ops::createNode<graph::shader::BumpTexture>("E:/Dev/VortexOptix/data/Textures/xboibga_2K_Bump.jpg");
+				//bumpMap->setSocketDefault(VF_BUMP_TEXTURE_FACTOR_SOCKET, mdl::createConstantFloat(0.1f));
+				//const auto mixNormal = ops::createNode<graph::shader::NormalMix>();
+				//
+				//mixNormal->connectInput(VF_MIX_NORMAL_BASE_SOCKET, normalMap);
+				//mixNormal->connectInput(VF_MIX_NORMAL_LAYER_SOCKET, bumpMap);
+				//
+				//principledGraph->connectInput(NORMALMAP_SOCKET, mixNormal);
+
+				bool swap = true;
 				for (const auto& instance : instances)
 				{
-					instance->addMaterial(pBsdfMaterial, 0);
+					if(swap)
+					{
+						instance->addMaterial(pBsdfMaterial1, 0);
+						swap = false;
+					}
+					else
+					{
+						instance->addMaterial(pBsdfMaterial2, 0);
+						swap = true;
+						
+					}
 				}
 			}
 			break;
@@ -856,27 +875,33 @@ namespace vtx::ops
 			{
 				const std::vector<std::shared_ptr<Instance>> instances = SIM::getAllNodeOfType<graph::Instance>(NT_INSTANCE);
 				const std::shared_ptr<Material> importedMdlMaterial = ops::createNode<Material>();
+
+				std::string materialName;
+				std::string materialPath;
+
 				switch (mdlMaterial)
 				{
 				case BSDF_DIFFUSE_REFLECTION:
 					{
-					importedMdlMaterial->shader->name = "bsdf_diffuse_reflection";
-					importedMdlMaterial->shader->path = "\\bsdf_diffuse_reflection.mdl";
+					materialName = "bsdf_diffuse_reflection";
+					materialPath = "\\bsdf_diffuse_reflection.mdl";
 				}
 					break;
 				case STONE_MEDITERRANEAN:
 				{
-					importedMdlMaterial->shader->name = "Stone_Mediterranean";
-					importedMdlMaterial->shader->path = "\\vMaterials_2\\Stone\\Stone_Mediterranean.mdl";
+					materialName = "Stone_Mediterranean";
+					materialPath = "\\vMaterials_2\\Stone\\Stone_Mediterranean.mdl";
 				}
 				break;
 				case ALLUMINIUM:
 				{
-					importedMdlMaterial->shader->name = "Aluminum";
-					importedMdlMaterial->shader->path = "\\vMaterials_2\\Metal\\Aluminum.mdl";
+					materialName = "Aluminum";
+					materialPath = "\\vMaterials_2\\Metal\\Aluminum.mdl";
 				}
 					break;
 				}
+				const std::shared_ptr<graph::shader::ImportedNode> materialGraph = ops::createNode<graph::shader::ImportedNode>(materialPath, materialName, true);
+				importedMdlMaterial->materialGraph = materialGraph;
 
 				for (const std::shared_ptr<Instance>& instance : instances)
 				{
@@ -886,17 +911,9 @@ namespace vtx::ops
 			break;
 			case CREATED_MDL : 
 			{
-				const auto diffuseTexture = ops::createNode<shader::TextureFile>();
-				diffuseTexture->path = "E:/Dev/VortexOptix/data/Textures/xboibga_2K_Albedo.jpg";
 
-				const auto roughnessTexture = ops::createNode<shader::TextureFile>();
-				roughnessTexture->path = "E:/Dev/VortexOptix/data/Textures/xboibga_2K_Roughness.jpg";
-
-				const auto diffuseTextureColor = ops::createNode<shader::TextureReturn>(shader::SNT::TK_COLOR);
-				diffuseTextureColor->connectInput("s", diffuseTexture);
-
-				const auto roughnessTextureMono = ops::createNode<shader::TextureReturn>(shader::SNT::TK_FLOAT);
-				roughnessTextureMono->connectInput("s", roughnessTexture);
+				const auto roughnessTextureMono = ops::createNode<graph::shader::MonoTexture>("E:/Dev/VortexOptix/data/Textures/xboibga_2K_Roughness.jpg");
+				const auto diffuseTextureColor = ops::createNode<graph::shader::ColorTexture>("E:/Dev/VortexOptix/data/Textures/xboibga_2K_Albedo.jpg");
 
 				const auto brdfNode = ops::createNode<shader::DiffuseReflection>();
 				brdfNode->connectInput("tint", diffuseTextureColor);

@@ -7,36 +7,23 @@ namespace vtx::mdl
 {
 	using namespace graph::shader;
 
-
-		void ShaderVisitor::visit(std::shared_ptr<TextureFile> textureFileNode)
-		{
-			textureFileNode->sockets["texture"].parameterInfo.defaultValue = mdl::createTextureConstant(textureFileNode->path);
-			textureFileNode->expression = mdl::generateFunctionExpression(textureFileNode->functionInfo.signature, textureFileNode->sockets);
-		}
-
-		void ShaderVisitor::visit(std::shared_ptr<TextureReturn> textureReturnNode)
-		{
-			textureReturnNode->expression = mdl::generateFunctionExpression(textureReturnNode->functionInfo.signature, textureReturnNode->sockets);
-		}
-
-		void ShaderVisitor::visit(std::shared_ptr<DiffuseReflection> shaderDiffuseReflection)
-		{
-			shaderDiffuseReflection->expression = mdl::generateFunctionExpression(shaderDiffuseReflection->functionInfo.signature, shaderDiffuseReflection->sockets);
-		}
-
-		void ShaderVisitor::visit(std::shared_ptr<graph::shader::MaterialSurface> materialSurfaceNode)
-		{
-			materialSurfaceNode->expression = mdl::generateFunctionExpression(materialSurfaceNode->functionInfo.signature, materialSurfaceNode->sockets);
-		}
-
-		void ShaderVisitor::visit(std::shared_ptr<graph::shader::Material> materialNode)
-		{
-			materialNode->expression = mdl::generateFunctionExpression(materialNode->functionInfo.signature, materialNode->sockets);
-		}
-
-		void ShaderVisitor::visit(std::shared_ptr<graph::shader::ImportedNode> importedNode)
-		{
-			importedNode->expression = mdl::generateFunctionExpression(importedNode->functionInfo.signature, importedNode->sockets);
-		}
-
+	#define STANDARD_SHADER_NODE_VISIT(SHADER_NODE_NAME) \
+	void ShaderVisitor::visit(std::shared_ptr<SHADER_NODE_NAME> shaderNode)\
+	{\
+		if(!shaderNode->expression.get()){\
+			shaderNode->expression = mdl::generateFunctionExpression(shaderNode->functionInfo.signature, shaderNode->sockets, shaderNode->name); \
+		}\
+	}
+	STANDARD_SHADER_NODE_VISIT(DiffuseReflection)
+	STANDARD_SHADER_NODE_VISIT(MaterialSurface)
+	STANDARD_SHADER_NODE_VISIT(Material)
+	STANDARD_SHADER_NODE_VISIT(ImportedNode)
+	STANDARD_SHADER_NODE_VISIT(PrincipledMaterial)
+	STANDARD_SHADER_NODE_VISIT(TextureTransform)
+	STANDARD_SHADER_NODE_VISIT(NormalMix)
+	STANDARD_SHADER_NODE_VISIT(ColorTexture)
+	STANDARD_SHADER_NODE_VISIT(MonoTexture)
+	STANDARD_SHADER_NODE_VISIT(NormalTexture)
+	STANDARD_SHADER_NODE_VISIT(BumpTexture)
+	STANDARD_SHADER_NODE_VISIT(GetChannel)
 }

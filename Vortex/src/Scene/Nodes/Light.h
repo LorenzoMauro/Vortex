@@ -81,18 +81,9 @@ namespace vtx::graph
 
 		void init() override
 		{
-			if(material->shader->useEmission())
-			{
-				computeAreaCdf();
-				isValid = (cdfAreas.size() > 1);
-				isInitialized = true;
-			}
-			else
-			{
-				isValid = false;
-				isInitialized = true;
-			}
-			
+			computeAreaCdf();
+			isValid = (cdfAreas.size() > 1);
+			isInitialized = true;
 		}
 
 		void computeAreaCdf()

@@ -18,6 +18,9 @@ namespace vtx {
 #define FLAG_SHADOW        0x00000002
 // Prevent that division by very small floating point values results in huge values, for example dividing by pdf.
 #define DENOMINATOR_EPSILON 1.0e-6f
+#define REDCOLOR  math::vec3f(1.0f, 0.0f, 0.0f)
+#define GREENCOLOR  math::vec3f(0.0f, 1.0f, 0.0f)
+#define BLUECOLOR  math::vec3f(0.0f, 0.0f, 1.0f)
 
 	enum TraceEvent
 	{
@@ -40,8 +43,7 @@ namespace vtx {
 
 		// Material Properties
 		const MaterialData* material = nullptr;
-		const ShaderData* shader = nullptr;
-		const DeviceShaderConfiguration* shaderConfiguration = nullptr;
+		const DeviceShaderConfiguration* materialConfiguration = nullptr;
 		const LightData* meshLight = nullptr;
 		const MeshLightAttributesData* meshLightAttributes = nullptr;
 
@@ -124,6 +126,7 @@ namespace vtx {
 		// Small material stack tracking IOR, absorption and scattering coefficients of the entered materials. Entry 0 is vacuum.
 		int           idxStack;
 		MaterialStack stack[MATERIAL_STACK_SIZE];
+		math::vec3f           mediumIor;
 
 		ShadingColors colors;
 	};

@@ -38,10 +38,6 @@ namespace vtx
 	void HostVisitor::visit(std::shared_ptr<graph::Renderer> renderer) {
 	};
 
-	void HostVisitor::visit(std::shared_ptr<graph::Shader> shader) {
-		
-	};
-
 	void HostVisitor::visit(std::shared_ptr<graph::Texture> texture) {
 
 	};

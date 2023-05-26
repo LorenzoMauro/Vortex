@@ -1,5 +1,6 @@
 #include "ShutDownOperations.h"
 #include "ImGuiOp.h"
+#include "Device/OptixWrapper.h"
 #include "Device/UploadCode/UploadBuffers.h"
 #include "Device/UploadCode/UploadData.h"
 #include "MDL/MdlWrapper.h"

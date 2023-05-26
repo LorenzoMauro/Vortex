@@ -9,7 +9,7 @@ OBJ_DIR =   my_project_dir .. "build/bin-int/" .. OUTPUT_DIR .. "/%{prj.name}"
 
 -- Local Project Paths
 GLFW_RP = "../ext/glfw/"
-VORTEX_RP = "../VortexOptix/"
+VORTEX_RP = "../Vortex/"
 IMGUI_RP = "../ext/imgui/"
 
 -- External Resources Paths

@@ -64,6 +64,18 @@ namespace utl{
 		return fileName;
 	}
 
+	std::string getFileExtension(const std::string& path)
+	{
+		std::string fileName = getFile(path);
+		// Remove the file name
+		const std::size_t last_dot = fileName.find_last_of('.');
+		if (last_dot != std::string::npos)
+		{
+			fileName.erase(0, last_dot + 1);
+		}
+		return fileName;
+	}
+
 
 	std::vector<char> readData(const std::string& FilePath) {
 		std::ifstream inputData(FilePath, std::ios::binary);

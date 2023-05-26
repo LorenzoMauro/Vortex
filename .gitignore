@@ -5,10 +5,10 @@ bin-int/
 .vs/
 ext/MDL/
 old/
-VortexOptix/x64/
 nsightProfile/
 data/*.*
 data/*
+Vortex/x64/*
 
 # Ignore object files and libraries
 *.o
@@ -34,3 +34,5 @@ Vortex.sln.nvsettings
 *.user
 VortexOptix/Vortex.lua
 *.DotSettings
+Vortex/x64/Debug/NoiseKernel.cu.obj
+Vortex/x64/Release/NoiseKernel.cu.obj

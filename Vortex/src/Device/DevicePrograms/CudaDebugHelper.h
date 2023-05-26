@@ -40,7 +40,7 @@ namespace vtx
 	__forceinline__ __device__ void printMath(const char* message, const math::vec3f& vector)
 	{
 		printf("%s :\n"
-					"\t %.1f %.1f %.1f\n",
+					"\t %.6f %.6f %.6f\n",
 			   message, 
 					vector.x, vector.y, vector.z);		
 	}

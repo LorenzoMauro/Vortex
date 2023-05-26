@@ -36,11 +36,11 @@ namespace vtx::device
 		CudaMap<vtxID, std::tuple<InstanceData,		InstanceData*>>				instanceDataMap;
 		CudaMap<vtxID, std::tuple<GeometryData,		GeometryData*>>				geometryDataMap;
 		CudaMap<vtxID, std::tuple<MaterialData,		MaterialData*>>				materialDataMap;
-		CudaMap<vtxID, std::tuple<ShaderData,		ShaderData*>>				shaderDataMap;
 		CudaMap<vtxID, std::tuple<TextureData,		TextureData*>>				textureDataMap;
 		CudaMap<vtxID, std::tuple<BsdfData,			BsdfData*>>					bsdfDataMap;
 		CudaMap<vtxID, std::tuple<LightProfileData, LightProfileData*>>			lightProfileDataMap;
-		CudaMap<vtxID, std::tuple<LightData,		LightData*>>				lightDataMap;
+		CudaMap<vtxID, std::tuple<LightData, LightData*, bool>>					lightDataMap;
+		CudaMap<vtxID, LightData*>												lightToSampleFrom;
 
 		CameraData								cameraData;
 		bool									isCameraUpdated;

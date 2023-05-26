@@ -36,5 +36,5 @@ group "Dependencies"
 group ""
 
 group "Core"
-    include "VortexOptix/Vortex.lua"
+    include "Vortex/Vortex.lua"
 group ""

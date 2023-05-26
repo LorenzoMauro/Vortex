@@ -65,9 +65,9 @@ namespace vtx
 		request.surroundingIor = 1.0f;
 
 		mdl::MaterialEvaluation matEval;
-		if (!hitP.shaderConfiguration->directCallable)
+		if (!hitP.materialConfiguration->directCallable)
 		{
-			const int sbtIndex = hitP.shaderConfiguration->idxCallEvaluateMaterial;
+			const int sbtIndex = hitP.materialConfiguration->idxCallEvaluateMaterial;
 			optixDirectCall<void, mdl::MdlRequest*, mdl::MaterialEvaluation*>(sbtIndex, &request, &matEval);
 		}
 		else
@@ -285,12 +285,7 @@ namespace vtx
 			request.lastRayDirection = prd->wo;
 			request.hitP = &hitP;
 
-			//printf("OUTSIDE - request pointer : %p\n"
-			//	   "OUTSIDE - hitP pointer    : %p\n", (void*)&request, (void*)request.hitP);
-
-			/*printf("OUTISDE - HiP tex coords: %f %f\n\n",
-				   request.hitP->textureCoordinates[0].x, request.hitP->textureCoordinates[0].y);*/
-			request.surroundingIor = math::vec3f{1.0f};
+			request.surroundingIor = prd->mediumIor;
 
 			if (hitP.meshLightAttributes != nullptr)
 			{
@@ -322,24 +317,15 @@ namespace vtx
 
 
 			mdl::MaterialEvaluation matEval;
-			if (!hitP.shaderConfiguration->directCallable)
+			if (!hitP.materialConfiguration->directCallable)
 			{
-				const int sbtIndex = hitP.shaderConfiguration->idxCallEvaluateMaterial;
+				const int sbtIndex = hitP.materialConfiguration->idxCallEvaluateMaterial;
 				optixDirectCall<void, mdl::MdlRequest*, mdl::MaterialEvaluation*>(sbtIndex, &request, &matEval);
 			}
 			else
 			{
 				matEval = mdl::evaluateMdlMaterial(&request);
 			}
-
-			/*printf("Aux Valid %i\n"
-				   "Bsdf Sample Valid %i\n"
-				   "Bsdf Eval Valid %i\n"
-				   "Light Sample Valid %i\n\n",
-				   matEval.aux.isValid,
-				   matEval.bsdfEvaluation.isValid,
-				   matEval.bsdfEvaluation.isValid,
-				   lightSample.isValid);*/
 
 			// Auxiliary Data
 			if (prd->depth == 0)
@@ -375,7 +361,6 @@ namespace vtx
 				}
 				// Power (flux) [W] divided by light area gives radiant exitance [W/m^2].
 				const float factor = (matEval.edf.mode == 0) ? 1.0f : 1.0f / area;
-
 				prd->radiance += prd->throughput * matEval.edf.intensity * matEval.edf.edf * (factor* misWeight);
 			}
 
@@ -396,38 +381,42 @@ namespace vtx
 					prd->pdf = matEval.bsdfSample.pdf;
 					// Note that specular events return pdf == 0.0f! (=> Not a path termination condition.)
 					prd->eventType = matEval.bsdfSample.eventType;
-					// This replaces the PRD flags used inside the other examples.
-					if ((matEval.bsdfSample.eventType & mi::neuraylib::BSDF_EVENT_TRANSMISSION) != 0)
-					{
-						// continue on the opposite side
-						utl::offsetRay(prd->position, -hitP.ngW);
-					}
-					else
-					{
-						// continue on the current side
-						utl::offsetRay(prd->position, hitP.ngW);
-					}
 				}
 				else
 				{
 					prd->traceResult = TR_HIT;
 					return;
-					// None of the following code will have any effect in that case.
 				}
 			}
 
-			//Direct Light Sampling
+			const bool isDiffuse      = (matEval.bsdfSample.eventType & mi::neuraylib::BSDF_EVENT_DIFFUSE) != 0;
+			const bool isGlossy       = (matEval.bsdfSample.eventType & mi::neuraylib::BSDF_EVENT_GLOSSY) != 0;
+			const bool isTransmission = (matEval.bsdfSample.eventType & mi::neuraylib::BSDF_EVENT_TRANSMISSION) != 0;
+			const bool isSpecular     = (matEval.bsdfSample.eventType & mi::neuraylib::BSDF_EVENT_SPECULAR) != 0;
 
+			if(prd->depth == 0)
+			{
+				if (isDiffuse)
+				{
+					prd->colors.debugColor1 = REDCOLOR;
+				}
+				if (isSpecular)
+				{
+					prd->colors.debugColor1 = GREENCOLOR;
+				}
+				if (isGlossy)
+				{
+					prd->colors.debugColor1 = BLUECOLOR;
+				}
+			}
+			
+			//Direct Light Sampling
 			if ((samplingTechnique == RendererDeviceSettings::S_MIS || samplingTechnique == RendererDeviceSettings::S_DIRECT_LIGHT) && lightSample.isValid)
 			{
 				//printf("number of tries: %d\n", numberOfTries);
 				auto bxdf = math::vec3f(0.0f, 0.0f, 0.0f);
 				bxdf += matEval.bsdfEvaluation.diffuse;
 				bxdf += matEval.bsdfEvaluation.glossy;
-				if(matEval.bsdfEvaluation.pdf>0.0f)
-				{
-					prd->colors.debugColor1 = 1.0f;
-				}
 
 				if (0.0f < matEval.bsdfEvaluation.pdf && bxdf != math::vec3f(0.0f, 0.0f, 0.0f))
 				{
@@ -468,6 +457,20 @@ namespace vtx
 					}
 				}
 			}
+
+			if (!matEval.isThinWalled && (prd->eventType & mi::neuraylib::BSDF_EVENT_TRANSMISSION) != 0)
+			{
+				if (hitP.isFrontFace) // Entered a volume. 
+				{
+					prd->mediumIor = matEval.ior;
+					//printf("Entering Volume Ior = %f %f %f\n", matEval.ior.x, matEval.ior.y, matEval.ior.z);
+				}
+				else // if !isFrontFace. Left a volume.
+				{
+					prd->mediumIor = 1.0f;
+				}
+			}
+
 		}
 		prd->traceResult = TR_HIT;
 	}
@@ -501,9 +504,9 @@ namespace vtx
 			request.hitP    = &hitP;
 			request.opacity = true;
 			mdl::MaterialEvaluation eval;
-			if (!hitP.shaderConfiguration->directCallable)
+			if (!hitP.materialConfiguration->directCallable)
 			{
-				const int sbtIndex = hitP.shaderConfiguration->idxCallEvaluateMaterial;
+				const int sbtIndex = hitP.materialConfiguration->idxCallEvaluateMaterial;
 				optixDirectCall<void, mdl::MdlRequest*, mdl::MaterialEvaluation*>(sbtIndex, &request, &eval);
 				opacity            = eval.opacity;
 			}
@@ -574,7 +577,8 @@ namespace vtx
 					float misWeight = 1.0f;
 					// If the last surface intersection was a diffuse event which was directly lit with multiple importance sampling,
 					// then calculate light emission with multiple importance sampling for this implicit light hit as well.
-					if (prd->pdf > 0.0f && optixLaunchParams.settings->samplingTechnique == RendererDeviceSettings::S_MIS)
+					bool MiSCondition = (optixLaunchParams.settings->samplingTechnique == RendererDeviceSettings::S_MIS) && (prd->eventType & (mi::neuraylib::BSDF_EVENT_DIFFUSE | mi::neuraylib::BSDF_EVENT_GLOSSY));
+					if (prd->pdf > 0.0f && MiSCondition)
 					{
 						float envSamplePdf = attrib.aliasMap[y * texture->dimension.x + x].pdf;
 						misWeight = utl::heuristic(prd->pdf, envSamplePdf);
@@ -611,6 +615,8 @@ namespace vtx
 		prd.stack[0].scattering = math::vec3f(0.0f); // No volume scattering.
 		prd.stack[0].bias       = 0.0f;              // Isotropic volume scattering.
 		prd.depth               = 0;
+
+		prd.mediumIor = math::vec3f(1.0f);
 
 		prd.colors.diffuse = 0.0f;
 		prd.colors.trueNormal = 0.0f;

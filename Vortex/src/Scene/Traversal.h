@@ -9,33 +9,6 @@
 
 namespace vtx {
 
-	/*namespace graph
-	{
-		namespace shader
-		{
-			class TextureFile;
-			class TextureReturn;
-			class ShaderNode;
-			class Material;
-			class DiffuseReflection;
-			class MaterialSurface;
-		}
-
-		class Light;
-		class Node;
-		class Transform;
-		class Instance;
-		class Group;
-		class Mesh;
-		class Material;
-		class Camera;
-		class Renderer;
-		class Shader;
-		class Texture;
-		class BsdfMeasurement;
-		class LightProfile;
-	}*/
-
 	class NodeVisitor {
 	public:
 		virtual ~NodeVisitor() = default;
@@ -46,7 +19,6 @@ namespace vtx {
 		virtual void visit(std::shared_ptr<graph::Material> material){}
 		virtual void visit(std::shared_ptr<graph::Camera> camera){}
 		virtual void visit(std::shared_ptr<graph::Renderer> renderer) {}
-		virtual void visit(std::shared_ptr<graph::Shader> shader) {}
 		virtual void visit(std::shared_ptr<graph::Texture> texture){}
 		virtual void visit(std::shared_ptr<graph::BsdfMeasurement> bsdfMeasurement) {}
 		virtual void visit(std::shared_ptr<graph::LightProfile> lightProfile) {}
@@ -56,14 +28,21 @@ namespace vtx {
 		//////////////////////// Shaders Nodes ///////////////////////////////////////////
 		//////////////////////////////////////////////////////////////////////////////////
 
-		virtual void visit(std::shared_ptr<graph::shader::TextureFile> textureFileNode) {};
-		virtual void visit(std::shared_ptr<graph::shader::TextureReturn> textureReturnNode) {};
+		//virtual void visit(std::shared_ptr<graph::shader::TextureFile> textureFileNode) {};
+		//virtual void visit(std::shared_ptr<graph::shader::TextureReturn> textureReturnNode) {};
 		virtual void visit(std::shared_ptr<graph::shader::ShaderNode> shaderNode) {}
-		virtual void visit(std::shared_ptr<graph::shader::DiffuseReflection> shaderDiffuseReflection) {}
-		virtual void visit(std::shared_ptr<graph::shader::MaterialSurface> materialSurfaceNode) {}
-		virtual void visit(std::shared_ptr<graph::shader::Material> materialNode) {}
-		virtual void visit(std::shared_ptr<graph::shader::ImportedNode> importedNode) {};
-
+		virtual void visit(std::shared_ptr<graph::shader::DiffuseReflection> shaderNode) {}
+		virtual void visit(std::shared_ptr<graph::shader::MaterialSurface> shaderNode) {}
+		virtual void visit(std::shared_ptr<graph::shader::Material> shaderNode) {}
+		virtual void visit(std::shared_ptr<graph::shader::ImportedNode> shaderNode) {}
+		virtual void visit(std::shared_ptr<graph::shader::PrincipledMaterial> shaderNode) {}
+		virtual void visit(std::shared_ptr<graph::shader::ColorTexture> shaderNode) {}
+		virtual void visit(std::shared_ptr<graph::shader::MonoTexture> shaderNode) {}
+		virtual void visit(std::shared_ptr<graph::shader::NormalTexture> shaderNode) {}
+		virtual void visit(std::shared_ptr<graph::shader::BumpTexture> shaderNode) {}
+		virtual void visit(std::shared_ptr<graph::shader::TextureTransform> shaderNode) {}
+		virtual void visit(std::shared_ptr<graph::shader::NormalMix> shaderNode) {}
+		virtual void visit(std::shared_ptr<graph::shader::GetChannel> shaderNode) {}
 
 		virtual void popTransform() {
 			transformIndexStack.pop_back();

@@ -1,5 +1,6 @@
 #include "Light.h"
 #include "Scene/Traversal.h"
+#include "Shader/Texture.h"
 
 
 namespace vtx::graph

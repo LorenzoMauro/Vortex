@@ -59,13 +59,15 @@ namespace vtx::mdl
             printf("%s"
                    "isValid: %d\n"
 				   "isComputed %d\n"
-				   "Next Direction: %f %f %f\n"
+                   "Next Direction: %f %f %f\n"
+                   "Bsdf Over Pdf: %f %f %f\n"
                    "pdf: %f\n"
                    "eventType: %d\n\n",
                    message,
                    isValid,
                    isComputed,
                    nextDirection.x, nextDirection.y, nextDirection.z,
+                   bsdfOverPdf.x, bsdfOverPdf.y, bsdfOverPdf.z,
                    pdf,
                    eventType);
         }
@@ -86,6 +88,7 @@ namespace vtx::mdl
         BsdfAuxResult    aux;
         math::vec3f      ior;
         float            opacity;
+        bool             isThinWalled;
 
     };
 

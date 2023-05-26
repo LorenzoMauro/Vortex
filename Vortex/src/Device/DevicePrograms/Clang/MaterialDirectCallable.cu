@@ -8,17 +8,15 @@ namespace vtx::mdl
     {
         MdlData mdlData = mdlInit(request->hitP);
 
-        if (request->ior)
-        {
-            iorEvaluation(&result->ior, &mdlData.state, &mdlData.resourceData, nullptr, mdlData.argBlock);
-        }
+        thinWalled(&mdlData.isThinWalled, &mdlData.state, &mdlData.resourceData, nullptr, mdlData.argBlock);
+
+        result->isThinWalled = mdlData.isThinWalled;
+
+        iorEvaluation(&result->ior, &mdlData.state, &mdlData.resourceData, nullptr, mdlData.argBlock);
+
         if (request->opacity)
         {
             opacityEvaluation(&result->opacity, &mdlData.state, &mdlData.resourceData, nullptr, mdlData.argBlock);
-        }
-        if (request->edf || request->bsdfEvaluation || request->bsdfSample)
-        {
-            thinWalled(&mdlData.isThinWalled, &mdlData.state, &mdlData.resourceData, nullptr, mdlData.argBlock);
         }
         if (request->edf)
         {

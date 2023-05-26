@@ -7,6 +7,7 @@
 
 #include "Scene/SIM.h"
 #include "Device/DevicePrograms/NoiseKernel.h"
+#include "Scene/Nodes/Shader/Texture.h"
 
 namespace vtx::device
 {
@@ -19,7 +20,7 @@ namespace vtx::device
 
 		CudaMap<vtxID, std::tuple<GeometryData, GeometryData*>>& geometryDataMap = UPLOAD_DATA->geometryDataMap;
 		CudaMap<vtxID, std::tuple<MaterialData, MaterialData*>>& materialDataMap = UPLOAD_DATA->materialDataMap;
-		CudaMap<vtxID, std::tuple<LightData, LightData*>>&       lightDataMap    = UPLOAD_DATA->lightDataMap;
+		CudaMap<vtxID, std::tuple<LightData, LightData*, bool>>& lightDataMap    = UPLOAD_DATA->lightDataMap;
 
 		InstanceData instanceData{};
 		instanceData.instanceId = instanceId;
@@ -47,15 +48,15 @@ namespace vtx::device
 			{
 				slotIds.material = std::get<1>(materialDataMap[materialId]);
 
-				if (vtxID lightId = materialSlot.meshLight->getID(); lightDataMap.contains(lightId) && materialSlot.meshLight->attributes->isValid) {
-					instanceData.hasEmission = true;
+				if (vtxID lightId = materialSlot.meshLight->getID(); lightDataMap.contains(lightId)) {
+					instanceData.hasEmission = materialSlot.material->useAsLight;
 					slotIds.meshLight = std::get<1>(lightDataMap[lightId]);
 				}
 
 				if(!instanceData.hasOpacity)
 				{
 					auto materialNode = graph::SIM::getNode<graph::Material>(materialId);
-					if (bool hasOpacity = materialNode->shader->useOpacity())
+					if (bool hasOpacity = materialNode->useOpacity())
 					{
 						instanceData.hasOpacity = true;
 					}
@@ -102,8 +103,9 @@ namespace vtx::device
 			actualTriangleIndices.upload(attributes->actualTriangleIndices);
 
 			vtxID meshId = attributes->mesh->getID();
+			vtxID materialId = attributes->material->getID();
 			GeometryData* geometryData = std::get<1>(UPLOAD_DATA->geometryDataMap[meshId]);
-			MaterialData* materialData = std::get<1>(UPLOAD_DATA->materialDataMap[meshId]);
+			MaterialData* materialData = std::get<1>(UPLOAD_DATA->materialDataMap[materialId]);
 
 			meshLightData.instanceId            = attributes->parentInstanceId;
 			meshLightData.geometryData			= geometryData;
@@ -205,33 +207,11 @@ namespace vtx::device
 		return tuple;
 	}
 
-	std::tuple<MaterialData, MaterialData*> createMaterialData(std::shared_ptr<graph::Material> material)
+	DeviceShaderConfiguration* createDeviceShaderConfiguration(std::shared_ptr<graph::Material> material)
 	{
-		CUDA_SYNC_CHECK();
-		MaterialData materialData   = {}; // Set everything to zero.
-		CUDABuffer&  argBlockBuffer = GET_BUFFER(Buffers::MaterialBuffers, material->getID(), argBlockBuffer);
-		// If the material has an argument block, allocate and upload it.
-		if (const size_t sizeArgumentBlock = material->getArgumentBlockSize(); sizeArgumentBlock > 0)
-		{
-			argBlockBuffer.upload(material->getArgumentBlockData(), sizeArgumentBlock);
-		}
-
-		materialData.argBlock = argBlockBuffer.castedPointer<char>();
-		ShaderData* shaderData = std::get<1>(UPLOAD_DATA->shaderDataMap[material->getShader()->getID()]);
-		materialData.shader = shaderData;
-
-		CUDABuffer& materialDataBuffer = GET_BUFFER(Buffers::MaterialBuffers, material->getID(), materialDataBuffer);
-		materialDataBuffer.upload(materialData);
-
-		return std::tuple(materialData, materialDataBuffer.castedPointer<MaterialData>());
-
-	}
-
-	DeviceShaderConfiguration createDeviceShaderConfiguration(std::shared_ptr<graph::Shader> shader)
-	{
-		const graph::Shader::DevicePrograms&      dp     = shader->getPrograms();
-		const graph::Shader::Configuration&       config = shader->getConfiguration();
-		optix::PipelineOptix*                     rp     = optix::getRenderingPipeline();
+		const graph::DevicePrograms& dp = material->getPrograms();
+		const graph::Configuration& config = material->getConfiguration();
+		optix::PipelineOptix* rp = optix::getRenderingPipeline();
 		const CudaMap<vtxID, optix::sbtPosition>& sbtMap = rp->getSbtMap();
 		DeviceShaderConfiguration                 dvConfig;
 
@@ -239,12 +219,12 @@ namespace vtx::device
 		//bool thin_walled; // Stored inside flags.
 		// Simplify the conditions by translating all constants unconditionally.
 
-		dvConfig.isThinWalled = shader->isThinWalled();
-		dvConfig.hasOpacity = shader->useOpacity();
-		dvConfig.isEmissive = shader->useEmission();
+		dvConfig.isThinWalled = material->isThinWalled();
+		dvConfig.hasOpacity = material->useOpacity();
+		dvConfig.isEmissive = material->useEmission();
 		dvConfig.directCallable = getOptions()->directCallable;
 
-		if(getOptions()->directCallable)
+		if (getOptions()->directCallable)
 		{
 			dvConfig.surfaceIntensity = math::vec3f(config.surfaceIntensity[0], config.surfaceIntensity[1], config.surfaceIntensity[2]);
 			dvConfig.surfaceIntensityMode = config.surfaceIntensityMode;
@@ -343,34 +323,34 @@ namespace vtx::device
 		{
 			if (dp.pgEvaluateMaterial) {
 				dvConfig.idxCallEvaluateMaterial = optix::PipelineOptix::getProgramSbt(sbtMap, dp.pgEvaluateMaterial->name);
+				VTX_WARN("Fetching Shader {} EvaluateMaterial program {} with SBT {}", material->name, dp.pgEvaluateMaterial->name, dvConfig.idxCallEvaluateMaterial);
 			}
 		}
-		
 
 
-		return dvConfig;
+		CUDABuffer& materialConfigBuffer = GET_BUFFER(Buffers::MaterialBuffers, material->getID(), materialConfigBuffer);
+		materialConfigBuffer.upload(dvConfig);
+		return materialConfigBuffer.castedPointer<DeviceShaderConfiguration>();
 	}
 
-	std::tuple<ShaderData, ShaderData*> createShaderData(std::shared_ptr<graph::Shader> shaderNode)
+	TextureHandler* createTextureHandler(std::shared_ptr<graph::Material> material)
 	{
-		//uploadData.geometryInstanceDataMap.allocAndUpload();
-		ShaderData     shaderData{};
 		TextureHandler textureHandler;
 
-		const CudaMap<vtxID, std::tuple<TextureData, TextureData*>>&			textureDataMap		= UPLOAD_DATA->textureDataMap;
-		const CudaMap<vtxID, std::tuple<BsdfData, BsdfData*>>&					bsdfDataMap			= UPLOAD_DATA->bsdfDataMap;
-		const CudaMap<vtxID, std::tuple<LightProfileData, LightProfileData*>>&	lightProfileDataMap = UPLOAD_DATA->lightProfileDataMap;
+		const CudaMap<vtxID, std::tuple<TextureData, TextureData*>>& textureDataMap = UPLOAD_DATA->textureDataMap;
+		const CudaMap<vtxID, std::tuple<BsdfData, BsdfData*>>& bsdfDataMap = UPLOAD_DATA->bsdfDataMap;
+		const CudaMap<vtxID, std::tuple<LightProfileData, LightProfileData*>>& lightProfileDataMap = UPLOAD_DATA->lightProfileDataMap;
 
 		// The following code was based on different assumptions on how mdl can access textures, it was probably wrong
 		// It seems like mdl will provide indices to shader resource based on the order by whihch they are declared in the mdl file (target code)
 		// Thi following code will try to remap the order
-		if (const size_t size = shaderNode->getTextures().size(); size > 0)
+		if (const size_t size = material->getTextures().size(); size > 0)
 		{
 			std::vector<TextureData*> textures(size);
-			for (const std::shared_ptr<graph::Texture> texture : shaderNode->getTextures())
+			for (const std::shared_ptr<graph::Texture> texture : material->getTextures())
 			{
 				vtxID          textureId = texture->getID();
-				const uint32_t mdlIndex  = texture->mdlIndex;
+				const uint32_t mdlIndex = texture->mdlIndex;
 				if (textureDataMap.contains(textureId))
 				{
 					textures[mdlIndex - 1] = std::get<1>(textureDataMap[textureId]);
@@ -381,24 +361,24 @@ namespace vtx::device
 					VTX_ERROR("Requesting Texture device Data of texture Node {} but not found!", textureId);
 				}
 			}
-			CUDABuffer& textureIdBuffer = GET_BUFFER(Buffers::ShaderBuffers, shaderNode->getID(), textureIdBuffer);
+			CUDABuffer& textureIdBuffer = GET_BUFFER(Buffers::MaterialBuffers, material->getID(), textureIdBuffer);
 			textureIdBuffer.upload(textures);
-			textureHandler.numTextures        = textures.size();
+			textureHandler.numTextures = textures.size();
 			textureHandler.textures = textureIdBuffer.castedPointer<TextureData*>();
 		}
 		else
 		{
-			textureHandler.numTextures        = 0;
+			textureHandler.numTextures = 0;
 			textureHandler.textures = nullptr;
 		}
 
 
-		if (const size_t size = shaderNode->getBsdfs().size(); size > 0)
+		if (const size_t size = material->getBsdfs().size(); size > 0)
 		{
 			std::vector<BsdfData*> bsdfs(size);
-			for (const std::shared_ptr<graph::BsdfMeasurement> bsdf : shaderNode->getBsdfs())
+			for (const std::shared_ptr<graph::BsdfMeasurement> bsdf : material->getBsdfs())
 			{
-				vtxID          bsdfId   = bsdf->getID();
+				vtxID          bsdfId = bsdf->getID();
 				const uint32_t mdlIndex = bsdf->mdlIndex;
 				if (bsdfDataMap.contains(bsdfId))
 				{
@@ -409,24 +389,24 @@ namespace vtx::device
 					VTX_ERROR("Requesting Bsdf device Data of Bsdf Node {} but not found!", bsdfId);
 				}
 			}
-			CUDABuffer& bsdfIdBuffer = GET_BUFFER(Buffers::ShaderBuffers, shaderNode->getID(), bsdfIdBuffer);
+			CUDABuffer& bsdfIdBuffer = GET_BUFFER(Buffers::MaterialBuffers, material->getID(), bsdfIdBuffer);
 			bsdfIdBuffer.upload(bsdfs);
 			textureHandler.bsdfs = bsdfIdBuffer.castedPointer<BsdfData*>();
-			textureHandler.numBsdfs        = bsdfs.size();
+			textureHandler.numBsdfs = bsdfs.size();
 		}
 		else
 		{
-			textureHandler.numBsdfs        = 0;
+			textureHandler.numBsdfs = 0;
 			textureHandler.bsdfs = nullptr;
 		}
 
-		if (const size_t size = shaderNode->getLightProfiles().size(); size > 0)
+		if (const size_t size = material->getLightProfiles().size(); size > 0)
 		{
 			std::vector<LightProfileData*> lightProfiles(size);
-			for (const std::shared_ptr<graph::LightProfile> lightProfile : shaderNode->getLightProfiles())
+			for (const std::shared_ptr<graph::LightProfile> lightProfile : material->getLightProfiles())
 			{
 				vtxID          lightProfileId = lightProfile->getID();
-				const uint32_t mdlIndex       = lightProfile->mdlIndex;
+				const uint32_t mdlIndex = lightProfile->mdlIndex;
 				if (lightProfileDataMap.contains(lightProfileId))
 				{
 					lightProfiles[mdlIndex] = std::get<1>(lightProfileDataMap[lightProfileId]);
@@ -437,31 +417,49 @@ namespace vtx::device
 					VTX_ERROR("Requesting Light profile device Data of light profile Node {} but not found!", lightProfileId);
 				}
 			}
-			CUDABuffer& lightProfileBuffer = GET_BUFFER(Buffers::ShaderBuffers, shaderNode->getID(), lightProfileBuffer);
+			CUDABuffer& lightProfileBuffer = GET_BUFFER(Buffers::MaterialBuffers, material->getID(), lightProfileBuffer);
 			lightProfileBuffer.upload(lightProfiles);
 			textureHandler.lightProfiles = lightProfileBuffer.castedPointer<LightProfileData*>();
-			textureHandler.numLightProfiles        = lightProfiles.size();
+			textureHandler.numLightProfiles = lightProfiles.size();
 		}
 		else
 		{
-			textureHandler.numLightProfiles        = 0;
+			textureHandler.numLightProfiles = 0;
 			textureHandler.lightProfiles = nullptr;
 		}
 
 
-		const DeviceShaderConfiguration shaderConfig = createDeviceShaderConfiguration(shaderNode);
-		CUDABuffer& shaderConfigBuffer = GET_BUFFER(Buffers::ShaderBuffers, shaderNode->getID(), shaderConfigBuffer);
-		shaderConfigBuffer.upload(shaderConfig);
-		shaderData.shaderConfiguration = shaderConfigBuffer.castedPointer<DeviceShaderConfiguration>();
 
-		CUDABuffer& textureHandlerBuffer = GET_BUFFER(Buffers::ShaderBuffers, shaderNode->getID(), TextureHandlerBuffer);
+		CUDABuffer& textureHandlerBuffer = GET_BUFFER(Buffers::MaterialBuffers, material->getID(), TextureHandlerBuffer);
 		textureHandlerBuffer.upload(textureHandler);
-		shaderData.textureHandler = textureHandlerBuffer.castedPointer<TextureHandler>();
-
-		CUDABuffer& shaderDataBuffer = GET_BUFFER(Buffers::ShaderBuffers, shaderNode->getID(), shaderDataBuffer);
-		shaderDataBuffer.upload(shaderData);
-		return {shaderData, shaderDataBuffer .castedPointer<ShaderData>()};
+		return textureHandlerBuffer.castedPointer<TextureHandler>();
+		
 	}
+
+	std::tuple<MaterialData, MaterialData*> createMaterialData(std::shared_ptr<graph::Material> material)
+	{
+
+		CUDA_SYNC_CHECK();
+		MaterialData materialData   = {}; // Set everything to zero.
+		CUDABuffer&  argBlockBuffer = GET_BUFFER(Buffers::MaterialBuffers, material->getID(), argBlockBuffer);
+		// If the material has an argument block, allocate and upload it.
+		if (const size_t sizeArgumentBlock = material->getArgumentBlockSize(); sizeArgumentBlock > 0)
+		{
+			argBlockBuffer.upload(material->getArgumentBlockData(), sizeArgumentBlock);
+		}
+
+		materialData.materialConfiguration = createDeviceShaderConfiguration(material);
+		materialData.textureHandler = createTextureHandler(material);
+
+		materialData.argBlock = argBlockBuffer.castedPointer<char>();
+
+		CUDABuffer& materialDataBuffer = GET_BUFFER(Buffers::MaterialBuffers, material->getID(), materialDataBuffer);
+		materialDataBuffer.upload(materialData);
+
+		return std::tuple(materialData, materialDataBuffer.castedPointer<MaterialData>());
+
+	}
+
 
 	std::tuple<TextureData, TextureData *> createTextureData(std::shared_ptr<vtx::graph::Texture>& textureNode)
 	{

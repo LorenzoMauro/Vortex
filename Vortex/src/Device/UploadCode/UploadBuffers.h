@@ -72,6 +72,12 @@ namespace vtx::device
 		{
 			CUDABuffer argBlockBuffer;
 			CUDABuffer materialDataBuffer;
+			CUDABuffer materialConfigBuffer;
+			CUDABuffer textureIdBuffer;
+			CUDABuffer bsdfIdBuffer;
+			CUDABuffer lightProfileBuffer;
+			CUDABuffer TextureHandlerBuffer;
+			CUDABuffer shaderDataBuffer;
 
 			MaterialBuffers() = default;
 			~MaterialBuffers()
@@ -79,23 +85,7 @@ namespace vtx::device
 				VTX_INFO("ShutDown: Material Buffers");
 				argBlockBuffer.free();
 				materialDataBuffer.free();
-			}
-		};
-
-		struct ShaderBuffers
-		{
-			CUDABuffer shaderConfigBuffer;
-			CUDABuffer textureIdBuffer;
-			CUDABuffer bsdfIdBuffer;
-			CUDABuffer lightProfileBuffer;
-			CUDABuffer TextureHandlerBuffer;
-			CUDABuffer shaderDataBuffer;
-
-			ShaderBuffers() = default;
-			~ShaderBuffers()
-			{
-				VTX_INFO("ShutDown: Shaders Buffers");
-				shaderConfigBuffer.free();
+				materialConfigBuffer.free();
 				textureIdBuffer.free();
 				bsdfIdBuffer.free();
 				lightProfileBuffer.free();
@@ -271,11 +261,6 @@ namespace vtx::device
 		}
 
 		template<>
-		ShaderBuffers& getBuffer(const vtxID nodeId) {
-			return getBufferCollectionElement(shader, nodeId);
-		}
-
-		template<>
 		TextureBuffers& getBuffer(const vtxID nodeId) {
 			return getBufferCollectionElement(texture, nodeId);
 		}
@@ -303,7 +288,6 @@ namespace vtx::device
 		std::map<vtxID, InstanceBuffers>     instance;
 		std::map<vtxID, GeometryBuffers>     geometry;
 		std::map<vtxID, MaterialBuffers>     material;
-		std::map<vtxID, ShaderBuffers>       shader;
 		std::map<vtxID, TextureBuffers>      texture;
 		std::map<vtxID, BsdfBuffers>         bsdf;
 		std::map<vtxID, LightProfileBuffers> lightProfile;

@@ -6,12 +6,12 @@ namespace vtx::graph {
 
 	void BsdfMeasurement::init()
 	{
-		reflectionBsdf = mdl::fetchBsdfData(databaseName, MBSDF_DATA_REFLECTION);
+		reflectionBsdf = mdl::fetchBsdfData(databaseName, mi::neuraylib::MBSDF_DATA_REFLECTION);
 		if(reflectionBsdf.srcData != nullptr)
 		{
 			prepareSampling(reflectionBsdf);
 		}
-		transmissionBsdf = mdl::fetchBsdfData(databaseName, MBSDF_DATA_TRANSMISSION);
+		transmissionBsdf = mdl::fetchBsdfData(databaseName, mi::neuraylib::MBSDF_DATA_TRANSMISSION);
 		if (transmissionBsdf.srcData != nullptr)
 		{
 			prepareSampling(transmissionBsdf);

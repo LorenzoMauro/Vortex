@@ -155,7 +155,7 @@ namespace vtx::optix
 		return fullFunctionName.substr(prefix.size());
 	}
 
-	std::shared_ptr<ProgramOptix> createDcProgram(std::shared_ptr<ModuleOptix> module, std::string functionName)
+	std::shared_ptr<ProgramOptix> createDcProgram(std::shared_ptr<ModuleOptix> module, std::string functionName, vtxID id)
 	{
 		const auto function = std::make_shared<optix::FunctionOptix>();
 		function->name = functionName;
@@ -164,7 +164,14 @@ namespace vtx::optix
 
 		auto program = std::make_shared<optix::ProgramOptix>();
 		program->type = optix::OptixProgramType::P_DirectCallable;
-		program->name = getStrippedProgramName(functionName);
+		if(id ==0)
+		{
+			program->name = getStrippedProgramName(functionName);
+		}
+		else
+		{
+			program->name = getStrippedProgramName(functionName) + "_" + std::to_string(id);
+		}
 		program->directCallableFunction = function;
 
 		optix::getRenderingPipeline()->registerProgram(program);

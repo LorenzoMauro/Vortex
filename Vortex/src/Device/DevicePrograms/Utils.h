@@ -2,7 +2,7 @@
 #ifndef UTILS_H
 #define UTILS_H
 #include <optix_device.h>
-
+#include "Core/Math.h"
 namespace vtx::utl
 {
 	
@@ -83,7 +83,7 @@ namespace vtx::utl
 		return temp.bit;
 	}
 
-	__forceinline__ __device__ void offsetRay(math::vec3f hitPosition, const math::vec3f& normal)
+	__forceinline__ __device__ void offsetRay(math::vec3f& hitPosition, const math::vec3f& normal)
 	{
 		constexpr float origin = 1.0f / 32.0f;
 		constexpr float floatScale = 1.0f / 65536.0f;
@@ -302,16 +302,14 @@ namespace vtx::utl
 			if (slotIds.material != nullptr)
 			{
 				hitP->material            = slotIds.material;
-				hitP->shader              = hitP->material->shader;
-				hitP->shaderConfiguration = hitP->shader->shaderConfiguration;
+				hitP->materialConfiguration = hitP->material->materialConfiguration;
 			}
 			if (slotIds.meshLight != nullptr)
 			{
 				const LightData*               lightData  = slotIds.meshLight;
-				const MeshLightAttributesData* attributes = reinterpret_cast<MeshLightAttributesData*>(lightData->
-					attributes);
-				hitP->meshLight           = lightData;
-				hitP->meshLightAttributes = attributes;
+				const MeshLightAttributesData* attributes = reinterpret_cast<MeshLightAttributesData*>(lightData->attributes);
+				hitP->meshLight							  = lightData;
+				hitP->meshLightAttributes				  = attributes;
 			}
 		}
 	}

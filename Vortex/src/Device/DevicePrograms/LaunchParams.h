@@ -12,6 +12,8 @@
 #include "Scene/Nodes/LightTypes.h"
 #include <optix.h>
 
+#include "Device/UploadCode/UploadBuffers.h"
+
 namespace vtx {
 
     struct SbtProgramIdx
@@ -171,20 +173,11 @@ namespace vtx {
     };
 
 
-    struct ShaderData
-    {
-        DeviceShaderConfiguration*  shaderConfiguration;
-        TextureHandler*             textureHandler;
-        //vtxID*                      lightProfilesId;
-        //vtxID*                      bsdfsId;
-        //vtxID*                      texturesId;
-    };
-
-
     struct MaterialData
     {
         char*                       argBlock;
-        ShaderData*                 shader;
+        DeviceShaderConfiguration*  materialConfiguration;
+        TextureHandler*             textureHandler;
     };
 
     struct AliasData {
@@ -207,8 +200,8 @@ namespace vtx {
     struct MeshLightAttributesData
     {
         vtxID           instanceId; //To retrieve the transform
-        GeometryData* geometryData;
-        MaterialData* materialId;
+        GeometryData*   geometryData;
+        MaterialData*   materialId;
 
         float* cdfArea;
         uint32_t* actualTriangleIndices;
@@ -324,17 +317,17 @@ namespace vtx {
 
 	struct LaunchParams
     {
-		int*                          frameID;
-		FrameBufferData               frameBuffer;
-		CameraData                    cameraData;
-		RendererDeviceSettings*       settings;
-        ToneMapperSettings*           toneMapperSettings;
-		SbtProgramIdx*                programs;
-		OptixTraversableHandle        topObject;
-		InstanceData**                instances;
-		LightData*                    envLight = nullptr;
-		LightData**                   lights;
-		int                           numberOfLights;
+		int*                    frameID;
+		FrameBufferData         frameBuffer;
+		CameraData              cameraData;
+		RendererDeviceSettings* settings;
+        ToneMapperSettings*     toneMapperSettings;
+		SbtProgramIdx*          programs;
+		OptixTraversableHandle  topObject;
+		InstanceData**          instances;
+		LightData*              envLight = nullptr;
+        LightData**             lights;
+        int                     numberOfLights;
 	};
 
     enum TypeRay

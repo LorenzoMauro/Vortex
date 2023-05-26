@@ -41,11 +41,11 @@ namespace vtx::gui
             renderNode->settings.iteration = -1;
             renderNode->settings.isUpdated = true;
         };
-        if (ImGui::SliderFloat(labelPrefix("Min Clip").c_str(), &(renderNode->settings.minClamp), 0, 1000, "%.3f")) {
+        if (ImGui::DragFloat(labelPrefix("Min Clip").c_str(), &(renderNode->settings.minClamp),0.01, 0, 1000, "%.3f")) {
             renderNode->settings.iteration = -1;
             renderNode->settings.isUpdated = true;
         };
-        if (ImGui::SliderFloat(labelPrefix("Max Clip").c_str(), &(renderNode->settings.maxClamp), 0, 10000, "%.3f")) {
+        if (ImGui::DragFloat(labelPrefix("Max Clip").c_str(), &(renderNode->settings.maxClamp),1, 0, 10000, "%.3f")) {
             renderNode->settings.iteration = -1;
             renderNode->settings.isUpdated = true;
         };

@@ -7,3 +7,6 @@
 #include "Nodes/Renderer.h"
 #include "Nodes/Transform.h"
 #include "Nodes/Instance.h"
+#include "Nodes/Shader/LightProfile.h"
+#include "Nodes/Shader/BsdfMeasurement.h"
+#include "Nodes/Shader/Texture.h"

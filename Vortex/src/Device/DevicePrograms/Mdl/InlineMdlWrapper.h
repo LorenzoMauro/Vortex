@@ -18,20 +18,44 @@ namespace vtx::mdl {
         // The material's IOR is the current top-of-stack. We need the one further down!
         data.k1 = outgoingDirection; // == -optixGetWorldRayDirection()
         data.xi = rng4(seed);
+        data.pdf = 1.0f;
+
         if (mdlData->isFrontFace || mdlData->isThinWalled)
         {
             //printf("Evaluating Frontface\n");
             data.ior1 = surroundingIor;
             data.ior2.x = MI_NEURAYLIB_BSDF_USE_MATERIAL_IOR;
-            frontBsdf_sample(&data, &mdlData->state, &mdlData->resourceData, nullptr, mdlData->argBlock);
         }
         else
         {
             //printf("Evaluating Backface\n");
             data.ior1.x = MI_NEURAYLIB_BSDF_USE_MATERIAL_IOR;
             data.ior2 = surroundingIor;
+        }
+
+        if (mdlData->isFrontFace || !mdlData->isThinWalled)
+        {
+            frontBsdf_sample(&data, &mdlData->state, &mdlData->resourceData, nullptr, mdlData->argBlock);
+        }
+        else
+        {
             backBsdf_sample(&data, &mdlData->state, &mdlData->resourceData, nullptr, mdlData->argBlock);
         }
+
+        // I've noticed that if the mdl doesn't contain df_specular but roughness is not zero the eventType will always be glossy even for
+        // specular paths (pdf becomes a large floating number)
+        if(data.pdf > 1.0f || data.pdf < 0.0f && (data.event_type & mi::neuraylib::BSDF_EVENT_ABSORB)==0)
+        {
+			data.pdf = 1.0f;
+            if((data.event_type & mi::neuraylib::BSDF_EVENT_REFLECTION)!=0)
+            {
+                data.event_type = mi::neuraylib::BSDF_EVENT_SPECULAR_REFLECTION;
+            }
+            else if ((data.event_type & mi::neuraylib::BSDF_EVENT_TRANSMISSION) != 0)
+            {
+                data.event_type = mi::neuraylib::BSDF_EVENT_SPECULAR_TRANSMISSION;
+            }
+		}
 
         BsdfSampleResult result;
         result.isValid = true;
@@ -41,48 +65,48 @@ namespace vtx::mdl {
         result.eventType = data.event_type;
         result.pdf = data.pdf;
 
-        /*switch(result.eventType)
-        {
-		case mi::neuraylib::BSDF_EVENT_ABSORB:
-            printf("Event Type : BSDF_EVENT_ABSORB");
-       break;
-        case mi::neuraylib::BSDF_EVENT_DIFFUSE:
-            printf("Event Type : BSDF_EVENT_DIFFUSE"); 
-                   break;
-        case mi::neuraylib::BSDF_EVENT_GLOSSY:
-            printf("Event Type : BSDF_EVENT_GLOSSY"); 
-                   break;
-        case mi::neuraylib::BSDF_EVENT_SPECULAR:
-            printf("Event Type : BSDF_EVENT_SPECULAR");
-                   break;
-        case mi::neuraylib::BSDF_EVENT_REFLECTION:
-            printf("Event Type : BSDF_EVENT_REFLECTION"); 
-                   break;
-        case mi::neuraylib::BSDF_EVENT_TRANSMISSION:
-            printf("Event Type : BSDF_EVENT_TRANSMISSION"); 
-                   break;
-        case mi::neuraylib::BSDF_EVENT_DIFFUSE_REFLECTION:
-            printf("Event Type : BSDF_EVENT_DIFFUSE_REFLECTION");
-                   break;
-        case mi::neuraylib::BSDF_EVENT_DIFFUSE_TRANSMISSION:
-            printf("Event Type : BSDF_EVENT_DIFFUSE_TRANSMISSION"); 
-                   break;
-        case mi::neuraylib::BSDF_EVENT_GLOSSY_REFLECTION:
-            printf("Event Type : BSDF_EVENT_GLOSSY_REFLECTION"); 
-                   break;
-        case mi::neuraylib::BSDF_EVENT_GLOSSY_TRANSMISSION:
-            printf("Event Type : BSDF_EVENT_GLOSSY_TRANSMISSION"); 
-                   break;
-        case mi::neuraylib::BSDF_EVENT_SPECULAR_REFLECTION:
-            printf("Event Type : BSDF_EVENT_SPECULAR_REFLECTION"); 
-                   break;
-        case mi::neuraylib::BSDF_EVENT_SPECULAR_TRANSMISSION:
-            printf("Event Type : BSDF_EVENT_SPECULAR_TRANSMISSION"); 
-                   break;
-        case mi::neuraylib::BSDF_EVENT_FORCE_32_BIT:
-            printf("Event Type : BSDF_EVENT_FORCE_32_BIT"); 
-            break;
-		}*/
+        //switch(result.eventType)
+        //{
+		//case mi::neuraylib::BSDF_EVENT_ABSORB:
+        //    printf("Event Type : BSDF_EVENT_ABSORB\n");
+		//break;
+        //case mi::neuraylib::BSDF_EVENT_DIFFUSE:
+        //    printf("Event Type : BSDF_EVENT_DIFFUSE\n"); 
+        //           break;
+        //case mi::neuraylib::BSDF_EVENT_GLOSSY:
+        //    printf("Event Type : BSDF_EVENT_GLOSSY\n"); 
+        //           break;
+        //case mi::neuraylib::BSDF_EVENT_SPECULAR:
+        //    printf("Event Type : BSDF_EVENT_SPECULAR\n");
+        //           break;
+        //case mi::neuraylib::BSDF_EVENT_REFLECTION:
+        //    printf("Event Type : BSDF_EVENT_REFLECTION\n"); 
+        //           break;
+        //case mi::neuraylib::BSDF_EVENT_TRANSMISSION:
+        //    printf("Event Type : BSDF_EVENT_TRANSMISSION\n"); 
+        //           break;
+        //case mi::neuraylib::BSDF_EVENT_DIFFUSE_REFLECTION:
+        //    printf("Event Type : BSDF_EVENT_DIFFUSE_REFLECTION\n");
+        //           break;
+        //case mi::neuraylib::BSDF_EVENT_DIFFUSE_TRANSMISSION:
+        //    printf("Event Type : BSDF_EVENT_DIFFUSE_TRANSMISSION\n"); 
+        //           break;
+        //case mi::neuraylib::BSDF_EVENT_GLOSSY_REFLECTION:
+        //    printf("Event Type : BSDF_EVENT_GLOSSY_REFLECTION\n"); 
+        //           break;
+        //case mi::neuraylib::BSDF_EVENT_GLOSSY_TRANSMISSION:
+        //    printf("Event Type : BSDF_EVENT_GLOSSY_TRANSMISSION\n"); 
+        //           break;
+        //case mi::neuraylib::BSDF_EVENT_SPECULAR_REFLECTION:
+        //    printf("Event Type : BSDF_EVENT_SPECULAR_REFLECTION\n"); 
+        //           break;
+        //case mi::neuraylib::BSDF_EVENT_SPECULAR_TRANSMISSION:
+        //    printf("Event Type : BSDF_EVENT_SPECULAR_TRANSMISSION\n"); 
+        //           break;
+        //case mi::neuraylib::BSDF_EVENT_FORCE_32_BIT:
+        //    printf("Event Type : BSDF_EVENT_FORCE_32_BIT\n"); 
+        //    break;
+		//}
         /*printf("Sampled BSDF: %f %f %f\n"
                "BSDF over PDF:  %f %f %f\n"
                "PDF: %f\n",
@@ -100,6 +124,8 @@ namespace vtx::mdl {
 
         evalData.k1 = outgoingDirection;
         evalData.k2 = incomingDirection;
+        evalData.bsdf_diffuse = math::vec3f(0.0f);
+        evalData.bsdf_glossy = math::vec3f(0.0f);
 
         // If the hit is either on the surface or a thin-walled material,
         // the ray is inside the surrounding material and the material ior is on the other side.
@@ -107,7 +133,6 @@ namespace vtx::mdl {
         {
             evalData.ior1 = surroundingIor; // From surrounding medium ior
             evalData.ior2.x = MI_NEURAYLIB_BSDF_USE_MATERIAL_IOR;                    // to material ior.
-            frontBsdf_evaluate(&evalData, &mdlData->state, &mdlData->resourceData, nullptr, mdlData->argBlock);
         }
         else
         {
@@ -116,7 +141,15 @@ namespace vtx::mdl {
             // The material's IOR is the current top-of-stack. We need the one further down!
             evalData.ior1.x = MI_NEURAYLIB_BSDF_USE_MATERIAL_IOR;                    // From material ior 
             evalData.ior2 = surroundingIor; // From surrounding medium ior
+        }
+
+        if(mdlData->isFrontFace || !mdlData->isThinWalled)
+        {
             frontBsdf_evaluate(&evalData, &mdlData->state, &mdlData->resourceData, nullptr, mdlData->argBlock);
+        }
+        else
+        {
+            backBsdf_evaluate(&evalData, &mdlData->state, &mdlData->resourceData, nullptr, mdlData->argBlock);
         }
 
         BsdfEvalResult result;
@@ -134,13 +167,13 @@ namespace vtx::mdl {
         BsdfAuxiliaryData auxData;
 
         auxData.k1 = outgoingDirection;
+
         // If the hit is either on the surface or a thin-walled material,
         // the ray is inside the surrounding material and the material ior is on the other side.
         if (mdlData->isFrontFace || mdlData->isThinWalled)
         {
             auxData.ior1 = surroundingIor; // From surrounding medium ior
             auxData.ior2.x = MI_NEURAYLIB_BSDF_USE_MATERIAL_IOR;                    // to material ior.
-            frontBsdf_auxiliary(&auxData, &mdlData->state, &mdlData->resourceData, nullptr, mdlData->argBlock);
         }
         else
         {
@@ -149,6 +182,15 @@ namespace vtx::mdl {
             // The material's IOR is the current top-of-stack. We need the one further down!
             auxData.ior1.x = MI_NEURAYLIB_BSDF_USE_MATERIAL_IOR;                    // From material ior 
             auxData.ior2 = surroundingIor; // From surrounding medium ior
+        }
+
+
+        if (mdlData->isFrontFace || !mdlData->isThinWalled)
+        {
+            frontBsdf_auxiliary(&auxData, &mdlData->state, &mdlData->resourceData, nullptr, mdlData->argBlock);
+        }
+        else
+        {
             backBsdf_auxiliary(&auxData, &mdlData->state, &mdlData->resourceData, nullptr, mdlData->argBlock);
         }
 
@@ -163,42 +205,49 @@ namespace vtx::mdl {
     {
         EdfEvaluateData evalData;
         EdfResult result;
+
+        float3 emissionIntensity;
+        emissionIntensity.x = 0.0f;
+        emissionIntensity.y = 0.0f;
+        emissionIntensity.z = 0.0f;
+
         // Emission 
-        if (mdlData->isFrontFace)
+        if (mdlData->isFrontFace || !mdlData->isThinWalled)
         {
-            frontEdfIntensity(&result.intensity, &mdlData->state, &mdlData->resourceData, nullptr, mdlData->argBlock);
+            frontEdfIntensity(&emissionIntensity, &mdlData->state, &mdlData->resourceData, nullptr, mdlData->argBlock);
+
+            result.intensity = emissionIntensity;
+            //printMath("Front Intensity", emissionIntensity);
+
+            if (result.intensity == math::vec3f(0.0f)) {
+                result.isValid = false;
+                return result;
+            }
+
+            evalData.k1 = outgoingDirection; // input: outgoing direction (-ray.direction)
             frontEdfMode(&result.mode, &mdlData->state, &mdlData->resourceData, nullptr, mdlData->argBlock);
-        }
-        else if (mdlData->isThinWalled)
-        {
-            backEdfIntensity(&result.intensity, &mdlData->state, &mdlData->resourceData, nullptr, mdlData->argBlock);
-            backEdfMode(&result.mode, &mdlData->state, &mdlData->resourceData, nullptr, mdlData->argBlock);
-        }
-
-        if (result.intensity == math::vec3f(0.0f)) {
-            result.isValid = false;
-            return result;
-        }
-        // Check if the hit geometry contains any emission.
-
-        evalData.k1 = outgoingDirection; // input: outgoing direction (-ray.direction)
-
-        if (mdlData->isFrontFace)
-        {
             frontEdf_evaluate(&evalData, &mdlData->state, &mdlData->resourceData, nullptr, mdlData->argBlock);
-            frontEdfMode(&result.mode, &mdlData->state, &mdlData->resourceData, nullptr, mdlData->argBlock);
         }
-        else if (mdlData->isThinWalled)
+        else
         {
-            backEdf_evaluate(&evalData, &mdlData->state, &mdlData->resourceData, nullptr, mdlData->argBlock);
+            backEdfIntensity(&emissionIntensity, &mdlData->state, &mdlData->resourceData, nullptr, mdlData->argBlock);
+            result.intensity = emissionIntensity;
+
+
+            if (result.intensity == math::vec3f(0.0f)) {
+                result.isValid = false;
+                return result;
+            }
+            evalData.k1 = outgoingDirection; // input: outgoing direction (-ray.direction)
             backEdfMode(&result.mode, &mdlData->state, &mdlData->resourceData, nullptr, mdlData->argBlock);
+            backEdf_evaluate(&evalData, &mdlData->state, &mdlData->resourceData, nullptr, mdlData->argBlock);
         }
 
+        // Check if the hit geometry contains any emission.
         result.isValid = true;
         result.cos = evalData.cos;
         result.edf = evalData.edf;
         result.pdf = evalData.pdf;
-
         return result;
     }
 
@@ -222,8 +271,8 @@ namespace vtx::mdl {
         mdlData.state.meters_per_scene_unit = 1.0f;
 
         mdlData.resourceData.shared_data = nullptr;
-        mdlData.resourceData.texture_handler = hitP->shader->textureHandler;
-        mdlData.argBlock = reinterpret_cast<char*>(hitP->material->argBlock);
+        mdlData.resourceData.texture_handler = hitP->material->textureHandler;
+        mdlData.argBlock = hitP->material->argBlock;
         mdlData.isFrontFace = hitP->isFrontFace;
 
         init(&mdlData.state, &mdlData.resourceData, nullptr, mdlData.argBlock);

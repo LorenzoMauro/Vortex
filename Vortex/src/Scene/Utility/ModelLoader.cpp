@@ -5,13 +5,18 @@
 
 namespace vtx::importer
 {
+    struct GetTextureInput
+    {
+    	aiTextureType type;
+		unsigned index;
+	};
     // Types sorted by preferences
-    void getTexturePath(const aiMaterial* material, const std::vector<aiTextureType>& potentialTypes, std::string& returnPath, std::string& scenePath)
+    void getTexturePath(const aiMaterial* material, const std::vector<GetTextureInput>& potentialTypes, std::string& returnPath, const std::string& scenePath)
     {
         aiString path;
-        for(const auto type : potentialTypes)
+        for(const auto potential : potentialTypes)
 	    {
-		    if(material->GetTexture(type, 0, &path) == AI_SUCCESS)
+		    if(material->GetTexture(potential.type, potential.index, &path) == AI_SUCCESS)
 		    {
                 returnPath = utl::absolutePath(path.C_Str(), scenePath);
 		    	return;
@@ -52,71 +57,187 @@ namespace vtx::importer
         }
     }
 
-    std::shared_ptr<graph::shader::ImportedNode> createPrincipledMaterial(AssimpMaterialProperties properties)
+    std::shared_ptr<graph::shader::PrincipledMaterial> createPrincipledMaterial(const AssimpMaterialProperties& properties)
     {
-        auto principled = ops::createPbsdfGraph();
+        auto principled = ops::createNode<graph::shader::PrincipledMaterial>();
+
+		const std::string name = properties.name;
+        if(!name.empty())
+        {
+            principled->name = "";
+            for (size_t i = 0; i < name.size(); ++i) {
+                if (name[i] == '.') {
+                    principled->name.push_back('_');
+                }
+                else {
+                    principled->name.push_back(name[i]);
+                }
+            }
+        }
+        
 
         // Diffuse
         if(!properties.diffuse.path.empty())
         {
-            principled->setSocketDefault(DIFFUSE_TEXTURE_SOCKET, mdl::createTextureConstant(properties.diffuse.path));
+            principled->connectInput(ALBEDO_SOCKET, ops::createNode<graph::shader::ColorTexture>(properties.diffuse.path));
         }
-        if(properties.diffuse.value != math::vec3f(-1.0f))
+        else if(properties.diffuse.value != math::vec3f(-1.0f))
         {
-            principled->setSocketDefault(DIFFUSE_COLOR_SOCKET, mdl::createConstantColor(properties.diffuse.value));
+            principled->setSocketDefault(ALBEDO_SOCKET, mdl::createConstantColor(properties.diffuse.value));
         }
 
-        // Ambient Occlusion
-        if (!properties.ambientOcclusion.path.empty())
+        if(!properties.ORM.path.empty())
         {
-            principled->setSocketDefault(AO_TEXTURE_SOCKET, mdl::createTextureConstant(properties.ambientOcclusion.path, mi::neuraylib::IType_texture::TS_2D, 1.0f));
-            principled->setSocketDefault(AO_TO_DIFFUSE_SOCKET, mdl::createConstantFloat(0.5f));
+			const auto ormTexture = ops::createNode<graph::shader::ColorTexture>(properties.ORM.path);
+	        if(properties.roughness.value!=1.0f)
+	        {
+                principled->setSocketDefault(ROUGHNESS_SOCKET, mdl::createConstantFloat(properties.roughness.value));
+
+	        }
+            else
+            {
+				const auto roughnessChannel = ops::createNode<graph::shader::GetChannel>(1);
+                roughnessChannel->connectInput(VF_GET_COLOR_CHANNEL_COLOR_SOCKET, ormTexture);
+                principled->connectInput(ROUGHNESS_SOCKET, roughnessChannel);
+            }
+
+            if (properties.metallic.value != 1.0f)
+            {
+                principled->setSocketDefault(METALLIC_SOCKET, mdl::createConstantFloat(properties.metallic.value));
+
+            }
+            else
+            {
+				const auto metallicChannel = ops::createNode<graph::shader::GetChannel>(2);
+                metallicChannel->connectInput(VF_GET_COLOR_CHANNEL_COLOR_SOCKET, ormTexture);
+                principled->connectInput(METALLIC_SOCKET, metallicChannel);
+            }
+        }
+        else
+        {
+            // Metallic
+            if (!properties.metallic.path.empty())
+            {
+                principled->connectInput(METALLIC_SOCKET, ops::createNode<graph::shader::MonoTexture>(properties.metallic.path));
+            }
+            else if (properties.metallic.value >= 0.0f)
+            {
+                principled->setSocketDefault(METALLIC_SOCKET, mdl::createConstantFloat(properties.metallic.value));
+            }
+
+            // Roughness
+            if (!properties.roughness.path.empty())
+            {
+                principled->connectInput(ROUGHNESS_SOCKET, ops::createNode<graph::shader::MonoTexture>(properties.roughness.path));
+            }
+            else if (properties.roughness.value >= 0.0f)
+            {
+                principled->setSocketDefault(ROUGHNESS_SOCKET, mdl::createConstantFloat(properties.roughness.value));
+            }
+        }
+        
+
+        //Normal and Bump
+        if(!properties.normal.path.empty() && !properties.bump.path.empty())
+        {
+			const auto normalMap = ops::createNode<graph::shader::NormalTexture>(properties.normal.path);
+			const auto bumpMap   = ops::createNode<graph::shader::BumpTexture>(properties.bump.path);
+			const auto mixNormal = ops::createNode<graph::shader::NormalMix>();
+
+            mixNormal->connectInput(VF_MIX_NORMAL_BASE_SOCKET, normalMap);
+            mixNormal->connectInput(VF_MIX_NORMAL_LAYER_SOCKET, bumpMap);
+
+            principled->connectInput(NORMALMAP_SOCKET, mixNormal);
+        }
+        else if(!properties.normal.path.empty())
+        {
+			const auto normalMap = ops::createNode<graph::shader::NormalTexture>(properties.normal.path);
+            principled->connectInput(NORMALMAP_SOCKET, normalMap);
+
+        }
+		else if(!properties.bump.path.empty())
+		{
+			const auto bumpMap = ops::createNode<graph::shader::BumpTexture>(properties.bump.path);
+            principled->connectInput(NORMALMAP_SOCKET, bumpMap);
+		}
+
+        // Emission
+
+        if (!properties.emissionIntensity.path.empty())
+        {
+            principled->connectInput(EMISSION_INTENSITY_SOCKET, ops::createNode<graph::shader::ColorTexture>(properties.emissionIntensity.path));
+        }
+        else if (properties.emissionIntensity.value >= 1.0f)
+        {
+            principled->setSocketDefault(EMISSION_INTENSITY_SOCKET, mdl::createConstantFloat(properties.emissionIntensity.value));
+        }
+        if(!properties.emissionColor.path.empty())
+        {
+        	principled->connectInput(EMISSION_COLOR_SOCKET, ops::createNode<graph::shader::ColorTexture>(properties.emissionColor.path));
+		}
+		else if(properties.emissionColor.value != math::vec3f(-1.0f))
+		{
+            principled->setSocketDefault(EMISSION_COLOR_SOCKET, mdl::createConstantColor(properties.emissionColor.value));
+            if (properties.emissionColor.value != math::vec3f(0.0f))
+            {
+                //HACK this is a hack to compensate for lack of blender to gltf intensity eport
+                principled->setSocketDefault(EMISSION_INTENSITY_SOCKET, mdl::createConstantFloat(100.0f));
+            }
+		}
+
+        // ClearCoat
+        if (!properties.clearcoatAmount.path.empty()) {
+            principled->connectInput(COAT_AMOUNT_SOCKET, ops::createNode<graph::shader::MonoTexture>(properties.clearcoatAmount.path));
+        }
+        else if (properties.clearcoatAmount.value >= 0.0f) {
+            principled->setSocketDefault(COAT_AMOUNT_SOCKET, mdl::createConstantFloat(properties.clearcoatAmount.value));
         }
 
-        // MetallNess
-        if (!properties.metallic.path.empty())
-        {
-            principled->setSocketDefault(METALLIC_TEXTURE_SOCKET, mdl::createTextureConstant(properties.metallic.path, mi::neuraylib::IType_texture::TS_2D, 1.0f));
-        	principled->setSocketDefault(METALLIC_TEXTURE_INFLUENCE_SOCKET, mdl::createConstantFloat(1.0f));
+        if (!properties.clearcoatRoughness.path.empty()) {
+            principled->connectInput(COAT_ROUGHNESS_SOCKET, ops::createNode<graph::shader::MonoTexture>(properties.clearcoatRoughness.path));
         }
-        if (properties.metallic.value >= 0.0f)
-        {
-            principled->setSocketDefault(METALLIC_CONSTANT_SOCKET, mdl::createConstantFloat(properties.metallic.value));
+        else if (properties.clearcoatRoughness.value >= 0.0f) {
+            principled->setSocketDefault(COAT_ROUGHNESS_SOCKET, mdl::createConstantFloat(properties.clearcoatRoughness.value));
         }
 
-        // Roughness
-        if (!properties.roughness.path.empty())
-        {
-            principled->setSocketDefault(ROUGHNESS_TEXTURE_SOCKET, mdl::createTextureConstant(properties.roughness.path, mi::neuraylib::IType_texture::TS_2D, 1.0f));
-            principled->setSocketDefault(ROUGHNESS_TEXTURE_INFLUENCE_SOCKET, mdl::createConstantFloat(1.0f));
-        }
-        if (properties.roughness.value >= 0.0f)
-        {
-            principled->setSocketDefault(ROUGHNESS_CONSTANT_SOCKET, mdl::createConstantFloat(properties.roughness.value));
+        if (!properties.clearcoatNormal.path.empty()) {
+            const auto clearcoatNormalMap = ops::createNode<graph::shader::NormalTexture>(properties.clearcoatNormal.path);
+            principled->connectInput(COAT_NORMALMAP_SOCKET, clearcoatNormalMap);
         }
 
-        //Normal
-        if (!properties.normal.path.empty())
-        {
-            principled->setSocketDefault(NORMALMAP_TEXTURE_SOCKET, mdl::createTextureConstant(properties.normal.path, mi::neuraylib::IType_texture::TS_2D, 1.0f));
-            principled->setSocketDefault(NORMALMAP_FACTOR_SOCKET, mdl::createConstantFloat(0.7f));
+        // Transmission
+        if (!properties.transmission.path.empty()) {
+            principled->connectInput(TRANSMISSION_SOCKET, ops::createNode<graph::shader::MonoTexture>(properties.transmission.path));
         }
-        if (properties.normal.value >= 0.0f)
-        {
-            principled->setSocketDefault(NORMALMAP_FACTOR_SOCKET, mdl::createConstantFloat(properties.normal.value));
+        else if (properties.transmission.value >= 0.0f) {
+            principled->setSocketDefault(TRANSMISSION_SOCKET, mdl::createConstantFloat(properties.transmission.value));
         }
 
-        //Bump
-        if (!properties.bump.path.empty())
-        {
-            principled->setSocketDefault(BUMPMAP_TEXTURE_SOCKET, mdl::createTextureConstant(properties.bump.path, mi::neuraylib::IType_texture::TS_2D, 1.0f));
+        // Sheen
+        if (!properties.sheenColor.path.empty()) {
+            principled->setSocketDefault(SHEEN_AMOUNT_SOCKET, mdl::createConstantFloat(0.5f));
+            principled->connectInput(SHEEN_TINT_SOCKET, ops::createNode<graph::shader::ColorTexture>(properties.sheenColor.path));
+        }
+        else if (properties.sheenColor.value != math::vec3f(-1.0f)) {
+            principled->setSocketDefault(SHEEN_AMOUNT_SOCKET, mdl::createConstantFloat(0.5f));
+            principled->setSocketDefault(SHEEN_TINT_SOCKET, mdl::createConstantColor(properties.sheenColor.value));
         }
 
-        //Specular Level
-        if (properties.specular.value >= 0.0f)
-        {
-            principled->setSocketDefault(SPECULAR_LEVEL_SOCKET, mdl::createConstantFloat(properties.specular.value));
+        if (!properties.sheenRoughness.path.empty()) {
+            principled->setSocketDefault(SHEEN_AMOUNT_SOCKET, mdl::createConstantFloat(0.5f));
+            principled->connectInput(SHEEN_ROUGHNESS_SOCKET, ops::createNode<graph::shader::MonoTexture>(properties.sheenRoughness.path));
         }
+        else if (properties.sheenRoughness.value >= 0.0f) {
+            principled->setSocketDefault(SHEEN_AMOUNT_SOCKET, mdl::createConstantFloat(0.5f));
+            principled->setSocketDefault(SHEEN_ROUGHNESS_SOCKET, mdl::createConstantFloat(properties.sheenRoughness.value));
+        }
+
+        // Anisotropy
+        if (properties.anisotropy.value >= 0.0f) {
+            principled->setSocketDefault(ANISOTROPY_SOCKET, mdl::createConstantFloat(abs(properties.anisotropy.value)));
+            // Since there's no separate texture or value for anisotropy rotation, you may need to set a default value or use a value based on some condition.
+        }
+
 
         return principled;
     }
@@ -124,20 +245,34 @@ namespace vtx::importer
 
     void AssimpMaterialProperties::determineProperties(const aiMaterial* material, std::string scenePath)
     {
+        aiString matName;
+        material->Get(AI_MATKEY_NAME, matName);
+
+        name = matName.C_Str();
 		// Diffuse texture and color
-        getTexturePath(material, { aiTextureType_DIFFUSE, aiTextureType_BASE_COLOR }, diffuse.path, scenePath);
+        AI_MATKEY_TEXTURE_DIFFUSE()
+        getTexturePath(material, { {aiTextureType_DIFFUSE,0}, {AI_MATKEY_BASE_COLOR_TEXTURE} }, diffuse.path, scenePath);
         getColorValue(material, { { AI_MATKEY_COLOR_DIFFUSE}, {AI_MATKEY_COLOR_SPECULAR} }, diffuse.value);
 
         // Ambient Occlusion texture and color
-        getTexturePath(material, { aiTextureType_AMBIENT_OCCLUSION }, ambientOcclusion.path, scenePath);
+        getTexturePath(material, { {aiTextureType_AMBIENT_OCCLUSION ,0}}, ambientOcclusion.path, scenePath);
 
         // Roughness texture and value
-        getTexturePath(material, { aiTextureType_DIFFUSE_ROUGHNESS, aiTextureType_SHININESS }, roughness.path, scenePath);
+        getTexturePath(material, { {AI_MATKEY_ROUGHNESS_TEXTURE}, {aiTextureType_SHININESS ,0}}, roughness.path, scenePath);
         getFloatValue(material, { { AI_MATKEY_ROUGHNESS_FACTOR} }, roughness.value); //, {AI_MATKEY_SHININESS}
 
+        // Metallic texture and value
+        getTexturePath(material, { {AI_MATKEY_METALLIC_TEXTURE} }, metallic.path, scenePath);
+        getFloatValue(material, { { AI_MATKEY_METALLIC_FACTOR}, { AI_MATKEY_REFLECTIVITY } }, metallic.value);
+
+        // MetallicRoughness texture
+        getTexturePath(material, { {aiTextureType_UNKNOWN,0} }, ORM.path, scenePath);
+
         // Specular texture and value
-        getTexturePath(material, { aiTextureType_SPECULAR }, specular.path, scenePath);
+        getTexturePath(material, { {aiTextureType_SPECULAR ,0}}, specular.path, scenePath);
         getFloatValue(material, { {AI_MATKEY_GLOSSINESS_FACTOR}, {AI_MATKEY_SPECULAR_FACTOR} }, specular.value);
+
+
         if (specular.value == -1.0f)
         {
             math::vec3f shininessColor = -1.0f;
@@ -151,15 +286,42 @@ namespace vtx::importer
             }
         }
 
-        // Metallic texture and value
-        getTexturePath(material, { aiTextureType_METALNESS }, metallic.path, scenePath);
-        getFloatValue(material, { { AI_MATKEY_METALLIC_FACTOR}, { AI_MATKEY_REFLECTIVITY } }, metallic.value);
-
         // Normal texture
-        getTexturePath(material, { aiTextureType_NORMAL_CAMERA, aiTextureType_NORMALS }, normal.path, scenePath);
+        getTexturePath(material, { {aiTextureType_NORMAL_CAMERA,0}, {aiTextureType_NORMALS ,0}}, normal.path, scenePath);
         getFloatValue(material, { { AI_MATKEY_BUMPSCALING} }, normal.value);
         // Bump texture
-        getTexturePath(material, { aiTextureType_HEIGHT }, bump.path, scenePath);
+        getTexturePath(material, { {aiTextureType_HEIGHT ,0}}, bump.path, scenePath);
+
+
+        // Metallic texture and value
+        getTexturePath(material, { {aiTextureType_EMISSION_COLOR ,0}}, emissionColor.path, scenePath);
+        getColorValue(material, { { AI_MATKEY_COLOR_EMISSIVE} }, emissionColor.value);
+
+        getTexturePath(material, { {aiTextureType_EMISSIVE ,0}}, emissionIntensity.path, scenePath);
+        getFloatValue(material, { { AI_MATKEY_EMISSIVE_INTENSITY} }, emissionIntensity.value);
+
+        //ClearCoat
+        getTexturePath(material, { {AI_MATKEY_CLEARCOAT_TEXTURE} }, clearcoatAmount.path, scenePath);
+        getFloatValue(material, { { AI_MATKEY_CLEARCOAT_FACTOR} }, clearcoatAmount.value);
+
+        getTexturePath(material, { {AI_MATKEY_CLEARCOAT_ROUGHNESS_TEXTURE} }, clearcoatRoughness.path, scenePath);
+        getFloatValue(material, { { AI_MATKEY_CLEARCOAT_ROUGHNESS_FACTOR} }, clearcoatRoughness.value);
+
+        getTexturePath(material, { {AI_MATKEY_CLEARCOAT_NORMAL_TEXTURE} }, clearcoatNormal.path, scenePath);
+
+        //Transmission
+        getTexturePath(material, { {AI_MATKEY_TRANSMISSION_TEXTURE}}, transmission.path, scenePath);
+        getFloatValue(material, { { AI_MATKEY_TRANSMISSION_FACTOR} }, transmission.value);
+
+        //Sheen
+        getTexturePath(material, { {AI_MATKEY_SHEEN_COLOR_TEXTURE} }, sheenColor.path, scenePath);
+        getColorValue(material, { { AI_MATKEY_SHEEN_COLOR_FACTOR} }, sheenColor.value);
+
+        getTexturePath(material, { {AI_MATKEY_CLEARCOAT_ROUGHNESS_TEXTURE} }, sheenRoughness.path, scenePath);
+        getFloatValue(material, { { AI_MATKEY_SHEEN_ROUGHNESS_FACTOR} }, sheenRoughness.value);
+
+        //Anisotropy
+        getFloatValue(material, { { AI_MATKEY_ANISOTROPY_FACTOR} }, anisotropy.value);
 
         //float glossinessFactor = -1.0f;
         //getFloatValue(material, { { AI_MATKEY_GLOSSINESS_FACTOR} }, glossinessFactor);
@@ -188,7 +350,7 @@ namespace vtx::importer
 
         for (unsigned int i = 0; i < scene->mNumMaterials; ++i)
         {
-            aiMaterial* aiMat = scene->mMaterials[i];
+			const aiMaterial* aiMat = scene->mMaterials[i];
 
             // Create a new material in your renderer and set its properties based on aiMat
             auto material = ops::createNode<graph::Material>();
@@ -197,7 +359,7 @@ namespace vtx::importer
 
             AssimpMaterialProperties properties;
             properties.determineProperties(aiMat, scenePath);
-            const auto principled = createPrincipledMaterial(properties);
+            auto principled = createPrincipledMaterial(properties);
             // You can now use the extracted variables within the function
             material->materialGraph = principled;
             materials.push_back(material);
@@ -206,7 +368,7 @@ namespace vtx::importer
         return materials;
     }
 
-    void convertAssimpMeshToMeshNode(aiMesh* aiMesh, std::shared_ptr<graph::Mesh> meshNode)
+    void convertAssimpMeshToMeshNode(const aiMesh* aiMesh, std::shared_ptr<graph::Mesh> meshNode)
     {
         // Process vertices
         meshNode->vertices.resize(aiMesh->mNumVertices);
@@ -318,8 +480,8 @@ namespace vtx::importer
         return groupNode;
     }
 
-    void processMetadata(const aiScene* scene) {
-        if (scene->mMetaData)
+    void processMetadata(const aiScene* scene, const std::string& fileFormat) {
+        if (scene->mMetaData!=nullptr)
         { 
            /* int32_t frontAxis = 0; 
             int32_t frontAxisSign = 1; 
@@ -334,37 +496,87 @@ namespace vtx::importer
             int32_t coordAxisSign = 1;
             int32_t upAxis = 1;  // Changed from 2 to 1
             int32_t upAxisSign = 1;
-            double unitScaleFactor = 0.01;
+            double unitScaleFactor = 1.0;
+            if(fileFormat == "fbx")
+            {
+	            unitScaleFactor = 0.01;
+			}
+			else if(fileFormat == "obj")
+			{
+				unitScaleFactor = 1.0;
+			}
+			else
+			{
+				unitScaleFactor = 1.0;
+            }
             for (unsigned MetadataIndex = 0; MetadataIndex < scene->mMetaData->mNumProperties; ++MetadataIndex)
             {
-                if (strcmp(scene->mMetaData->mKeys[MetadataIndex].C_Str(), "UpAxis") == 0)
-                {
-                    scene->mMetaData->Get<int32_t>(MetadataIndex, upAxis);
-                }
-                if (strcmp(scene->mMetaData->mKeys[MetadataIndex].C_Str(), "UpAxisSign") == 0)
-                {
-                    scene->mMetaData->Get<int32_t>(MetadataIndex, upAxisSign);
-                }
-                if (strcmp(scene->mMetaData->mKeys[MetadataIndex].C_Str(), "FrontAxis") == 0)
-                {
-                    scene->mMetaData->Get<int32_t>(MetadataIndex, frontAxis);
-                }
-                if (strcmp(scene->mMetaData->mKeys[MetadataIndex].C_Str(), "FrontAxisSign") == 0)
-                {
-                    scene->mMetaData->Get<int32_t>(MetadataIndex, frontAxisSign);
-                }
-                if (strcmp(scene->mMetaData->mKeys[MetadataIndex].C_Str(), "CoordAxis") == 0)
-                {
-                    scene->mMetaData->Get<int32_t>(MetadataIndex, coordAxis);
-                }
-                if (strcmp(scene->mMetaData->mKeys[MetadataIndex].C_Str(), "CoordAxisSign") == 0)
-                {
-                    scene->mMetaData->Get<int32_t>(MetadataIndex, coordAxisSign);
-                }
-                if (strcmp(scene->mMetaData->mKeys[MetadataIndex].C_Str(), "UnitScaleFactor") == 0)
-                {
-                    scene->mMetaData->Get<double>(MetadataIndex, unitScaleFactor);
-                }
+                VTX_INFO("Metadata: {0}", scene->mMetaData->mKeys[MetadataIndex].C_Str());
+				if (strcmp(scene->mMetaData->mKeys[MetadataIndex].C_Str(), "UpAxis") == 0)
+				{
+					const bool result = scene->mMetaData->Get<int32_t>(MetadataIndex, upAxis);
+					if (!result)
+					{
+						VTX_WARN("Some Error Occurred Collecting Assimp Metadata UpAxis");
+					}
+				}
+				if (strcmp(scene->mMetaData->mKeys[MetadataIndex].C_Str(), "UpAxisSign") == 0)
+				{
+					const bool result = scene->mMetaData->Get<int32_t>(MetadataIndex, upAxisSign);
+					if (!result)
+					{
+						VTX_WARN("Some Error Occurred Collecting Assimp Metadata UpAxisSign");
+					}
+				}
+				if (strcmp(scene->mMetaData->mKeys[MetadataIndex].C_Str(), "FrontAxis") == 0)
+				{
+					const bool result = scene->mMetaData->Get<int32_t>(MetadataIndex, frontAxis);
+					if (!result)
+					{
+						VTX_WARN("Some Error Occurred Collecting Assimp Metadata FrontAxis");
+					}
+				}
+				if (strcmp(scene->mMetaData->mKeys[MetadataIndex].C_Str(), "FrontAxisSign") == 0)
+				{
+					const bool result = scene->mMetaData->Get<int32_t>(MetadataIndex, frontAxisSign);
+					if (!result)
+					{
+						VTX_WARN("Some Error Occurred Collecting Assimp Metadata FrontAxisSign");
+					}
+				}
+				if (strcmp(scene->mMetaData->mKeys[MetadataIndex].C_Str(), "CoordAxis") == 0)
+				{
+					const bool result = scene->mMetaData->Get<int32_t>(MetadataIndex, coordAxis);
+					if (!result)
+					{
+						VTX_WARN("Some Error Occurred Collecting Assimp Metadata CoordAxis");
+					}
+				}
+				if (strcmp(scene->mMetaData->mKeys[MetadataIndex].C_Str(), "CoordAxisSign") == 0)
+				{
+					const bool result = scene->mMetaData->Get<int32_t>(MetadataIndex, coordAxisSign);
+					if (!result)
+					{
+						VTX_WARN("Some Error Occurred Collecting Assimp Metadata CoordAxisSign");
+					}
+				}
+				/*if (strcmp(scene->mMetaData->mKeys[MetadataIndex].C_Str(), "UnitScaleFactor") == 0)
+				{
+					bool result = scene->mMetaData->Get<double>(MetadataIndex, unitScaleFactor);
+					if (!result)
+					{
+                        float unitScaleFactorFloat;
+                        bool result = scene->mMetaData->Get<float>(MetadataIndex, unitScaleFactorFloat);
+                        if (!result)
+                        {
+                            VTX_WARN("Some Error Occurred Collecting Assimp Metadata UnitScaleFactor");
+                        }
+                        else
+                        {
+                            unitScaleFactor = (double)unitScaleFactorFloat;
+                        }
+					}
+				}*/
             }
 
             aiVector3D upVec; 
@@ -375,10 +587,10 @@ namespace vtx::importer
             forwardVec[frontAxis]   = frontAxisSign * (float)unitScaleFactor;
             rightVec[coordAxis]     = coordAxisSign * (float)unitScaleFactor;
 
-			aiMatrix4x4 mat(forwardVec.x,   forwardVec.y,   forwardVec.z,   0.0f,
-							rightVec.x,     rightVec.y,     rightVec.z,     0.0f,
-							upVec.x,        upVec.y,        upVec.z,        0.0f,
-							0.0f,           0.0f,           0.0f,           1.0f);
+		   const aiMatrix4x4 mat(forwardVec.x,   forwardVec.y,   forwardVec.z,   0.0f,
+								 rightVec.x,     rightVec.y,     rightVec.z,     0.0f,
+								 upVec.x,        upVec.y,        upVec.z,        0.0f,
+								 0.0f,           0.0f,           0.0f,           1.0f);
 
             scene->mRootNode->mTransformation = mat;
         }
@@ -386,7 +598,8 @@ namespace vtx::importer
 
     std::shared_ptr<graph::Group> importSceneFile(std::string filePath)
     {
-        filePath = utl::absolutePath(filePath);
+        filePath                     = utl::absolutePath(filePath);
+		const std::string fileFormat = utl::getFileExtension(filePath);
         VTX_INFO("Loading scene file: {}", filePath);
         Assimp::Importer importer;
         const aiScene* scene = importer.ReadFile(filePath,
@@ -412,7 +625,7 @@ namespace vtx::importer
         const bool successCondition = (scene && !(scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE) && scene->mRootNode);
         VTX_ASSERT_CONTINUE(successCondition, "Assimp Importer Errror: {}", importer.GetErrorString());
 
-        processMetadata(scene);
+        processMetadata(scene, fileFormat);
         std::map<unsigned, vtxID> meshMap;
         VTX_INFO("Creating Scene Graph");
 		const std::vector<std::shared_ptr<graph::Material>> importedMaterials = processMaterials(scene, utl::getFolder(filePath));

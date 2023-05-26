@@ -34,8 +34,6 @@ namespace vtx::device
 
 	DeviceShaderConfiguration createDeviceShaderConfiguration(std::shared_ptr<graph::Shader> shader);
 
-	std::tuple<ShaderData, ShaderData*> createShaderData(std::shared_ptr<graph::Shader> shaderNode);
-
 	CUDA_RESOURCE_DESC uploadTexture(
 		const std::vector<const void*>& imageLayers,
 		const CUDA_ARRAY3D_DESCRIPTOR& descArray3D,

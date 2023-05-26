@@ -8,6 +8,7 @@
 #include "UploadCode/UploadData.h"
 #include "UploadCode/UploadFunctions.h"
 #include "UploadCode/CUDAMap.h"
+
 namespace vtx::device
 {
 	void DeviceVisitor::visit(const std::shared_ptr<graph::Instance> instance)
@@ -64,6 +65,7 @@ namespace vtx::device
 		if (const vtxID materialId = material->getID(); (!UPLOAD_DATA->materialDataMap.contains(materialId) || material->isUpdated)) {
 			const std::tuple<MaterialData, MaterialData*> mat = createMaterialData(material);
 			UPLOAD_DATA->materialDataMap.insert(materialId, mat);
+			material->isUpdated = false;
 		}
 	}
 
@@ -75,14 +77,6 @@ namespace vtx::device
 	void DeviceVisitor::visit(const std::shared_ptr < graph::Renderer > renderer)
 	{
 		setRendererData(renderer);
-	}
-
-	void DeviceVisitor::visit(std::shared_ptr<graph::Shader> shader)
-	{
-		if (const vtxID shaderId = shader->getID(); !UPLOAD_DATA->shaderDataMap.contains(shaderId)) {
-			const std::tuple<ShaderData, ShaderData*> shaderData = createShaderData(shader);
-			UPLOAD_DATA->shaderDataMap.insert(shaderId, shaderData);
-		}
 	}
 
 	void DeviceVisitor::visit(std::shared_ptr<graph::Texture> textureNode)
@@ -117,10 +111,29 @@ namespace vtx::device
 		//TODO : Check if the mesh has been updated
 		if (const vtxID lightId = lightNode->getID(); !UPLOAD_DATA->lightDataMap.contains(lightId)) {
 			const std::tuple<LightData, LightData*> lightData = createLightData(lightNode);
-			UPLOAD_DATA->lightDataMap.insert(lightId, lightData);
-			if(std::get<0>(lightData).type == L_ENV){
+			// We keep a list on the device of all potential mesh lights but only the mesh lights associated with a material
+			// markes as light will be sampled in the mis.
+
+			switch(std::get<0>(lightData).type)
+			{
+			case L_MESH:
+			{
+				if(std::dynamic_pointer_cast<graph::MeshLightAttributes>(lightNode->attributes)->material->useAsLight)
+				{
+					UPLOAD_DATA->lightDataMap.insert(lightId, std::tuple(std::get<0>(lightData), std::get<1>(lightData), true));
+				}
+				else
+				{
+					UPLOAD_DATA->lightDataMap.insert(lightId, std::tuple(std::get<0>(lightData), std::get<1>(lightData), false));
+				}
+
+			}break;
+			case L_ENV:
+			{
 				// TODO : How do we handle the presence of another env Light?
+				UPLOAD_DATA->lightDataMap.insert(lightId, std::tuple(std::get<0>(lightData), std::get<1>(lightData), true));
 				UPLOAD_DATA->launchParams.envLight = std::get<1>(lightData);
+			}
 			}
 		}
 	}
@@ -157,8 +170,11 @@ namespace vtx::device
 			std::vector<LightData*> lightData;
 			for (auto lightEntry : uploadData->lightDataMap)
 			{
-				LightData* light = std::get<1>(lightEntry.second);
-				lightData.push_back(light);
+				if(std::get<2>(lightEntry.second)) // we only add the lights that are marked as lights
+				{
+					LightData* light = std::get<1>(lightEntry.second);
+					lightData.push_back(light);
+				}
 			}
 			uploadBuffers->lightsDataBuffer.upload(lightData);
 			uploadData->launchParams.lights = uploadBuffers->lightsDataBuffer.castedPointer<LightData*>();

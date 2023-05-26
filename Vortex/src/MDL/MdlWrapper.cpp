@@ -4,7 +4,10 @@
 #include "ShaderVisitor.h"
 #include "traversal.h"
 #include "Device/OptixWrapper.h"
+#include "Scene/Nodes/Material.h"
+#include "Scene/Nodes/Shader/Texture.h"
 #include "Scene/Nodes/Shader/mdl/ShaderNodes.h"
+
 
 namespace vtx::mdl
 {
@@ -311,22 +314,22 @@ namespace vtx::mdl
 		bool isTransactionNew = false;
 		if (!tI.transaction)
 		{
-			VTX_INFO("Creating global transaction + Handle");
+			//VTX_INFO("Creating global transaction + Handle");
 			tI.transaction = make_handle<ITransaction>(globalScope->create_transaction());
 			isTransactionNew = true;
 		}
 		else if (!tI.transaction->is_open()) {
-			VTX_INFO("Creating global transaction");
+			//VTX_INFO("Creating global transaction");
 			tI.transaction = globalScope->create_transaction();
 			isTransactionNew = true;
 		}
 		else
 		{
-			VTX_INFO("Using existing global transaction");
+			//VTX_INFO("Using existing global transaction");
 		}
 		if (isTransactionNew && openFactories)
 		{
-			VTX_INFO("Opening Expression, Value and Type Factory");
+			//VTX_INFO("Opening Expression, Value and Type Factory");
 			tI.expressionFactory = factory->create_expression_factory(tI.transaction.get());
 			tI.valueFactory = factory->create_value_factory(tI.transaction.get());
 			tI.typeFactory = factory->create_type_factory(tI.transaction.get());
@@ -340,7 +343,6 @@ namespace vtx::mdl
 			//tI.transaction->commit();
 		}
 	}
-
 
 	/*path expressed as relative to the search path added to mdl sdk*/
 	std::string pathToModuleName(const std::string& materialPath) {
@@ -403,53 +405,76 @@ namespace vtx::mdl
 		return overloads->get_c_str();
 
 	}
-	
-	void compileMaterial(const std::string& path, std::string materialName, std::string* materialDbName)
+
+	// Utility function to dump the hash, arguments, temporaries, and fields of a compiled material.
+	void dump_compiled_material(
+		mi::neuraylib::ITransaction* transaction,
+		mi::neuraylib::IMdl_factory* mdl_factory,
+		const mi::neuraylib::ICompiled_material* cm,
+		std::ostream& s)
 	{
-		Sint32 result;
+		mi::base::Handle<mi::neuraylib::IValue_factory> value_factory(
+			mdl_factory->create_value_factory(transaction));
+		mi::base::Handle<mi::neuraylib::IExpression_factory> expression_factory(
+			mdl_factory->create_expression_factory(transaction));
 
-		MdlState&                    state = *getState();
-		const TransactionInterfaces* tI    = state.getTransactionInterfaces();
+		mi::base::Uuid hash = cm->get_hash();
+		char buffer[36];
+		snprintf(buffer, sizeof(buffer),
+				 "%08x %08x %08x %08x", hash.m_id1, hash.m_id2, hash.m_id3, hash.m_id4);
+		s << "    hash overall = " << buffer << std::endl;
 
-		std::string moduleName = pathToModuleName(path);
+		for (mi::Uint32 i = mi::neuraylib::SLOT_FIRST; i <= mi::neuraylib::SLOT_LAST; ++i) {
+			hash = cm->get_slot_hash(mi::neuraylib::Material_slot(i));
+			snprintf(buffer, sizeof(buffer),
+					 "%08x %08x %08x %08x", hash.m_id1, hash.m_id2, hash.m_id3, hash.m_id4);
+			s << "    hash slot " << std::setw(2) << i << " = " << buffer << std::endl;
+		}
 
-		result = state.impExpApi->load_module(tI->transaction.get(), moduleName.c_str(), state.context.get());
-		//result = state.impExpApi->load_module(transaction,"::df", state.context.get());
-		//VTX_ASSERT_RETURN((result >= 0 && logMessage(state.context.get())), state.lastError);
+		mi::Size parameter_count = cm->get_parameter_count();
+		for (mi::Size i = 0; i < parameter_count; ++i) {
+			mi::base::Handle<const mi::neuraylib::IValue> argument(cm->get_argument(i));
+			std::stringstream name;
+			name << i;
+			mi::base::Handle<const mi::IString> result(
+				value_factory->dump(argument.get(), name.str().c_str(), 1));
+			s << "    argument " << result->get_c_str() << std::endl;
+		}
 
-		do {
-			const Handle<const IString> moduleDatabaseName(state.factory->get_db_module_name(moduleName.c_str()));
-			// access module
-			const Handle<const IModule> module(tI->transaction->access<IModule>(moduleDatabaseName.get()->get_c_str()));
-			VTX_ASSERT_BREAK((module.is_valid_interface()), "Error with module access");
+		mi::Size temporary_count = cm->get_temporary_count();
+		for (mi::Size i = 0; i < temporary_count; ++i) {
+			mi::base::Handle<const mi::neuraylib::IExpression> temporary(cm->get_temporary(i));
+			std::stringstream name;
+			name << i;
+			mi::base::Handle<const mi::IString> result(
+				expression_factory->dump(temporary.get(), name.str().c_str(), 1));
+			s << "    temporary " << result->get_c_str() << std::endl;
+		}
 
-			// define material module Name and verify no overload
-			const std::string materialDatabaseName = getMaterialDatabaseName(module.get(), moduleDatabaseName.get(), materialName);
-			if (materialDbName != nullptr) {
-				*materialDbName = materialDatabaseName;
-			}
-			VTX_ASSERT_BREAK(!materialDatabaseName.empty(), "Error with retrieving material {} in the module {}, material might have overload", materialName, moduleName);
+		mi::base::Handle<const mi::neuraylib::IExpression> body(cm->get_body());
+		mi::base::Handle<const mi::IString> result(expression_factory->dump(body.get(), 0, 1));
+		s << "    body " << result->get_c_str() << std::endl;
 
-			// Create material Definition
-			const Handle<const IFunction_definition> materialDefinition(tI->transaction->access<IFunction_definition>(materialDatabaseName.c_str()));
-			VTX_ASSERT_BREAK((materialDefinition.is_valid_interface()), "Error with material definition creation for material {} in module {}", materialName, moduleName);
+		s << std::endl;
+	}
 
-			//Create material Call
-			const Handle<IFunction_call> materialCall(materialDefinition->create_function_call(0, &result));
-			VTX_ASSERT_BREAK((materialCall.is_valid_interface() && !(result != 0)), "Error with material instance creation for material {} in module {}", materialName, moduleName);
-
+	void compileMaterial(const std::string functionDatabaseName, const std::string materialDataBaseName)
+	{
+		MdlState& state = *getState();
+		const TransactionInterfaces* tI = state.getTransactionInterfaces();
+		{
+			Handle<const IFunction_call> materialCall(tI->transaction->access<mi::neuraylib::IFunction_call>(functionDatabaseName.c_str()));
 			//Create material Instance
-			const Handle<IMaterial_instance> materialInstance(materialCall->get_interface<IMaterial_instance>());
-			VTX_ASSERT_BREAK((materialInstance.is_valid_interface()), "Error with material instance creation for material {} in module {}", materialName, moduleName);
+			const Handle<const IMaterial_instance> materialInstance(materialCall->get_interface<IMaterial_instance>());
 
 			//Create compiled material
 			const Uint32 flags = IMaterial_instance::CLASS_COMPILATION;
 			const Handle<ICompiled_material> compiledMaterial(materialInstance->create_compiled_material(flags, state.context.get()));
 			VTX_ASSERT_BREAK((logMessage(state.context.get())), state.lastError);
 
-			tI->transaction->store(compiledMaterial.get(), ("compiledMaterial_" + materialDatabaseName).c_str());
-		} while (0);
-
+			//dump_compiled_material(tI->transaction.get(), state.factory.get(), compiledMaterial.get(), std::cout);
+			tI->transaction->store(compiledMaterial.get(), ("compiledMaterial_" + materialDataBaseName).c_str());
+		}
 	}
 
 	bool isValidDistribution(IExpression const* expr)
@@ -490,12 +515,12 @@ namespace vtx::mdl
 		return true;
 	}
 	
-	graph::Shader::Configuration determineShaderConfiguration(const std::string& materialDbName)
+	graph::Configuration determineShaderConfiguration(const std::string& materialDbName)
 	{
 
 		MdlState& state = *getState();
 		TransactionInterfaces* tI = state.getTransactionInterfaces();
-		graph::Shader::Configuration config;
+		graph::Configuration config;
 		do {
 			const Handle<const ICompiled_material> compiledMaterial((tI->transaction->access(("compiledMaterial_" + materialDbName).c_str())->get_interface<ICompiled_material>()));
 			//const ICompiled_material* compiledMaterial = shader->compilation.compiledMaterial.get();
@@ -526,6 +551,7 @@ namespace vtx::mdl
 					config.isBackfaceBsdfValid = (compiledMaterial->get_slot_hash(SLOT_SURFACE_SCATTERING) != compiledMaterial->get_slot_hash(SLOT_BACKFACE_SCATTERING));
 				}
 			}
+
 
 			ExprEvaluation<bool> surfaceEdfEval = analyzeExpression<bool>(compiledMaterial, "surface.emission.emission");
 			config.isSurfaceEdfValid = surfaceEdfEval.isValid;
@@ -658,7 +684,7 @@ namespace vtx::mdl
 		return config;
 	}
 
-	std::vector<Target_function_description> createShaderDescription(const graph::Shader::Configuration& config, const vtxID& shaderIndex, graph::Shader::FunctionNames& fNames) {
+	std::vector<Target_function_description> createShaderDescription(const graph::Configuration& config, const vtxID& shaderIndex, graph::FunctionNames& fNames) {
 		std::vector<Target_function_description> descriptions;
 
 		if(getOptions()->directCallable)
@@ -667,7 +693,7 @@ namespace vtx::mdl
 			// The Target_function_description only stores the C-pointers to the base names!
 			// Make sure these are not destroyed as long as the descs vector is used.
 
-			fNames = graph::Shader::FunctionNames(std::to_string(shaderIndex));
+			fNames = graph::FunctionNames(std::to_string(shaderIndex));
 
 			// Centralize the init functions in a single material init().
 			// This will only save time when there would have been multiple init functions inside the shader.
@@ -784,7 +810,7 @@ namespace vtx::mdl
 
 	}
 
-	Handle<ITarget_code const> createTargetCode(const std::string& materialDbName, const graph::Shader::Configuration& config, const vtxID& shaderIndex)
+	Handle<ITarget_code const> createTargetCode(const std::string& materialDbName, const graph::Configuration& config, const vtxID& shaderIndex)
 	{
 
 		MdlState&                    state = *getState();
@@ -794,9 +820,9 @@ namespace vtx::mdl
 			const Handle<const ICompiled_material> compiledMaterial(tI->transaction->access<ICompiled_material>(("compiledMaterial_" + materialDbName).c_str()));
 
 			//const Handle<const ICompiled_material> compiledMaterial((tI->transaction->access(("compiledMaterial_" + materialDbName).c_str())->get_interface<ICompiled_material>()));
-			const Handle<const IFunction_definition> materialDefinition(tI->transaction->access<IFunction_definition>(materialDbName.c_str()));
+			//const Handle<const IFunction_definition> materialDefinition(tI->transaction->access<IFunction_definition>(materialDbName.c_str()));
 
-			graph::Shader::FunctionNames fNames;
+			graph::FunctionNames fNames;
 			std::vector<Target_function_description> descriptions = createShaderDescription(config, shaderIndex, fNames);
 
 			VTX_INFO("Creating target code for shader {} index {} with {} functions.", materialDbName, shaderIndex, descriptions.size());
@@ -817,6 +843,103 @@ namespace vtx::mdl
 		return targetCode;
 	}
 
+	struct Annotation
+	{
+		std::string name;
+		std::string displayName;
+		std::string groupName;
+		float range[2] = { 0.0f, 1.0f };
+		bool isValid = false;
+	};
+
+	Annotation getAnnotation(std::string parameterName, const Handle<IAnnotation_list const>& annoList)
+	{
+		// Check for annotation info
+		Handle annoBlock = make_handle<IAnnotation_block const>(annoList->get_annotation_block(parameterName.c_str()));
+		Annotation annotation;
+		annotation.name = parameterName;
+		if (annoBlock)
+		{
+			Annotation_wrapper annos(annoBlock.get());
+			Size annoIndex;
+
+			annoIndex = annos.get_annotation_index("::anno::hard_range(float,float)");
+			if (annoIndex == static_cast<Size>(-1))
+			{
+				annoIndex = annos.get_annotation_index("::anno::soft_range(float,float)");
+			}
+			if (annoIndex != static_cast<Size>(-1))
+			{
+				annos.get_annotation_param_value(annoIndex, 0, annotation.range[0]);
+				annos.get_annotation_param_value(annoIndex, 1, annotation.range[1]);
+			}
+
+			annoIndex = annos.get_annotation_index("::anno::display_name(string)");
+			if (annoIndex != static_cast<Size>(-1))
+			{
+				char const* displayName = nullptr;
+				annos.get_annotation_param_value(annoIndex, 0, displayName);
+				annotation.displayName = displayName;
+			}
+			annoIndex = annos.get_annotation_index("::anno::in_group(string)");
+			if (annoIndex != static_cast<Size>(-1))
+			{
+				char const* groupName = nullptr;
+				annos.get_annotation_param_value(annoIndex, 0, groupName);
+				annotation.groupName = groupName;
+			}
+			else
+			{
+				std::string name = annotation.name;
+
+				std::size_t pos = name.find('.');
+
+				if (pos != std::string::npos) { // if the dot was found
+					std::string originalParameterName = name.substr(0, pos); // extract the part before the dot
+					std::string inputName = name.substr(pos + 1); // extract the part after the dot
+
+					Annotation OriginalAnnotation = getAnnotation(originalParameterName, annoList);
+					if(OriginalAnnotation.isValid)
+					{
+						annotation.groupName = OriginalAnnotation.groupName;
+						annotation.displayName = name;
+					}
+				}
+			}
+			annotation.isValid = true;
+		}
+		else
+		{
+			std::string name = annotation.name;
+
+			std::size_t pos = name.find('.');
+
+			if (pos != std::string::npos) { // if the dot was found
+				std::string originalParameterName = name.substr(0, pos); // extract the part before the dot
+				std::string inputName = name.substr(pos + 1); // extract the part after the dot
+
+				Annotation OriginalAnnotation = getAnnotation(originalParameterName, annoList);
+				if (OriginalAnnotation.isValid)
+				{
+					annotation.displayName = name;
+					annotation.groupName = OriginalAnnotation.groupName;
+					annotation.isValid = true;
+				}
+				else
+				{
+					annotation.isValid = false;
+				}
+			}
+			else
+			{
+				annotation.isValid = false;
+
+			}
+		}
+
+		return annotation;
+	}
+
 	graph::ParamInfo generateParamInfo(
 		const size_t index,
 		const Handle<const ICompiled_material>& compiledMat,
@@ -831,7 +954,7 @@ namespace vtx::mdl
 		using graph::ParamInfo;
 
 		const char* name = compiledMat->get_parameter_name(index);
-
+		VTX_INFO("Parameter name: {}", name);
 		if (name == nullptr) return {};
 
 		Handle argument = make_handle<IValue const>(compiledMat->get_argument(index));
@@ -1006,39 +1129,16 @@ namespace vtx::mdl
 							enumType);
 
 		// Check for annotation info
-		Handle annoBlock = make_handle<IAnnotation_block const>(annoList->get_annotation_block(name));
-		if (annoBlock)
+		Annotation anno = getAnnotation(name, annoList);
+
+		if(anno.isValid)
 		{
-			Annotation_wrapper annos(annoBlock.get());
-			Size annoIndex;
-
-			annoIndex = annos.get_annotation_index("::anno::hard_range(float,float)");
-			if (annoIndex == static_cast<Size>(-1))
-			{
-				annoIndex = annos.get_annotation_index("::anno::soft_range(float,float)");
-			}
-			if (annoIndex != static_cast<Size>(-1))
-			{
-				annos.get_annotation_param_value(annoIndex, 0, paramInfo.rangeMin());
-				annos.get_annotation_param_value(annoIndex, 1, paramInfo.rangeMax());
-			}
-
-			annoIndex = annos.get_annotation_index("::anno::display_name(string)");
-			if (annoIndex != static_cast<Size>(-1))
-			{
-				char const* displayName = nullptr;
-				annos.get_annotation_param_value(annoIndex, 0, displayName);
-				paramInfo.setDisplayName(displayName);
-			}
-			annoIndex = annos.get_annotation_index("::anno::in_group(string)");
-			if (annoIndex != static_cast<Size>(-1))
-			{
-				char const* groupName = nullptr;
-				annos.get_annotation_param_value(annoIndex, 0, groupName);
-				paramInfo.setGroupName(groupName);
-			}
+			paramInfo.rangeMax() = anno.range[1];
+			paramInfo.rangeMin() = anno.range[0];
+			paramInfo.setDisplayName(anno.displayName.data());
+			paramInfo.setGroupName(anno.groupName.data());
 		}
-
+		
 		return paramInfo;
 	}
 
@@ -1046,7 +1146,7 @@ namespace vtx::mdl
 		const std::string& materialDbName,
 		const Handle<ITarget_code const>& targetCode,
 		Handle<ITarget_argument_block>& argumentBlockClone,
-		std::list<graph::ParamInfo>& params,
+		std::map<std::string, std::vector<graph::ParamInfo>>& params,
 		std::map<std::string, std::shared_ptr<graph::EnumTypeInfo>>& mapEnumTypes)
 	{
 		using graph::EnumValue;
@@ -1055,10 +1155,10 @@ namespace vtx::mdl
 
 		char* argBlockData = nullptr;
 		Handle<ITarget_value_layout const> argBlockLayout;
+
 		if (targetCode->get_argument_block_count() > 0)
 		{
 			const auto argumentBlock = make_handle<ITarget_argument_block const>(targetCode->get_argument_block(0));
-
 			argumentBlockClone = Handle(argumentBlock->clone());
 			argBlockData = argumentBlockClone->get_data();
 			argBlockLayout = make_handle<ITarget_value_layout const>(targetCode->get_argument_block_layout(0));
@@ -1081,26 +1181,20 @@ namespace vtx::mdl
 			{
 				ParamInfo paramInfo = generateParamInfo(j, compiledMaterial, argBlockData, argBlockLayout, annoList, mapEnumTypes);
 
-				// Add the parameter information as last entry of the corresponding group, or to the
-				// end of the list, if no group name is available.
-				if (paramInfo.groupName() != nullptr)
+				if(paramInfo.groupName() == nullptr)
 				{
-					bool groupFound = false;
-					for (auto it = params.begin(); it != params.end(); ++it)
-					{
-						const bool sameGroup = (it->groupName() != nullptr && strcmp(it->groupName(), paramInfo.groupName()) == 0);
-						if (groupFound && !sameGroup)
-						{
-							params.insert(it, paramInfo);
-							return;
-						}
-						if (sameGroup)
-						{
-							groupFound = true;
-						}
-					}
+					paramInfo.setGroupName("");
 				}
-				params.push_back(paramInfo);
+
+				if(params.find(paramInfo.groupName()) == params.end())
+				{
+					params[paramInfo.groupName()] = std::vector<ParamInfo>();
+					params[paramInfo.groupName()].push_back(paramInfo);
+				}
+				else
+				{
+					params[paramInfo.groupName()].push_back(paramInfo);
+				}
 			}
 		}
 		state.commitTransaction();
@@ -1143,112 +1237,6 @@ namespace vtx::mdl
 		return textureNode;
 	}
 
-	std::string createTextureExpression(const std::string& filePath)
-	{
-		MdlState& state = *getState();
-		TransactionInterfaces* tI = state.getTransactionInterfaces();
-
-		const Handle<IMdl_execution_context> context = state.context;
-		const Handle<IMdl_impexp_api>        impExp = state.impExpApi;
-		const Handle<IValue_factory>         vf = tI->valueFactory;
-		const Handle<IExpression_factory>    ef = tI->expressionFactory;
-		Sint32                               result;
-
-		std::string imageDbName;
-		std::string textureDbName;
-		std::string imageName = utl::getFileName(filePath);
-		std::string textureCallFunction = "callTexture" + imageName;
-		std::string textureTintCallFunction = "callTextureTint" + imageName;
-		{
-			// Load environment texture
-			const Handle image(tI->transaction->create<IImage>("Image"));
-			VTX_ASSERT_CONTINUE(image.is_valid_interface(), "image invalid Interface!");
-			result = image->reset_file(filePath.c_str());
-			VTX_ASSERT_BREAK(result == 0, "Error with creating new Texture image {}", filePath);
-			imageDbName = "Image_" + imageName;
-			tI->transaction->store(image.get(), imageDbName.c_str());
-
-			// Create a new texture instance and set its properties
-			Handle texture(tI->transaction->create<ITexture>("Texture"));
-			VTX_ASSERT_CONTINUE(texture.is_valid_interface(), "texture invalid Interface!");
-
-			texture->set_image(imageDbName.c_str());
-
-			textureDbName = "userTexture_" + imageName;
-
-			result = tI->transaction->store(texture.get(), textureDbName.c_str());
-			VTX_ASSERT_CONTINUE((result >= 0), "failed texture store");
-		}
-		{
-			result = impExp->load_module(tI->transaction.get(), "::base", context.get());
-			VTX_ASSERT_CONTINUE((result >= 0 && logMessage(context.get())), state.lastError);
-		}
-		{
-			Handle baseModule(tI->transaction->access<IModule>("mdl::base"));
-			VTX_ASSERT_CONTINUE(baseModule.is_valid_interface(), "baseModule invalid Interface!");
-			Handle overloads(baseModule->get_function_overloads("mdl::base::file_texture"));
-			VTX_ASSERT_CONTINUE(overloads->get_length() == 1, "More than one overload");
-			VTX_ASSERT_CONTINUE(overloads.is_valid_interface(), "overloads invalid Interface!");
-			Handle<const IString> fileTextureName(overloads->get_element<IString>(0));
-			VTX_ASSERT_CONTINUE(fileTextureName.is_valid_interface(), "fileTextureName invalid Interface!");
-			// Prepare the arguments of the function call for "mdl::base::file_texture": set the
-			// "texture" argument to the "nvidia_texture" texture.
-			Handle<const IFunction_definition> functionDefinition(tI->transaction->access<IFunction_definition>(fileTextureName->get_c_str()));
-			VTX_ASSERT_CONTINUE(functionDefinition.is_valid_interface(), "functionDefinition invalid Interface!");
-			Handle<const IType_list> types(functionDefinition->get_parameter_types());
-			VTX_ASSERT_CONTINUE(types.is_valid_interface(), "types invalid Interface!");
-			Handle<const IType> argType(types->get_type("texture"));
-			VTX_ASSERT_CONTINUE(argType.is_valid_interface(), "argType invalid Interface!");
-			Handle<IValue_texture> argValue(vf->create<IValue_texture>(argType.get()));
-			VTX_ASSERT_CONTINUE(argValue.is_valid_interface(), "argValue invalid Interface!");
-			argValue->set_value(textureDbName.c_str());
-			Handle<IExpression> argExpr(ef->create_constant(argValue.get()));
-			VTX_ASSERT_CONTINUE(argExpr.is_valid_interface(), "argExpr invalid Interface!");
-			Handle<IExpression_list> arguments(ef->create_expression_list());
-			VTX_ASSERT_CONTINUE(arguments.is_valid_interface(), "arguments invalid Interface!");
-			arguments->add_expression("texture", argExpr.get());
-
-			// Create a function call from the function definition "mdl::base::file_texture" with the
-			// just prepared arguments.
-			Handle<IFunction_call> functionCall(functionDefinition->create_function_call(arguments.get(), &result));
-			VTX_ASSERT_CONTINUE(functionCall.is_valid_interface(), "functionCall invalid Interface!");
-			result = tI->transaction->store(functionCall.get(), textureCallFunction.c_str());
-			VTX_ASSERT_CONTINUE((result >= 0), "failed functionCall store");
-
-
-			// Dump the created material instance and function calls.
-			Handle<const IFunction_call> call(tI->transaction->access<IFunction_call>(textureCallFunction.c_str()));
-			dumpInstance(ef.get(), call.get(), textureCallFunction);
-		}
-		{
-			// Prepare the arguments of the function call for "mdl::base::texture_return.tint": set the
-			// "s" argument to the "call of file_texture" function call.
-			Handle<IExpression> argExpr(ef->create_call(textureCallFunction.c_str()));
-
-
-
-
-			VTX_ASSERT_CONTINUE(argExpr.is_valid_interface(), "argExpr invalid Interface!");
-			Handle<IExpression_list> arguments(ef->create_expression_list());
-			VTX_ASSERT_CONTINUE(arguments.is_valid_interface(), "arguments invalid Interface!");
-			arguments->add_expression("s", argExpr.get());
-
-			// Create a function call from the function definition "mdl::base::file_texture" with the
-			// just prepared arguments.
-			Handle<const IFunction_definition> functionDefinition(tI->transaction->access<IFunction_definition>("mdl::base::texture_return.tint(::base::texture_return)"));
-			VTX_ASSERT_CONTINUE(functionDefinition.is_valid_interface(), "functionDefinition invalid Interface!");
-			Handle<IFunction_call> functionCall(functionDefinition->create_function_call(arguments.get(), &result));
-			VTX_ASSERT_CONTINUE(functionCall.is_valid_interface(), "functionCall invalid Interface!");
-			result = tI->transaction->store(functionCall.get(), textureTintCallFunction.c_str());
-			VTX_ASSERT_CONTINUE((result >= 0), "failed functionCall store");
-
-			// Dump the created material instance and function calls.
-			Handle<const IFunction_call> call(tI->transaction->access<IFunction_call>(textureTintCallFunction.c_str()));
-			dumpInstance(ef.get(), call.get(), textureTintCallFunction);
-		}
-		return textureTintCallFunction;
-	}
-
 	void fetchTextureData(const std::shared_ptr<graph::Texture>& textureNode)
 	{
 
@@ -1269,9 +1257,21 @@ namespace vtx::mdl
 			std::vector<const void*>& imageLayersPointers = textureNode->imageLayersPointers;
 
 			// Access texture image and canvas
-			const Handle						texture = make_handle(tI->transaction->access<ITexture>(textureNode->databaseName.c_str()));
-			const Handle						image = make_handle<const IImage>(tI->transaction->access<IImage>(texture->get_image()));
-			Handle								canvas = make_handle<const ICanvas>(image->get_canvas(0, 0, 0));
+			const Handle texture = make_handle(tI->transaction->access<ITexture>(textureNode->databaseName.c_str()));
+			const Handle image   = make_handle<const IImage>(tI->transaction->access<IImage>(texture->get_image()));
+			const char*  url     = image->get_filename(0, 0);
+			if(textureNode->filePath.empty())
+			{
+				if (url != nullptr)
+				{
+					textureNode->filePath = url;
+				}
+				else
+				{
+					textureNode->filePath = textureNode->databaseName;
+				}
+			}
+			Handle       canvas  = make_handle<const ICanvas>(image->get_canvas(0, 0, 0));
 			//const Float32						effectiveGamma			= texture->get_effective_gamma(0, 0);
 
 			if (image->is_uvtile() || image->is_animated())
@@ -1352,6 +1352,25 @@ namespace vtx::mdl
 				const auto tile = make_handle<const ITile>(canvas->get_tile(z));
 				void* dst = malloc(dimension.x * dimension.y * pixelBytesSize * dimension.w);
 				memcpy(dst, tile->get_data(), dimension.x * dimension.y * pixelBytesSize * dimension.w);
+				// Debug set every pixel to red
+				//for(unsigned int i = 0; i < dimension.x * dimension.y * dimension.w; i += 4)
+				//{
+				//	if(pixelBytesSize == sizeof(Float32))
+				//	{
+				//		((Float32*)dst)[i] = 1.0f;
+				//		((Float32*)dst)[i + 1] = 0.0f;
+				//		((Float32*)dst)[i + 2] = 0.0f;
+				//		((Float32*)dst)[i + 3] = 1.0f;
+				//	}
+				//	else if(pixelBytesSize == sizeof(Uint8))
+				//	{
+				//		((Uint8*)dst)[i] = 255;
+				//		((Uint8*)dst)[i + 1] = 0;
+				//		((Uint8*)dst)[i + 2] = 0;
+				//		((Uint8*)dst)[i + 3] = 255;
+				//	}
+				//	
+				//}
 				imageLayersPointers.push_back(dst);
 			}
 		}
@@ -1401,7 +1420,6 @@ namespace vtx::mdl
 		//tI->transaction->commit();
 		return data;
 	}
-
 
 	graph::LightProfile::LightProfileData fetchLightProfileData(const std::string& lightDbName)
 	{
@@ -1619,7 +1637,12 @@ namespace vtx::mdl
 			result = impExp->load_module(tI->transaction.get(), removeMdlPrefix(functionInfo->module).c_str(), context.get());
 			VTX_ASSERT_CONTINUE((result >= 0 && mdl::logMessage(context.get())), state->lastError);
 
-			const Handle<const IModule> module(tI->transaction->access<IModule>(functionInfo->module.c_str()));
+
+			const Handle<const IString> moduleDatabaseName(state->factory->get_db_module_name(removeMdlPrefix(functionInfo->module).c_str()));
+			const Handle<const IModule> module(tI->transaction->access<IModule>(moduleDatabaseName.get()->get_c_str()));
+			VTX_ASSERT_BREAK((module.is_valid_interface()), "Error with module access");
+
+			//const Handle<const IModule> module(tI->transaction->access<IModule>(functionInfo->module.c_str()));
 			const Handle<const IArray>  overloads(module->get_function_overloads(functionInfo->name.c_str()));
 			const Handle<const IString> mdlSignature(overloads->get_element<IString>(0));
 			functionInfo->signature = mdlSignature->get_c_str();
@@ -1629,26 +1652,28 @@ namespace vtx::mdl
 		functionInfo->returnType = functionDefinition->get_return_type()->skip_all_type_aliases();
 	}
 
-	std::vector<ParameterInfo> getFunctionParameters(const MdlFunctionInfo& functionInfo, const vtxID callingNodeId)
+	std::vector<ParameterInfo> getFunctionParameters(const MdlFunctionInfo& functionInfo, const std::string callingNodeName)
 	{
 		MdlState* state = getState();
 		const TransactionInterfaces* tI = state->getTransactionInterfaces();
 		const Handle<const IFunction_definition> functionDefinition(tI->transaction->access<IFunction_definition>(functionInfo.signature.c_str()));
 		const Handle<const IType_list>           types(functionDefinition->get_parameter_types());
-		const Handle<const IExpression_list>     defaults(functionDefinition->get_defaults());
-		const Size                               paramCount = functionDefinition->get_parameter_count();
+		const Handle<const IAnnotation_list>     anno(functionDefinition->get_parameter_annotations());
+		const Handle<const IExpression_list> defaults(functionDefinition->get_defaults());
+		const Size                           paramCount = functionDefinition->get_parameter_count();
 		//functionDefinition->get_return_type();
 		std::vector<ParameterInfo> parameters;
 		for (int i = 0; i < paramCount; i++)
 		{
 			ParameterInfo paramInfo;
 
-			paramInfo.type = types->get_type(i);
-			const char* name = types->get_name(i);
-			paramInfo.kind = paramInfo.type->get_kind();
-			paramInfo.argumentName = name;
-			paramInfo.index = i;
-			paramInfo.actualName = name + ("_" + std::to_string(callingNodeId));
+			paramInfo.type                 = types->get_type(i);
+			const char*              name  = types->get_name(i);
+			paramInfo.annotations		   = anno->get_annotation_block(anno->get_index(name));
+			paramInfo.kind                 = paramInfo.type->get_kind();
+			paramInfo.argumentName         = name;
+			paramInfo.index                = i;
+			paramInfo.actualName           = callingNodeName + "_" + name;
 			if (const int defaultIndex = defaults->get_index(name); defaultIndex != -1)
 			{
 				paramInfo.defaultValue = defaults->get_expression(defaultIndex);
@@ -1718,7 +1743,7 @@ namespace vtx::mdl
 
 	}
 
-	Handle<IExpression> generateFunctionExpression(const std::string& functionSignature, std::map<std::string, graph::shader::ShaderNodeSocket>& sockets)
+	Handle<IExpression> generateFunctionExpression(const std::string& functionSignature, std::map<std::string, graph::shader::ShaderNodeSocket>& sockets, std::string callerNodeName)
 	{
 		VTX_INFO("Generating function expression for {}", functionSignature);
 		MdlState* state = getState();
@@ -1727,6 +1752,7 @@ namespace vtx::mdl
 		const Handle<IExpression_factory>& ef = tI->expressionFactory;
 		{
 			const Handle<IExpression_list> callArguments(ef->create_expression_list());
+			const Handle<IExpression_list> definitionCallArg(ef->create_expression_list());
 
 			for (auto& [name, socket] : sockets)
 			{
@@ -1774,6 +1800,10 @@ namespace vtx::mdl
 				if(addNodeSocketAsExpression)
 				{
 					callArguments->add_expression(param.argumentName.c_str(), shaderNodeSocket->expression.get());
+
+
+					Handle<IExpression> socketCall(ef->create_call(shaderNodeSocket->name.c_str()));
+					definitionCallArg->add_expression(param.argumentName.c_str(), socketCall.get());
 				}
 				else
 				{
@@ -1782,15 +1812,26 @@ namespace vtx::mdl
 						param.defaultValue = shaderNodeSocket->expression;
 
 					}
+
+					definitionCallArg->add_expression(param.argumentName.c_str(), param.defaultValue.get());
+
 					const Handle<IExpression> paramExpression(ef->create_parameter(param.type->skip_all_type_aliases(), mcp.paramCount));
 					++mcp.paramCount;
 					callArguments->add_expression(param.argumentName.c_str(), paramExpression.get());
 					mcp.parameters->add_type(param.actualName.c_str(), param.type.get());
 					mcp.defaults->add_expression(param.actualName.c_str(), param.defaultValue.get());
+					mcp.parameterAnnotations->add_annotation_block(param.actualName.c_str(), param.annotations.get());
 				}
 			}
 
 			Sint32 result;
+			Handle<const IFunction_definition> definition(tI->transaction->access<IFunction_definition>(functionSignature.c_str()));
+			Handle<IFunction_call>       call(definition->create_function_call(definitionCallArg.get(), &result));
+			tI->transaction->store(call.get(), callerNodeName.c_str());
+
+			Handle<const IFunction_call> function_call(tI->transaction->access<mi::neuraylib::IFunction_call>(callerNodeName.c_str()));
+			dumpInstance(ef.get(), function_call.get(), callerNodeName);
+
 			Handle<IExpression> expression = make_handle(ef->create_direct_call(functionSignature.c_str(), callArguments.get(), &result));
 
 			VTX_ASSERT_CONTINUE(result >= 0, analizeDirectCallResult(result, functionSignature, callArguments));
@@ -1822,6 +1863,17 @@ namespace vtx::mdl
 		return floatExpr;
 	}
 
+	Handle<IExpression> createConstantInt(const int value)
+	{
+		MdlState* state = getState();
+		const TransactionInterfaces*		tI = state->getTransactionInterfaces();
+		const Handle<IValue_factory>&		vf = tI->valueFactory;
+		const Handle<IExpression_factory>&	ef = tI->expressionFactory;
+		const Handle<IValue>				intValue(vf->create_int(value));
+		const Handle<IExpression>			intExpr(ef->create_constant(intValue.get()));
+		return intExpr;
+	}
+
 	Handle<IExpression> createTextureConstant(const std::string& texturePath, const IType_texture::Shape shape, const float gamma)
 	{
 		MdlState* state = getState();
@@ -1840,54 +1892,13 @@ namespace vtx::mdl
 		return argExpr;
 	};
 
-	std::tuple<std::string, std::string> createNewFunctionInModule(std::shared_ptr<graph::shader::ShaderNode> shaderGraph)
+	void createShaderGraphFunctionCalls(std::shared_ptr<graph::shader::ShaderNode> shaderGraph)
 	{
 		MdlState* state = getState();
 		const TransactionInterfaces* tI = state->getTransactionInterfaces();
 		ModuleCreationParameters& mcp = state->moduleCreationParameter;
 		mcp.reset();
 		shaderGraph->traverse({ std::make_shared<ShaderVisitor>() });
-		mcp.moduleName = ("::" + ("module_" + shaderGraph->name));
-		mcp.functionName = shaderGraph->name;
-		mcp.body = shaderGraph->expression;
-		{
-			const Handle<IMdl_execution_context> context = state->context;
-			const Handle<IMdl_factory>           factory = state->factory;
-			const Handle<IMdl_impexp_api>        impExp = state->impExpApi;
-			Sint32 result;
-			VTX_INFO("Creating new function {} in module: {} With parameters:", mcp.functionName, mcp.moduleName);
-			for (int i = 0; i < mcp.parameters->get_size(); i++)
-			{
-				VTX_INFO("Parameter: {}", mcp.parameters->get_name(i));
-			}
-
-			const Handle moduleBuilder(factory->create_module_builder(tI->transaction.get(),
-																	  ("mdl" + mcp.moduleName).c_str(),
-																	  MDL_VERSION_1_0,
-																	  MDL_VERSION_LATEST,
-																	  context.get()));
-			// Add the material to the module.
-			result = moduleBuilder->add_function(mcp.functionName.c_str(),
-												 mcp.body.get(),
-												 mcp.parameters.get(),
-												 mcp.defaults.get(),
-												 mcp.parameterAnnotations.get(),
-												 mcp.annotations.get(),
-												 mcp.returnAnnotations.get(),
-												 /*is_exported*/ true,
-												 /*frequency_qualifier*/ IType::MK_NONE,
-												 context.get());
-
-			VTX_ASSERT_CONTINUE((mdl::logMessage(context.get()) && result >= 0), "");
-
-			// Print the exported MDL source code to the console.
-			const Handle<IString> moduleSource(tI->transaction->create<IString>("String"));
-			impExp->export_module_to_string(tI->transaction.get(), ("mdl" + mcp.moduleName).c_str(), moduleSource.get(), context.get());
-			VTX_INFO("Exported MDL source code:\n {}", moduleSource->get_c_str());
-		}
-		state->commitTransaction();
-		shaderGraph->isUpdated = false;
-		return { mcp.moduleName, mcp.functionName};
 	}
 
 	void ModuleCreationParameters::reset()
@@ -1908,3 +1919,6 @@ namespace vtx::mdl
 
 
 }
+
+
+

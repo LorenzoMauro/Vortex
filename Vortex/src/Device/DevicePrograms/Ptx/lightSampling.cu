@@ -58,9 +58,9 @@ namespace vtx
         request.lastRayDirection = -lightSample.direction;
 
         mdl::MaterialEvaluation matEval;
-        if (hitP.shaderConfiguration->directCallable)
+        if (hitP.materialConfiguration->directCallable)
         {
-            const int sbtIndex = hitP.shaderConfiguration->idxCallEvaluateMaterial;
+            const int sbtIndex = hitP.materialConfiguration->idxCallEvaluateMaterial;
             matEval = optixDirectCall<mdl::MaterialEvaluation, mdl::MdlRequest*>(sbtIndex, &request);
         }
         else

@@ -6,6 +6,8 @@
 #include "Core/Math.h"
 #include <map>
 
+#include "Core/VortexID.h"
+
 namespace vtx::optix
 {
 	/*SBT Record Template*/
@@ -158,7 +160,7 @@ namespace vtx::optix
 	void createRenderingPipeline();
 
 	/*Utility to directly create a direct callable program from a function name and module*/
-	std::shared_ptr<ProgramOptix> createDcProgram(std::shared_ptr<ModuleOptix> module, std::string functionName);
+	std::shared_ptr<ProgramOptix> createDcProgram(std::shared_ptr<ModuleOptix> module, std::string functionName, vtxID id = 0);
 
 	/*Utility to create BLAS*/
 	OptixTraversableHandle createGeometryAcceleration(CUdeviceptr vertexData, uint32_t verticesNumber, uint32_t verticesStride, 

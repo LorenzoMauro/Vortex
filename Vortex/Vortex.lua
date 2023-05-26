@@ -62,6 +62,7 @@ function genClangCommand(cu_file, bc_file,d_file, clang_path, cuda_path, include
     ClangCompileCommand = ClangCompileCommand .. " -c"
     ClangCompileCommand = ClangCompileCommand .. " -w"
     ClangCompileCommand = ClangCompileCommand .. " -O3"
+    ClangCompileCommand = ClangCompileCommand .. " -m64"
     ClangCompileCommand = ClangCompileCommand .. " -ffast-math"
     ClangCompileCommand = ClangCompileCommand .. " -fcuda-flush-denormals-to-zero"
     ClangCompileCommand = ClangCompileCommand .. " -fno-vectorize"
@@ -90,7 +91,7 @@ project "OptixApp"
         "%{IncludeDir.gdt}/**.cpp",
         "src/**.h",
         "src/**.cpp",
-        "src/Device/DevicePrograms/**.cu"
+        "src/Device/DevicePrograms/**.cu",
         "src/Device/DevicePrograms/Cuda/**.cu"
     }
 

@@ -1,7 +1,5 @@
 #pragma once
-#include "DevicePrograms/LaunchParams.h"
 #include "Scene/Traversal.h"
-#include <map>
 #include "Scene/Nodes/Shader/BsdfMeasurement.h"
 
 
@@ -17,7 +15,6 @@ namespace vtx::device
 		void visit(std::shared_ptr<graph::Material> material) override;
 		void visit(std::shared_ptr<graph::Camera> camera) override;
 		void visit(std::shared_ptr<graph::Renderer> renderer) override;
-		void visit(std::shared_ptr<graph::Shader> shader) override;
 		void visit(std::shared_ptr<graph::Texture> textureNode) override;
 		void visit(std::shared_ptr<graph::BsdfMeasurement> bsdfMeasurementNode) override;
 		void visit(std::shared_ptr<graph::LightProfile> lightProfile) override;

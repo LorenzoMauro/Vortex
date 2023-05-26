@@ -37,13 +37,16 @@ namespace vtx::graph
 		NT_MDL_LIGHTPROFILE,
 
 		NT_SHADER_TEXTURE,
-		NT_SHADER_DIFFUSE_REFLECTION,
+		NT_SHADER_DF,
 		NT_SHADER_MATERIAL,
 		NT_SHADER_SURFACE,
 		NT_SHADER_IMPORTED,
+		NT_SHADER_COLOR,
+		NT_SHADER_FLOAT3,
+		NT_SHADER_FLOAT,
+		NT_SHADER_COORDINATE,
 
-
-		NT_NUM_NODE_TYPES,
+		NT_NUM_NODE_TYPES
 	};
         
 	class Node : public std::enable_shared_from_this<Node> {
@@ -85,6 +88,14 @@ namespace vtx::graph
 		class DiffuseReflection;
 		class MaterialSurface;
 		class ImportedNode;
+		class PrincipledMaterial;
+		class ColorTexture;
+		class MonoTexture;
+		class NormalTexture;
+		class BumpTexture;
+		class TextureTransform;
+		class NormalMix;
+		class GetChannel;
 	}
 
 	class Light;
@@ -96,8 +107,13 @@ namespace vtx::graph
 	class Material;
 	class Camera;
 	class Renderer;
-	class Shader;
 	class Texture;
 	class BsdfMeasurement;
 	class LightProfile;
+	struct EnumValue;
+	struct EnumTypeInfo;
+	class ParamInfo;
+	struct Configuration;
+	struct FunctionNames;
+	struct DevicePrograms;
 }

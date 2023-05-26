@@ -86,11 +86,13 @@ namespace vtx::mdl
             optixDirectCall<void>(shaders->idxCallBackfaceScatteringSample, &data, &mdlData.state, &mdlData.resourceData, nullptr, mdlData.argBlock);
         }
 
+
         result.isValid = true;
         result.nextDirection = data.k2;
         result.bsdfOverPdf = data.bsdf_over_pdf;
         result.eventType = data.event_type;
         result.pdf = data.pdf;
+
         return result;
 
     }
@@ -273,14 +275,14 @@ namespace vtx::mdl
         mdlData.state.meters_per_scene_unit = 1.0f;
 
         mdlData.resourceData.shared_data = nullptr;
-        mdlData.resourceData.texture_handler = hitP.shader->textureHandler;
+        mdlData.resourceData.texture_handler = hitP.material->textureHandler;
         //mdlData.shaderConfiguration = hitP.shader->shaderConfiguration;
         mdlData.isFrontFace = hitP.isFrontFace;
         mdlData.argBlock = hitP.material->argBlock;
 
         // Using a single material init function instead of per distribution init functions.
         // This is always present, even if it just returns.
-        optixDirectCall<void>(hitP.shaderConfiguration->idxCallInit, &mdlData.state, &mdlData.resourceData, nullptr, mdlData.argBlock);
+        optixDirectCall<void>(hitP.materialConfiguration->idxCallInit, &mdlData.state, &mdlData.resourceData, nullptr, mdlData.argBlock);
 
         return mdlData;
     }
@@ -293,31 +295,31 @@ namespace vtx::mdl
         HitProperties& hitP = *request->hitP;
         if (request->ior)
         {
-            result.ior = getIor(mdlData, hitP.shaderConfiguration);
+            result.ior = getIor(mdlData, hitP.materialConfiguration);
         }
         if (request->opacity)
         {
-            result.opacity = determineOpacity(mdlData, hitP.shaderConfiguration);
+            result.opacity = determineOpacity(mdlData, hitP.materialConfiguration);
         }
         if (request->edf || request->bsdfEvaluation || request->bsdfSample)
         {
-            mdlData.isThinWalled = isThinWalled(mdlData, hitP.shaderConfiguration);
+            mdlData.isThinWalled = isThinWalled(mdlData, hitP.materialConfiguration);
         }
         if (request->edf)
         {
-            result.edf = evaluateEmission(mdlData, hitP.shaderConfiguration, request->lastRayDirection);
+            result.edf = evaluateEmission(mdlData, hitP.materialConfiguration, request->lastRayDirection);
         }
         if (request->bsdfEvaluation)
         {
-            result.bsdfEvaluation = evaluateBsdf(mdlData, hitP.shaderConfiguration, request->surroundingIor, request->lastRayDirection, request->toSampledLight);
+            result.bsdfEvaluation = evaluateBsdf(mdlData, hitP.materialConfiguration, request->surroundingIor, request->lastRayDirection, request->toSampledLight);
         }
         if (request->bsdfSample)
         {
-            result.bsdfSample = sampleBsdf(mdlData, hitP.shaderConfiguration, request->surroundingIor, request->lastRayDirection, request->hitP->seed);
+            result.bsdfSample = sampleBsdf(mdlData, hitP.materialConfiguration, request->surroundingIor, request->lastRayDirection, request->hitP->seed);
         }
         if (request->auxiliary)
         {
-            result.aux = getAuxiliaryData(mdlData, hitP.shaderConfiguration, request->surroundingIor, request->lastRayDirection);
+            result.aux = getAuxiliaryData(mdlData, hitP.materialConfiguration, request->surroundingIor, request->lastRayDirection);
         }
 
         return result;

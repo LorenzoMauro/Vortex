@@ -18,42 +18,65 @@
 
 namespace gdt {
 
+	// Helper function for comparing floating point numbers
+	template<typename T>
+	inline __forceinline__ __both__ bool isEqual(const T& a, const T& b, float maxDiff=0.0001f, float maxRelDiff = FLT_EPSILON)
+	{
+		// Check if the numbers are really close -- needed
+		// when comparing numbers near zero.
+		const float diff = fabs(a - b);
+		if (diff <= maxDiff)
+			return true;
+
+		const float asbA = fabs(a);
+		const float asbB = fabs(b);
+
+		if (const float largest = (asbB > asbA) ? asbB : asbA; diff <= largest * maxRelDiff)
+			return true;
+		return false;
+	}
+
   // ------------------------------------------------------------------
   // ==
   // ------------------------------------------------------------------
 
-#ifdef __CUDACC__
-  template<typename T>
-  inline __both__ bool operator==(const vec_t<T,2> &a, const vec_t<T,2> &b)
-  { return (a.x==b.x) & (a.y==b.y); }
-  
-  template<typename T>
-  inline __both__ bool operator==(const vec_t<T,3> &a, const vec_t<T,3> &b)
-  { return (a.x==b.x) & (a.y==b.y) & (a.z==b.z); }
-  
-  template<typename T>
-  inline __both__ bool operator==(const vec_t<T,4> &a, const vec_t<T,4> &b)
-  { return (a.x==b.x) & (a.y==b.y) & (a.z==b.z) & (a.w==b.w); }
-#else
-  template<typename T>
-  inline __both__ bool operator==(const vec_t<T,2> &a, const vec_t<T,2> &b)
-  { return a.x==b.x && a.y==b.y; }
+	template<typename T>
+	inline __forceinline__ __both__ bool operator==(const vec_t<T, 2>& a, const vec_t<T, 2>& b)
+	{
+		return (isEqual(a.x, b.x) && isEqual(a.y, b.y));
+	}
 
-  template<typename T>
-  inline __both__ bool operator==(const vec_t<T,3> &a, const vec_t<T,3> &b)
-  { return a.x==b.x && a.y==b.y && a.z==b.z; }
+	template<typename T>
+	inline __forceinline__ __both__ bool operator==(const vec_t<T, 3>& a, const vec_t<T, 3>& b)
+	{
+		return (isEqual(a.x, b.x) && isEqual(a.y, b.y) && isEqual(a.z, b.z));
+	}
 
-  template<typename T>
-  inline __both__ bool operator==(const vec_t<T,4> &a, const vec_t<T,4> &b)
-  { return a.x==b.x && a.y==b.y && a.z==b.z && a.w==b.w; }
-#endif
+	template<typename T>
+	inline __forceinline__ __both__ bool operator==(const vec_t<T, 4>& a, const vec_t<T, 4>& b)
+	{
+		return (isEqual(a.x, b.x) && isEqual(a.y, b.y) && isEqual(a.z, b.z) && isEqual(a.w, b.w));
+	}
   
   // ------------------------------------------------------------------
   // !=
   // ------------------------------------------------------------------
-  
-  template<typename T, int N>
-  inline __both__ bool operator!=(const vec_t<T,N> &a, const vec_t<T,N> &b)
-  { return !(a==b); }
-  
+	template<typename T>
+	inline __forceinline__ __both__ bool operator!=(const vec_t<T, 2>& a, const vec_t<T, 2>& b)
+	{
+		return (!isEqual(a.x, b.x) || !isEqual(a.y, b.y));
+	}
+
+	template<typename T>
+	inline __forceinline__ __both__ bool operator!=(const vec_t<T, 3>& a, const vec_t<T, 3>& b)
+	{
+		return (!isEqual(a.x, b.x) || !isEqual(a.y, b.y) || !isEqual(a.z, b.z));
+	}
+
+	template<typename T>
+	inline __forceinline__ __both__ bool operator!=(const vec_t<T, 4>& a, const vec_t<T, 4>& b)
+	{
+		return (!isEqual(a.x, b.x) || !isEqual(a.y, b.y) || !isEqual(a.z, b.z) || !isEqual(a.w, b.w));
+	}
+
 } // ::gdt

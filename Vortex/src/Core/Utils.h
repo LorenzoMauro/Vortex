@@ -12,6 +12,8 @@ namespace utl{
 
 	std::string getFileName(const std::string& path);
 
+	std::string getFileExtension(const std::string& path);
+
 	std::vector<char> readData(const std::string& FilePath);
 
 	bool saveString(const std::string& filename, const std::string& text);

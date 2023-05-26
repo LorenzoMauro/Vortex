@@ -438,7 +438,7 @@ extern "C" __device__ void tex_lookup_float4_3d(
         storeResult4(result, 0.0f);
     }
 
-    storeResult4(result, tex3D<float4>(textureData->texObj, u, v, w));
+    //storeResult4(result, tex3D<float4>(textureData->texObj, u, v, w));
 }
 
 // Implementation of tex::lookup_float3() for a texture_3d texture.
