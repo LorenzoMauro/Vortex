@@ -8,7 +8,6 @@
 #include "Scene/Nodes/Shader/Texture.h"
 #include "Scene/Nodes/Shader/mdl/ShaderNodes.h"
 
-
 namespace vtx::mdl
 {
 	using namespace mi;
@@ -472,8 +471,12 @@ namespace vtx::mdl
 			const Handle<ICompiled_material> compiledMaterial(materialInstance->create_compiled_material(flags, state.context.get()));
 			VTX_ASSERT_BREAK((logMessage(state.context.get())), state.lastError);
 
+			base::Uuid hash = compiledMaterial->get_hash();
+
+			VTX_INFO("Compiled material hash:{} {} {} {} ", hash.m_id1, hash.m_id2, hash.m_id3, hash.m_id4);
+
 			//dump_compiled_material(tI->transaction.get(), state.factory.get(), compiledMaterial.get(), std::cout);
-			tI->transaction->store(compiledMaterial.get(), ("compiledMaterial_" + materialDataBaseName).c_str());
+			tI->transaction->store(compiledMaterial.get(), materialDataBaseName.c_str());
 		}
 	}
 
@@ -522,7 +525,7 @@ namespace vtx::mdl
 		TransactionInterfaces* tI = state.getTransactionInterfaces();
 		graph::Configuration config;
 		do {
-			const Handle<const ICompiled_material> compiledMaterial((tI->transaction->access(("compiledMaterial_" + materialDbName).c_str())->get_interface<ICompiled_material>()));
+			const Handle<const ICompiled_material> compiledMaterial((tI->transaction->access(materialDbName.c_str())->get_interface<ICompiled_material>()));
 			//const ICompiled_material* compiledMaterial = shader->compilation.compiledMaterial.get();
 
 			ExprEvaluation<bool> thinWalledEval = analyzeExpression<bool>(compiledMaterial, "thin_walled");
@@ -810,6 +813,89 @@ namespace vtx::mdl
 
 	}
 
+	void addMaterialToLinkUnit(const std::string& materialDbName, const graph::Configuration& config, const vtxID& shaderIndex, Handle<ILink_unit>& linkUnit)
+	{
+		MdlState& state = *getState();
+		const TransactionInterfaces* tI = state.getTransactionInterfaces();
+		Handle<ITarget_code const>   targetCode;
+		do {
+			const Handle<const ICompiled_material> compiledMaterial(tI->transaction->access<ICompiled_material>(materialDbName.c_str()));
+
+			graph::FunctionNames fNames;
+			std::vector<Target_function_description> descriptions = createShaderDescription(config, shaderIndex, fNames);
+
+			if (linkUnit.get() == nullptr)
+			{
+				linkUnit = make_handle(state.backend->create_link_unit(tI->transaction.get(), state.context.get()));
+			}
+
+			VTX_ASSERT_BREAK((logMessage(state.context.get())), state.lastError);
+			const Sint32 result = linkUnit->add_material(compiledMaterial.get(), descriptions.data(), descriptions.size(), state.context.get());
+			VTX_ASSERT_BREAK((result == 0 && logMessage(state.context.get())), state.lastError);
+
+		} while (false);
+
+		state.commitTransaction();
+	}
+
+	Handle<ITarget_code const> generateTargetCode(Handle<ILink_unit>& linkUnit)
+	{
+		MdlState& state = *getState();
+		const TransactionInterfaces* tI = state.getTransactionInterfaces();
+		Handle<ITarget_code const>   targetCode;
+
+		{
+			targetCode = make_handle(state.backend->translate_link_unit(linkUnit.get(), state.context.get()));
+			VTX_ASSERT_BREAK((logMessage(state.context.get())), state.lastError);
+
+		}
+		state.commitTransaction();
+		return targetCode;
+	}
+
+	std::vector<std::shared_ptr<graph::Texture>> createTextureResources(Handle<ITarget_code const>& targetCode)
+	{
+		std::vector<std::shared_ptr<graph::Texture>> textures;
+		// TODO We have to store the textures, light profiles and bsdf indices since these will be refencered by the mdl lookup functions
+		for (Size i = 1, n = targetCode->get_texture_count(); i < n; ++i) {
+			auto texture = std::make_shared<graph::Texture>(targetCode->get_texture(i), targetCode->get_texture_shape(i));
+			texture->mdlIndex = i;
+			textures.emplace_back(texture);
+		}
+		return textures;
+	}
+
+	std::vector<std::shared_ptr<graph::LightProfile>> createLightProfileResources(Handle<ITarget_code const>& targetCode)
+	{
+		std::vector<std::shared_ptr<graph::LightProfile>> lightProfiles;
+		if (targetCode->get_light_profile_count() > 0)
+		{
+			for (mi::Size i = 1, n = targetCode->get_light_profile_count(); i < n; ++i)
+			{
+				auto lightProfile = std::make_shared<graph::LightProfile>(targetCode->get_light_profile(i));
+				lightProfile->mdlIndex = i;
+				lightProfiles.emplace_back(lightProfile);
+			}
+		}
+		return lightProfiles;
+	}
+
+	std::vector<std::shared_ptr<graph::BsdfMeasurement>> createBsdfMeasurementResources(Handle<ITarget_code const>& targetCode)
+	{
+		std::vector<std::shared_ptr<graph::BsdfMeasurement>> bsdfMeasurements;
+		if (targetCode->get_bsdf_measurement_count() > 0)
+		{
+			for (mi::Size i = 1, n = targetCode->get_bsdf_measurement_count(); i < n; ++i)
+			{
+				auto bsdfMeasurement = std::make_shared<graph::BsdfMeasurement>(targetCode->get_bsdf_measurement(i));
+				bsdfMeasurement->mdlIndex = i;
+				bsdfMeasurements.emplace_back(bsdfMeasurement);
+			}
+		}
+
+		return bsdfMeasurements;
+	}
+
 	Handle<ITarget_code const> createTargetCode(const std::string& materialDbName, const graph::Configuration& config, const vtxID& shaderIndex)
 	{
 
@@ -817,7 +903,7 @@ namespace vtx::mdl
 		const TransactionInterfaces* tI    = state.getTransactionInterfaces();
 		Handle<ITarget_code const>   targetCode;
 		do {
-			const Handle<const ICompiled_material> compiledMaterial(tI->transaction->access<ICompiled_material>(("compiledMaterial_" + materialDbName).c_str()));
+			const Handle<const ICompiled_material> compiledMaterial(tI->transaction->access<ICompiled_material>(materialDbName.c_str()));
 
 			//const Handle<const ICompiled_material> compiledMaterial((tI->transaction->access(("compiledMaterial_" + materialDbName).c_str())->get_interface<ICompiled_material>()));
 			//const Handle<const IFunction_definition> materialDefinition(tI->transaction->access<IFunction_definition>(materialDbName.c_str()));
@@ -826,12 +912,19 @@ namespace vtx::mdl
 			std::vector<Target_function_description> descriptions = createShaderDescription(config, shaderIndex, fNames);
 
 			VTX_INFO("Creating target code for shader {} index {} with {} functions.", materialDbName, shaderIndex, descriptions.size());
-			const Handle<ILink_unit> link_unit(state.backend->create_link_unit(tI->transaction.get(), state.context.get()));
+
+			Handle<ILink_unit> linkUnit(tI->transaction->edit<ILink_unit>("VORTEX_linkUnit"));
+			if(linkUnit.get()==nullptr)
+			{
+				linkUnit = make_handle(state.backend->create_link_unit(tI->transaction.get(), state.context.get()));
+				tI->transaction->store(linkUnit.get(), ("VORTEX_linkUnit"));
+			}
+
 			VTX_ASSERT_BREAK((logMessage(state.context.get())), state.lastError);
-			const Sint32 result = link_unit->add_material(compiledMaterial.get(), descriptions.data(), descriptions.size(), state.context.get());
+			const Sint32 result = linkUnit->add_material(compiledMaterial.get(), descriptions.data(), descriptions.size(), state.context.get());
 			VTX_ASSERT_BREAK((result == 0 && logMessage(state.context.get())), state.lastError);
 
-			targetCode = make_handle(state.backend->translate_link_unit(link_unit.get(), state.context.get()));
+			targetCode = make_handle(state.backend->translate_link_unit(linkUnit.get(), state.context.get()));
 			VTX_ASSERT_BREAK((logMessage(state.context.get())), state.lastError);
 			//mi::neuraylib::ITarget_code::Prototype_language
 
@@ -843,36 +936,15 @@ namespace vtx::mdl
 		return targetCode;
 	}
 
-	struct Annotation
-	{
-		std::string name;
-		std::string displayName;
-		std::string groupName;
-		float range[2] = { 0.0f, 1.0f };
-		bool isValid = false;
-	};
 
-	Annotation getAnnotation(std::string parameterName, const Handle<IAnnotation_list const>& annoList)
+	graph::shader::Annotation getAnnotation(Handle<IAnnotation_block const> annoBlock)
 	{
 		// Check for annotation info
-		Handle annoBlock = make_handle<IAnnotation_block const>(annoList->get_annotation_block(parameterName.c_str()));
-		Annotation annotation;
-		annotation.name = parameterName;
+		graph::shader::Annotation annotation;
 		if (annoBlock)
 		{
 			Annotation_wrapper annos(annoBlock.get());
 			Size annoIndex;
-
-			annoIndex = annos.get_annotation_index("::anno::hard_range(float,float)");
-			if (annoIndex == static_cast<Size>(-1))
-			{
-				annoIndex = annos.get_annotation_index("::anno::soft_range(float,float)");
-			}
-			if (annoIndex != static_cast<Size>(-1))
-			{
-				annos.get_annotation_param_value(annoIndex, 0, annotation.range[0]);
-				annos.get_annotation_param_value(annoIndex, 1, annotation.range[1]);
-			}
 
 			annoIndex = annos.get_annotation_index("::anno::display_name(string)");
 			if (annoIndex != static_cast<Size>(-1))
@@ -881,6 +953,38 @@ namespace vtx::mdl
 				annos.get_annotation_param_value(annoIndex, 0, displayName);
 				annotation.displayName = displayName;
 			}
+
+			std::string rangeType = "float";
+			annoIndex = annos.get_annotation_index("::anno::hard_range(float,float)");
+			if (annoIndex == static_cast<Size>(-1))
+			{
+				annoIndex = annos.get_annotation_index("::anno::soft_range(float,float)");
+			}
+			if (annoIndex == static_cast<Size>(-1))
+			{
+				annoIndex = annos.get_annotation_index("::anno::hard_range(int,int)");
+				rangeType = "int";
+			}
+			if (annoIndex == static_cast<Size>(-1))
+			{
+				annoIndex = annos.get_annotation_index("::anno::soft_range(int,int)");
+				rangeType = "int";
+			}
+			if (annoIndex != static_cast<Size>(-1) && rangeType=="float")
+			{
+				annos.get_annotation_param_value(annoIndex, 0, annotation.range[0]);
+				annos.get_annotation_param_value(annoIndex, 1, annotation.range[1]);
+			}
+			else if (annoIndex != static_cast<Size>(-1) && rangeType == "int")
+			{
+				int range[2];
+				annos.get_annotation_param_value(annoIndex, 0, range[0]);
+				annos.get_annotation_param_value(annoIndex, 1, range[1]);
+				annotation.range[0] = static_cast<float>(range[0]);
+				annotation.range[1] = static_cast<float>(range[1]);
+			}
+
+
 			annoIndex = annos.get_annotation_index("::anno::in_group(string)");
 			if (annoIndex != static_cast<Size>(-1))
 			{
@@ -888,79 +992,32 @@ namespace vtx::mdl
 				annos.get_annotation_param_value(annoIndex, 0, groupName);
 				annotation.groupName = groupName;
 			}
-			else
-			{
-				std::string name = annotation.name;
-
-				std::size_t pos = name.find('.');
-
-				if (pos != std::string::npos) { // if the dot was found
-					std::string originalParameterName = name.substr(0, pos); // extract the part before the dot
-					std::string inputName = name.substr(pos + 1); // extract the part after the dot
-
-					Annotation OriginalAnnotation = getAnnotation(originalParameterName, annoList);
-					if(OriginalAnnotation.isValid)
-					{
-						annotation.groupName = OriginalAnnotation.groupName;
-						annotation.displayName = name;
-					}
-				}
-			}
 			annotation.isValid = true;
-		}
-		else
-		{
-			std::string name = annotation.name;
-
-			std::size_t pos = name.find('.');
-
-			if (pos != std::string::npos) { // if the dot was found
-				std::string originalParameterName = name.substr(0, pos); // extract the part before the dot
-				std::string inputName = name.substr(pos + 1); // extract the part after the dot
-
-				Annotation OriginalAnnotation = getAnnotation(originalParameterName, annoList);
-				if (OriginalAnnotation.isValid)
-				{
-					annotation.displayName = name;
-					annotation.groupName = OriginalAnnotation.groupName;
-					annotation.isValid = true;
-				}
-				else
-				{
-					annotation.isValid = false;
-				}
-			}
-			else
-			{
-				annotation.isValid = false;
-
-			}
 		}
 
 		return annotation;
 	}
 
-	graph::ParamInfo generateParamInfo(
+	graph::shader::ParameterInfo generateParamInfo(
 		const size_t index,
 		const Handle<const ICompiled_material>& compiledMat,
 		char* argBlockData,
 		Handle<ITarget_value_layout const>& argBlockLayout,
 		const Handle<IAnnotation_list const>& annoList,
-		std::map<std::string, std::shared_ptr<graph::EnumTypeInfo>>& mapEnumTypes
+		std::map<std::string, std::shared_ptr<graph::shader::EnumTypeInfo>>& mapEnumTypes
 	)
 	{
-		using graph::EnumValue;
-		using graph::EnumTypeInfo;
-		using graph::ParamInfo;
+		using graph::shader::EnumValue;
+		using graph::shader::EnumTypeInfo;
+		using graph::shader::ParameterInfo;
 
 		const char* name = compiledMat->get_parameter_name(index);
-		VTX_INFO("Parameter name: {}", name);
 		if (name == nullptr) return {};
 
 		Handle argument = make_handle<IValue const>(compiledMat->get_argument(index));
 		const IValue::Kind kind = argument->get_kind();
-		auto paramKind = ParamInfo::PK_UNKNOWN;
-		auto paramArrayElemKind = ParamInfo::PK_UNKNOWN;
+		auto paramKind = ParameterInfo::PK_UNKNOWN;
+		auto paramArrayElemKind = ParameterInfo::PK_UNKNOWN;
 		Size paramArraySize = 0;
 		Size paramArrayPitch = 0;
 		const EnumTypeInfo* enumType = nullptr;
@@ -968,16 +1025,16 @@ namespace vtx::mdl
 		switch (kind)
 		{
 			case IValue::VK_FLOAT:
-				paramKind = ParamInfo::PK_FLOAT;
+				paramKind = ParameterInfo::PK_FLOAT;
 				break;
 			case IValue::VK_COLOR:
-				paramKind = ParamInfo::PK_COLOR;
+				paramKind = ParameterInfo::PK_COLOR;
 				break;
 			case IValue::VK_BOOL:
-				paramKind = ParamInfo::PK_BOOL;
+				paramKind = ParameterInfo::PK_BOOL;
 				break;
 			case IValue::VK_INT:
-				paramKind = ParamInfo::PK_INT;
+				paramKind = ParameterInfo::PK_INT;
 				break;
 			case IValue::VK_VECTOR:
 			{
@@ -989,10 +1046,10 @@ namespace vtx::mdl
 					switch (valType->get_size())
 					{
 						case 2:
-							paramKind = ParamInfo::PK_FLOAT2;
+							paramKind = ParameterInfo::PK_FLOAT2;
 							break;
 						case 3:
-							paramKind = ParamInfo::PK_FLOAT3;
+							paramKind = ParameterInfo::PK_FLOAT3;
 							break;
 					}
 				}
@@ -1007,16 +1064,16 @@ namespace vtx::mdl
 				switch (const Handle elemType = make_handle<const IType>(valType->get_element_type()); elemType->get_kind())
 				{
 					case IType::TK_FLOAT:
-						paramArrayElemKind = ParamInfo::PK_FLOAT;
+						paramArrayElemKind = ParameterInfo::PK_FLOAT;
 						break;
 					case IType::TK_COLOR:
-						paramArrayElemKind = ParamInfo::PK_COLOR;
+						paramArrayElemKind = ParameterInfo::PK_COLOR;
 						break;
 					case IType::TK_BOOL:
-						paramArrayElemKind = ParamInfo::PK_BOOL;
+						paramArrayElemKind = ParameterInfo::PK_BOOL;
 						break;
 					case IType::TK_INT:
-						paramArrayElemKind = ParamInfo::PK_INT;
+						paramArrayElemKind = ParameterInfo::PK_INT;
 						break;
 					case IType::TK_VECTOR:
 					{
@@ -1027,10 +1084,10 @@ namespace vtx::mdl
 							switch (valType->get_size())
 							{
 								case 2:
-									paramArrayElemKind = ParamInfo::PK_FLOAT2;
+									paramArrayElemKind = ParameterInfo::PK_FLOAT2;
 									break;
 								case 3:
-									paramArrayElemKind = ParamInfo::PK_FLOAT3;
+									paramArrayElemKind = ParameterInfo::PK_FLOAT3;
 									break;
 							}
 						}
@@ -1039,9 +1096,9 @@ namespace vtx::mdl
 					default:
 						break;
 				}
-				if (paramArrayElemKind != ParamInfo::PK_UNKNOWN)
+				if (paramArrayElemKind != ParameterInfo::PK_UNKNOWN)
 				{
-					paramKind = ParamInfo::PK_ARRAY;
+					paramKind = ParameterInfo::PK_ARRAY;
 					paramArraySize = valType->get_size();
 
 					// determine pitch of array if there are at least two elements
@@ -1085,20 +1142,20 @@ namespace vtx::mdl
 					info = enumTypeInfo.get();
 				}
 				enumType = info;
-				paramKind = ParamInfo::PK_ENUM;
+				paramKind = ParameterInfo::PK_ENUM;
 			}
 			break;
 			case IValue::VK_STRING:
-				paramKind = ParamInfo::PK_STRING;
+				paramKind = ParameterInfo::PK_STRING;
 				break;
 			case IValue::VK_TEXTURE:
-				paramKind = ParamInfo::PK_TEXTURE;
+				paramKind = ParameterInfo::PK_TEXTURE;
 				break;
 			case IValue::VK_LIGHT_PROFILE:
-				paramKind = ParamInfo::PK_LIGHT_PROFILE;
+				paramKind = ParameterInfo::PK_LIGHT_PROFILE;
 				break;
 			case IValue::VK_BSDF_MEASUREMENT:
-				paramKind = ParamInfo::PK_BSDF_MEASUREMENT;
+				paramKind = ParameterInfo::PK_BSDF_MEASUREMENT;
 				break;
 			default:
 				// Unsupported? -> skip
@@ -1112,56 +1169,52 @@ namespace vtx::mdl
 		const Size offset = argBlockLayout->get_layout(kind2, paramSize, targetValueLayoutState);
 		if (kind != kind2)
 		{
+			VTX_WARN("Argument kind mismatch During Material Parameter Generation {}", name);
 			return {};  // layout is invalid -> skip
 		}
 
 		char* dataPtr = argBlockData + offset;
 
-		ParamInfo paramInfo(index,
-							name,
-							name,
-							/*groupName=*/ "",
-							paramKind,
-							paramArrayElemKind,
-							paramArraySize,
-							paramArrayPitch,
-							dataPtr,
-							enumType);
 
-		// Check for annotation info
-		Annotation anno = getAnnotation(name, annoList);
+		ParameterInfo paramInfo;
 
-		if(anno.isValid)
-		{
-			paramInfo.rangeMax() = anno.range[1];
-			paramInfo.rangeMin() = anno.range[0];
-			paramInfo.setDisplayName(anno.displayName.data());
-			paramInfo.setGroupName(anno.groupName.data());
-		}
-		
+		paramInfo.index = index;
+		paramInfo.argumentName = name;
+		paramInfo.annotation.groupName = "";
+		paramInfo.kind = paramKind;
+		paramInfo.arrayElemKind = paramArrayElemKind;
+		paramInfo.arraySize = paramArraySize;
+		paramInfo.arrayPitch = paramArrayPitch;
+		paramInfo.dataPtr = dataPtr;
+		paramInfo.enumInfo = enumType;
+		paramInfo.annotation = getAnnotation(make_handle<IAnnotation_block const>(annoList->get_annotation_block(name)));
+
 		return paramInfo;
 	}
 
-	void setMaterialParameters(
+	std::vector<graph::shader::ParameterInfo> getArgumentBlockData(
 		const std::string& materialDbName,
+		const std::string& functionDefinitionSignature,
 		const Handle<ITarget_code const>& targetCode,
 		Handle<ITarget_argument_block>& argumentBlockClone,
-		std::map<std::string, std::vector<graph::ParamInfo>>& params,
-		std::map<std::string, std::shared_ptr<graph::EnumTypeInfo>>& mapEnumTypes)
+		std::map<std::string, std::shared_ptr<graph::shader::EnumTypeInfo>>& mapEnumTypes,
+		int materialAdditionIndex)
 	{
-		using graph::EnumValue;
-		using graph::EnumTypeInfo;
-		using graph::ParamInfo;
-
 		char* argBlockData = nullptr;
 		Handle<ITarget_value_layout const> argBlockLayout;
 
-		if (targetCode->get_argument_block_count() > 0)
+		//for (int id = 0; id < targetCode->get_callable_function_count(); id++) {
+		//	const char* fun = targetCode->get_callable_function(id);
+		//	//targetCode->get_argument_block(id);
+		//	VTX_INFO("MDL WRAPPER: Target code callable function: {} ", fun);
+		//}
+
+		if (targetCode->get_argument_block_count() > materialAdditionIndex)
 		{
-			const auto argumentBlock = make_handle<ITarget_argument_block const>(targetCode->get_argument_block(0));
+			const auto argumentBlock = make_handle<ITarget_argument_block const>(targetCode->get_argument_block(materialAdditionIndex));
 			argumentBlockClone = Handle(argumentBlock->clone());
 			argBlockData = argumentBlockClone->get_data();
-			argBlockLayout = make_handle<ITarget_value_layout const>(targetCode->get_argument_block_layout(0));
+			argBlockLayout = make_handle<ITarget_value_layout const>(targetCode->get_argument_block_layout(materialAdditionIndex));
 		}
 		else
 		{
@@ -1170,35 +1223,32 @@ namespace vtx::mdl
 
 
 		MdlState&                    state = *getState();
+		std::vector<graph::shader::ParameterInfo> paramInfos;
 		const TransactionInterfaces* tI    = state.getTransactionInterfaces();
 		{
-			const Handle	compiledMaterial = make_handle(tI->transaction->access<ICompiled_material>(("compiledMaterial_" + materialDbName).c_str()));
-			const Handle	materialDefinition = make_handle(tI->transaction->access<IFunction_definition>(materialDbName.c_str()));
+			const Handle	compiledMaterial = make_handle(tI->transaction->access<ICompiled_material>(materialDbName.c_str()));
+			const Handle	materialDefinition = make_handle(tI->transaction->access<IFunction_definition>(functionDefinitionSignature.c_str()));
 			const Handle	annoList = make_handle<const IAnnotation_list>(materialDefinition->get_parameter_annotations());
 			const Size		numParams = compiledMaterial->get_parameter_count();
 
 			for (Size j = 0; j < numParams; ++j)
 			{
-				ParamInfo paramInfo = generateParamInfo(j, compiledMaterial, argBlockData, argBlockLayout, annoList, mapEnumTypes);
+				graph::shader::ParameterInfo paramInfo = generateParamInfo(j, compiledMaterial, argBlockData, argBlockLayout, annoList, mapEnumTypes);
 
-				if(paramInfo.groupName() == nullptr)
+				if((void*)paramInfo.dataPtr != nullptr)
 				{
-					paramInfo.setGroupName("");
-				}
-
-				if(params.find(paramInfo.groupName()) == params.end())
-				{
-					params[paramInfo.groupName()] = std::vector<ParamInfo>();
-					params[paramInfo.groupName()].push_back(paramInfo);
+					//VTX_INFO("Material {} Parameter: {} Found!", materialDbName, paramInfo.argumentName);
+					paramInfos.push_back(paramInfo);
 				}
 				else
 				{
-					params[paramInfo.groupName()].push_back(paramInfo);
+					VTX_INFO("Material {} Parameter: {} Not available for use!", materialDbName, compiledMaterial->get_parameter_name(j));
 				}
 			}
 		}
 		state.commitTransaction();
 		//tI->transaction->commit();
+		return paramInfos;
 	}
 
 	std::shared_ptr<graph::Texture> createTextureFromFile(const std::string& filePath)
@@ -1652,32 +1702,24 @@ namespace vtx::mdl
 		functionInfo->returnType = functionDefinition->get_return_type()->skip_all_type_aliases();
 	}
 
-	std::vector<ParameterInfo> getFunctionParameters(const MdlFunctionInfo& functionInfo, const std::string callingNodeName)
+	std::vector<graph::shader::ParameterInfo> getFunctionParameters(const MdlFunctionInfo& functionInfo, const std::string callingNodeName)
 	{
 		MdlState* state = getState();
 		const TransactionInterfaces* tI = state->getTransactionInterfaces();
 		const Handle<const IFunction_definition> functionDefinition(tI->transaction->access<IFunction_definition>(functionInfo.signature.c_str()));
 		const Handle<const IType_list>           types(functionDefinition->get_parameter_types());
 		const Handle<const IAnnotation_list>     anno(functionDefinition->get_parameter_annotations());
-		const Handle<const IExpression_list> defaults(functionDefinition->get_defaults());
-		const Size                           paramCount = functionDefinition->get_parameter_count();
-		//functionDefinition->get_return_type();
-		std::vector<ParameterInfo> parameters;
+		const Handle<const IExpression_list>	defaults(functionDefinition->get_defaults());
+		const Size								paramCount = functionDefinition->get_parameter_count();
+		std::vector<graph::shader::ParameterInfo>               parameters;
+
 		for (int i = 0; i < paramCount; i++)
 		{
-			ParameterInfo paramInfo;
-
-			paramInfo.type                 = types->get_type(i);
-			const char*              name  = types->get_name(i);
-			paramInfo.annotations		   = anno->get_annotation_block(anno->get_index(name));
-			paramInfo.kind                 = paramInfo.type->get_kind();
-			paramInfo.argumentName         = name;
+			graph::shader::ParameterInfo paramInfo;
+			paramInfo.argumentName = types->get_name(i);
+			paramInfo.expressionKind                 = types->get_type(i)->skip_all_type_aliases()->get_kind();
+			paramInfo.annotation		   = getAnnotation(make_handle(anno->get_annotation_block(anno->get_index(paramInfo.argumentName.c_str()))));
 			paramInfo.index                = i;
-			paramInfo.actualName           = callingNodeName + "_" + name;
-			if (const int defaultIndex = defaults->get_index(name); defaultIndex != -1)
-			{
-				paramInfo.defaultValue = defaults->get_expression(defaultIndex);
-			}
 			parameters.push_back(paramInfo);
 		}
 		return parameters;
@@ -1743,102 +1785,58 @@ namespace vtx::mdl
 
 	}
 
-	Handle<IExpression> generateFunctionExpression(const std::string& functionSignature, std::map<std::string, graph::shader::ShaderNodeSocket>& sockets, std::string callerNodeName)
+	bool generateFunctionExpression(const std::string& functionSignature, std::map<std::string, graph::shader::ShaderNodeSocket>& sockets, std::string callerNodeName)
 	{
-		VTX_INFO("Generating function expression for {}", functionSignature);
+		VTX_INFO("Generating function expression for:\n\tNode {}\n\tSignature {}", callerNodeName, functionSignature);
 		MdlState* state = getState();
 		const TransactionInterfaces* tI = state->getTransactionInterfaces();
 		ModuleCreationParameters& mcp = state->moduleCreationParameter;
 		const Handle<IExpression_factory>& ef = tI->expressionFactory;
 		{
-			const Handle<IExpression_list> callArguments(ef->create_expression_list());
+			//const Handle<IExpression_list> callArguments(ef->create_expression_list());
 			const Handle<IExpression_list> definitionCallArg(ef->create_expression_list());
+
+			const Handle<const IFunction_definition> definition(tI->transaction->access<IFunction_definition>(functionSignature.c_str()));
+			Handle<const IExpression_list> defaultsExprList(definition->get_defaults());
 
 			for (auto& [name, socket] : sockets)
 			{
 				std::shared_ptr<graph::shader::ShaderNode> shaderNodeSocket = socket.node;
-				ParameterInfo& param = socket.parameterInfo;
-				IType::Kind paramType = param.type->get_kind();
-
-				//NB, types like material surface or bxdf can't be set as default. I will probably have to fix this later
-				bool addNodeSocketAsExpression = false;
-				bool addNodeSocketAsDefault = false;
-
+				graph::shader::ParameterInfo&              param            = socket.parameterInfo;
 
 				if(shaderNodeSocket)
 				{
-					if(shaderNodeSocket->expression.is_valid_interface())
-					{
-						IExpression::Kind exprKind = shaderNodeSocket->expression->get_kind();
-						if (exprKind == IExpression::EK_DIRECT_CALL)
-						{
-							VTX_INFO("\t\t {} socket expression is a direct call", name);
-							addNodeSocketAsExpression = true;
-							//addNodeSocketAsDefault = true;
-						}
-						else
-						{
-							VTX_INFO("\t\t {} socket is being set as a parameter", name);
-							addNodeSocketAsDefault = true;
-						}
-					}
-					else
-					{
-						VTX_ERROR("Shader node socket expression is not valid");
-					}
-				}
-				else if(name == "handle" ||
-						name == "emission" ||
-						name == "backface" ||
-						name == "volume" ||
-						name == "geometry" ||
-						name==	"hair")
-				{
-					continue;
-				}
-
-				if(addNodeSocketAsExpression)
-				{
-					callArguments->add_expression(param.argumentName.c_str(), shaderNodeSocket->expression.get());
-
-
 					Handle<IExpression> socketCall(ef->create_call(shaderNodeSocket->name.c_str()));
 					definitionCallArg->add_expression(param.argumentName.c_str(), socketCall.get());
 				}
-				else
+				else if(socket.directExpression.is_valid_interface())
 				{
-					if(addNodeSocketAsDefault)
-					{
-						param.defaultValue = shaderNodeSocket->expression;
-
-					}
-
-					definitionCallArg->add_expression(param.argumentName.c_str(), param.defaultValue.get());
-
-					const Handle<IExpression> paramExpression(ef->create_parameter(param.type->skip_all_type_aliases(), mcp.paramCount));
-					++mcp.paramCount;
-					callArguments->add_expression(param.argumentName.c_str(), paramExpression.get());
-					mcp.parameters->add_type(param.actualName.c_str(), param.type.get());
-					mcp.defaults->add_expression(param.actualName.c_str(), param.defaultValue.get());
-					mcp.parameterAnnotations->add_annotation_block(param.actualName.c_str(), param.annotations.get());
+					definitionCallArg->add_expression(param.argumentName.c_str(), socket.directExpression.get());
 				}
+				
 			}
 
 			Sint32 result;
-			Handle<const IFunction_definition> definition(tI->transaction->access<IFunction_definition>(functionSignature.c_str()));
 			Handle<IFunction_call>       call(definition->create_function_call(definitionCallArg.get(), &result));
-			tI->transaction->store(call.get(), callerNodeName.c_str());
+			result = tI->transaction->store(call.get(), callerNodeName.c_str());
 
 			Handle<const IFunction_call> function_call(tI->transaction->access<mi::neuraylib::IFunction_call>(callerNodeName.c_str()));
-			dumpInstance(ef.get(), function_call.get(), callerNodeName);
+			//dumpInstance(ef.get(), function_call.get(), callerNodeName);
 
-			Handle<IExpression> expression = make_handle(ef->create_direct_call(functionSignature.c_str(), callArguments.get(), &result));
-
-			VTX_ASSERT_CONTINUE(result >= 0, analizeDirectCallResult(result, functionSignature, callArguments));
-			//tI->transaction->store(functionInfo.expression.get(), "testName");
-
-			return expression;
+			if(result==0)
+			{
+				return true;
+			}
+			return false;
+			
 		}
+	}
+
+	IType::Kind getExpressionKind(const std::string& dbExpressionName)
+	{
+		MdlState* state = getState();
+		const TransactionInterfaces* tI = state->getTransactionInterfaces();
+		return tI->transaction->access<IExpression>(dbExpressionName.c_str())->get_type()->skip_all_type_aliases()->get_kind();
 	}
 
 	Handle<IExpression> createConstantColor(const math::vec3f& color)
@@ -1871,6 +1869,7 @@ namespace vtx::mdl
 		const Handle<IExpression_factory>&	ef = tI->expressionFactory;
 		const Handle<IValue>				intValue(vf->create_int(value));
 		const Handle<IExpression>			intExpr(ef->create_constant(intValue.get()));
+
 		return intExpr;
 	}
 

@@ -8,6 +8,8 @@
 
 namespace utl{
 
+	std::vector<std::string> splitString(const std::string& input, const std::string separator);
+
 	std::string absolutePath(const std::string& relativePath, const std::string& folderPath = "");
 
 	std::string getFileName(const std::string& path);

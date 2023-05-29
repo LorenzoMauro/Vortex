@@ -673,19 +673,9 @@ namespace vtx::ops
 																	  "OmniPBR");
 		principled->printSocketInfos();
 
-		principled->sockets["diffuse_texture"].parameterInfo.defaultValue = mdl::createTextureConstant(
-			"E:/Dev/VortexOptix/data/Textures/xboibga_2K_Albedo.jpg");
-		principled->sockets["ao_texture"].parameterInfo.defaultValue = mdl::createTextureConstant(
-			"E:/Dev/VortexOptix/data/Textures/xboibga_2K_AO.jpg");
-		principled->sockets["ao_to_diffuse"].parameterInfo.defaultValue = mdl::createConstantFloat(0.5f);
-
-		principled->sockets["reflectionroughness_texture"].parameterInfo.defaultValue = mdl::createTextureConstant(
-			"E:/Dev/VortexOptix/data/Textures/xboibga_2K_Roughness.jpg");
-		principled->sockets["reflection_roughness_texture_influence"].parameterInfo.defaultValue =
-			mdl::createConstantFloat(1.0f);
-
-		principled->sockets["normalmap_texture"].parameterInfo.defaultValue = mdl::createTextureConstant(
-			"E:/Dev/VortexOptix/data/Textures/xboibga_2K_Normal.jpg");
+		principled->connectInput(ALBEDO_SOCKET, ops::createNode<graph::shader::ColorTexture>("E:/Dev/VortexOptix/data/models/Blender/textures/wlhkfhqv_2K_Albedo.jpg"));
+		principled->connectInput(ROUGHNESS_SOCKET, ops::createNode<graph::shader::MonoTexture>("E:/Dev/VortexOptix/data/models/Blender/textures/wlhkfhqv_2K_Roughness.jpg"));
+		principled->connectInput(NORMALMAP_SOCKET, ops::createNode<graph::shader::NormalTexture>("E:/Dev/VortexOptix/data/models/Blender/textures/wdelddp_2K_Normal.jpg"));
 		//principled->sockets["metallic_texture"].parameterInfo.defaultValue = mdl::createTextureConstant("E:/Dev/VortexOptix/data/Textures/xboibga_2K_Normal.jpg");
 
 		const std::shared_ptr<Material> material1 = ops::createNode<Material>();
@@ -844,9 +834,9 @@ namespace vtx::ops
 				//principledGraph->connectInput(ROUGHNESS_SOCKET, ops::createNode<graph::shader::MonoTexture>("E:/Dev/VortexOptix/data/Textures/xboibga_2K_Roughness.jpg"));
 				//
 				//const auto normalMap = ops::createNode<graph::shader::NormalTexture>("E:/Dev/VortexOptix/data/Textures/xboibga_2K_Normal.jpg");
-				//normalMap->setSocketDefault(VF_NORMAL_TEXTURE_FACTOR_SOCKET, mdl::createConstantFloat(0.3f));
+				//normalMap->setSocketValue(VF_NORMAL_TEXTURE_FACTOR_SOCKET, mdl::createConstantFloat(0.3f));
 				//const auto bumpMap = ops::createNode<graph::shader::BumpTexture>("E:/Dev/VortexOptix/data/Textures/xboibga_2K_Bump.jpg");
-				//bumpMap->setSocketDefault(VF_BUMP_TEXTURE_FACTOR_SOCKET, mdl::createConstantFloat(0.1f));
+				//bumpMap->setSocketValue(VF_BUMP_TEXTURE_FACTOR_SOCKET, mdl::createConstantFloat(0.1f));
 				//const auto mixNormal = ops::createNode<graph::shader::NormalMix>();
 				//
 				//mixNormal->connectInput(VF_MIX_NORMAL_BASE_SOCKET, normalMap);

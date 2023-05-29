@@ -105,7 +105,8 @@ project "OptixApp"
         "%{IncludeDir.CUDA}",
         "%{IncludeDir.gdt}",
         "%{IncludeDir.MDL}",
-        "%{IncludeDir.ASSIMP}"
+        "%{IncludeDir.ASSIMP}",
+        "%{IncludeDir.ImNode}"
     }
     
     libdirs {
@@ -120,6 +121,7 @@ project "OptixApp"
         "Glad",
         "opengl32.lib",
         "ImGui",
+        "ImNode",
         "mdl_sdk.lib",
         "mdl_core.lib",
         "nv_freeimage.lib",

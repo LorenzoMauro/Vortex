@@ -2,6 +2,7 @@
 #include "imgui.h"
 #include "GuiElements/RendererNodeGui.h"
 #include "GuiElements/MaterialNodeGui.h"
+#include "Scene/Nodes/Material.h"
 
 namespace vtx {
 	ViewportLayer::ViewportLayer(std::shared_ptr<graph::Renderer> _Renderer)
@@ -9,7 +10,7 @@ namespace vtx {
         renderer = _Renderer;
         deviceVisitor = std::make_shared<device::DeviceVisitor>();
         hostVisitor = std::make_shared<HostVisitor>();
-        materialGui = gui::MaterialGui();
+        //materialGui = gui::MaterialGui();
     }
 
     void ViewportLayer::OnAttach()
@@ -32,6 +33,7 @@ namespace vtx {
         {
             renderer->settings.iteration++;
             renderer->settings.isUpdated = true;
+			graph::computeMaterialsMultiThreadCode();
             renderer->traverse({ std::dynamic_pointer_cast<NodeVisitor>(hostVisitor) });
             renderer->traverse({ std::dynamic_pointer_cast<NodeVisitor>(deviceVisitor) });
             device::incrementFrame();
@@ -45,7 +47,7 @@ namespace vtx {
     void ViewportLayer::OnUIRender() {
 
 		gui::rendererNodeGui(renderer);
-        materialGui.materialGui();
+        //materialGui.materialGui();
         ImGui::Begin("Viewport");
         const uint32_t width = ImGui::GetContentRegionAvail().x;
         const uint32_t height = ImGui::GetContentRegionAvail().y;

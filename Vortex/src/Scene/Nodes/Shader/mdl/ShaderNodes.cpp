@@ -1,4 +1,6 @@
 #include "ShaderNodes.h"
+
+#include "MDL/MdlTypesName.h"
 #include "Scene/Traversal.h"
 
 namespace vtx::graph::shader
@@ -6,10 +8,20 @@ namespace vtx::graph::shader
 
 	void ShaderNode::initializeSockets()
 	{
-		const std::vector<mdl::ParameterInfo> parameters = mdl::getFunctionParameters(functionInfo, name);
+		const std::vector<ParameterInfo> parameters = mdl::getFunctionParameters(functionInfo, name);
+		vtxID socketId = 1;
 		for(auto& parameter : parameters)
 		{
-			sockets[parameter.argumentName] = ShaderNodeSocket{ nullptr, parameter };
+			sockets[parameter.argumentName] = ShaderNodeSocket{nullptr, parameter, SIM::getFreeIndex(), {} };
+			socketId++;
+			if (socketsGroupedByGroup.count(parameter.annotation.groupName) > 0)
+			{
+				socketsGroupedByGroup[parameter.annotation.groupName].push_back(parameter.argumentName);
+			}
+			else
+			{
+				socketsGroupedByGroup.insert({ parameter.annotation.groupName, {parameter.argumentName} });
+			}
 		}
 	}
 
@@ -20,31 +32,32 @@ namespace vtx::graph::shader
 
 		if(doSocketExists)
 		{
-			const mi::neuraylib::IType::Kind& socketType = sockets[socketName].parameterInfo.type->skip_all_type_aliases()->get_kind();
-			const mi::neuraylib::IType::Kind& inputType  = inputNode->functionInfo.returnType->skip_all_type_aliases()->get_kind();
+			const mi::neuraylib::IType::Kind& socketType = sockets[socketName].parameterInfo.expressionKind;
+			const mi::neuraylib::IType::Kind& inputType = inputNode->outputSocket.parameterInfo.expressionKind;
 			const bool                        isSameType = socketType == inputType;
-			VTX_ASSERT_CONTINUE(isSameType, "Node Sockets {} Mismatch: input type {} socket type {}!", socketName, shaderNodeOutputName[inputType], shaderNodeOutputName[socketType]);
-			if(isSameType)
+			VTX_ASSERT_CONTINUE(isSameType, "Node Sockets {} Mismatch: input type {} socket type {}!", socketName, mdl::ITypeToString[inputType], mdl::ITypeToString[socketType]);
+			if (isSameType)
 			{
 				sockets[socketName].node = inputNode;
+				sockets[socketName].linkId = SIM::getFreeIndex();
 			}
 		}
 	}
 
-	void ShaderNode::setSocketDefault(std::string socketName, const mi::base::Handle<mi::neuraylib::IExpression>& defaultExpression)
+	void ShaderNode::setSocketValue(std::string socketName, const mi::base::Handle<mi::neuraylib::IExpression>& defaultExpression)
 	{
 		const bool doSocketExists = sockets.find(socketName) != sockets.end();
 		VTX_ASSERT_CONTINUE(doSocketExists, "Trying to connect Shader Node to a not existing input socket {}!", socketName);
 
 		if (doSocketExists)
 		{
-			const mi::neuraylib::IType::Kind& socketType = sockets[socketName].parameterInfo.type->skip_all_type_aliases()->get_kind();
-			const mi::neuraylib::IType::Kind& inputType  = defaultExpression->get_type()->skip_all_type_aliases()->get_kind();
+			const mi::neuraylib::IType::Kind& socketType = sockets[socketName].parameterInfo.expressionKind;
+			const mi::neuraylib::IType::Kind& inputType = defaultExpression->get_type()->skip_all_type_aliases()->get_kind();
 			const bool                        isSameType = socketType == inputType;
-			VTX_ASSERT_CONTINUE(isSameType, "Node Sockets {} Mismatch: input type {} socket type {}!", socketName, shaderNodeOutputName[inputType], shaderNodeOutputName[socketType]);
+			VTX_ASSERT_CONTINUE(isSameType, "Node Sockets {} Mismatch: input type {} socket type {}!", socketName, mdl::ITypeToString[inputType], mdl::ITypeToString[socketType]);
 			if (isSameType)
 			{
-				sockets[socketName].parameterInfo.defaultValue = defaultExpression;
+				sockets[socketName].directExpression = defaultExpression;
 			}
 		}
 	}

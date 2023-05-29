@@ -33,6 +33,7 @@ group "Dependencies"
     include "ext/glfw/glfw.lua"
     include "ext/imgui/imgui.lua"
     include "ext/glad/glad.lua"
+    include "ext/imnodes/imnode.lua"
 group ""
 
 group "Core"

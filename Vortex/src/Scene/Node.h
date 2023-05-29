@@ -96,6 +96,13 @@ namespace vtx::graph
 		class TextureTransform;
 		class NormalMix;
 		class GetChannel;
+
+		struct EnumValue;
+		struct EnumTypeInfo;
+		enum ParamKind;
+		struct Annotation;
+		class ParameterInfo;
+		struct ShaderNodeSocket;
 	}
 
 	class Light;
@@ -110,9 +117,6 @@ namespace vtx::graph
 	class Texture;
 	class BsdfMeasurement;
 	class LightProfile;
-	struct EnumValue;
-	struct EnumTypeInfo;
-	class ParamInfo;
 	struct Configuration;
 	struct FunctionNames;
 	struct DevicePrograms;

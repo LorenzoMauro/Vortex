@@ -27,6 +27,7 @@ IncludeDir["ImGui"] = my_project_dir .. "/ext/imgui"
 IncludeDir["spdlog"] = my_project_dir .. "/ext/spdlog/include"
 IncludeDir["gdt"] = my_project_dir .. "/ext/gdt"
 IncludeDir["MDL"] = my_project_dir .. "/ext/MDL/include"
+IncludeDir["ImNode"] = my_project_dir .. "/ext/imnodes"
 IncludeDir["OPTIX"] = path.join(OPTIX_SDK_PATH, "include")
 IncludeDir["CUDA"] = path.join(CUDA_TOOLKIT_PATH, "include")
 IncludeDir["ASSIMP"] = path.join(ASSIMP_SDK_PATH, "include")

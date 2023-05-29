@@ -27,6 +27,6 @@ namespace vtx {
         bool        m_isResized = false;
         std::shared_ptr<device::DeviceVisitor> deviceVisitor;
         std::shared_ptr<HostVisitor> hostVisitor;
-        gui::MaterialGui materialGui;
+        //gui::MaterialGui materialGui;
     };
 }

@@ -11,21 +11,23 @@ namespace vtx::graph
 	void Material::init()
 	{
 
-		mdl::compileMaterial(materialGraph->name, materialGraph->functionInfo.signature);
+		mdl::compileMaterial(materialGraph->name, getMaterialDbName());
 
-		config = mdl::determineShaderConfiguration(materialGraph->functionInfo.signature);
-		targetCode = mdl::createTargetCode(materialGraph->functionInfo.signature, config, getID());
+		config = mdl::determineShaderConfiguration(getMaterialDbName());
+		targetCode = mdl::createTargetCode(getMaterialDbName(), config, getID());
 
 		createPrograms();
-		createChildResources();
+		textures = mdl::createTextureResources(targetCode);
+		bsdfMeasurements = mdl::createBsdfMeasurementResources(targetCode);
+		lightProfiles = mdl::createLightProfileResources(targetCode);
 
-		mdl::setMaterialParameters(materialGraph->functionInfo.signature, targetCode, argBlock, params, mapEnumTypes);
+		dispatchParameters(mdl::getArgumentBlockData(getMaterialDbName(), materialGraph->functionInfo.signature, targetCode, argBlock, mapEnumTypes));
 
-		std::string enable_emission = "enable_emission";
+		/*std::string enable_emission = "enable_emission";
 		std::string enable_opacity = "enable_opacity";
 		bool* enableEmission = nullptr;
 		bool* enableOpacity = nullptr;
-		for(std::pair<const std::string, std::vector<ParamInfo>> param : params)
+		for(std::pair<const std::string, std::vector<shader::ParameterInfo>> param : params)
 		{
 			for(auto paramInfo : param.second)
 			{
@@ -50,8 +52,72 @@ namespace vtx::graph
 		if(enableOpacity != nullptr)
 		{
 			config.opacityToggle = enableOpacity;
-		}
+		}*/
 		isInitialized = true;
+	}
+
+	void Material::dispatchParameters(std::vector<shader::ParameterInfo> params)
+	{
+		for(auto param : params)
+		{
+			std::string& argumentName = param.argumentName;
+
+			std::vector<std::string> potentialShaderGraphPath = utl::splitString(argumentName, ".");
+
+			shader::ParameterInfo* parameterInfo = nullptr;
+			std::shared_ptr<graph::shader::ShaderNode> shaderNode = materialGraph;
+			bool foundSocket = true;
+			for( auto& shaderSocketName : potentialShaderGraphPath)
+			{
+				if (shaderNode->sockets.count(shaderSocketName) > 0) {
+					// shaderSocketName is in the map.
+					auto& socket = shaderNode->sockets[shaderSocketName];
+					parameterInfo = &socket.parameterInfo;
+					if (socket.node)
+					{
+						shaderNode = socket.node;
+					}
+				}
+				else
+				{
+					foundSocket = false;
+					break;
+				}
+			}
+			if(foundSocket)
+			{
+				/*VTX_INFO("Traversed path: {} Found Socket of Shader Node {} Named {}\n"
+							"With Target Code Annotation: {}\n"
+							"and Function Definition Annotation: {}\n", argumentName, shaderNode->name, parameterInfo->argumentName, param.annotation.print(), parameterInfo->annotation.print());*/
+
+
+				//parameterInfo->index = param.index;
+				//parameterInfo->argumentName = param.argumentName;
+				parameterInfo->kind = param.kind;
+				parameterInfo->arrayElemKind = param.arrayElemKind;
+				parameterInfo->arraySize = param.arraySize;
+				parameterInfo->arrayPitch = param.arrayPitch;
+				parameterInfo->dataPtr = param.dataPtr;
+				parameterInfo->enumInfo = param.enumInfo;
+				//parameterInfo->expressionKind = param.expressionKind;
+			}
+			/*else
+			{
+				VTX_WARN("Could not find socket path {} in shader node {}", argumentName, shaderNode->name);
+			}*/
+
+		}
+	}
+
+	std::string Material::getMaterialDbName()
+	{
+		if(materialDbName.empty())
+		{
+			name = materialGraph->name;
+			materialDbName = "compiledMaterial_" + name + "_" + std::to_string(getID());
+
+		}
+		return materialDbName;
 	}
 
 	size_t Material::getArgumentBlockSize()
@@ -247,38 +313,6 @@ namespace vtx::graph
 		}
 	}
 
-
-	void Material::createChildResources()
-	{
-		// TODO We have to store the textures, light profiles and bsdf indices since these will be refencered by the mdl lookup functions
-		for (Size i = 1, n = targetCode->get_texture_count(); i < n; ++i) {
-			auto texture = std::make_shared<graph::Texture>(targetCode->get_texture(i), targetCode->get_texture_shape(i));
-			texture->mdlIndex = i;
-			textures.emplace_back(texture);
-		}
-
-		if (targetCode->get_light_profile_count() > 0)
-		{
-			for (mi::Size i = 1, n = targetCode->get_light_profile_count(); i < n; ++i)
-			{
-				auto lightProfile = std::make_shared<graph::LightProfile>(targetCode->get_light_profile(i));
-				lightProfile->mdlIndex = i;
-				lightProfiles.emplace_back(lightProfile);
-			}
-		}
-
-		if (targetCode->get_bsdf_measurement_count() > 0)
-		{
-			for (mi::Size i = 1, n = targetCode->get_bsdf_measurement_count(); i < n; ++i)
-			{
-				auto bsdfMeasurement = std::make_shared<graph::BsdfMeasurement>(targetCode->get_bsdf_measurement(i));
-				bsdfMeasurement->mdlIndex = i;
-				bsdfMeasurements.emplace_back(bsdfMeasurement);
-			}
-		}
-	}
-
-
 	const Configuration& Material::getConfiguration()
 	{
 		if (!isInitialized)
@@ -392,5 +426,99 @@ namespace vtx::graph
 		}
 		return config.useCutoutOpacity;
 	};
+
+
+	void processMaterial(std::shared_ptr<Material>& material)
+	{
+		if (!material->isInitialized)
+		{
+			Handle<ILink_unit> linkUnit;
+			mdl::createShaderGraphFunctionCalls(material->materialGraph);
+			mdl::compileMaterial(material->materialGraph->name, material->getMaterialDbName());
+			material->config = mdl::determineShaderConfiguration(material->getMaterialDbName());
+			mdl::addMaterialToLinkUnit(material->getMaterialDbName(), material->config, material->getID(), linkUnit);
+			VTX_INFO("Creating target code for shader {} index {} with {} functions.", material->getMaterialDbName());
+			Handle<ITarget_code const> targetCode = mdl::generateTargetCode(linkUnit);
+			material->textures = mdl::createTextureResources(targetCode);
+			material->bsdfMeasurements = mdl::createBsdfMeasurementResources(targetCode);
+			material->lightProfiles = mdl::createLightProfileResources(targetCode);
+			material->targetCode = targetCode;
+			material->createPrograms();
+			material->dispatchParameters(mdl::getArgumentBlockData(material->getMaterialDbName(), material->materialGraph->functionInfo.signature, material->targetCode, material->argBlock, material->mapEnumTypes, 0));
+			material->isInitialized = true;
+		}
+	}
+
+	void computeMaterialsMultiThreadCode()
+	{
+		std::vector<std::shared_ptr<Material>> materials = SIM::getAllNodeOfType<graph::Material>(NT_MATERIAL);
+
+		std::vector<std::thread> threads;
+
+		for (std::shared_ptr<Material>& material : materials)
+		{
+			threads.push_back(std::thread(processMaterial, std::ref(material)));
+		}
+
+		for (std::thread& thread : threads)
+		{
+			if (thread.joinable())
+			{
+				thread.join();
+			}
+		}
+	}
+
+	void computeMaterialCode()
+	{
+		auto materials = SIM::getAllNodeOfType<graph::Material>(NT_MATERIAL);
+
+		Handle<ILink_unit> linkUnit;
+
+		std::map<vtxID , int> materialToTargetCodeIndex;
+		int targetCodeIndex = 0;
+
+		for (auto& material : materials)
+		{
+			if(!material->isInitialized)
+			{
+				mdl::createShaderGraphFunctionCalls(material->materialGraph);
+				mdl::compileMaterial(material->materialGraph->name, material->getMaterialDbName());
+				material->config = mdl::determineShaderConfiguration(material->getMaterialDbName());
+				mdl::addMaterialToLinkUnit(material->getMaterialDbName(), material->config, material->getID(), linkUnit);
+				materialToTargetCodeIndex.insert({ material->getID(), targetCodeIndex });
+				targetCodeIndex++;
+			}
+
+		}
+
+		if(targetCodeIndex>0)
+		{
+			Handle<ITarget_code const> targetCode = mdl::generateTargetCode(linkUnit);
+			auto textures = mdl::createTextureResources(targetCode);
+			auto bsdfMeasurements = mdl::createBsdfMeasurementResources(targetCode);
+			auto lightProfiles = mdl::createLightProfileResources(targetCode);
+
+			for (auto& material : materials) {
+				if (!material->isInitialized && materialToTargetCodeIndex.count(material->getID()) > 0)
+				{
+					material->targetCode = targetCode;
+
+					material->createPrograms();
+
+					material->textures = textures;
+					material->bsdfMeasurements = bsdfMeasurements;
+					material->lightProfiles = lightProfiles;
+
+					material->dispatchParameters(mdl::getArgumentBlockData(material->getMaterialDbName(), material->materialGraph->functionInfo.signature, material->targetCode, material->argBlock, material->mapEnumTypes, materialToTargetCodeIndex[material->getID()]));
+
+					material->isInitialized = true;
+
+				}
+
+			}
+		}
+		
+	}
 }
 

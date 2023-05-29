@@ -83,7 +83,7 @@ namespace vtx::importer
         }
         else if(properties.diffuse.value != math::vec3f(-1.0f))
         {
-            principled->setSocketDefault(ALBEDO_SOCKET, mdl::createConstantColor(properties.diffuse.value));
+            principled->setSocketValue(ALBEDO_SOCKET, mdl::createConstantColor(properties.diffuse.value));
         }
 
         if(!properties.ORM.path.empty())
@@ -91,7 +91,7 @@ namespace vtx::importer
 			const auto ormTexture = ops::createNode<graph::shader::ColorTexture>(properties.ORM.path);
 	        if(properties.roughness.value!=1.0f)
 	        {
-                principled->setSocketDefault(ROUGHNESS_SOCKET, mdl::createConstantFloat(properties.roughness.value));
+                principled->setSocketValue(ROUGHNESS_SOCKET, mdl::createConstantFloat(properties.roughness.value));
 
 	        }
             else
@@ -103,7 +103,7 @@ namespace vtx::importer
 
             if (properties.metallic.value != 1.0f)
             {
-                principled->setSocketDefault(METALLIC_SOCKET, mdl::createConstantFloat(properties.metallic.value));
+                principled->setSocketValue(METALLIC_SOCKET, mdl::createConstantFloat(properties.metallic.value));
 
             }
             else
@@ -122,7 +122,7 @@ namespace vtx::importer
             }
             else if (properties.metallic.value >= 0.0f)
             {
-                principled->setSocketDefault(METALLIC_SOCKET, mdl::createConstantFloat(properties.metallic.value));
+                principled->setSocketValue(METALLIC_SOCKET, mdl::createConstantFloat(properties.metallic.value));
             }
 
             // Roughness
@@ -132,7 +132,7 @@ namespace vtx::importer
             }
             else if (properties.roughness.value >= 0.0f)
             {
-                principled->setSocketDefault(ROUGHNESS_SOCKET, mdl::createConstantFloat(properties.roughness.value));
+                principled->setSocketValue(ROUGHNESS_SOCKET, mdl::createConstantFloat(properties.roughness.value));
             }
         }
         
@@ -169,7 +169,7 @@ namespace vtx::importer
         }
         else if (properties.emissionIntensity.value >= 1.0f)
         {
-            principled->setSocketDefault(EMISSION_INTENSITY_SOCKET, mdl::createConstantFloat(properties.emissionIntensity.value));
+            principled->setSocketValue(EMISSION_INTENSITY_SOCKET, mdl::createConstantFloat(properties.emissionIntensity.value));
         }
         if(!properties.emissionColor.path.empty())
         {
@@ -177,11 +177,11 @@ namespace vtx::importer
 		}
 		else if(properties.emissionColor.value != math::vec3f(-1.0f))
 		{
-            principled->setSocketDefault(EMISSION_COLOR_SOCKET, mdl::createConstantColor(properties.emissionColor.value));
+            principled->setSocketValue(EMISSION_COLOR_SOCKET, mdl::createConstantColor(properties.emissionColor.value));
             if (properties.emissionColor.value != math::vec3f(0.0f))
             {
                 //HACK this is a hack to compensate for lack of blender to gltf intensity eport
-                principled->setSocketDefault(EMISSION_INTENSITY_SOCKET, mdl::createConstantFloat(100.0f));
+                principled->setSocketValue(EMISSION_INTENSITY_SOCKET, mdl::createConstantFloat(100.0f));
             }
 		}
 
@@ -190,14 +190,14 @@ namespace vtx::importer
             principled->connectInput(COAT_AMOUNT_SOCKET, ops::createNode<graph::shader::MonoTexture>(properties.clearcoatAmount.path));
         }
         else if (properties.clearcoatAmount.value >= 0.0f) {
-            principled->setSocketDefault(COAT_AMOUNT_SOCKET, mdl::createConstantFloat(properties.clearcoatAmount.value));
+            principled->setSocketValue(COAT_AMOUNT_SOCKET, mdl::createConstantFloat(properties.clearcoatAmount.value));
         }
 
         if (!properties.clearcoatRoughness.path.empty()) {
             principled->connectInput(COAT_ROUGHNESS_SOCKET, ops::createNode<graph::shader::MonoTexture>(properties.clearcoatRoughness.path));
         }
         else if (properties.clearcoatRoughness.value >= 0.0f) {
-            principled->setSocketDefault(COAT_ROUGHNESS_SOCKET, mdl::createConstantFloat(properties.clearcoatRoughness.value));
+            principled->setSocketValue(COAT_ROUGHNESS_SOCKET, mdl::createConstantFloat(properties.clearcoatRoughness.value));
         }
 
         if (!properties.clearcoatNormal.path.empty()) {
@@ -210,31 +210,31 @@ namespace vtx::importer
             principled->connectInput(TRANSMISSION_SOCKET, ops::createNode<graph::shader::MonoTexture>(properties.transmission.path));
         }
         else if (properties.transmission.value >= 0.0f) {
-            principled->setSocketDefault(TRANSMISSION_SOCKET, mdl::createConstantFloat(properties.transmission.value));
+            principled->setSocketValue(TRANSMISSION_SOCKET, mdl::createConstantFloat(properties.transmission.value));
         }
 
         // Sheen
         if (!properties.sheenColor.path.empty()) {
-            principled->setSocketDefault(SHEEN_AMOUNT_SOCKET, mdl::createConstantFloat(0.5f));
+            principled->setSocketValue(SHEEN_AMOUNT_SOCKET, mdl::createConstantFloat(0.5f));
             principled->connectInput(SHEEN_TINT_SOCKET, ops::createNode<graph::shader::ColorTexture>(properties.sheenColor.path));
         }
         else if (properties.sheenColor.value != math::vec3f(-1.0f)) {
-            principled->setSocketDefault(SHEEN_AMOUNT_SOCKET, mdl::createConstantFloat(0.5f));
-            principled->setSocketDefault(SHEEN_TINT_SOCKET, mdl::createConstantColor(properties.sheenColor.value));
+            principled->setSocketValue(SHEEN_AMOUNT_SOCKET, mdl::createConstantFloat(0.5f));
+            principled->setSocketValue(SHEEN_TINT_SOCKET, mdl::createConstantColor(properties.sheenColor.value));
         }
 
         if (!properties.sheenRoughness.path.empty()) {
-            principled->setSocketDefault(SHEEN_AMOUNT_SOCKET, mdl::createConstantFloat(0.5f));
+            principled->setSocketValue(SHEEN_AMOUNT_SOCKET, mdl::createConstantFloat(0.5f));
             principled->connectInput(SHEEN_ROUGHNESS_SOCKET, ops::createNode<graph::shader::MonoTexture>(properties.sheenRoughness.path));
         }
         else if (properties.sheenRoughness.value >= 0.0f) {
-            principled->setSocketDefault(SHEEN_AMOUNT_SOCKET, mdl::createConstantFloat(0.5f));
-            principled->setSocketDefault(SHEEN_ROUGHNESS_SOCKET, mdl::createConstantFloat(properties.sheenRoughness.value));
+            principled->setSocketValue(SHEEN_AMOUNT_SOCKET, mdl::createConstantFloat(0.5f));
+            principled->setSocketValue(SHEEN_ROUGHNESS_SOCKET, mdl::createConstantFloat(properties.sheenRoughness.value));
         }
 
         // Anisotropy
         if (properties.anisotropy.value >= 0.0f) {
-            principled->setSocketDefault(ANISOTROPY_SOCKET, mdl::createConstantFloat(abs(properties.anisotropy.value)));
+            principled->setSocketValue(ANISOTROPY_SOCKET, mdl::createConstantFloat(abs(properties.anisotropy.value)));
             // Since there's no separate texture or value for anisotropy rotation, you may need to set a default value or use a value based on some condition.
         }
 

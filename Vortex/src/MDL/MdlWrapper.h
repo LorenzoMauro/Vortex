@@ -154,6 +154,17 @@ namespace vtx::mdl
 
 	void compileMaterial(const std::string functionDatabaseName, const std::string materialDataBaseName);
 
+	void addMaterialToLinkUnit(const std::string& materialDbName, const graph::Configuration& config, const vtxID& shaderIndex, mi::base::Handle<mi::neuraylib::ILink_unit>& linkUnit);
+
+	mi::base::Handle<mi::neuraylib::ITarget_code const> generateTargetCode(mi::base::Handle<mi::neuraylib::ILink_unit>& linkUnit);
+
+	std::vector<std::shared_ptr<graph::Texture>>         createTextureResources(mi::base::Handle<mi::neuraylib::ITarget_code const>& targetCode);
+	std::vector<std::shared_ptr<graph::BsdfMeasurement>> createBsdfMeasurementResources(mi::base::Handle<mi::neuraylib::ITarget_code const>& targetCode);
+	std::vector<std::shared_ptr<graph::LightProfile>>    createLightProfileResources(mi::base::Handle<mi::neuraylib::ITarget_code const>& targetCode);
+
+
+
+
 	/*Get the shader configuration for the given material*/
 	graph::Configuration determineShaderConfiguration(const std::string& materialDbName);
 
@@ -161,11 +172,13 @@ namespace vtx::mdl
 	mi::base::Handle<mi::neuraylib::ITarget_code const> createTargetCode(const std::string& materialDbName, const graph::Configuration& config, const vtxID& shaderIndex);
 
 	/*Analyze target Code and extract all parameters, it sets the values of the argumentBlockClone, params list and mapEnumTypes*/	
-	void setMaterialParameters(const std::string& materialDbName,
-							   const mi::base::Handle<mi::neuraylib::ITarget_code const>& targetCode,
-							   mi::base::Handle<mi::neuraylib::ITarget_argument_block>& argumentBlockClone,
-							   std::map<std::string, std::vector<graph::ParamInfo>>& params,
-							   std::map<std::string, std::shared_ptr<graph::EnumTypeInfo>>& mapEnumTypes);
+	std::vector<graph::shader::ParameterInfo> getArgumentBlockData(
+		const std::string&                                                   materialDbName,
+		const std::string&													functionDefinitionSignature,
+		const mi::base::Handle<mi::neuraylib::ITarget_code const>&           targetCode,
+		mi::base::Handle<mi::neuraylib::ITarget_argument_block>&             argumentBlockClone,
+		std::map<std::string, std::shared_ptr<graph::shader::EnumTypeInfo>>& mapEnumTypes,
+		int materialAdditionIndex = 0);
 
 	std::shared_ptr<graph::Texture> createTextureFromFile(const std::string& filePath);
 
@@ -189,28 +202,20 @@ namespace vtx::mdl
 		mi::base::Handle<const mi::neuraylib::IType> returnType;
 	};
 
-	struct ParameterInfo
-	{
-		std::string                                        argumentName;
-		std::string                                        actualName;
-		mi::base::Handle<const mi::neuraylib::IType>       type;
-		mi::base::Handle<const mi::neuraylib::IExpression> defaultValue;
-		mi::base::Handle<const mi::neuraylib::IAnnotation_block> annotations;
-		mi::neuraylib::IType::Kind                         kind;
-		int                                                index;
-	};
 
 	void createShaderGraphFunctionCalls(std::shared_ptr<graph::shader::ShaderNode> shaderGraph);
 
 	void getFunctionSignature(MdlFunctionInfo* functionInfo);
 
-	std::vector<ParameterInfo> getFunctionParameters(const MdlFunctionInfo& functionInfo, const std::string callingNodeName);
+	std::vector<graph::shader::ParameterInfo> getFunctionParameters(const MdlFunctionInfo& functionInfo, const std::string callingNodeName);
 
-	mi::base::Handle<mi::neuraylib::IExpression> generateFunctionExpression(const std::string& functionSignature, std::map<std::string, graph::shader::ShaderNodeSocket>& sockets, std::string callerNodeName="");
+	bool generateFunctionExpression(const std::string& functionSignature, std::map<std::string, graph::shader::ShaderNodeSocket>& sockets, std::string callerNodeName="");
 
 	void setRendererModule(const std::string& rendererModule, const std::string& visibleFunction);
 
 	std::tuple<std::string, std::string> createNewFunctionInModule(std::shared_ptr<graph::shader::ShaderNode> shaderGraph);
+
+	mi::neuraylib::IType::Kind getExpressionKind(const std::string& dbExpressionName);
 
 	mi::base::Handle<mi::neuraylib::IExpression> createConstantColor(const math::vec3f& color);
 
@@ -220,7 +225,6 @@ namespace vtx::mdl
 
 	mi::base::Handle<mi::neuraylib::IExpression> createTextureConstant(const std::string& texturePath, const mi::neuraylib::IType_texture::Shape shape = mi::neuraylib::IType_texture::TS_2D, const float gamma = 2.2f);
 	
-
 	// Utility function to dump the arguments of a material instance or function call.
 	template <class T>
 	void dumpInstance(mi::neuraylib::IExpression_factory* expression_factory, const T* instance, std::string name)
@@ -298,8 +302,6 @@ namespace vtx::mdl
 
 		return ss.str();
 	}
-
-
 
 }
 

@@ -7,3 +7,6 @@
 [submodule "ext/spdlog"]
 	path = ext/spdlog
 	url = https://github.com/gabime/spdlog.git
+[submodule "ext/imnodes"]
+	path = ext/imnodes
+	url = https://github.com/LorenzoMauro/imnodes.git

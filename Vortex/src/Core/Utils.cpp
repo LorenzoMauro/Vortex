@@ -3,6 +3,19 @@
 
 namespace utl{
 
+	std::vector<std::string> splitString(const std::string& input, const std::string separator) {
+		std::vector<std::string> result;
+		size_t current, previous = 0;
+		current = input.find(separator);
+		while (current != std::string::npos) {
+			result.push_back(input.substr(previous, current - previous));
+			previous = current + separator.length();
+			current = input.find(separator, previous);
+		}
+		result.push_back(input.substr(previous, current - previous));
+		return result;
+	}
+
 	std::string absolutePath(const std::string& relativePath, const std::string& folderPath) {
 
 		const std::filesystem::path path = relativePath;

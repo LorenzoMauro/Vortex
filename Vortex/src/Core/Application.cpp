@@ -4,6 +4,8 @@
 #include "ImGuiOp.h"
 #include "Device/OptixWrapper.h"
 #include "Device/PipelineConfiguration.h"
+#include "Layers/MaterialEditorLayer.h"
+#include "Layers/ViewportLayer.h"
 
 namespace vtx
 {
@@ -26,6 +28,7 @@ namespace vtx
 
 		scene.start();
 		scene.renderer->setWindow(window);
+		createLayer<MaterialEditorLayer>();
 		createLayer<ViewportLayer>(scene.renderer);
 		//m_scene.renderer->ElaborateScene();
 	}

@@ -3,66 +3,33 @@
 #include <mi/neuraylib/itype.h>
 
 #include "NodesDefine.h"
+#include "MDL/MdlTypesName.h"
 #include "MDL/MdlWrapper.h"
 #include "Scene/Node.h"
+#include "Scene/SIM.h"
+#include "Scene/Nodes/Shader/mdl/ShaderSocket.h"
 
 namespace vtx::graph::shader
 {
 
-
-	using SNT = mi::neuraylib::IType::Kind;
-
-	static inline std::map<SNT, std::string> shaderNodeOutputName({
-		{SNT::TK_ALIAS ,"Alias"},
-		{SNT::TK_BOOL ,"Bool"},
-		{SNT::TK_INT ,"Int"},
-		{SNT::TK_ENUM ,"Enum"},
-		{SNT::TK_FLOAT ,"Float"},
-		{SNT::TK_DOUBLE ,"Double"},
-		{SNT::TK_STRING ,"String"},
-		{SNT::TK_VECTOR ,"Vector"},
-		{SNT::TK_MATRIX ,"Matrix"},
-		{SNT::TK_COLOR ,"Color"},
-		{SNT::TK_ARRAY ,"Array"},
-		{SNT::TK_STRUCT ,"Struct"},
-		{SNT::TK_TEXTURE ,"Texture"},
-		{SNT::TK_LIGHT_PROFILE ,"LightProfile"},
-		{SNT::TK_BSDF_MEASUREMENT ,"BsdfMeasurement"},
-		{SNT::TK_BSDF ,"Bsdf"},
-		{SNT::TK_HAIR_BSDF ,"HairBsdf"},
-		{SNT::TK_EDF ,"EDF"},
-		{SNT::TK_VDF ,"VDF"}
-	});
-
-	struct CustomAnnotation
-	{
-		std::string              displayName;
-		std::string              description;
-		std::string              groupName;
-		std::tuple<float, float> hardRange{-1.0f, -1.0f};
-		std::tuple<float, float> softRange{-1.0f, -1.0f};
-		bool                     use = false;
-
-	};
-	struct ShaderNodeSocket
-	{
-		std::shared_ptr<ShaderNode> node;
-		mdl::ParameterInfo			parameterInfo;
-	};
-
-	using ShaderInputSockets = std::map<std::string, ShaderNodeSocket>;
-
 	class ShaderNode : public Node
 	{
 	public:
-		
+
+		~ShaderNode()
+		{
+			for(auto& [name, socket]:sockets)
+			{
+				SIM::releaseIndex(socket.Id);
+			}
+		}
 		ShaderNode(const NodeType cNodeType,
 				   mdl::MdlFunctionInfo cFunctionInfo) :
 			Node(cNodeType),
 			functionInfo(std::move(cFunctionInfo))
 		{
 			mdl::getFunctionSignature(&functionInfo);
-			outputType = functionInfo.returnType->skip_all_type_aliases()->get_kind();
+			generateOutputSocket();
 			defineName();
 			initializeSockets();
 			isUpdated=true;
@@ -81,18 +48,24 @@ namespace vtx::graph::shader
 			functionInfo.module = "mdl" + mdl::pathToModuleName(modulePath);
 			functionInfo.name = functionInfo.module + "::" + functionName;
 			mdl::getFunctionSignature(&functionInfo);
-			outputType = functionInfo.returnType->skip_all_type_aliases()->get_kind();
+			generateOutputSocket();
 			defineName();
 			initializeSockets();
 		}
 
 		//void accept(std::shared_ptr<NodeVisitor> visitor) override;
+		void generateOutputSocket()
+		{
+			outputSocket.Id = SIM::getFreeIndex();
+			outputSocket.parameterInfo.expressionKind = functionInfo.returnType->skip_all_type_aliases()->get_kind();
+			outputSocket.parameterInfo.annotation.displayName = mdl::ITypeToString[outputSocket.parameterInfo.expressionKind];
+		}
 
 		void initializeSockets();
 
 		void connectInput(std::string socketName, const std::shared_ptr<ShaderNode>& inputNode);
 
-		void setSocketDefault(std::string socketName, const mi::base::Handle<mi::neuraylib::IExpression>& defaultExpression);
+		void setSocketValue(std::string socketName, const mi::base::Handle<mi::neuraylib::IExpression>& defaultExpression);
 
 		void defineName()
 		{
@@ -110,18 +83,18 @@ namespace vtx::graph::shader
 			ss << "ShaderNode: " << name << std::endl;
 			for (auto& [name, socket] : sockets)
 			{
-				auto& [node, parameterInfo] = socket;
-				std::string socketNameType  = shaderNodeOutputName[parameterInfo.type->skip_all_type_aliases()->get_kind()];
+				auto& [node, parameterInfo, id, expression, linkID] = socket;
+				std::string socketNameType  = mdl::ITypeToString[parameterInfo.expressionKind];
 				ss << "\nSocket: " << name << " Type: " << socketNameType << std::endl;
 			}
 			VTX_INFO(ss.str());
 		}
 
-		SNT                                          outputType = mi::neuraylib::IType::TK_FORCE_32_BIT;
-		ShaderInputSockets                           sockets;
-		mdl::MdlFunctionInfo                         functionInfo;
-		mi::base::Handle<mi::neuraylib::IExpression> expression;
-		std::string                                  name;
+		ShaderInputSockets                              sockets;
+		mdl::MdlFunctionInfo                            functionInfo;
+		std::string                                     name;
+		std::map<std::string, std::vector<std::string>> socketsGroupedByGroup;
+		ShaderNodeSocket                                outputSocket;
 	};
 
 
@@ -224,7 +197,7 @@ namespace vtx::graph::shader
 		ColorTexture(const std::string& cTexturePath) : ShaderNode(NT_SHADER_COLOR, VORTEX_FUNCTIONS_MODULE, VF_COLOR_TEXTURE)
 		{
 			texturePath = cTexturePath;
-			sockets[VF_COLOR_TEXTURE_TEXTURE_SOCKET].parameterInfo.defaultValue = mdl::createTextureConstant(texturePath);
+			setSocketValue(VF_COLOR_TEXTURE_TEXTURE_SOCKET, mdl::createTextureConstant(texturePath));
 		}
 
 		void traverse(const std::vector<std::shared_ptr<NodeVisitor>>& orderedVisitors) override;
@@ -238,7 +211,7 @@ namespace vtx::graph::shader
 		MonoTexture(const std::string& cTexturePath) : ShaderNode(NT_SHADER_FLOAT, VORTEX_FUNCTIONS_MODULE, VF_MONO_TEXTURE)
 		{
 			texturePath = cTexturePath;
-			sockets[VF_MONO_TEXTURE_TEXTURE_SOCKET].parameterInfo.defaultValue = mdl::createTextureConstant(texturePath, mi::neuraylib::IType_texture::TS_2D, 1.0f);
+			setSocketValue(VF_MONO_TEXTURE_TEXTURE_SOCKET, mdl::createTextureConstant(texturePath, mi::neuraylib::IType_texture::TS_2D, 1.0f));
 		}
 
 		void traverse(const std::vector<std::shared_ptr<NodeVisitor>>& orderedVisitors) override;
@@ -252,7 +225,7 @@ namespace vtx::graph::shader
 		NormalTexture(const std::string& cTexturePath) : ShaderNode(NT_SHADER_FLOAT3, VORTEX_FUNCTIONS_MODULE, VF_NORMAL_TEXTURE)
 		{
 			texturePath = cTexturePath;
-			sockets[VF_NORMAL_TEXTURE_TEXTURE_SOCKET].parameterInfo.defaultValue = mdl::createTextureConstant(texturePath, mi::neuraylib::IType_texture::TS_2D, 1.0f);
+			setSocketValue(VF_NORMAL_TEXTURE_TEXTURE_SOCKET, mdl::createTextureConstant(texturePath, mi::neuraylib::IType_texture::TS_2D, 1.0f));
 		}
 
 		void traverse(const std::vector<std::shared_ptr<NodeVisitor>>& orderedVisitors) override;
@@ -266,7 +239,7 @@ namespace vtx::graph::shader
 		BumpTexture(const std::string& cTexturePath) : ShaderNode(NT_SHADER_FLOAT3, VORTEX_FUNCTIONS_MODULE, VF_BUMP_TEXTURE)
 		{
 			texturePath = cTexturePath;
-			sockets[VF_BUMP_TEXTURE_TEXTURE_SOCKET].parameterInfo.defaultValue = mdl::createTextureConstant(texturePath, mi::neuraylib::IType_texture::TS_2D, 1.0f);
+			setSocketValue(VF_BUMP_TEXTURE_TEXTURE_SOCKET, mdl::createTextureConstant(texturePath, mi::neuraylib::IType_texture::TS_2D, 1.0f));
 		}
 
 		void traverse(const std::vector<std::shared_ptr<NodeVisitor>>& orderedVisitors) override;
@@ -316,7 +289,7 @@ namespace vtx::graph::shader
 			}
 
 			channel = cChannel;
-			sockets[VF_GET_COLOR_CHANNEL_CHANNEL_SOCKET].parameterInfo.defaultValue = mdl::createConstantInt(channel);
+			setSocketValue(VF_GET_COLOR_CHANNEL_CHANNEL_SOCKET, mdl::createConstantInt(channel));
 		}
 
 		void traverse(const std::vector<std::shared_ptr<NodeVisitor>>& orderedVisitors) override;
