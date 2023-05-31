@@ -5,6 +5,20 @@
 
 namespace vtx
 {
+
+	enum NoiseType
+	{
+		LUMINANCE,
+		COLOR
+	};
+
+	enum NoiseDataType
+	{
+		RADIANCE,
+		ALBEDO,
+		NORMAL
+	};
+
     struct NoiseData
     {
         float noise;

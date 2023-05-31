@@ -1,4 +1,4 @@
-#include "../NoiseKernel.h"
+#include "../CudaKernels.h"
 #include "device_launch_parameters.h"
 #ifdef __CUDACC__
 #define cuda_SYNCTHREADS() __syncthreads()
@@ -18,18 +18,6 @@
 namespace vtx
 {
 
-	enum NoiseType
-	{
-		LUMINANCE,
-		COLOR
-	};
-
-	enum NoiseDataType
-	{
-		RADIANCE,
-		ALBEDO,
-		NORMAL
-	};
 	__forceinline__ __host__ __device__ float luminance(const math::vec3f& rgb)
 	{
 		const math::vec3f ntscLuminance{0.30f, 0.59f, 0.11f};

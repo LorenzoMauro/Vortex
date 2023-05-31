@@ -27,10 +27,16 @@ namespace vtx::graph
 		int                                       noiseKernelSize;
 		bool                                      adaptiveSampling;
 		int                                       minAdaptiveSamples;
-		int										  minPixelSamples;
-		int										  maxPixelSamples;
-		float									albedoNormalNoiseInfluence;
-		float									noiseCutOff;
+		int                                       minPixelSamples;
+		int                                       maxPixelSamples;
+		float                                     albedoNormalNoiseInfluence;
+		float                                     noiseCutOff;
+		int                                       fireflyKernelSize;
+		float								      fireflyThreshold;
+		bool									  removeFireflies;
+		bool									  enableDenoiser;
+		int										  denoiserStart;
+		float									  denoiserBlend;
 	};
 
 	struct ToneMapperSettings
@@ -92,6 +98,11 @@ namespace vtx::graph
 		bool											resized = true;
 
 		vtx::Timer timer;
+
+		float		noiseComputationTime;
+		float		traceComputationTime;
+		float		postProcessingComputationTime;
+		float		displayComputationTime;
 		float      frameTime;
 		float      fps;
 		float      totalTimeSeconds;

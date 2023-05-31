@@ -90,7 +90,8 @@ namespace vtx {
 
 	struct ShadingColors
 	{
-		math::vec3f diffuse;
+		math::vec3f finalDiffuse;
+		math::vec3f bounceDiffuse;
 		math::vec3f shadingNormal;
 		math::vec3f trueNormal;
 		math::vec3f orientation;

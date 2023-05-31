@@ -2,6 +2,7 @@
 #include "../randomNumberGenerator.h"
 #include "../RayData.h"
 #include "../Utils.h"
+#include "Device/DevicePrograms/HitPropertiesComputation.h"
 #include "Device/DevicePrograms/Mdl/directMdlWrapper.h"
 #include "Scene/Nodes/Light.h"
 

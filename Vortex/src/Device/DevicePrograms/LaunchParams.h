@@ -235,14 +235,36 @@ namespace vtx {
 
     struct FrameBufferData
     {
-        math::vec3f* radianceBuffer;
-        math::vec3f* toneMappedRadiance;
+        //math::vec3f* toneMappedRadiance;
+
+        ///////////////////////////////////////////
+        /////////////// Passes ////////////////////
+        ///////////////////////////////////////////
+        math::vec3f* rawRadiance;
+        math::vec3f* directLight;
+        math::vec3f* diffuseIndirect;
+        math::vec3f* glossyIndirect;
+        math::vec3f* transmissionIndirect;
+
+        math::vec3f* tmRadiance;
+        math::vec3f* tmDirectLight;
+        math::vec3f* tmDiffuseIndirect;
+        math::vec3f* tmGlossyIndirect;
+        math::vec3f* tmTransmissionIndirect;
+
         math::vec3f* albedo;
         math::vec3f* normal;
+        math::vec3f* trueNormal;
+        math::vec3f* tangent;
+        math::vec3f* orientation;
+        math::vec3f* uv;
+        math::vec3f* debugColor1;
+
+        math::vec3f* fireflyPass;
         NoiseData*   noiseBuffer;
         CUdeviceptr  outputBuffer{};
         math::vec2ui frameSize;
-    };
+	};
 
     struct RendererDeviceSettings
     {
@@ -263,7 +285,13 @@ namespace vtx {
 
         enum DisplayBuffer
         {
+            FB_BEAUTY,
             FB_NOISY,
+            FB_DIRECT_LIGHT,
+            FB_DIFFUSE_INDIRECT,
+            FB_GLOSSY_INDIRECT,
+            FB_TRANSMISSION_INDIRECT,
+
             FB_DIFFUSE,
             FB_ORIENTATION,
             FB_TRUE_NORMAL,
@@ -274,11 +302,16 @@ namespace vtx {
             FB_SAMPLES,
             FB_DEBUG_1,
 
-            FB_COUNT
+            FB_COUNT,
         };
 
         inline static const char* displayBufferNames[] = {
+				"Beauty",
                 "Noisy",
+                "Direct Light",
+                "diffuse Indirect",
+                "Glossy Indirect",
+                "Transmission Indirect",
                 "Diffuse",
                 "Orientation",
                 "True Normal",
@@ -303,6 +336,9 @@ namespace vtx {
         int                 minPixelSamples;
         int                 maxPixelSamples;
         float               noiseCutOff;
+
+        bool                enableDenoiser;
+        bool                removeFirefly;
 	};
 
     struct ToneMapperSettings

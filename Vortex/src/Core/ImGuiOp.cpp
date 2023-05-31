@@ -55,6 +55,28 @@ namespace vtx {
         delete[] image.pixels;
     }
 
+    void loadFonts()
+    {
+        ImGuiIO& io = ImGui::GetIO(); (void)io;
+
+        // Load Font
+        // Default Font
+        std::string FontPath = utl::absolutePath(getOptions()->fontPath);
+        ImFontConfig fontConfig01;
+        fontConfig01.FontDataOwnedByAtlas = false;
+        ImFont* robotoFont = io.Fonts->AddFontFromFileTTF(FontPath.data(), 12.0f, &fontConfig01);
+        io.FontDefault = robotoFont;
+
+        //Icond Font
+        //std::string iconFontPath = Utils::absolutePath(ICON_FONT);
+        //ImFontConfig fontConfig02;
+        //fontConfig02.MergeMode = true;
+        //fontConfig02.GlyphMinAdvanceX = 13.0f; // Use if you want to make the icon monospaced
+        //ImWchar icon_ranges[] = { ICON_MIN_FA, ICON_MAX_FA, 0 };
+        //io.Fonts->AddFontFromFileTTF(iconFontPath.data(), 18.0f, &fontConfig02, icon_ranges);
+
+    }
+
     void Init_ImGui(GLFWwindow* window) {
         VTX_INFO("Starting ImGui");
         IMGUI_CHECKVERSION();
@@ -85,7 +107,7 @@ namespace vtx {
         ImGui_ImplOpenGL3_Init(glsl_version);
         //SetWindowTitleBarColor(window, 0.2f, 0.2f, 0.2f);
         // Upload Fonts
-        //LoadFonts();
+        loadFonts();
 
         ImGui::LoadIniSettingsFromDisk(utl::absolutePath(getOptions()->imGuiIniFile).data());
 

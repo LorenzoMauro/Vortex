@@ -314,23 +314,31 @@ namespace vtx::gui {
         ImNodes::EndInputAttribute();
 
         //TODO: Some socket appear with no description
-        for(auto& [name, socket] : shaderNode->sockets)
+        for(auto& [SocketGroup, socketGroupName] : shaderNode->socketsGroupedByGroup)
         {
-	        if(socket.node)
-	        {
-		        ImNodes::BeginInputAttribute(socket.Id);
-                ImGui::Text(name.c_str());
-                
-		        ImNodes::EndInputAttribute();
-	        }
-            else
+            vtxImGui::HalfSpaceWidget(" ", vtxImGui::booleanText, " ");
+            vtxImGui::HalfSpaceWidget("Group:", vtxImGui::ClippedText, SocketGroup.c_str());
+            for (auto& socketName : socketGroupName)
             {
-                if(!socket.parameterInfo.annotation.displayName.empty())
+                std::string name = socketName;
+                auto& socket = shaderNode->sockets[name];
+
+                if (socket.node)
                 {
                     ImNodes::BeginInputAttribute(socket.Id);
-                    changed |= parameterGui(socket.parameterInfo, material);
+                    ImGui::Text(name.c_str());
+
                     ImNodes::EndInputAttribute();
-				}
+                }
+                else
+                {
+                    if (!socket.parameterInfo.annotation.displayName.empty())
+                    {
+                        ImNodes::BeginInputAttribute(socket.Id);
+                        changed |= parameterGui(socket.parameterInfo, material);
+                        ImNodes::EndInputAttribute();
+                    }
+                }
             }
         }
 

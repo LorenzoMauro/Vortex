@@ -167,29 +167,67 @@ namespace vtx::device
 
 		struct FrameBufferBuffers
 		{
+
+			CUDABuffer rawRadiance;
+			CUDABuffer directLight;
+			CUDABuffer diffuseIndirect;
+			CUDABuffer glossyIndirect;
+			CUDABuffer transmissionIndirect;
+
+			CUDABuffer tmRadiance;
+			CUDABuffer tmDirectLight;
+			CUDABuffer tmDiffuseIndirect;
+			CUDABuffer tmGlossyIndirect;
+			CUDABuffer tmTransmissionIndirect;
+
+			CUDABuffer albedo;
+			CUDABuffer normal;
+			CUDABuffer trueNormal;
+			CUDABuffer tangent;
+			CUDABuffer orientation;
+			CUDABuffer uv;
+			CUDABuffer debugColor1;
+
+			CUDABuffer fireflyRemoval;
+
 			CUDABuffer cudaOutputBuffer;
-			CUDABuffer radianceBuffer;
-			CUDABuffer toneMappedRadianceBuffer;
-			CUDABuffer albedoBuffer;
-			CUDABuffer normalBuffer;
 			CUDABuffer noiseDataBuffer;
 			CUDABuffer radianceRangeBuffer;
 			CUDABuffer normalRangeBuffer;
 			CUDABuffer albedoRangeBuffer;
+
+
 			FrameBufferBuffers() = default;
 			~FrameBufferBuffers()
 			{
 				VTX_INFO("ShutDown: Frame Buffers");
 				cudaOutputBuffer.free();
-				radianceBuffer.free();
-				toneMappedRadianceBuffer.free();
-				albedoBuffer.free();
-				normalBuffer.free();
+				rawRadiance.free();
+				directLight.free();
+				diffuseIndirect.free();
+				glossyIndirect.free();
+				transmissionIndirect.free();
+				tmRadiance.free();
+				tmDirectLight.free();
+				tmDiffuseIndirect.free();
+				tmGlossyIndirect.free();
+				tmTransmissionIndirect.free();
+				albedo.free();
+				normal.free();
+				trueNormal.free();
+				tangent.free();
+				orientation.free();
+				uv.free();
+				debugColor1.free();
+				fireflyRemoval.free();
 				noiseDataBuffer.free();
 				noiseDataBuffer.free();
 				radianceRangeBuffer.free();
 				normalRangeBuffer.free();
 				albedoRangeBuffer.free();
+				directLight.free();
+				diffuseIndirect.free();
+				glossyIndirect.free();
 			}
 		};
 

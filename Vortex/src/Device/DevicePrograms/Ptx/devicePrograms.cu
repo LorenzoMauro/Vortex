@@ -7,6 +7,8 @@
 #include "../DataFetcher.h"
 #include "../Utils.h"
 #include "../ToneMapper.h"
+#include "Device/DevicePrograms/HitPropertiesComputation.h"
+#include "Device/DevicePrograms/ToneMapper.h"
 #include "Device/DevicePrograms/Mdl/directMdlWrapper.h"
 
 namespace vtx
@@ -328,19 +330,21 @@ namespace vtx
 			}
 
 			// Auxiliary Data
-			if (prd->depth == 0)
+
+			if (matEval.aux.isValid)
 			{
-				if (matEval.aux.isValid)
+				prd->colors.bounceDiffuse = matEval.aux.albedo;
+				if (prd->depth == 0)
 				{
-					prd->colors.diffuse       = matEval.aux.albedo;
-					prd->colors.shadingNormal = matEval.aux.normal;
-					prd->colors.shadingNormal = 0.5f * (prd->colors.shadingNormal + 1.0f);
+					prd->colors.shadingNormal = 0.5f * (matEval.aux.normal + 1.0f);
 				}
-				else
+			}
+			else
+			{
+				prd->colors.bounceDiffuse = math::vec3f(1.0f, 0.0f, 1.0f);
+				if (prd->depth == 0)
 				{
-					prd->colors.diffuse       = math::vec3f(1.0f, 0.0f, 1.0f);
-					prd->colors.shadingNormal = hitP.nsW;
-					prd->colors.shadingNormal = 0.5f * (prd->colors.shadingNormal + 1.0f);
+					prd->colors.shadingNormal = 0.5f * (hitP.nsW + 1.0f);
 				}
 			}
 
@@ -389,12 +393,12 @@ namespace vtx
 				}
 			}
 
-			const bool isDiffuse      = (matEval.bsdfSample.eventType & mi::neuraylib::BSDF_EVENT_DIFFUSE) != 0;
-			const bool isGlossy       = (matEval.bsdfSample.eventType & mi::neuraylib::BSDF_EVENT_GLOSSY) != 0;
-			const bool isTransmission = (matEval.bsdfSample.eventType & mi::neuraylib::BSDF_EVENT_TRANSMISSION) != 0;
-			const bool isSpecular     = (matEval.bsdfSample.eventType & mi::neuraylib::BSDF_EVENT_SPECULAR) != 0;
+			const bool isDiffuse = (prd->eventType & mi::neuraylib::BSDF_EVENT_DIFFUSE) != 0;
+			const bool isGlossy = (prd->eventType & mi::neuraylib::BSDF_EVENT_GLOSSY) != 0;
+			const bool isTransmission = (prd->eventType & mi::neuraylib::BSDF_EVENT_TRANSMISSION) != 0;
+			const bool isSpecular = (prd->eventType & mi::neuraylib::BSDF_EVENT_SPECULAR) != 0;
 
-			if(prd->depth == 0)
+			if (prd->depth == 0)
 			{
 				if (isDiffuse)
 				{
@@ -409,6 +413,8 @@ namespace vtx
 					prd->colors.debugColor1 = BLUECOLOR;
 				}
 			}
+
+
 			
 			//Direct Light Sampling
 			if ((samplingTechnique == RendererDeviceSettings::S_MIS || samplingTechnique == RendererDeviceSettings::S_DIRECT_LIGHT) && lightSample.isValid)
@@ -443,9 +449,11 @@ namespace vtx
 					if (prd->traceResult != TR_SHADOW)
 					{
 						float weightMis = 1.0f;
-						if (lightSample.typeLight == L_MESH || lightSample.typeLight == L_ENV)
+						if ((lightSample.typeLight == L_MESH || lightSample.typeLight == L_ENV)&& samplingTechnique == RendererDeviceSettings::S_MIS)
 						{
 							weightMis = utl::heuristic(lightSample.pdf, matEval.bsdfEvaluation.pdf);
+							//weightMis = utl::heuristic(matEval.bsdfEvaluation.pdf, lightSample.pdf);
+							//weightMis = matEval.bsdfEvaluation.pdf*lightSample.pdf;
 						}
 
 						// The sampled emission needs to be scaled by the inverse probability to have selected this light,
@@ -587,9 +595,9 @@ namespace vtx
 					prd->radiance += prd->throughput * emission * misWeight;
 					prd->eventType = mi::neuraylib::BSDF_EVENT_ABSORB;
 
+					prd->colors.bounceDiffuse = math::normalize(emission);
 					if (prd->depth == 0)
 					{
-						prd->colors.diffuse = emission;
 						prd->colors.trueNormal = prd->wi;
 						prd->colors.shadingNormal = 0.0f;
 					}
@@ -598,8 +606,24 @@ namespace vtx
 		}
 	}
 
-	__forceinline__ __device__ math::vec3f integrator(PerRayData& prd)
+	struct Radiances
 	{
+		math::vec3f radiance;
+		math::vec3f directLight;
+		math::vec3f diffuseIndirect;
+		math::vec3f transmissionIndirect;
+		math::vec3f glossyIndirect;
+	};
+
+	__forceinline__ __device__ Radiances integrator(PerRayData& prd)
+	{
+		Radiances radiances;
+
+		radiances.radiance = math::vec3f(0.0f);
+		radiances.directLight = math::vec3f(0.0f);
+		radiances.diffuseIndirect = math::vec3f(0.0f);
+		radiances.transmissionIndirect = math::vec3f(0.0f);
+		radiances.glossyIndirect = math::vec3f(0.0f);
 		// The integrator starts with black radiance and full path throughput.
 		prd.radiance = math::vec3f(0.0f);
 		prd.pdf = 0.0f;
@@ -618,7 +642,8 @@ namespace vtx
 
 		prd.mediumIor = math::vec3f(1.0f);
 
-		prd.colors.diffuse = 0.0f;
+		prd.colors.finalDiffuse = 0.0f;
+		prd.colors.bounceDiffuse = 0.0f;
 		prd.colors.trueNormal = 0.0f;
 		prd.colors.shadingNormal = 0.0f;
 		prd.colors.tangent = 0.0f;
@@ -630,6 +655,12 @@ namespace vtx
 		int maxDepth = (optixLaunchParams.settings->samplingTechnique== RendererDeviceSettings::SamplingTechnique::S_DIRECT_LIGHT) ? 0 :optixLaunchParams.settings->maxBounces;
 
 		math::vec2ui payload = splitPointer(&prd);
+
+		bool isDiffuse = false ;
+		bool isGlossy = false ;
+		bool isTransmission = false ;
+		bool isSpecular = false ;
+		bool isFirstSpecular = false;
 
 		while (prd.depth <= maxDepth)
 		{
@@ -653,11 +684,43 @@ namespace vtx
 					   payload.y);
 
 
+
+			if (prd.depth == 0) {
+				isDiffuse = (prd.eventType & mi::neuraylib::BSDF_EVENT_DIFFUSE) != 0;
+				isGlossy = (prd.eventType & mi::neuraylib::BSDF_EVENT_GLOSSY) != 0;
+				isTransmission = (prd.eventType & mi::neuraylib::BSDF_EVENT_TRANSMISSION) != 0;
+				isSpecular = (prd.eventType & mi::neuraylib::BSDF_EVENT_SPECULAR) != 0;
+				if(isSpecular == true)
+					isFirstSpecular = true;
+				prd.colors.finalDiffuse = prd.colors.bounceDiffuse;
+			}
+
+			//if (isFirstSpecular && prd.depth > 0)
+			//{
+			//	if(!((prd.eventType & mi::neuraylib::BSDF_EVENT_SPECULAR) != 0))
+			//	{
+			//		prd.colors.finalDiffuse = prd.colors.bounceDiffuse;
+			//		isFirstSpecular = false;
+			//		// update prd. colors albedo
+			//	}
+			//}
+
+			if(prd.depth == 0 && prd.traceResult == TR_MISS)
+			{
+				radiances.directLight = prd.radiance;
+				break;
+			}
+			if(prd.depth == 1 && prd.traceResult == TR_MISS)
+			{
+				radiances.directLight = prd.radiance;
+			}
+
 			// Path termination by miss shader or sample() routines.
 			if (prd.eventType == mi::neuraylib::BSDF_EVENT_ABSORB || prd.throughput == math::vec3f(0.0f) || prd.traceResult == TR_MISS)
 			{
 				break;
 			}
+
 			// Unbiased Russian Roulette path termination.
 			if (2 <= prd.depth) // Start termination after a minimum number of bounces.
 			{
@@ -674,9 +737,22 @@ namespace vtx
 			++prd.depth; // Next path segment.
 		}
 
-		return prd.radiance;
-	}
+		math::vec3f deltaRadiance = prd.radiance - radiances.directLight;
 
+		if(isTransmission)
+		{
+			radiances.transmissionIndirect = deltaRadiance;
+		}
+		else if (isDiffuse) {
+			radiances.diffuseIndirect = deltaRadiance;
+		}
+		else if (isGlossy || isSpecular) {
+			radiances.glossyIndirect = deltaRadiance;
+		}
+
+		radiances.radiance = prd.radiance;
+		return radiances;
+	}
 
 	//------------------------------------------------------------------------------
 	// ray gen program - the actual rendering happens in here
@@ -691,41 +767,50 @@ namespace vtx
 		const uint32_t fbIndex = ix + iy * frameSize.x;
 		const math::vec2f pixel = math::vec2f(optixGetLaunchIndex().x, optixGetLaunchIndex().y);
 		float& noise = frameBuffer->noiseBuffer[fbIndex].noise;
-		auto outputBuffer = reinterpret_cast<math::vec4f*>(frameBuffer->outputBuffer);
 		bool runningAverage = false;
 
 		int& iteration = optixLaunchParams.settings->iteration;
-		int& samples = frameBuffer->noiseBuffer[fbIndex].samples;
-		if(iteration <= 0)
+		int samples = iteration>= 0 ? iteration: 0;
+		int samplesPerLaunch = 1;
+
+		math::vec3f& directLightBuffer = frameBuffer->directLight[fbIndex];
+		math::vec3f& diffuseIndirectBuffer = frameBuffer->diffuseIndirect[fbIndex];
+		math::vec3f& glossyIndirectBuffer = frameBuffer->glossyIndirect[fbIndex];
+		math::vec3f& transmissionIndirect = frameBuffer->transmissionIndirect[fbIndex];
+
+		if(samples == 0)
 		{
-			samples = 0;
+			directLightBuffer = math::vec3f(0.0f);
+			diffuseIndirectBuffer = math::vec3f(0.0f);
+			glossyIndirectBuffer = math::vec3f(0.0f);
+			transmissionIndirect = math::vec3f(0.0f);
 		}
 
-		PerRayData prd;
-		prd.seed = tea<4>(fbIndex, *optixLaunchParams.frameID);
-
-		int* actualSamples;
-		int samplesPerLaunch = 1;
-		if (settings->adaptiveSampling)
+		if(settings->adaptiveSampling)
 		{
-			actualSamples = &samples;
+			if(samples == 0)
+			{
+				frameBuffer->noiseBuffer[fbIndex].samples = 0;
+			}
+			else
+			{
+				samples = frameBuffer->noiseBuffer[fbIndex].samples;
+			}
 			if (settings->minAdaptiveSamples <= iteration)
 			{
-
 				if (noise < settings->noiseCutOff)
 				{
 					samplesPerLaunch = 0;
 				}
 				else
 				{
-					samplesPerLaunch = utl::lerp((float)settings->minPixelSamples, (float)settings->maxPixelSamples, noise*noise);
+					samplesPerLaunch = utl::lerp((float)settings->minPixelSamples, (float)settings->maxPixelSamples, noise * noise);
 				}
 			}
 		}
-		else
-		{
-			actualSamples = &iteration;
-		}
+
+		PerRayData prd;
+		prd.seed = tea<4>(fbIndex, *optixLaunchParams.frameID);
 
 		for (int i = 0; i < samplesPerLaunch; i++)
 		{
@@ -738,124 +823,69 @@ namespace vtx
 			prd.position = cameraRay.org;
 			prd.wi = cameraRay.dir;
 
-			math::vec3f radiance = integrator(prd);
+			Radiances radiance = integrator(prd);
 
-			// DEBUG Highlight numerical errors.
-			//if (isnan(radiance.x) || isnan(radiance.y) || isnan(radiance.z))
-			//{
-			//	radiance = make_float3(0.0f, 1000000.0f, 0.0f); // super green
-			//}
-			//else if (isinf(radiance.x) || isinf(radiance.y) || isinf(radiance.z))
-			//{
-			//	radiance = make_float3(1000000.0f, 0.0f, 0.0f); // super red
-			//}
-			//else if (radiance.x < 0.0f || radiance.y < 0.0f || radiance.z < 0.0f)
-			//{
-			//	radiance = make_float3(0.0f, 0.0f, 1000000.0f); // super blue
-			//}
-			
-			if ((!(isnan(radiance.x) || isnan(radiance.y) || isnan(radiance.z))))
-			{
-				if ((!settings->accumulate || *actualSamples <= 0))
-				{
-					frameBuffer->radianceBuffer[fbIndex] = radiance;
-				}
-				else
-				{
-					if (runningAverage)
-					{
-						const math::vec3f dst = frameBuffer->radianceBuffer[fbIndex];
-						frameBuffer->radianceBuffer[fbIndex] = utl::lerp(dst, radiance, (float)(*actualSamples+1));
-					}
-					else
-					{
-						frameBuffer->radianceBuffer[fbIndex] += radiance;
-					}
-				}
-			}
-			samples++;
-		}
+			++samples;
 
-		if ((!settings->accumulate || *actualSamples == 0))
-		{
-			frameBuffer->toneMappedRadiance[fbIndex] = toneMap(frameBuffer->radianceBuffer[fbIndex]);
-		}
-		else
-		{
-			if (runningAverage)
+			if (!settings->accumulate || samples <= 1)
 			{
-				frameBuffer->toneMappedRadiance[fbIndex] = toneMap(frameBuffer->radianceBuffer[fbIndex]);
+				utl::replaceNanCheck(radiance.radiance, frameBuffer->rawRadiance[fbIndex]);
+				utl::replaceNanCheck(radiance.directLight, directLightBuffer);
+				utl::replaceNanCheck(radiance.diffuseIndirect, diffuseIndirectBuffer);
+				utl::replaceNanCheck(radiance.glossyIndirect, glossyIndirectBuffer);
+				utl::replaceNanCheck(radiance.transmissionIndirect, transmissionIndirect);
+				utl::replaceNanCheck(prd.colors.finalDiffuse, frameBuffer->albedo[fbIndex]);
+				utl::replaceNanCheck(prd.colors.shadingNormal, frameBuffer->normal[fbIndex]);
+				utl::replaceNanCheck(prd.colors.trueNormal, frameBuffer->trueNormal[fbIndex]);
+				utl::replaceNanCheck(prd.colors.tangent, frameBuffer->tangent[fbIndex]);
+				utl::replaceNanCheck(prd.colors.orientation, frameBuffer->orientation[fbIndex]);
+				utl::replaceNanCheck(prd.colors.uv, frameBuffer->uv[fbIndex]);
+				utl::replaceNanCheck(prd.colors.debugColor1, frameBuffer->debugColor1[fbIndex]);
 			}
 			else
 			{
-				int divideSamples = (settings->adaptiveSampling) ? *actualSamples : *actualSamples + 1;
-				frameBuffer->toneMappedRadiance[fbIndex] = toneMap(frameBuffer->radianceBuffer[fbIndex] / ((float)divideSamples));
-			}
-		}
-		frameBuffer->albedo[fbIndex] = toneMap(prd.colors.diffuse);
-		frameBuffer->normal[fbIndex] = toneMap(prd.colors.shadingNormal);
-
-		switch (settings->displayBuffer)
-		{
-			case(RendererDeviceSettings::DisplayBuffer::FB_NOISY):
-			{
-				outputBuffer[fbIndex] = math::vec4f(frameBuffer->toneMappedRadiance[fbIndex], 1.0f);
-			}
-			break;
-			case(RendererDeviceSettings::DisplayBuffer::FB_DIFFUSE):
-			{
-				outputBuffer[fbIndex] = math::vec4f(prd.colors.diffuse, 1.0f);
-			}
-			break;
-			case(RendererDeviceSettings::DisplayBuffer::FB_ORIENTATION):
-			{
-				outputBuffer[fbIndex] = math::vec4f(prd.colors.orientation, 1.0f);
-			}
-			break;
-			case(RendererDeviceSettings::DisplayBuffer::FB_TRUE_NORMAL):
-			{
-				outputBuffer[fbIndex] = math::vec4f(prd.colors.trueNormal, 1.0f);
-			}
-			break;
-			case(RendererDeviceSettings::DisplayBuffer::FB_SHADING_NORMAL):
-			{
-				outputBuffer[fbIndex] = math::vec4f(prd.colors.shadingNormal, 1.0f);
-			}
-			break;
-			case(RendererDeviceSettings::DisplayBuffer::FB_TANGENT):
-			{
-				outputBuffer[fbIndex] = math::vec4f(prd.colors.tangent, 1.0f);
-			}
-			break;
-			case(RendererDeviceSettings::DisplayBuffer::FB_UV):
-			{
-				outputBuffer[fbIndex] = math::vec4f(prd.colors.uv, 1.0f);
-			}
-			break;
-			case(RendererDeviceSettings::DisplayBuffer::FB_NOISE):
-			{
-				outputBuffer[fbIndex] = math::vec4f(floatToScientificRGB(noise), 1.0f);
-			}
-			break;
-			case(RendererDeviceSettings::DisplayBuffer::FB_SAMPLES):
-			{
-				float samplesMetric;
-				if(iteration> settings->minAdaptiveSamples)
+				if (runningAverage)
 				{
-					samplesMetric = (float)(samples - settings->minAdaptiveSamples) / (float)(iteration - settings->minAdaptiveSamples);
+					const float fSamples = (float)samples;
+					utl::lerpAccumulate(radiance.radiance, frameBuffer->rawRadiance[fbIndex], fSamples);
+					utl::lerpAccumulate(radiance.directLight, directLightBuffer, fSamples);
+					utl::lerpAccumulate(radiance.diffuseIndirect, diffuseIndirectBuffer, fSamples);
+					utl::lerpAccumulate(radiance.glossyIndirect, glossyIndirectBuffer, fSamples);
+					utl::lerpAccumulate(radiance.transmissionIndirect, transmissionIndirect, fSamples);
+					utl::lerpAccumulate(prd.colors.finalDiffuse, frameBuffer->albedo[fbIndex], fSamples);
+					utl::lerpAccumulate(prd.colors.shadingNormal, frameBuffer->normal[fbIndex], fSamples);
+					utl::lerpAccumulate(prd.colors.trueNormal, frameBuffer->trueNormal[fbIndex], fSamples);
+					utl::lerpAccumulate(prd.colors.tangent, frameBuffer->tangent[fbIndex], fSamples);
+					utl::lerpAccumulate(prd.colors.orientation, frameBuffer->orientation[fbIndex], fSamples);
+					utl::lerpAccumulate(prd.colors.uv, frameBuffer->uv[fbIndex], fSamples);
+					utl::lerpAccumulate(prd.colors.debugColor1, frameBuffer->debugColor1[fbIndex], fSamples);
 				}
 				else
 				{
-					samplesMetric = 0.5f;
+					float kFactor = 1.0f / (float)samples;
+					float jFactor = ((float)samples - 1.0f) * kFactor;
+					utl::accumulate(radiance.radiance, frameBuffer->rawRadiance[fbIndex], kFactor, jFactor);
+					utl::accumulate(radiance.directLight, directLightBuffer, kFactor, jFactor);
+					utl::accumulate(radiance.diffuseIndirect, diffuseIndirectBuffer, kFactor, jFactor);
+					utl::accumulate(radiance.glossyIndirect, glossyIndirectBuffer, kFactor, jFactor);
+					utl::accumulate(radiance.transmissionIndirect, transmissionIndirect, kFactor, jFactor);
+					utl::accumulate(prd.colors.finalDiffuse, frameBuffer->albedo[fbIndex], kFactor, jFactor);
+					utl::accumulate(prd.colors.shadingNormal, frameBuffer->normal[fbIndex], kFactor, jFactor);
+					utl::accumulate(prd.colors.trueNormal, frameBuffer->trueNormal[fbIndex], kFactor, jFactor);
+					utl::accumulate(prd.colors.tangent, frameBuffer->tangent[fbIndex], kFactor, jFactor);
+					utl::accumulate(prd.colors.orientation, frameBuffer->orientation[fbIndex], kFactor, jFactor);
+					utl::accumulate(prd.colors.uv, frameBuffer->uv[fbIndex], kFactor, jFactor);
+					utl::accumulate(prd.colors.debugColor1, frameBuffer->debugColor1[fbIndex], kFactor, jFactor);
 				}
-				outputBuffer[fbIndex] = math::vec4f(floatToScientificRGB(toneMap(samplesMetric).x), 1.0f);
 			}
-			break;
-			case(RendererDeviceSettings::DisplayBuffer::FB_DEBUG_1):
-			{
-				outputBuffer[fbIndex] = math::vec4f(prd.colors.debugColor1, 1.0f);
-			}
-			break;
+
 		}
+
+		if (settings->adaptiveSampling)
+		{
+			frameBuffer->noiseBuffer[fbIndex].samples = samples;
+		}
+
+		frameBuffer->tmRadiance[fbIndex] = toneMap(optixLaunchParams.toneMapperSettings, frameBuffer->rawRadiance[fbIndex]);
 	}
 }

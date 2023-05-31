@@ -145,3 +145,13 @@ bool vtx::vtxImGui::ColorEdit3NoInputs(const char* label, float* col) {
 
     return valueChanged;
 }
+
+bool vtx::vtxImGui::booleanText(const char* fmt, ...)
+{
+
+    va_list args;
+    va_start(args, fmt);
+    ImGui::TextV(fmt, args);
+    va_end(args);
+    return false;
+}

@@ -16,6 +16,8 @@ namespace vtx::vtxImGui
 
     bool ColorEdit3NoInputs(const char* label, float* col);
 
+    bool booleanText(const char* fmt, ...);
+
     template<typename Func, typename ...Args>
     bool HalfSpaceWidget(const char* label, Func&& widgetFunc, Args&&... args) {
         bool valueChanged = false;
@@ -30,16 +32,15 @@ namespace vtx::vtxImGui
 
         ImGui::PushItemWidth(halfItemWidth - style.ItemSpacing.x); // Set the width of the next widget to 200
 
+        float cursorPosX = ImGui::GetCursorPosX();
+
         ClippedText(label); // Draw the label in the first column
 
         ImGui::PopItemWidth(); // Restore the width
 
-        // After rendering the clipped text
-        ImVec2 textSize = ImGui::GetItemRectSize();
-        float remainingWidth = totalItemWidth - textSize.x - style.ItemSpacing.x;
-
         ImGui::SameLine(); // Draw the button on the same line as the label
-        ImGui::PushItemWidth(remainingWidth); // Set the width of the next widget to 200
+        ImGui::SetCursorPosX(cursorPosX + halfItemWidth); // Position in window coordinates
+        ImGui::PushItemWidth(halfItemWidth - style.ItemSpacing.x); // Set the width of the next widget to 200
         valueChanged = widgetFunc(std::forward<Args>(args)...);
         ImGui::PopItemWidth(); // Restore the width
 

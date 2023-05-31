@@ -10,6 +10,7 @@
 #include "Scene/Traversal.h"
 #include "device_launch_parameters.h"
 #include "cuda_runtime.h"
+#include "Device/DevicePrograms/CudaKernels.h"
 #include "Device/UploadCode/UploadFunctions.h"
 
 namespace vtx::graph
@@ -44,6 +45,16 @@ namespace vtx::graph
 		settings.maxPixelSamples = getOptions()->maxPixelSamples;
 		settings.albedoNormalNoiseInfluence = getOptions()->albedoNormalNoiseInfluence;
 		settings.noiseCutOff = getOptions()->noiseCutOff;
+
+
+		settings.fireflyKernelSize = getOptions()->fireflyKernelSize;
+		settings.fireflyThreshold = getOptions()->fireflyThreshold;
+		settings.removeFireflies = getOptions()->removeFireflies;
+
+		settings.enableDenoiser = getOptions()->enableDenoiser;
+
+		settings.denoiserStart = getOptions()->denoiserStart;
+		settings.denoiserBlend = getOptions()->denoiserBlend;
 
 		toneMapperSettings.whitePoint = getOptions()->whitePoint;
 		toneMapperSettings.colorBalance = getOptions()->colorBalance;
@@ -121,7 +132,6 @@ namespace vtx::graph
 
 	void Renderer::render()
 	{
-		timer.reset();
 
 		const LaunchParams& launchParams = UPLOAD_DATA->launchParams;
 		const CUDABuffer& launchParamsBuffer = UPLOAD_BUFFERS->launchParamsBuffer;
@@ -132,40 +142,95 @@ namespace vtx::graph
 			return;
 		}
 
-		if (settings.adaptiveSampling && settings.minAdaptiveSamples <= settings.iteration)
 		{
-			device::computeNoiseInfo(sharedFromBase<Renderer>());
+			timer.reset();
+			if (settings.adaptiveSampling && settings.minAdaptiveSamples <= settings.iteration)
+			{
+				if (settings.adaptiveSampling && settings.iteration >= settings.minAdaptiveSamples)
+				{
+					const auto* radianceBuffer      = GET_BUFFER(device::Buffers::FrameBufferBuffers, getID(), tmRadiance).castedPointer<math::vec3f>();
+					const auto* normalBuffer        = GET_BUFFER(device::Buffers::FrameBufferBuffers, getID(), normal).castedPointer<math::vec3f>();
+					const auto* albedoBuffer        = GET_BUFFER(device::Buffers::FrameBufferBuffers, getID(), albedo).castedPointer<math::vec3f>();
+					auto*       noiseBuffer         = GET_BUFFER(device::Buffers::FrameBufferBuffers, getID(), noiseDataBuffer).castedPointer<NoiseData>();
+					auto*       radianceRangeBuffer = GET_BUFFER(device::Buffers::FrameBufferBuffers, getID(), radianceRangeBuffer).castedPointer<math::vec2f>();
+					auto*       albedoRangeBuffer   = GET_BUFFER(device::Buffers::FrameBufferBuffers, getID(), albedoRangeBuffer).castedPointer<math::vec2f>();
+					auto*       normalRangeBuffer   = GET_BUFFER(device::Buffers::FrameBufferBuffers, getID(), normalRangeBuffer).castedPointer<math::vec2f>();
+
+					noiseComputation(noiseBuffer,
+						radianceBuffer, albedoBuffer, normalBuffer,
+						radianceRangeBuffer, albedoRangeBuffer, normalRangeBuffer,
+						width, height, settings.noiseKernelSize, settings.albedoNormalNoiseInfluence);
+				}
+			}
+
+			device::incrementFrame();
+			CUDA_SYNC_CHECK();
+			noiseComputationTime += timer.elapsedMillis();
 		}
 
-		device::incrementFrame();
+		{
+			timer.reset();
+			const optix::State& state = *(optix::getState());
+			const OptixPipeline& pipeline = optix::getRenderingPipeline()->getPipeline();
+			const OptixShaderBindingTable& sbt = optix::getRenderingPipeline()->getSbt();
 
-		const optix::State& state = *(optix::getState());
-		const OptixPipeline& pipeline = optix::getRenderingPipeline()->getPipeline();
-		const OptixShaderBindingTable& sbt = optix::getRenderingPipeline()->getSbt();
+			const auto result = optixLaunch(/*! pipeline we're launching launch: */
+				pipeline, state.stream,
+				/*! parameters and SBT */
+				launchParamsBuffer.dPointer(),
+				launchParamsBuffer.bytesSize(),
+				&sbt,
+				/*! dimensions of the launch: */
+				launchParams.frameBuffer.frameSize.x,
+				launchParams.frameBuffer.frameSize.y,
+				1
+			);
+			OPTIX_CHECK(result);
+			CUDA_SYNC_CHECK();
+			traceComputationTime += timer.elapsedMillis();
+		}
 
-		CUDA_SYNC_CHECK();
-		const auto result = optixLaunch(/*! pipeline we're launching launch: */
-			pipeline, state.stream,
-			/*! parameters and SBT */
-			launchParamsBuffer.dPointer(),
-			launchParamsBuffer.bytesSize(),
-			&sbt,
-			/*! dimensions of the launch: */
-			launchParams.frameBuffer.frameSize.x,
-			launchParams.frameBuffer.frameSize.y,
-			1
-		);
-		OPTIX_CHECK(result);
-		copyToGl();
-		frameTime = timer.elapsedMillis();
+		{
+			timer.reset();
+
+			math::vec3f* beauty = nullptr;
+			if (settings.removeFireflies)
+			{
+				removeFireflies(launchParamsBuffer.castedPointer<LaunchParams>(), settings.fireflyKernelSize, settings.fireflyThreshold, width, height);
+				beauty = GET_BUFFER(device::Buffers::FrameBufferBuffers, getID(), fireflyRemoval).castedPointer<math::vec3f>();
+				CUDA_SYNC_CHECK();
+			}
+
+			if(settings.enableDenoiser && settings.iteration>settings.denoiserStart)
+			{
+				CUDABuffer& denoiserRadianceInput = settings.removeFireflies ? GET_BUFFER(device::Buffers::FrameBufferBuffers, getID(), fireflyRemoval) : GET_BUFFER(device::Buffers::FrameBufferBuffers, getID(), rawRadiance);
+				CUDABuffer& albedoBuffer = GET_BUFFER(device::Buffers::FrameBufferBuffers, getID(), albedo);
+				CUDABuffer& normalBuffer = GET_BUFFER(device::Buffers::FrameBufferBuffers, getID(), normal);
+				optix::getState()->denoiser.setInputs(denoiserRadianceInput, albedoBuffer, normalBuffer);
+				beauty = optix::getState()->denoiser.denoise(settings.denoiserBlend);
+			}
+
+			CUDA_SYNC_CHECK();
+			switchOutput(launchParamsBuffer.castedPointer<LaunchParams>(), width, height, beauty);
+			postProcessingComputationTime += timer.elapsedMillis();
+		}
+
+		{
+			timer.reset();
+			CUDA_SYNC_CHECK();
+			copyToGl();
+			displayComputationTime += timer.elapsedMillis();
+		}
+
 		if (settings.iteration == 0)
 		{
 			totalTimeSeconds = 0;
+			noiseComputationTime = 0;
+			traceComputationTime = 0;
+			postProcessingComputationTime = 0;
+			displayComputationTime = 0;
 		}
-		else
-		{
-			totalTimeSeconds += frameTime / 1000.0f;
-		}
+		totalTimeSeconds = (noiseComputationTime + traceComputationTime + postProcessingComputationTime + displayComputationTime) / 1000.0f;
 
 		fps = (float)(settings.iteration + 1) / totalTimeSeconds;
 		sppS = ((float)width * (float)height * ((float)settings.iteration + 1)) / totalTimeSeconds;
@@ -185,7 +250,7 @@ namespace vtx::graph
 	void Renderer::copyToGl() {
 		// Update the GL buffer here
 		CUDA_SYNC_CHECK();
-		optix::State& state = *(optix::getState());
+		const optix::State& state = *(optix::getState());
 		const LaunchParams& launchParams = UPLOAD_DATA->launchParams;
 
 		if(resizeGlBuffer)

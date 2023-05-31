@@ -29,9 +29,6 @@ namespace vtx::math
 		return a < b ? a : b;
 	}
 
-
-	
-
 	using OneTy = gdt::OneTy;
 	static OneTy Identity = gdt::one;
 
@@ -46,8 +43,8 @@ namespace vtx::math
 	}
 
 	///////////////////////////////////////////////////////////////////////////
-		///// Vector Definitions //////////////////////////////////////////////////
-		///////////////////////////////////////////////////////////////////////////
+	///// Vector Definitions //////////////////////////////////////////////////
+	///////////////////////////////////////////////////////////////////////////
 	
 	template<typename T, int N>
 	using vec_t = gdt::vec_t<T, N>;
@@ -75,6 +72,15 @@ namespace vtx::math
 	template<typename T>
 	static inline __both__ vec_t<T, 3> normalize(const vec_t<T, 3>& v) {
 		return gdt::normalize(v);
+	}
+
+	__inline__ __both__ float saturate(float f)
+	{
+		return min(1.f, max(0.f, f));
+	}
+
+	static inline __both__ vec3f saturate(const vec3f& v) {
+		return vec3f(saturate(v.x), saturate(v.y), saturate(v.z));
 	}
 
 	inline __both__ vec3f randomColor(int i)

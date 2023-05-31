@@ -6,6 +6,7 @@
 #include "Core/Math.h"
 #include <map>
 
+#include "Denoiser.h"
 #include "Core/VortexID.h"
 
 namespace vtx::optix
@@ -29,6 +30,7 @@ namespace vtx::optix
 		OptixPipelineLinkOptions		pipelineLinkOptions{};
 
 		bool							isValid = false;
+		OptixDenoiserWrapper			denoiser{};
 	};
 
 	// index 1 is global, index 2 is local
@@ -130,7 +132,6 @@ namespace vtx::optix
 		std::vector<OptixProgramGroup>											programGroups;
 		CudaMap<uint32_t, sbtPosition>											sbtMap;
 		CUDABuffer																sbtRecordHeadersBuffer;
-
 	};
 
 	State* getState();

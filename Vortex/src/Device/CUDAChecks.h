@@ -34,20 +34,20 @@ static void checkCuResultError(CUresult rc, std::string file, int line, bool clo
         VTX_ASSERT_CONTINUE(rc == CUDA_SUCCESS, "CUDA Driver API Error, ({}: line {}),  {} ({})", file, line, errorName, errorString);
 }
 
-static void checkOptixError(OptixResult res, const std::string& call_str, int line, bool close = true) {
+static void checkOptixError(OptixResult res, const std::string& call_str, std::string file, int line, bool close = true) {
     if (close)
-        VTX_ASSERT_CLOSE(res == OPTIX_SUCCESS, "Optix Error Check: call ({}) failed with code {} (line {})", call_str, res, line);
+        VTX_ASSERT_CLOSE(res == OPTIX_SUCCESS, "Optix Error Check: file: {} line: {}\n\tCall ({}) failed with code {}", file, line, call_str, res);
     else
-        VTX_ASSERT_CONTINUE(res == OPTIX_SUCCESS, "Optix Error Check: call ({}) failed with code {} (line {})", call_str, res, line);
+        VTX_ASSERT_CONTINUE(res == OPTIX_SUCCESS, "Optix Error Check: file: {} line: {}\n\tCall ({}) failed with code {}", file, line, call_str, res);
 }
 
 static void cudaSynchonize(std::string file, int line, bool close = true) {
     cudaDeviceSynchronize();
     cudaError_t error = cudaGetLastError();
     if (close)
-        VTX_ASSERT_CLOSE(error == cudaSuccess, "error ({}: line {}): %s\n", file, line, cudaGetErrorString(error));
+        VTX_ASSERT_CLOSE(error == cudaSuccess, "CUDA synchronization error: File {}: line {}:\n\t {}", file, line, cudaGetErrorString(error));
     else
-        VTX_ASSERT_CONTINUE(error == cudaSuccess, "error ({}: line {}): %s\n", file, line, cudaGetErrorString(error));
+        VTX_ASSERT_CONTINUE(error == cudaSuccess, "CUDA synchronization error: File {}: line {}:\n\t {}", file, line, cudaGetErrorString(error));
 }
 
 
@@ -76,7 +76,7 @@ static void context_log_cb(unsigned int level,
     }
 }
 
-#define OPTIX_CHECK(call) checkOptixError(call, #call, __LINE__)
+#define OPTIX_CHECK(call) checkOptixError(call, #call, __FILE__, __LINE__)
 
 #define CUDA_CHECK(call) checkCudaError(call,__FILE__, __LINE__)
 
@@ -85,7 +85,7 @@ static void context_log_cb(unsigned int level,
 #define CUDA_SYNC_CHECK() cudaSynchonize(__FILE__, __LINE__)
 
 
-#define OPTIX_CHECK_CONTINUE(call) checkOptixError(call, #call, __LINE__, false)
+#define OPTIX_CHECK_CONTINUE(call) checkOptixError(call, #call, __FILE__, __LINE__, false)
 
 #define CUDA_CHECK_CONTINUE(call) checkCudaError(call,__FILE__, __LINE__, false)
 

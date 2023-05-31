@@ -46,6 +46,15 @@ namespace vtx
 	}
 
 
+	__forceinline__ __device__ void printMath(const char* message, const math::vec4f& vector)
+	{
+		printf("%s :\n"
+			"\t %.6f %.6f %.6f %.6f\n",
+			message,
+			vector.x, vector.y, vector.z, vector.w);
+	}
+
+
 	__forceinline__ __device__ void printMath(const char* message, const math::affine3f& affine)
 	{
 		printf("%s :\n"

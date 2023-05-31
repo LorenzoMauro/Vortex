@@ -37,6 +37,13 @@ namespace vtx
 		float albedoNormalNoiseInfluence;
 		float noiseCutOff;
 
+		int fireflyKernelSize;
+		float fireflyThreshold;
+		bool removeFireflies;
+
+		bool enableDenoiser;
+		int denoiserStart;
+		float denoiserBlend;
 
 		math::vec3f whitePoint;
 		math::vec3f colorBalance;
@@ -68,7 +75,8 @@ namespace vtx
 		////////////////////////////////////////////////////////////////////////////////////
 		/////////////////// Gui Options ////////////////////////////////////////////////////
 		////////////////////////////////////////////////////////////////////////////////////
-		float                      nodeWidth;
+		float nodeWidth;
+		std::string   fontPath;
 	};
 
 	Options* getOptions();

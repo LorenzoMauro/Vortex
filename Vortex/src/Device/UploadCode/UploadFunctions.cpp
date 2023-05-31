@@ -5,8 +5,8 @@
 #include "Scene/Nodes/Renderer.h"
 #include <cudaGL.h>
 
+#include "Device/DevicePrograms/CudaKernels.h"
 #include "Scene/SIM.h"
-#include "Device/DevicePrograms/NoiseKernel.h"
 #include "Scene/Nodes/Shader/Texture.h"
 
 namespace vtx::device
@@ -460,7 +460,6 @@ namespace vtx::device
 
 	}
 
-
 	std::tuple<TextureData, TextureData *> createTextureData(std::shared_ptr<vtx::graph::Texture>& textureNode)
 	{
 		VTX_INFO("Creating Texture Data for Texture Node ID: {} Name: {}", textureNode->getID(), textureNode->databaseName);
@@ -702,26 +701,12 @@ namespace vtx::device
 		return { lightProfileData, bsdfDataBuffer.castedPointer<LightProfileData>() };
 	}
 
-	void computeNoiseInfo(std::shared_ptr<graph::Renderer> rendererNode)
-	{
 
-		if (rendererNode->settings.adaptiveSampling && rendererNode->settings.iteration >= rendererNode->settings.minAdaptiveSamples)
-		{
-			math::vec3f* radianceBuffer = GET_BUFFER(Buffers::FrameBufferBuffers, rendererNode->getID(), toneMappedRadianceBuffer).castedPointer<math::vec3f>();
-			math::vec3f* normalBuffer = GET_BUFFER(Buffers::FrameBufferBuffers, rendererNode->getID(), normalBuffer).castedPointer<math::vec3f>();
-			math::vec3f* albedoBuffer = GET_BUFFER(Buffers::FrameBufferBuffers, rendererNode->getID(), albedoBuffer).castedPointer<math::vec3f>();
-			NoiseData* noiseBuffer = GET_BUFFER(Buffers::FrameBufferBuffers, rendererNode->getID(), noiseDataBuffer).castedPointer<NoiseData>();
-			math::vec2f* radianceRangeBuffer = GET_BUFFER(Buffers::FrameBufferBuffers, rendererNode->getID(), radianceRangeBuffer).castedPointer<math::vec2f>();
-			math::vec2f* albedoRangeBuffer = GET_BUFFER(Buffers::FrameBufferBuffers, rendererNode->getID(), albedoRangeBuffer).castedPointer<math::vec2f>();
-			math::vec2f* normalRangeBuffer = GET_BUFFER(Buffers::FrameBufferBuffers, rendererNode->getID(), normalRangeBuffer).castedPointer<math::vec2f>();
-
-			noiseComputation(noiseBuffer,
-							 radianceBuffer, albedoBuffer, normalBuffer,
-							 radianceRangeBuffer, albedoRangeBuffer, normalRangeBuffer,
-							 rendererNode->width, rendererNode->height, rendererNode->settings.noiseKernelSize, rendererNode->settings.albedoNormalNoiseInfluence);
-		}
-	}
-
+#define PREPARE_BUFFER(cudaBuffer, bufferPoitner, dataType)\
+	CUDABuffer& cudaBuffer = GET_BUFFER(Buffers::FrameBufferBuffers, rendererNode->getID(), cudaBuffer); \
+	cudaBuffer.resize((size_t)rendererNode->width* (size_t)rendererNode->height * sizeof(dataType)); \
+	UPLOAD_DATA->frameBufferData.bufferPoitner = cudaBuffer.castedPointer<dataType>()\
+	
 	void setRendererData(std::shared_ptr<graph::Renderer> rendererNode)
 	{
 		//auto* tW = new float4[3];
@@ -734,34 +719,39 @@ namespace vtx::device
 		//const math::affine3f objectToWorld(tt);
 
 		if (rendererNode->resized) {
+
 			rendererNode->threadData.bufferUpdateReady = false;
 
 			CUDABuffer& cudaOutputBuffer = GET_BUFFER(Buffers::FrameBufferBuffers, rendererNode->getID(), cudaOutputBuffer);
 			cudaOutputBuffer.resize((size_t)rendererNode->width * (size_t)rendererNode->height * sizeof(math::vec4f));
 			UPLOAD_DATA->frameBufferData.outputBuffer = cudaOutputBuffer.dPointer();
 
-			CUDABuffer& radianceBuffer = GET_BUFFER(Buffers::FrameBufferBuffers, rendererNode->getID(), radianceBuffer);
-			radianceBuffer.resize((size_t)rendererNode->width * (size_t)rendererNode->height * sizeof(math::vec3f));
-			UPLOAD_DATA->frameBufferData.radianceBuffer = radianceBuffer.castedPointer<math::vec3f>();
+
+			PREPARE_BUFFER(rawRadiance, rawRadiance, math::vec3f);
+			PREPARE_BUFFER(directLight, directLight, math::vec3f);
+			PREPARE_BUFFER(diffuseIndirect, diffuseIndirect, math::vec3f);
+			PREPARE_BUFFER(glossyIndirect, glossyIndirect, math::vec3f);
+			PREPARE_BUFFER(transmissionIndirect, transmissionIndirect, math::vec3f);
+			PREPARE_BUFFER(tmRadiance, tmRadiance, math::vec3f);
+			PREPARE_BUFFER(tmDirectLight, tmDirectLight, math::vec3f);
+			PREPARE_BUFFER(tmDiffuseIndirect, tmDiffuseIndirect, math::vec3f);
+			PREPARE_BUFFER(tmGlossyIndirect, tmGlossyIndirect, math::vec3f);
+			PREPARE_BUFFER(tmTransmissionIndirect, tmTransmissionIndirect, math::vec3f);
+			PREPARE_BUFFER(albedo, albedo, math::vec3f);
+			PREPARE_BUFFER(normal, normal, math::vec3f);
+			PREPARE_BUFFER(trueNormal, trueNormal, math::vec3f);
+			PREPARE_BUFFER(tangent, tangent, math::vec3f);
+			PREPARE_BUFFER(orientation, orientation, math::vec3f);
+			PREPARE_BUFFER(uv, uv, math::vec3f);
+			PREPARE_BUFFER(debugColor1, debugColor1, math::vec3f);
+			PREPARE_BUFFER(fireflyRemoval, fireflyPass, math::vec3f);
+
+			optix::getState()->denoiser.resize(rendererNode->width, rendererNode->height);
 
 			//TODO Smarter way to set these value, I don't want to waste memory if we are not using adaptive samplig
 			{
-				CUDABuffer& toneMappedRadianceBuffer = GET_BUFFER(Buffers::FrameBufferBuffers, rendererNode->getID(), toneMappedRadianceBuffer);
-				toneMappedRadianceBuffer.resize((size_t)rendererNode->width * (size_t)rendererNode->height * sizeof(math::vec3f));
-				UPLOAD_DATA->frameBufferData.toneMappedRadiance = toneMappedRadianceBuffer.castedPointer<math::vec3f>();
-
-				CUDABuffer& albedoBuffer = GET_BUFFER(Buffers::FrameBufferBuffers, rendererNode->getID(), albedoBuffer);
-				albedoBuffer.resize((size_t)rendererNode->width * (size_t)rendererNode->height * sizeof(math::vec3f));
-				UPLOAD_DATA->frameBufferData.albedo = albedoBuffer.castedPointer<math::vec3f>();
-
-				CUDABuffer& NormalBuffer = GET_BUFFER(Buffers::FrameBufferBuffers, rendererNode->getID(), normalBuffer);
-				NormalBuffer.resize((size_t)rendererNode->width * (size_t)rendererNode->height * sizeof(math::vec3f));
-				UPLOAD_DATA->frameBufferData.normal = NormalBuffer.castedPointer<math::vec3f>();
-
-
-				CUDABuffer& noiseBuffer = GET_BUFFER(Buffers::FrameBufferBuffers, rendererNode->getID(), noiseDataBuffer);
-				noiseBuffer.resize((size_t)rendererNode->width * (size_t)rendererNode->height * sizeof(NoiseData));
-				UPLOAD_DATA->frameBufferData.noiseBuffer = noiseBuffer.castedPointer<NoiseData>();
+				//PREPARE_BUFFER(toneMappedRadianceBuffer, toneMappedRadiance, math::vec3f);
+				PREPARE_BUFFER(noiseDataBuffer, noiseBuffer, NoiseData);
 
 				const int size = rendererNode->width * rendererNode->height;
 				constexpr int threadsPerBlock = 256;
@@ -770,10 +760,8 @@ namespace vtx::device
 				CUDABuffer& radianceRangeBuffer = GET_BUFFER(Buffers::FrameBufferBuffers, rendererNode->getID(), radianceRangeBuffer);
 				radianceRangeBuffer.resize(numBlocks * sizeof(math::vec2f));
 
-
 				CUDABuffer& albedoRangeBuffer = GET_BUFFER(Buffers::FrameBufferBuffers, rendererNode->getID(), albedoRangeBuffer);
 				albedoRangeBuffer.resize(numBlocks * sizeof(math::vec2f));
-
 
 				CUDABuffer& normalRangeBuffer = GET_BUFFER(Buffers::FrameBufferBuffers, rendererNode->getID(), normalRangeBuffer);
 				normalRangeBuffer.resize(numBlocks * sizeof(math::vec2f));
@@ -787,9 +775,6 @@ namespace vtx::device
 			UPLOAD_DATA->isFrameBufferUpdated = true;
 			rendererNode->resizeGlBuffer      = true;
 		}
-
-
-		
 
 		if(rendererNode->settings.isUpdated)
 		{
@@ -806,6 +791,8 @@ namespace vtx::device
 			UPLOAD_DATA->settings.minPixelSamples = rendererNode->settings.minPixelSamples;
 			UPLOAD_DATA->settings.maxPixelSamples = rendererNode->settings.maxPixelSamples;
 			UPLOAD_DATA->settings.noiseCutOff = rendererNode->settings.noiseCutOff;
+			UPLOAD_DATA->settings.removeFirefly = rendererNode->settings.removeFireflies;
+			UPLOAD_DATA->settings.enableDenoiser = rendererNode->settings.enableDenoiser;
 
 			UPLOAD_DATA->isSettingsUpdated   = true;
 			rendererNode->settings.isUpdated = false;

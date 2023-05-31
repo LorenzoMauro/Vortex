@@ -41,6 +41,19 @@ namespace vtx
 		VTX_INFO("GLFW DESTROYED");
 	}
 
+	void framebuffer_size_callback(GLFWwindow* window, int width, int height)
+	{
+		// Here you can set your new window size. You could, for example, update
+		// your options object. Without knowing the structure of your options
+		// object or your application, here's a hypothetical example:
+
+		getOptions()->width = width;
+		getOptions()->height = height;
+
+		// You may also need to update your OpenGL viewport size here:
+		glViewport(0, 0, width, height);
+	}
+
 	void Application::initWindow() {
 		glfwSetErrorCallback(glfwErrorCallback);
 		if (!glfwInit())
@@ -50,6 +63,14 @@ namespace vtx
 		}
 		glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
 		glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 6);
+		glfwWindowHint(GLFW_MAXIMIZED, GLFW_TRUE);  // Set the window to start maximized
+
+		// Get the primary monitor
+		GLFWmonitor* monitor = glfwGetPrimaryMonitor();
+		const GLFWvidmode* mode = glfwGetVideoMode(monitor);
+
+		getOptions()->width = mode->width;
+		getOptions()->height = mode->height;
 
 		window = glfwCreateWindow(getOptions()->width, getOptions()->height, getOptions()->windowName.c_str(), nullptr, nullptr);
 		glfwMakeContextCurrent(window);

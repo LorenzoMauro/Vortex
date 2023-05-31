@@ -4,6 +4,10 @@
 
 namespace vtx {
 
+	struct TimingStats {
+
+	};
+
 	class Timer
 	{
 	public:
