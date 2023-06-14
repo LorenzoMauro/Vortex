@@ -5,6 +5,7 @@
 #include "Core/CustomImGui/CustomImGui.h"
 #include "Scene/Nodes/Renderer.h"
 #include "Device/DevicePrograms/LaunchParams.h"
+#include "Device/Wrappers/dWrapper.h"
 
 namespace vtx::gui
 {
@@ -35,6 +36,25 @@ namespace vtx::gui
             renderNode->settings.iteration = -1;
             renderNode->settings.isUpdated = true;
         }
+
+		if (vtxImGui::HalfSpaceWidget("Wavefront", ImGui::Checkbox, (hiddenLabel + "_Use Wavefront").c_str(), &(renderNode->settings.useWavefront)))
+		{
+			renderNode->settings.iteration = -1;
+			renderNode->settings.isUpdated = true;
+		}
+
+		if (vtxImGui::HalfSpaceWidget("Russian Roulette", ImGui::Checkbox, (hiddenLabel + "_Use Russian Roulette").c_str(), &(renderNode->settings.useRussianRoulette)))
+		{
+			renderNode->settings.iteration = -1;
+			renderNode->settings.isUpdated = true;
+		}
+
+
+		if (vtxImGui::HalfSpaceWidget("Wavefront Fit Kernel Launch", ImGui::Checkbox, (hiddenLabel + "_Wavefront Fit Kernel Launch").c_str(), &(renderNode->settings.fitWavefront)))
+		{
+			renderNode->settings.iteration = -1;
+			renderNode->settings.isUpdated = true;
+		}
 
 		ImGui::Separator();
 
@@ -182,6 +202,22 @@ namespace vtx::gui
 		vtxImGui::HalfSpaceWidget("Post	   Computation % ", vtxImGui::booleanText, "%.2f", (toPercent*renderNode->postProcessingComputationTime ));
 		vtxImGui::HalfSpaceWidget("Display Computation % ", vtxImGui::booleanText, "%.2f", (toPercent*renderNode->displayComputationTime ));
         ImGui::Separator();
+
+		KernelTimes& kernelTimes = renderNode->getWaveFrontTimes();
+		float factor = 100.0f / kernelTimes.totMs();
+		int actualLaunches = renderNode->getWavefrontLaunches();
+		factor = 1.0f/(float)actualLaunches;
+
+		vtxImGui::HalfSpaceWidget("Manage Pixel", vtxImGui::booleanText, "%.2f %", kernelTimes.pixelQueue* factor);
+		vtxImGui::HalfSpaceWidget("Generate Camera Ray", vtxImGui::booleanText, "%.2f %" , kernelTimes.genCameraRay*factor);
+		vtxImGui::HalfSpaceWidget("Trace Ray", vtxImGui::booleanText, "%.2f %", kernelTimes.traceRadianceRay*factor);
+		vtxImGui::HalfSpaceWidget("Reset Trace Ray", vtxImGui::booleanText, "%.2f %", kernelTimes.reset*factor);
+		vtxImGui::HalfSpaceWidget("Shade Rays", vtxImGui::booleanText, "%.2f %", kernelTimes.shadeRay*factor);
+		vtxImGui::HalfSpaceWidget("Handle Escaped Ray", vtxImGui::booleanText, "%.2f %", kernelTimes.handleEscapedRay*factor);
+		vtxImGui::HalfSpaceWidget("Accumulate Ray", vtxImGui::booleanText, "%.2f %", kernelTimes.accumulateRay*factor);
+		vtxImGui::HalfSpaceWidget("Reset Kernels", vtxImGui::booleanText, "%.2f %", kernelTimes.reset* factor);
+		vtxImGui::HalfSpaceWidget("Fetch Queue Size", vtxImGui::booleanText, "%.2f %", kernelTimes.fetchQueueSize*factor);
+		ImGui::Separator();
 
 		ImGui::PopItemWidth();
         ImGui::End();

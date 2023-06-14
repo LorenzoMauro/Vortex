@@ -1,19 +1,7 @@
 #include "../CudaKernels.h"
 #include "device_launch_parameters.h"
-#ifdef __CUDACC__
-#define cuda_SYNCTHREADS() __syncthreads()
-#define cuda_ATOMICADD(a,b) atomicAdd(a,b)
-#define cuda_ATOMICCAS(a,b,c) ::atomicCAS(a,b,c)
-#define cuda_FLOAT_AS_INT(a) __float_as_int(a)
-#define cuda_INT_AS_FLOAT(a) __int_as_float(a)
-#else
-#define cuda_SYNCTHREADS()
-#define cuda_ATOMICADD(a,b)
-#define cuda_ATOMICCAS(a,b,c) 1
-#define cuda_FLOAT_AS_INT(a) 1
-#define cuda_INT_AS_FLOAT(a) 1.0f
-#endif
 #include "Device/CUDAChecks.h"
+#include "Device/DevicePrograms/nvccUtils.h"
 
 namespace vtx
 {

@@ -1,5 +1,6 @@
 #include "DeviceVisitor.h"
 #include "CUDAChecks.h"
+#include "WorkQueues.h"
 #include "MDL/mdlWrapper.h"
 #include "Device/OptixWrapper.h"
 #include "Scene/Graph.h"

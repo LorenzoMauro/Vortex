@@ -3,15 +3,16 @@
 #include "Utils.h"
 #include <optix_device.h>
 
-#include "DataFetcher.h"
+//#include "DataFetcher.h"
 #include "LaunchParams.h"
 #include "RayData.h"
 #include <optix_device.h>
+#include "CudaDebugHelper.h"
 
 namespace vtx::utl
 {
 
-	__forceinline__ __device__ void getInstanceAndGeometry(HitProperties* hitP, const vtxID& instanceId)
+	__forceinline__ __device__ void getInstanceAndGeometry(HitProperties* hitP, const vtxID& instanceId, const LaunchParams& optixLaunchParams)
 	{
 		hitP->instance = optixLaunchParams.instances[instanceId];
 		hitP->geometry = (hitP->instance->geometryData);
@@ -70,6 +71,15 @@ namespace vtx::utl
 		hitP->worldToObject.toFloat4(hitP->wToF4);
 	}
 
+
+	__forceinline__ __device__ void setTransform(HitProperties* hitP, RayWorkItem* prd)
+	{
+		hitP->objectToWorld = math::affine3f(prd->hitOTW);
+		hitP->worldToObject = math::affine3f(prd->hitWTO);
+
+		hitP->objectToWorld.toFloat4(hitP->oTwF4);
+		hitP->worldToObject.toFloat4(hitP->wToF4);
+	}
 	__forceinline__ __device__ void computeGeometricHitProperties(HitProperties* hitP, const unsigned int triangleId, const bool useInstanceData = false)
 	{
 		if (hitP->geometry == nullptr)
@@ -149,13 +159,13 @@ namespace vtx::utl
 		}
 	}
 
-	__forceinline__ __device__ void computeHitProperties(HitProperties* hitP,
+	/*__forceinline__ __device__ void computeHitProperties(HitProperties* hitP,
 		const vtxID instanceId,
 		const unsigned int& triangleId,
 		const bool doComputeHit = false,
 		const math::vec3f& originPosition = math::vec3f(0.0f, 0.0f, 0.0f))
 	{
-		getInstanceAndGeometry(hitP, instanceId);
+		getInstanceAndGeometry(hitP, instanceId, );
 		getVertices(hitP, triangleId);
 
 		if (doComputeHit)
@@ -166,5 +176,5 @@ namespace vtx::utl
 		computeGeometricHitProperties(hitP, triangleId);
 
 		determineMaterialHitProperties(hitP, triangleId);
-	}
+	}*/
 }

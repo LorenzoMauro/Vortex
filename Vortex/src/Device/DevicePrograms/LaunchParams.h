@@ -11,10 +11,14 @@
 #include "Scene/DataStructs/VertexAttribute.h"
 #include "Scene/Nodes/LightTypes.h"
 #include <optix.h>
-
+#include "nvccUtils.h"
 #include "Device/UploadCode/UploadBuffers.h"
+#include "Device/Wrappers/SOA.h"
 
 namespace vtx {
+	struct RayData;
+
+	class WorkQueue;
 
     struct SbtProgramIdx
     {
@@ -71,7 +75,8 @@ namespace vtx {
         bool hasOpacity = false;
         bool directCallable;
 
-        int idxCallEvaluateMaterial = -1;
+        int idxCallEvaluateMaterialStandard = -1;
+        int idxCallEvaluateMaterialWavefront = -1;
 
         int idxCallInit = -1; // The material global init function.
 
@@ -171,7 +176,6 @@ namespace vtx {
         LightProfileData** lightProfiles;
         uint32_t numLightProfiles;
     };
-
 
     struct MaterialData
     {
@@ -337,8 +341,9 @@ namespace vtx {
         int                 maxPixelSamples;
         float               noiseCutOff;
 
-        bool                enableDenoiser;
-        bool                removeFirefly;
+        bool enableDenoiser;
+        bool removeFirefly;
+		bool  useRussianRoulette;
 	};
 
     struct ToneMapperSettings
@@ -351,9 +356,12 @@ namespace vtx {
         float 	 invGamma;
     };
 
+
 	struct LaunchParams
     {
 		int*                    frameID;
+        int 				    nextPixel = 0;
+        int                     remainingBounces;
 		FrameBufferData         frameBuffer;
 		CameraData              cameraData;
 		RendererDeviceSettings* settings;
@@ -364,6 +372,31 @@ namespace vtx {
 		LightData*              envLight = nullptr;
         LightData**             lights;
         int                     numberOfLights;
+
+        /*RayData*   rays;
+        int* radianceTraceQueueSize;
+        int* shadowTraceQueueSize;
+        int* shadeQueueSize;
+        int* escapedQueueSize;
+        int* accumulationQueueSize;
+        int* maxQueueSize;
+        RayData** radianceTraceQueue;
+        RayData** shadowTraceQueue;
+        RayData** shadeQueue;
+        RayData** escapedQueue;
+        RayData** accumulationQueue;*/
+
+        WorkQueueSOA<PixelWorkItem>* pixelQueue;
+        WorkQueueSOA<RayWorkItem>* radianceTraceQueue;
+        WorkQueueSOA<RayWorkItem>* shadeQueue;
+        WorkQueueSOA<RayWorkItem>* escapedQueue;
+        WorkQueueSOA<RayWorkItem>* accumulationQueue;
+        //WorkQueue* radianceTraceQueue = nullptr;
+        //WorkQueue* shadowTraceQueue = nullptr;
+        //WorkQueue* shadeQueue = nullptr;
+        //WorkQueue* escapedQueue = nullptr;
+        //WorkQueue* accumulationQueue = nullptr;
+
 	};
 
     enum TypeRay

@@ -1,15 +1,20 @@
 include "../PremakeScripts/path.lua"
 --"C:\Program Files\LLVM-15\bin\clang.exe" -std=c++17 test.cu -O3 -ffast-math -fcuda-flush-denormals-to-zero -fno-vectorize --cuda-gpu-arch=sm_60 --cuda-path="C:\\Program Files\\NVIDIA GPU Computing Toolkit\\CUDA\\v8.0" -c -o test.bc
-function genNvccCommand(cu_file, ptx_file, cuda_path, include_dirs, debug)
+function genNvccCommand(cu_file, ptx_file, cuda_path, include_dirs, debug, ptx)
     local nvcc_path = '"' .. path.join(cuda_path, "bin/nvcc.exe") .. '"'
     CudaCompileCommand = nvcc_path
     CudaCompileCommand = CudaCompileCommand .. " " .. cu_file
-    CudaCompileCommand = CudaCompileCommand .. " --optix-ir"
+    if(ptx) then
+        CudaCompileCommand = CudaCompileCommand .. " -ptx"
+    else
+        CudaCompileCommand = CudaCompileCommand .. " --optix-ir"
+    end
     CudaCompileCommand = CudaCompileCommand .. " --use_fast_math"
     CudaCompileCommand = CudaCompileCommand .. " --keep"
     CudaCompileCommand = CudaCompileCommand .. " -Wno-deprecated-gpu-targets"
     CudaCompileCommand = CudaCompileCommand .. " --std=c++17"
     CudaCompileCommand = CudaCompileCommand .. " -m64"
+    CudaCompileCommand = CudaCompileCommand .. " -arch=sm_70"
     CudaCompileCommand = CudaCompileCommand .. " --keep-device-functions"
     CudaCompileCommand = CudaCompileCommand .. " --relocatable-device-code=true"
     CudaCompileCommand = CudaCompileCommand .. " --generate-line-info"
@@ -189,7 +194,8 @@ project "OptixApp"
         }
     
     local cu_file = "%{file.relpath}"
-    local ptx_file = "%{cfg.targetdir}/ptx/%{file.basename}.optixir"
+    local ptx_file = "%{cfg.targetdir}/ptx/%{file.basename}.ptx"
+    local optixIr_file = "%{cfg.targetdir}/ptx/%{file.basename}.optixir"
     local bc_file = "%{cfg.targetdir}/bc/%{file.basename}.bc"
     local d_file = "%{cfg.targetdir}/bc/%{file.basename}.d"
 
@@ -201,10 +207,11 @@ project "OptixApp"
         "src/",
         "../ext/gdt/"
     }
+
     -- Custom build step to compile .cu files to .ptx files
     filter {"configurations:Debug", "files:src/Device/DevicePrograms/Ptx/**.cu"}
         
-        cudaCompileCommand = genNvccCommand(cu_file, ptx_file, CUDA_TOOLKIT_PATH, include_dirs, true)
+        cudaCompileCommand = genNvccCommand(cu_file, ptx_file, CUDA_TOOLKIT_PATH, include_dirs, true, true)
         
         printf("Optix Compile Debug command:\n %s", cudaCompileCommand)
 
@@ -219,7 +226,38 @@ project "OptixApp"
     -- Custom build step to compile .cu files to .ptx files
     filter {"configurations:Release", "files:src/Device/DevicePrograms/Ptx/**.cu"}
 
-        cudaCompileCommand = genNvccCommand(cu_file, ptx_file, CUDA_TOOLKIT_PATH, include_dirs, false)
+        cudaCompileCommand = genNvccCommand(cu_file, ptx_file, CUDA_TOOLKIT_PATH, include_dirs, false, true)
+        
+        printf("Optix Compile Release command:\n %s", cudaCompileCommand)
+
+        buildcommands {
+            'echo "Running NVCC:"' .. CudaCompileCommand .. '"',
+            CudaCompileCommand,
+        }
+        buildoutputs {
+            ptx_file,
+        }
+
+        
+    -- Custom build step to compile .cu files to .ptx files
+    filter {"configurations:Debug", "files:src/Device/DevicePrograms/optixIr/**.cu"}
+        
+        cudaCompileCommand = genNvccCommand(cu_file, optixIr_file, CUDA_TOOLKIT_PATH, include_dirs, true, false)
+        
+        printf("Optix Compile Debug command:\n %s", cudaCompileCommand)
+
+        buildcommands {
+            'echo "Running NVCC:"' .. CudaCompileCommand .. '"',
+            CudaCompileCommand,
+        }
+        buildoutputs {
+            ptx_file,
+        }
+
+    -- Custom build step to compile .cu files to .ptx files
+    filter {"configurations:Release", "files:src/Device/DevicePrograms/optixIr/**.cu"}
+
+        cudaCompileCommand = genNvccCommand(cu_file, optixIr_file, CUDA_TOOLKIT_PATH, include_dirs, false, false)
         
         printf("Optix Compile Release command:\n %s", cudaCompileCommand)
 

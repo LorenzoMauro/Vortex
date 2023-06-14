@@ -264,9 +264,13 @@ namespace vtx::mdl
 		}
 		configure();
 		startInterfaces();
-		if(!getOptions()->directCallable)
+		if(getOptions()->mdlCallType == MDL_INLINE)
 		{
-			setRendererModule("./bc/MaterialDirectCallable.bc", "__direct_callable__EvaluateMaterial");
+			setRendererModule("./bc/MaterialInline.bc", "__direct_callable__EvaluateMaterial");
+		}
+		else if(getOptions()->mdlCallType == MDL_CUDA)
+		{
+			setRendererModule("./bc/MaterialDirectCallable.bc", "__replace__EvaluateMaterial");
 		}
 	}
 
@@ -690,13 +694,12 @@ namespace vtx::mdl
 	std::vector<Target_function_description> createShaderDescription(const graph::Configuration& config, const vtxID& shaderIndex, graph::FunctionNames& fNames) {
 		std::vector<Target_function_description> descriptions;
 
-		if(getOptions()->directCallable)
+		if(getOptions()->mdlCallType == MDL_DIRECT_CALL)
 		{
 			// These are all expressions required for a materials which does everything supported in this renderer. 
 			// The Target_function_description only stores the C-pointers to the base names!
 			// Make sure these are not destroyed as long as the descs vector is used.
-
-			fNames = graph::FunctionNames(std::to_string(shaderIndex));
+			fNames = graph::SIM::Get()->getNode<graph::Material>(shaderIndex)->getFunctionNames();
 
 			// Centralize the init functions in a single material init().
 			// This will only save time when there would have been multiple init functions inside the shader.
@@ -786,8 +789,28 @@ namespace vtx::mdl
 			}
 
 		}
-		else
+		else if (getOptions()->mdlCallType == MDL_CUDA || getOptions()->mdlCallType == MDL_INLINE)
 		{
+			descriptions.emplace_back(Target_function_description("init", "init"));
+			descriptions.emplace_back(Target_function_description("thin_walled", "thinWalled"));
+			descriptions.emplace_back(Target_function_description("surface.scattering", "frontBsdf"));
+			descriptions.emplace_back(Target_function_description("surface.emission.emission", "frontEdf"));
+			descriptions.emplace_back(Target_function_description("surface.emission.intensity", "frontEdfIntensity"));
+			descriptions.emplace_back(Target_function_description("surface.emission.mode", "frontEdfMode"));
+			descriptions.emplace_back(Target_function_description("backface.scattering", "backBsdf"));
+			descriptions.emplace_back(Target_function_description("backface.emission.emission", "backEdf"));
+			descriptions.emplace_back(Target_function_description("backface.emission.intensity", "backEdfIntensity"));
+			descriptions.emplace_back(Target_function_description("backface.emission.mode", "backEdfMode"));
+			descriptions.emplace_back(Target_function_description("ior", "iorEvaluation"));
+			//descriptions.emplace_back(Target_function_description("volume.scattering", ));
+			//descriptions.emplace_back(Target_function_description("volume.absorption_coefficient", "volumeAbsorptionCoefficient"));
+			//descriptions.emplace_back(Target_function_description("volume.scattering_coefficient", "volumeScatteringCoefficient"));
+			//descriptions.emplace_back(Target_function_description("volume.scattering.directional_bias", "volumeDirectionalBias"));
+			//descriptions.emplace_back(Target_function_description("geometry.displacement", ));
+			descriptions.emplace_back(Target_function_description("geometry.cutout_opacity", "opacityEvaluation"));
+			//descriptions.emplace_back(Target_function_description("geometry.normal", ));
+		}
+		else{
 			descriptions.emplace_back(Target_function_description("init", "init"));
 			descriptions.emplace_back(Target_function_description("thin_walled", "thinWalled"));
 			descriptions.emplace_back(Target_function_description("surface.scattering", "frontBsdf"));

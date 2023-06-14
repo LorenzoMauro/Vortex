@@ -1,6 +1,9 @@
 #define NOMINMAX
 #include <algorithm>
 #include "OptixWrapper.h"
+
+#include <set>
+
 #include "Core/Log.h"
 #include "CUDAChecks.h"
 #include "Core/Options.h"
@@ -155,7 +158,7 @@ namespace vtx::optix
 		return fullFunctionName.substr(prefix.size());
 	}
 
-	std::shared_ptr<ProgramOptix> createDcProgram(std::shared_ptr<ModuleOptix> module, std::string functionName, vtxID id)
+	std::shared_ptr<ProgramOptix> createDcProgram(std::shared_ptr<ModuleOptix> module, std::string functionName, vtxID id, std::vector<std::string> sbtName)
 	{
 		const auto function = std::make_shared<optix::FunctionOptix>();
 		function->name = functionName;
@@ -174,7 +177,15 @@ namespace vtx::optix
 		}
 		program->directCallableFunction = function;
 
-		optix::getRenderingPipeline()->registerProgram(program);
+		if(sbtName.size() == 1 && sbtName[0].empty())
+		{
+			optix::getRenderingPipeline()->registerProgram(program);
+		}
+		else
+		{
+			optix::getRenderingPipeline()->registerProgram(program, sbtName);
+
+		}
 		return program;
 	}
 	
@@ -317,13 +328,20 @@ namespace vtx::optix
 		return pgd;
 	}
 
-	void PipelineOptix::registerProgram(std::shared_ptr<ProgramOptix> program)
+	void SbtPipeline::registerProgram(std::shared_ptr<ProgramOptix> program)
 	{
 		programs[program->type].push_back(program);
 		isDirty = true;
 	}
 
-	std::vector<OptixProgramGroup> PipelineOptix::getProgramGroups()
+	void SbtPipeline::initSbtMap()
+	{
+		computeStackSize();
+		createSbt();
+		isDirty = false;
+	}
+
+	std::vector<OptixProgramGroup> SbtPipeline::getProgramGroups()
 	{
 		// ATTENTION : the order in which the program groups is added will define the SBT index
 		if (isDirty || programGroups.empty())
@@ -353,50 +371,13 @@ namespace vtx::optix
 		return programGroups;
 	}
 
-	void PipelineOptix::createPipeline()
-	{
-		const std::vector<OptixProgramGroup>& pgs = getProgramGroups();
-
-		VTX_INFO("Optix Wrapper: Creating Pipeline");
-		const OptixDeviceContext& context = optix::getState()->optixContext;
-		const OptixPipelineLinkOptions& pipelineLinkOptions = optix::getState()->pipelineLinkOptions;
-		const OptixPipelineCompileOptions& pipelineCompileOptions = optix::getState()->pipelineCompileOptions;
-
-		char log[2048];
-		size_t logSize = sizeof(log);
-
-		const OptixResult result = optixPipelineCreate(context,
-													   &pipelineCompileOptions,
-													   &pipelineLinkOptions,
-													   pgs.data(),
-													   static_cast<int>(pgs.size()),
-													   log,
-													   &logSize,
-													   &pipeline);
-		//VTX_ASSERT_CONTINUE(logSize <= 1, log);
-		OPTIX_CHECK(result);
-
-		computeStackSize();
-		createSbt();
-		isDirty = false;
-	}
-
-	const OptixPipeline& PipelineOptix::getPipeline()
-	{
-		if (!pipeline)
-		{
-			createPipeline();
-		}
-		return pipeline;
-	}
-
-	void PipelineOptix::computeStackSize()
+	void SbtPipeline::computeStackSize()
 	{
 		VTX_INFO("Optix Wrapper: Computing Stack Sizes");
 
 		const OptixPipelineLinkOptions& pipelineLinkOptions = optix::getState()->pipelineLinkOptions;
 		const std::vector<OptixProgramGroup>& pgs = getProgramGroups();
-		const OptixPipeline& pipe = getPipeline();
+		const OptixPipeline& pipe = getRenderingPipeline()->getPipeline();
 
 		OptixStackSizes ssp = {}; // Whole Program Stack Size
 		for (const OptixProgramGroup pg : pgs) {
@@ -429,21 +410,21 @@ namespace vtx::optix
 		const unsigned int maxTraversableGraphDepth = getOptions()->maxTraversableGraphDepth;
 
 		const OptixResult result = optixPipelineSetStackSize(pipe,
-															 directCallableStackSizeFromTraversal,
-															 directCallableStackSizeFromState,
-															 continuationStackSize,
-															 maxTraversableGraphDepth);
+			directCallableStackSizeFromTraversal,
+			directCallableStackSizeFromState,
+			continuationStackSize,
+			maxTraversableGraphDepth);
 
 		OPTIX_CHECK(result);
 	}
 
-	void PipelineOptix::createSbt()
+	void SbtPipeline::createSbt()
 	{
 		VTX_INFO("Optix Wrapper: Filling Shader Table");
 
 
 		const std::vector<OptixProgramGroup>& pgs = getProgramGroups();
-		const OptixPipeline& pipe = getPipeline();
+		//const OptixPipeline& pipe = getPipeline();
 
 		const int numHeaders = static_cast<int>(pgs.size());
 
@@ -458,44 +439,60 @@ namespace vtx::optix
 		sbtRecordHeadersBuffer.upload(sbtRecordHeaders);
 
 		sbt = {};
+		int offset = 0;
 		sbt.raygenRecord = sbtRecordHeadersBuffer.dPointer();
+		offset = 1;
 
-		sbt.exceptionRecord = sbtRecordHeadersBuffer.dPointer() + sizeof(SbtRecordHeader) * OptixProgramType::P_Exception;
+		if(!programs[OptixProgramType::P_Exception].empty())
+		{
+			sbt.exceptionRecord = sbtRecordHeadersBuffer.dPointer() + sizeof(SbtRecordHeader) * offset;
+			offset += 1;
+		}
 
-		sbt.missRecordBase = sbtRecordHeadersBuffer.dPointer() + sizeof(SbtRecordHeader) * OptixProgramType::P_Miss;
-		sbt.missRecordStrideInBytes = static_cast<unsigned int>(sizeof(SbtRecordHeader));
-		sbt.missRecordCount = programs[OptixProgramType::P_Miss].size();
+		if(!programs[OptixProgramType::P_Miss].empty())
+		{
+			sbt.missRecordBase = sbtRecordHeadersBuffer.dPointer() + sizeof(SbtRecordHeader) * offset;
+			sbt.missRecordStrideInBytes = static_cast<unsigned int>(sizeof(SbtRecordHeader));
+			sbt.missRecordCount = programs[OptixProgramType::P_Miss].size();
+			offset += sbt.missRecordCount;
+		}
 
-		sbt.hitgroupRecordBase = sbtRecordHeadersBuffer.dPointer() + sizeof(SbtRecordHeader) * OptixProgramType::P_Hit;
-		sbt.hitgroupRecordStrideInBytes = static_cast<unsigned int>(sizeof(SbtRecordHeader));
-		sbt.hitgroupRecordCount = programs[OptixProgramType::P_Hit].size();
+		if (!programs[OptixProgramType::P_Hit].empty())
+		{
+			sbt.hitgroupRecordBase = sbtRecordHeadersBuffer.dPointer() + sizeof(SbtRecordHeader) * offset;
+			sbt.hitgroupRecordStrideInBytes = static_cast<unsigned int>(sizeof(SbtRecordHeader));
+			sbt.hitgroupRecordCount = programs[OptixProgramType::P_Hit].size();
+			offset += sbt.hitgroupRecordCount;
+		}
 
-		sbt.callablesRecordBase = sbtRecordHeadersBuffer.dPointer() + sizeof(SbtRecordHeader) * OptixProgramType::P_DirectCallable;
-		sbt.callablesRecordStrideInBytes = static_cast<unsigned int>(sizeof(SbtRecordHeader));
-		sbt.callablesRecordCount = programs[OptixProgramType::P_DirectCallable].size() + programs[OptixProgramType::P_ContinuationCallable].size();
-
+		if (!programs[OptixProgramType::P_DirectCallable].empty() || !programs[OptixProgramType::P_ContinuationCallable].empty())
+		{
+			sbt.callablesRecordBase = sbtRecordHeadersBuffer.dPointer() + sizeof(SbtRecordHeader) * offset;
+			sbt.callablesRecordStrideInBytes = static_cast<unsigned int>(sizeof(SbtRecordHeader));
+			sbt.callablesRecordCount = programs[OptixProgramType::P_DirectCallable].size() + programs[OptixProgramType::P_ContinuationCallable].size();
+		}
 	}
 
-	const OptixShaderBindingTable& PipelineOptix::getSbt()
+	const OptixShaderBindingTable& SbtPipeline::getSbt()
 	{
 		if (isDirty)
 		{
-			createPipeline();
+			initSbtMap();
 		}
 
 		return sbt;
 	}
 
-	const CudaMap<uint32_t, sbtPosition>& PipelineOptix::getSbtMap()
+	const CudaMap<uint32_t, sbtPosition>& SbtPipeline::getSbtMap()
 	{
 		if (isDirty)
 		{
-			createPipeline();
+			initSbtMap();
 		}
-		return sbtMap; 
+		return sbtMap;
 	}
 
-	int PipelineOptix::getProgramSbt(std::string programName)
+	int SbtPipeline::getProgramSbt(std::string programName)
 	{
 		const CudaMap<uint32_t, sbtPosition>& map = getSbtMap();
 		const uint32_t hash = stringHash(programName.data());
@@ -510,18 +507,116 @@ namespace vtx::optix
 		}
 	}
 
-	int PipelineOptix::getProgramSbt(const CudaMap<uint32_t, sbtPosition>& map, std::string programName)
+	//int SbtPipeline::getProgramSbt(const CudaMap<uint32_t, sbtPosition>& map, std::string programName)
+	//{
+	//	const uint32_t hash = stringHash(programName.data());
+	//	if (map.contains(hash))
+	//	{
+	//		return map[hash].y;
+	//	}
+	//	else
+	//	{
+	//		VTX_ERROR("Program {} not found in SBT", programName);
+	//		return -1;
+	//	}
+	//}
+
+	void PipelineOptix::registerProgram(std::shared_ptr<ProgramOptix> program, std::vector<std::string> sbtNames)
 	{
-		const uint32_t hash = stringHash(programName.data());
-		if (map.contains(hash))
+		if (sbtNames.size() == 1 && sbtNames[0] == "")
 		{
-			return map[hash].y;
+			sbtNames[0] = "Default";
 		}
-		else
+		for (const auto& sbtName : sbtNames)
 		{
-			VTX_ERROR("Program {} not found in SBT", programName);
-			return -1;
+			if (sbtPipelines.find(sbtName) == sbtPipelines.end())
+			{
+				sbtPipelines[sbtName] = SbtPipeline();
+			}
+
+			sbtPipelines[sbtName].registerProgram(program);
 		}
+		isDirty = true;
+	}
+
+	std::vector<OptixProgramGroup> PipelineOptix::getAllProgramGroups()
+	{
+		if (isDirty || allProgramGroups.empty())
+		{
+			for (auto& [sbtName, sbtPipe] : sbtPipelines)
+			{
+				std::vector<OptixProgramGroup>& sbtPrograms = sbtPipe.getProgramGroups();
+				for (auto& pg : sbtPrograms)
+				{
+					//Check if pg is already in allProgramGroups
+					if (std::find(allProgramGroups.begin(), allProgramGroups.end(), pg) == allProgramGroups.end())
+					{
+						allProgramGroups.push_back(pg);
+					}
+				}
+			}
+		}
+
+		return allProgramGroups;
+	}
+
+	void PipelineOptix::createPipeline()
+	{
+		const std::vector<OptixProgramGroup>& pgs = getAllProgramGroups();
+
+		VTX_INFO("Optix Wrapper: Creating Pipeline");
+		const OptixDeviceContext& context = optix::getState()->optixContext;
+		const OptixPipelineLinkOptions& pipelineLinkOptions = optix::getState()->pipelineLinkOptions;
+		const OptixPipelineCompileOptions& pipelineCompileOptions = optix::getState()->pipelineCompileOptions;
+
+		char log[2048];
+		size_t logSize = sizeof(log);
+
+		const OptixResult result = optixPipelineCreate(context,
+													   &pipelineCompileOptions,
+													   &pipelineLinkOptions,
+													   pgs.data(),
+													   static_cast<int>(pgs.size()),
+													   log,
+													   &logSize,
+													   &pipeline);
+		//VTX_ASSERT_CONTINUE(logSize <= 1, log);
+		OPTIX_CHECK(result);
+
+		for(auto& [sbtName, sbtPipe] : sbtPipelines)
+		{
+			sbtPipe.initSbtMap();
+		}
+		isDirty = false;
+	}
+
+	const OptixPipeline& PipelineOptix::getPipeline()
+	{
+		if (!pipeline)
+		{
+			createPipeline();
+		}
+		return pipeline;
+	}
+
+	int PipelineOptix::getProgramSbt(std::string programName, std::string sbtName)
+	{
+		if (sbtName.empty())
+		{
+			sbtName = "Default";
+		}
+
+		return sbtPipelines[sbtName].getProgramSbt(programName);
+	}
+
+	const OptixShaderBindingTable& PipelineOptix::getSbt(std::string sbtName)
+	{
+		if (sbtName.empty())
+		{
+			sbtName = "Default";
+		}
+
+		return sbtPipelines[sbtName].getSbt();
 	}
 
 	OptixTraversableHandle createGeometryAcceleration(CUdeviceptr vertexData, uint32_t verticesNumber, uint32_t verticesStride, CUdeviceptr indexData, uint32_t indexNumber, uint32_t indicesStride)

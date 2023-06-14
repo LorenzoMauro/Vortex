@@ -201,8 +201,6 @@ namespace vtx::utl
 
 		return lowerBound;
 	}
-
-
 }
 
 #endif

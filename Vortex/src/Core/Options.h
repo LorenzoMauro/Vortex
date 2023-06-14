@@ -6,6 +6,12 @@
 
 namespace vtx
 {
+	enum MdlCallType
+	{
+		MDL_DIRECT_CALL,
+		MDL_INLINE,
+		MDL_CUDA
+	};
 	struct Options
 	{
 		bool        initialized = false;
@@ -24,6 +30,9 @@ namespace vtx
 		uint32_t                                  maxBounces;
 		uint32_t                                  maxSamples;
 		bool                                      accumulate;
+		int										  useWavefront;
+		bool									  fitWavefront;
+		bool									  useRussianRoulette;
 		RendererDeviceSettings::SamplingTechnique samplingTechnique;
 		RendererDeviceSettings::DisplayBuffer     displayBuffer;
 		float                                     maxClamp;
@@ -70,13 +79,13 @@ namespace vtx
 		int                      numTextureResults;
 		bool                     enable_derivatives;
 		const char*              mdlOptLevel;
-		bool                     directCallable;
+		MdlCallType				 mdlCallType;
 
 		////////////////////////////////////////////////////////////////////////////////////
 		/////////////////// Gui Options ////////////////////////////////////////////////////
 		////////////////////////////////////////////////////////////////////////////////////
-		float nodeWidth;
-		std::string   fontPath;
+		float       nodeWidth;
+		std::string fontPath;
 	};
 
 	Options* getOptions();

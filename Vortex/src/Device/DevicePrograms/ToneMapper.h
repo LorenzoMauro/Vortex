@@ -7,7 +7,7 @@
 #include "Utils.h"
 namespace vtx
 {
-    __device__ math::vec3f floatToScientificRGB(float value) {
+    __forceinline__ __device__ math::vec3f floatToScientificRGB(float value) {
         assert(value >= 0.0f && value <= 1.0f);
 
         float r = 0.0f;

@@ -9,7 +9,7 @@
 #include <mutex>
 #include <condition_variable>
 
-
+#include "Device/DevicePrograms/WavefrontIntegrator.h"
 
 namespace vtx::graph
 {
@@ -32,11 +32,14 @@ namespace vtx::graph
 		float                                     albedoNormalNoiseInfluence;
 		float                                     noiseCutOff;
 		int                                       fireflyKernelSize;
-		float								      fireflyThreshold;
-		bool									  removeFireflies;
-		bool									  enableDenoiser;
-		int										  denoiserStart;
-		float									  denoiserBlend;
+		float                                     fireflyThreshold;
+		bool                                      removeFireflies;
+		bool                                      enableDenoiser;
+		int                                       denoiserStart;
+		float                                     denoiserBlend;
+		bool                                      useWavefront;
+		bool                                      useRussianRoulette;
+		bool                                       fitWavefront;
 	};
 
 	struct ToneMapperSettings
@@ -81,8 +84,12 @@ namespace vtx::graph
 		void copyToGl();
 		void  setWindow(GLFWwindow* window);
 
+		int getWavefrontLaunches();
+		KernelTimes& getWaveFrontTimes();
+
 	public:
 		//GL Interop
+		WaveFrontIntegrator								waveFrontIntegrator;
 		GlFrameBuffer									drawFrameBuffer;
 		GlFrameBuffer									displayFrameBuffer;
 		CUgraphicsResource								cudaGraphicsResource = nullptr;
@@ -147,7 +154,7 @@ namespace vtx::graph
 			std::atomic<bool> bufferUpdateReady;
 		} threadData;
 
-		bool resizeGlBuffer;
+		bool        resizeGlBuffer;
 		GLFWwindow* sharedContext;
 	};
 

@@ -47,7 +47,7 @@ bool vtx::vtxImGui::ClippedText(const char* label)
 
     std::string labelStr = label;
     // Adjust the label to fit the halfItemWidth
-    float       labelWidth;
+    float       labelWidth = ImGui::CalcTextSize(labelStr.c_str()).x;
     float       spaceWidth    = ImGui::CalcTextSize(" ").x;
 	const float ellipsisWidth = ImGui::CalcTextSize("...").x;
 
@@ -85,6 +85,8 @@ bool vtx::vtxImGui::ClippedText(const char* label)
 
     // Draw the label
     ImGui::TextUnformatted(labelStr.c_str());
+
+    return false;
 }
 
 bool vtx::vtxImGui::colorPicker(const char* label, float* col)

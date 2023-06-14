@@ -102,36 +102,50 @@ namespace vtx::optix
 		const OptixProgramGroup& getProgramGroup();
 	};
 
+	typedef std::map<OptixProgramType, std::vector<std::shared_ptr<ProgramOptix>>> ProgramMap;
+	typedef std::map<std::string, ProgramMap> SbtMap;
+
+	struct SbtPipeline
+	{
+		ProgramMap																programs;
+		CudaMap<uint32_t, sbtPosition>											sbtMap;
+		std::vector<OptixProgramGroup>											programGroups;
+		bool																	isDirty = true;
+		OptixShaderBindingTable													sbt = {};
+		SbtMap																	sbtPrograms;
+		CUDABuffer																sbtRecordHeadersBuffer;
+
+		void initSbtMap();
+		std::vector<OptixProgramGroup> getProgramGroups();
+		void computeStackSize();
+		void createSbt();
+		void registerProgram(std::shared_ptr<ProgramOptix> program);
+		const OptixShaderBindingTable& getSbt();
+		const CudaMap<uint32_t, sbtPosition>& getSbtMap();
+		int getProgramSbt(std::string programName);
+		//static int getProgramSbt(const CudaMap<uint32_t, sbtPosition>& map, std::string programName);
+	};
+
 	struct PipelineOptix
 	{
-		void registerProgram(std::shared_ptr<ProgramOptix> program);
+		void registerProgram(std::shared_ptr<ProgramOptix> program, std::vector<std::string> sbtNames = {""});
 
-		std::vector<OptixProgramGroup> getProgramGroups();
+		std::vector<OptixProgramGroup> getAllProgramGroups();
 
 		void createPipeline();
 
 		const OptixPipeline& getPipeline();
 
-		void computeStackSize();
+		int getProgramSbt(std::string programName, std::string sbtName = "");
 
-		void createSbt();
+		const OptixShaderBindingTable& getSbt(std::string sbtName = "");
 
-		const OptixShaderBindingTable& getSbt();
-
-		const CudaMap<uint32_t, sbtPosition>& getSbtMap();
-
-		int getProgramSbt(std::string programName);
-
-		static int getProgramSbt(const CudaMap<uint32_t, sbtPosition>& map, std::string programName);
 
 	private:
 		OptixPipeline															pipeline = nullptr;
-		OptixShaderBindingTable													sbt = {};
 		bool																	isDirty = true;
-		std::map<OptixProgramType, std::vector<std::shared_ptr<ProgramOptix>>>	programs;
-		std::vector<OptixProgramGroup>											programGroups;
-		CudaMap<uint32_t, sbtPosition>											sbtMap;
-		CUDABuffer																sbtRecordHeadersBuffer;
+		std::vector<OptixProgramGroup>											allProgramGroups;
+		std::map<std::string, SbtPipeline>										sbtPipelines;
 	};
 
 	State* getState();
@@ -161,7 +175,7 @@ namespace vtx::optix
 	void createRenderingPipeline();
 
 	/*Utility to directly create a direct callable program from a function name and module*/
-	std::shared_ptr<ProgramOptix> createDcProgram(std::shared_ptr<ModuleOptix> module, std::string functionName, vtxID id = 0);
+	std::shared_ptr<ProgramOptix> createDcProgram(std::shared_ptr<ModuleOptix> module, std::string functionName, vtxID id = 0, std::vector<std::string> sbtName = {""});
 
 	/*Utility to create BLAS*/
 	OptixTraversableHandle createGeometryAcceleration(CUdeviceptr vertexData, uint32_t verticesNumber, uint32_t verticesStride, 

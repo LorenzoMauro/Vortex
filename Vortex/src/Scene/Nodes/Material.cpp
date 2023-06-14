@@ -1,4 +1,6 @@
 #include "Material.h"
+
+#include "MDL/CudaLinker.h"
 #include "Scene/Traversal.h"
 #include "MDL/MdlWrapper.h"
 #include "Scene/Nodes/Shader/mdl/ShaderNodes.h"
@@ -15,6 +17,8 @@ namespace vtx::graph
 
 		config = mdl::determineShaderConfiguration(getMaterialDbName());
 		targetCode = mdl::createTargetCode(getMaterialDbName(), config, getID());
+
+		mdl::getMdlCudaLinker().submitTargetCode(targetCode, name);
 
 		createPrograms();
 		textures = mdl::createTextureResources(targetCode);
@@ -120,6 +124,14 @@ namespace vtx::graph
 		return materialDbName;
 	}
 
+	FunctionNames& Material::getFunctionNames(bool cuda)
+	{
+		const std::string suffix = std::to_string(getID());
+		fNames                   = FunctionNames(suffix, cuda);
+
+		return fNames;
+	}
+
 	size_t Material::getArgumentBlockSize()
 	{
 		if (!argBlock)
@@ -179,14 +191,14 @@ namespace vtx::graph
 	{
 		visitor->visit(sharedFromBase<Material>());
 	}*/
-
+	
 
 	void Material::createPrograms()
 	{
 		auto module = std::make_shared<optix::ModuleOptix>();
 		module->name = name;
 		module->code = targetCode->get_code();
-		if (getOptions()->directCallable)
+		if (getOptions()->mdlCallType == MDL_DIRECT_CALL)
 		{
 			const auto fNames = graph::FunctionNames(std::to_string(getID()));
 
@@ -307,9 +319,13 @@ namespace vtx::graph
 				devicePrograms.pgHairEval = optix::createDcProgram(module, (fNames.hairBsdf + "_evaluate"));
 			}
 		}
+		else if(getOptions()->mdlCallType== MDL_INLINE)
+		{
+			devicePrograms.pgEvaluateMaterial = optix::createDcProgram(module, "__direct_callable__EvaluateMaterial", getID(), {"Default", "wfShade"});
+		}
 		else
 		{
-			devicePrograms.pgEvaluateMaterial = optix::createDcProgram(module, "__direct_callable__EvaluateMaterial", getID());
+			mdl::getMdlCudaLinker().submitTargetCode(targetCode, name);
 		}
 	}
 
@@ -437,8 +453,9 @@ namespace vtx::graph
 			mdl::compileMaterial(material->materialGraph->name, material->getMaterialDbName());
 			material->config = mdl::determineShaderConfiguration(material->getMaterialDbName());
 			mdl::addMaterialToLinkUnit(material->getMaterialDbName(), material->config, material->getID(), linkUnit);
-			VTX_INFO("Creating target code for shader {} index {} with {} functions.", material->getMaterialDbName());
+			VTX_INFO("Creating target code for shader {}", material->getMaterialDbName());
 			Handle<ITarget_code const> targetCode = mdl::generateTargetCode(linkUnit);
+
 			material->textures = mdl::createTextureResources(targetCode);
 			material->bsdfMeasurements = mdl::createBsdfMeasurementResources(targetCode);
 			material->lightProfiles = mdl::createLightProfileResources(targetCode);

@@ -23,16 +23,19 @@ namespace vtx {
 		/////////////////// Rendering Settings /////////////////////////////////////////////
 		////////////////////////////////////////////////////////////////////////////////////
 
-		options.maxBounces = 10;
-		options.maxSamples = 10000;
+		options.maxBounces = 1;
+		options.maxSamples = 1000;
 		options.accumulate = true;
+		options.useWavefront = true;
+		options.useRussianRoulette = true;
+		options.fitWavefront = false;
 		options.samplingTechnique = RendererDeviceSettings::SamplingTechnique::S_MIS;
-		options.displayBuffer = RendererDeviceSettings::DisplayBuffer::FB_BEAUTY;
+		options.displayBuffer = RendererDeviceSettings::DisplayBuffer::FB_NOISY;
 		options.maxClamp = 0.01f;
 		options.minClamp = 1000.0f;
 
 		options.noiseKernelSize = 3;
-		options.adaptiveSampling = true;
+		options.adaptiveSampling = false;
 		options.minAdaptiveSamples = 100;
 		options.minPixelSamples = 1;
 		options.maxPixelSamples = 200;
@@ -41,11 +44,11 @@ namespace vtx {
 
 		options.fireflyKernelSize = 3;
 		options.fireflyThreshold = 2.0f;
-		options.removeFireflies = true;
+		options.removeFireflies = false;
 
-		options.enableDenoiser = true;
+		options.enableDenoiser = false;
 		options.denoiserStart = 10;
-		options.denoiserBlend = 1.0f;
+		options.denoiserBlend = 0.3f;
 
 		options.whitePoint = { 1.0f, 1.0f, 1.0f };
 		options.colorBalance = { 1.0f, 1.0f, 1.0f };
@@ -73,7 +76,7 @@ namespace vtx {
 		options.enable_derivatives = false;
 		options.mdlOptLevel = "2";
 		options.initialized = true;
-		options.directCallable = false;
+		options.mdlCallType = MDL_CUDA;
 
 		////////////////////////////////////////////////////////////////////////////////////
 		/////////////////// Gui Options ////////////////////////////////////////////////////

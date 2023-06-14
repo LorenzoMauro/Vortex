@@ -5,7 +5,9 @@
 #include "Scene/Nodes/Renderer.h"
 #include <cudaGL.h>
 
+#include "Device/WorkQueues.h"
 #include "Device/DevicePrograms/CudaKernels.h"
+#include "MDL/CudaLinker.h"
 #include "Scene/SIM.h"
 #include "Scene/Nodes/Shader/Texture.h"
 
@@ -212,7 +214,7 @@ namespace vtx::device
 		const graph::DevicePrograms& dp = material->getPrograms();
 		const graph::Configuration& config = material->getConfiguration();
 		optix::PipelineOptix* rp = optix::getRenderingPipeline();
-		const CudaMap<vtxID, optix::sbtPosition>& sbtMap = rp->getSbtMap();
+		//const CudaMap<vtxID, optix::sbtPosition>& sbtMap = rp->getSbtMap();
 		DeviceShaderConfiguration                 dvConfig;
 
 		// The constant expression values:
@@ -222,9 +224,9 @@ namespace vtx::device
 		dvConfig.isThinWalled = material->isThinWalled();
 		dvConfig.hasOpacity = material->useOpacity();
 		dvConfig.isEmissive = material->useEmission();
-		dvConfig.directCallable = getOptions()->directCallable;
+		dvConfig.directCallable = (getOptions()->mdlCallType == MDL_DIRECT_CALL);
 
-		if (getOptions()->directCallable)
+		if (getOptions()->mdlCallType == MDL_DIRECT_CALL)
 		{
 			dvConfig.surfaceIntensity = math::vec3f(config.surfaceIntensity[0], config.surfaceIntensity[1], config.surfaceIntensity[2]);
 			dvConfig.surfaceIntensityMode = config.surfaceIntensityMode;
@@ -236,95 +238,101 @@ namespace vtx::device
 			dvConfig.cutoutOpacity = config.cutoutOpacity;
 
 			if (dp.pgInit) {
-				dvConfig.idxCallInit = optix::PipelineOptix::getProgramSbt(sbtMap, dp.pgInit->name);
+				dvConfig.idxCallInit = rp->getProgramSbt(dp.pgInit->name);
 			}
 
 			if (dp.pgThinWalled) {
-				dvConfig.idxCallThinWalled = optix::PipelineOptix::getProgramSbt(sbtMap, dp.pgThinWalled->name);
+				dvConfig.idxCallThinWalled = rp->getProgramSbt(dp.pgThinWalled->name);
 			}
 
 			if (dp.pgSurfaceScatteringSample) {
-				dvConfig.idxCallSurfaceScatteringSample = optix::PipelineOptix::getProgramSbt(sbtMap, dp.pgSurfaceScatteringSample->name);
+				dvConfig.idxCallSurfaceScatteringSample = rp->getProgramSbt(dp.pgSurfaceScatteringSample->name);
 			}
 
 			if (dp.pgSurfaceScatteringEval) {
-				dvConfig.idxCallSurfaceScatteringEval = optix::PipelineOptix::getProgramSbt(sbtMap, dp.pgSurfaceScatteringEval->name);
+				dvConfig.idxCallSurfaceScatteringEval = rp->getProgramSbt(dp.pgSurfaceScatteringEval->name);
 			}
 
 			if (dp.pgSurfaceScatteringAuxiliary) {
-				dvConfig.idxCallSurfaceScatteringAuxiliary = optix::PipelineOptix::getProgramSbt(sbtMap, dp.pgSurfaceScatteringAuxiliary->name);
+				dvConfig.idxCallSurfaceScatteringAuxiliary = rp->getProgramSbt(dp.pgSurfaceScatteringAuxiliary->name);
 			}
 
 			if (dp.pgBackfaceScatteringSample) {
-				dvConfig.idxCallBackfaceScatteringSample = optix::PipelineOptix::getProgramSbt(sbtMap, dp.pgBackfaceScatteringSample->name);
+				dvConfig.idxCallBackfaceScatteringSample = rp->getProgramSbt(dp.pgBackfaceScatteringSample->name);
 			}
 
 			if (dp.pgBackfaceScatteringEval) {
-				dvConfig.idxCallBackfaceScatteringEval = optix::PipelineOptix::getProgramSbt(sbtMap, dp.pgBackfaceScatteringEval->name);
+				dvConfig.idxCallBackfaceScatteringEval = rp->getProgramSbt(dp.pgBackfaceScatteringEval->name);
 			}
 
 			if (dp.pgBackfaceScatteringAuxiliary) {
-				dvConfig.idxCallBackfaceScatteringAuxiliary = optix::PipelineOptix::getProgramSbt(sbtMap, dp.pgBackfaceScatteringAuxiliary->name);
+				dvConfig.idxCallBackfaceScatteringAuxiliary = rp->getProgramSbt(dp.pgBackfaceScatteringAuxiliary->name);
 			}
 
 			if (dp.pgSurfaceEmissionEval) {
-				dvConfig.idxCallSurfaceEmissionEval = optix::PipelineOptix::getProgramSbt(sbtMap, dp.pgSurfaceEmissionEval->name);
+				dvConfig.idxCallSurfaceEmissionEval = rp->getProgramSbt(dp.pgSurfaceEmissionEval->name);
 			}
 
 			if (dp.pgSurfaceEmissionIntensity) {
-				dvConfig.idxCallSurfaceEmissionIntensity = optix::PipelineOptix::getProgramSbt(sbtMap, dp.pgSurfaceEmissionIntensity->name);
+				dvConfig.idxCallSurfaceEmissionIntensity = rp->getProgramSbt(dp.pgSurfaceEmissionIntensity->name);
 			}
 
 			if (dp.pgSurfaceEmissionIntensityMode) {
-				dvConfig.idxCallSurfaceEmissionIntensityMode = optix::PipelineOptix::getProgramSbt(sbtMap, dp.pgSurfaceEmissionIntensityMode->name);
+				dvConfig.idxCallSurfaceEmissionIntensityMode = rp->getProgramSbt(dp.pgSurfaceEmissionIntensityMode->name);
 			}
 
 			if (dp.pgBackfaceEmissionEval) {
-				dvConfig.idxCallBackfaceEmissionEval = optix::PipelineOptix::getProgramSbt(sbtMap, dp.pgBackfaceEmissionEval->name);
+				dvConfig.idxCallBackfaceEmissionEval = rp->getProgramSbt(dp.pgBackfaceEmissionEval->name);
 			}
 
 			if (dp.pgBackfaceEmissionIntensity) {
-				dvConfig.idxCallBackfaceEmissionIntensity = optix::PipelineOptix::getProgramSbt(sbtMap, dp.pgBackfaceEmissionIntensity->name);
+				dvConfig.idxCallBackfaceEmissionIntensity = rp->getProgramSbt(dp.pgBackfaceEmissionIntensity->name);
 			}
 
 			if (dp.pgBackfaceEmissionIntensityMode) {
-				dvConfig.idxCallBackfaceEmissionIntensityMode = optix::PipelineOptix::getProgramSbt(sbtMap, dp.pgBackfaceEmissionIntensityMode->name);
+				dvConfig.idxCallBackfaceEmissionIntensityMode = rp->getProgramSbt(dp.pgBackfaceEmissionIntensityMode->name);
 			}
 
 			if (dp.pgIor) {
-				dvConfig.idxCallIor = optix::PipelineOptix::getProgramSbt(sbtMap, dp.pgIor->name);
+				dvConfig.idxCallIor = rp->getProgramSbt(dp.pgIor->name);
 			}
 
 			if (dp.pgVolumeAbsorptionCoefficient) {
-				dvConfig.idxCallVolumeAbsorptionCoefficient = optix::PipelineOptix::getProgramSbt(sbtMap, dp.pgVolumeAbsorptionCoefficient->name);
+				dvConfig.idxCallVolumeAbsorptionCoefficient = rp->getProgramSbt(dp.pgVolumeAbsorptionCoefficient->name);
 			}
 
 			if (dp.pgVolumeScatteringCoefficient) {
-				dvConfig.idxCallVolumeScatteringCoefficient = optix::PipelineOptix::getProgramSbt(sbtMap, dp.pgVolumeScatteringCoefficient->name);
+				dvConfig.idxCallVolumeScatteringCoefficient = rp->getProgramSbt(dp.pgVolumeScatteringCoefficient->name);
 			}
 
 			if (dp.pgVolumeDirectionalBias) {
-				dvConfig.idxCallVolumeDirectionalBias = optix::PipelineOptix::getProgramSbt(sbtMap, dp.pgVolumeDirectionalBias->name);
+				dvConfig.idxCallVolumeDirectionalBias = rp->getProgramSbt(dp.pgVolumeDirectionalBias->name);
 			}
 
 			if (dp.pgGeometryCutoutOpacity) {
-				dvConfig.idxCallGeometryCutoutOpacity = optix::PipelineOptix::getProgramSbt(sbtMap, dp.pgGeometryCutoutOpacity->name);
+				dvConfig.idxCallGeometryCutoutOpacity = rp->getProgramSbt(dp.pgGeometryCutoutOpacity->name);
 			}
 
 			if (dp.pgHairSample) {
-				dvConfig.idxCallHairSample = optix::PipelineOptix::getProgramSbt(sbtMap, dp.pgHairSample->name);
+				dvConfig.idxCallHairSample = rp->getProgramSbt(dp.pgHairSample->name);
 			}
 
 			if (dp.pgHairEval) {
-				dvConfig.idxCallHairEval = optix::PipelineOptix::getProgramSbt(sbtMap, dp.pgHairEval->name);
+				dvConfig.idxCallHairEval = rp->getProgramSbt(dp.pgHairEval->name);
 			}
 		}
-		else
+		else if( getOptions()->mdlCallType == MDL_INLINE)
 		{
 			if (dp.pgEvaluateMaterial) {
-				dvConfig.idxCallEvaluateMaterial = optix::PipelineOptix::getProgramSbt(sbtMap, dp.pgEvaluateMaterial->name);
-				VTX_WARN("Fetching Shader {} EvaluateMaterial program {} with SBT {}", material->name, dp.pgEvaluateMaterial->name, dvConfig.idxCallEvaluateMaterial);
+				dvConfig.idxCallEvaluateMaterialStandard = rp->getProgramSbt(dp.pgEvaluateMaterial->name);
+				dvConfig.idxCallEvaluateMaterialWavefront = rp->getProgramSbt(dp.pgEvaluateMaterial->name, "wfShade");
+				VTX_WARN("Fetching Shader {} EvaluateMaterial STANDARD program {} with SBT {}", material->name, dp.pgEvaluateMaterial->name, dvConfig.idxCallEvaluateMaterialStandard);
+				VTX_WARN("Fetching Shader {} EvaluateMaterial WAVEFRONT program {} with SBT {}", material->name, dp.pgEvaluateMaterial->name, dvConfig.idxCallEvaluateMaterialWavefront);
 			}
+		}
+		else if (getOptions()->mdlCallType == MDL_CUDA)
+		{
+			dvConfig.idxCallEvaluateMaterialWavefront = mdl::getMdlCudaLinker().getMdlFunctionIndices(material->name);
 		}
 
 
@@ -439,7 +447,8 @@ namespace vtx::device
 	std::tuple<MaterialData, MaterialData*> createMaterialData(std::shared_ptr<graph::Material> material)
 	{
 
-		CUDA_SYNC_CHECK();
+		//CUDA_SYNC_CHECK();
+
 		MaterialData materialData   = {}; // Set everything to zero.
 		CUDABuffer&  argBlockBuffer = GET_BUFFER(Buffers::MaterialBuffers, material->getID(), argBlockBuffer);
 		// If the material has an argument block, allocate and upload it.
@@ -774,6 +783,111 @@ namespace vtx::device
 			rendererNode->resized             = false;
 			UPLOAD_DATA->isFrameBufferUpdated = true;
 			rendererNode->resizeGlBuffer      = true;
+
+			{
+				int maxQueueSize = rendererNode->width * rendererNode->height;
+
+				CUDABufferManager::deallocateAll();
+				const WorkQueueSOA<PixelWorkItem> pixelQueue(maxQueueSize, "pixelQueue");
+				CUDABuffer pixelQueueBuffer;
+				pixelQueueBuffer.upload(pixelQueue);
+				UPLOAD_DATA->launchParams.pixelQueue = pixelQueueBuffer.castedPointer<WorkQueueSOA<PixelWorkItem>>();
+
+				const WorkQueueSOA<RayWorkItem> radianceTraceQueue(maxQueueSize, "radianceTraceQueue");
+				CUDABuffer radianceTraceQueueBuffer;
+				radianceTraceQueueBuffer.upload(radianceTraceQueue);
+				UPLOAD_DATA->launchParams.radianceTraceQueue = radianceTraceQueueBuffer.castedPointer<WorkQueueSOA<RayWorkItem>>();
+
+				const WorkQueueSOA<RayWorkItem> shadeQueue(maxQueueSize, "shadeQueue");
+				CUDABuffer shadeQueueBuffer;
+				shadeQueueBuffer.upload(shadeQueue);
+				UPLOAD_DATA->launchParams.shadeQueue = shadeQueueBuffer.castedPointer<WorkQueueSOA<RayWorkItem>>();
+
+				const WorkQueueSOA<RayWorkItem> escapedQueue(maxQueueSize, "escapedQueue");
+				CUDABuffer escapedQueueBuffer;
+				escapedQueueBuffer.upload(escapedQueue);
+				UPLOAD_DATA->launchParams.escapedQueue = escapedQueueBuffer.castedPointer<WorkQueueSOA<RayWorkItem>>();
+
+				const WorkQueueSOA<RayWorkItem> accumulationQueue(maxQueueSize, "accumulationQueue");
+				CUDABuffer accumulationQueueBuffer;
+				accumulationQueueBuffer.upload(accumulationQueue);
+				UPLOAD_DATA->launchParams.accumulationQueue = accumulationQueueBuffer.castedPointer<WorkQueueSOA<RayWorkItem>>();
+
+
+				//CUDABuffer rayDataBuffer;
+				//rayDataBuffer.alloc(sizeof(RayData) * maxQueueSize);
+				//UPLOAD_DATA->launchParams.rays = rayDataBuffer.castedPointer<RayData>();
+
+				//CUDABuffer raydataMissBuffer;
+				//raydataMissBuffer.alloc(sizeof(RayData*) * maxQueueSize);
+				//UPLOAD_DATA->launchParams.escapedQueue = raydataMissBuffer.castedPointer<RayData*>();
+				////CUDABuffer missQueueBuffer;
+				////WorkQueue missQueue;
+				////missQueue.maxSize = maxQueueSize;
+				////missQueueBuffer.upload(missQueue);
+				////UPLOAD_DATA->launchParams.escapedQueue = missQueueBuffer.castedPointer<WorkQueue>();
+
+				//CUDABuffer raydataHitBuffer;
+				//raydataHitBuffer.alloc(sizeof(RayData*) * maxQueueSize);
+				//UPLOAD_DATA->launchParams.shadeQueue = raydataHitBuffer.castedPointer<RayData*>();
+				////CUDABuffer hitQueueBuffer;
+				////WorkQueue hitQueue;
+				////hitQueue.maxSize = maxQueueSize;
+				////hitQueueBuffer.upload(hitQueue);
+				////UPLOAD_DATA->launchParams.shadeQueue = hitQueueBuffer.castedPointer<WorkQueue>();
+
+				//CUDABuffer traceHitBuffer;
+				//traceHitBuffer.alloc(sizeof(RayData*) * maxQueueSize);
+				//UPLOAD_DATA->launchParams.radianceTraceQueue = traceHitBuffer.castedPointer<RayData*>();
+				////CUDABuffer traceHitQueueBuffer;
+				////WorkQueue traceHitQueue;
+				////traceHitQueue.maxSize = maxQueueSize;
+				////traceHitQueueBuffer.upload(traceHitQueue);
+				////UPLOAD_DATA->launchParams.radianceTraceQueue = traceHitQueueBuffer.castedPointer<WorkQueue>();
+
+				//CUDABuffer traceShadowBuffer;
+				//traceShadowBuffer.alloc(sizeof(RayData*) * maxQueueSize);
+				//UPLOAD_DATA->launchParams.shadowTraceQueue = traceShadowBuffer.castedPointer<RayData*>();
+				////CUDABuffer traceShadowQueueBuffer;
+				////WorkQueue traceShadowQueue;
+				////traceShadowQueue.maxSize = maxQueueSize;
+				////traceShadowQueueBuffer.upload(traceShadowQueue);
+				////UPLOAD_DATA->launchParams.shadowTraceQueue = traceShadowQueueBuffer.castedPointer<WorkQueue>();
+
+				//CUDABuffer accumulationDataBuffer;
+				//accumulationDataBuffer.alloc(sizeof(RayData*) * maxQueueSize);
+				//UPLOAD_DATA->launchParams.accumulationQueue = accumulationDataBuffer.castedPointer<RayData*>();
+				////CUDABuffer accumulationQueueBuffer;
+				////WorkQueue accumulationQueue;
+				////accumulationQueue.maxSize = maxQueueSize;
+				////accumulationQueueBuffer.upload(accumulationQueue);
+				////UPLOAD_DATA->launchParams.accumulationQueue = accumulationQueueBuffer.castedPointer<WorkQueue>();
+
+				//constexpr int startSize = 0;
+				//CUDABuffer radianceTraceQueueSizeBuffer;
+				//radianceTraceQueueSizeBuffer.upload(startSize);
+				//UPLOAD_DATA->launchParams.radianceTraceQueueSize = radianceTraceQueueSizeBuffer.castedPointer<int>();
+
+				//CUDABuffer shadowTraceQueueSizeBuffer;
+				//shadowTraceQueueSizeBuffer.upload(startSize);
+				//UPLOAD_DATA->launchParams.shadowTraceQueueSize = shadowTraceQueueSizeBuffer.castedPointer<int>();
+
+				//CUDABuffer shadeQueueSizeBuffer;
+				//shadeQueueSizeBuffer.upload(startSize);
+				//UPLOAD_DATA->launchParams.shadeQueueSize = shadeQueueSizeBuffer.castedPointer<int>();
+
+				//CUDABuffer escapedQueueSizeBuffer;
+				//escapedQueueSizeBuffer.upload(startSize);
+				//UPLOAD_DATA->launchParams.escapedQueueSize = escapedQueueSizeBuffer.castedPointer<int>();
+
+				//CUDABuffer accumulationQueueSizeBuffer;
+				//accumulationQueueSizeBuffer.upload(startSize);
+				//UPLOAD_DATA->launchParams.accumulationQueueSize = accumulationQueueSizeBuffer.castedPointer<int>();
+
+				//CUDABuffer maxQueueSizeBuffer;
+				//maxQueueSizeBuffer.upload(maxQueueSize);
+				//UPLOAD_DATA->launchParams.maxQueueSize = maxQueueSizeBuffer.castedPointer<int>();
+			}
 		}
 
 		if(rendererNode->settings.isUpdated)
@@ -781,6 +895,7 @@ namespace vtx::device
 			UPLOAD_DATA->settings.iteration         = rendererNode->settings.iteration;
 			UPLOAD_DATA->settings.accumulate        = rendererNode->settings.accumulate;
 			UPLOAD_DATA->settings.maxBounces        = rendererNode->settings.maxBounces;
+			UPLOAD_DATA->launchParams.remainingBounces = rendererNode->settings.maxBounces;
 			UPLOAD_DATA->settings.displayBuffer     = rendererNode->settings.displayBuffer;
 			UPLOAD_DATA->settings.samplingTechnique = rendererNode->settings.samplingTechnique;
 			UPLOAD_DATA->settings.minClamp          = rendererNode->settings.minClamp;
@@ -793,6 +908,7 @@ namespace vtx::device
 			UPLOAD_DATA->settings.noiseCutOff = rendererNode->settings.noiseCutOff;
 			UPLOAD_DATA->settings.removeFirefly = rendererNode->settings.removeFireflies;
 			UPLOAD_DATA->settings.enableDenoiser = rendererNode->settings.enableDenoiser;
+			UPLOAD_DATA->settings.useRussianRoulette = rendererNode->settings.useRussianRoulette;
 
 			UPLOAD_DATA->isSettingsUpdated   = true;
 			rendererNode->settings.isUpdated = false;
@@ -830,17 +946,16 @@ namespace vtx::device
 	SbtProgramIdx setProgramsSbt()
 	{
 		// This is hard Coded, I didn't find a better way which didn't have some hardcoded design or some hash map conversion from string on the device
-		SbtProgramIdx                             pg{};
+		SbtProgramIdx                             pg;
 		optix::PipelineOptix*                     rp     = optix::getRenderingPipeline();
-		const CudaMap<vtxID, optix::sbtPosition>& sbtMap = rp->getSbtMap();
 
-		pg.raygen          = optix::PipelineOptix::getProgramSbt(sbtMap, "raygen");
-		pg.exception       = optix::PipelineOptix::getProgramSbt(sbtMap, "exception");
-		pg.miss            = optix::PipelineOptix::getProgramSbt(sbtMap, "miss");
-		pg.hit             = optix::PipelineOptix::getProgramSbt(sbtMap, "hit");
-		pg.pinhole         = optix::PipelineOptix::getProgramSbt(sbtMap, "pinhole");
-		pg.meshLightSample = optix::PipelineOptix::getProgramSbt(sbtMap, "meshLightSample");
-		pg.envLightSample  = optix::PipelineOptix::getProgramSbt(sbtMap, "envLightSample");
+		pg.raygen          = rp->getProgramSbt("raygen");
+		pg.exception       = rp->getProgramSbt("exception");
+		pg.miss            = rp->getProgramSbt("miss");
+		pg.hit             = rp->getProgramSbt("hit");
+		pg.pinhole         = rp->getProgramSbt("pinhole");
+		pg.meshLightSample = rp->getProgramSbt("meshLightSample");
+		pg.envLightSample  = rp->getProgramSbt("envLightSample");
 
 		return pg;
 	}

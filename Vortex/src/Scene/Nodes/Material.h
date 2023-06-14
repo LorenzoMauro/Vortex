@@ -20,8 +20,6 @@ namespace vtx::graph
 		class ShaderNode;
 	}
 
-	
-
 	struct Configuration {
 		// The state of the expressions :
 		bool isThinWalledConstant = false;
@@ -68,32 +66,65 @@ namespace vtx::graph
 
 		FunctionNames() = default;
 
-		FunctionNames(const std::string& suffix) {
-			init = "__direct_callable__init_" + suffix;
-			thinWalled = "__direct_callable__thin_walled_" + suffix;
+		FunctionNames(const std::string& suffix, bool cuda = false)
+		{
+			if(!cuda)
+			{
+				init = "__direct_callable__init_" + suffix;
+				thinWalled = "__direct_callable__thin_walled_" + suffix;
 
-			surfaceScattering = "__direct_callable__surface_scattering_" + suffix;
+				surfaceScattering = "__direct_callable__surface_scattering_" + suffix;
 
-			surfaceEmissionEmission = "__direct_callable__surface_emission_emission_" + suffix;
-			surfaceEmissionIntensity = "__direct_callable__surface_emission_intensity_" + suffix;
-			surfaceEmissionMode = "__direct_callable__surface_emission_mode_" + suffix;
+				surfaceEmissionEmission = "__direct_callable__surface_emission_emission_" + suffix;
+				surfaceEmissionIntensity = "__direct_callable__surface_emission_intensity_" + suffix;
+				surfaceEmissionMode = "__direct_callable__surface_emission_mode_" + suffix;
 
-			backfaceScattering = "__direct_callable__backface_scattering_" + suffix;
+				backfaceScattering = "__direct_callable__backface_scattering_" + suffix;
 
-			backfaceEmissionEmission = "__direct_callable__backface_emission_emission_" + suffix;
-			backfaceEmissionIntensity = "__direct_callable__backface_emission_intensity_" + suffix;
-			backfaceEmissionMode = "__direct_callable__backface_emission_mode_" + suffix;
+				backfaceEmissionEmission = "__direct_callable__backface_emission_emission_" + suffix;
+				backfaceEmissionIntensity = "__direct_callable__backface_emission_intensity_" + suffix;
+				backfaceEmissionMode = "__direct_callable__backface_emission_mode_" + suffix;
 
-			ior = "__direct_callable__ior_" + suffix;
+				ior = "__direct_callable__ior_" + suffix;
 
-			volumeAbsorptionCoefficient = "__direct_callable__volume_absorption_coefficient_" + suffix;
-			volumeScatteringCoefficient = "__direct_callable__volume_scattering_coefficient_" + suffix;
-			volumeDirectionalBias = "__direct_callable__volume_directional_bias_" + suffix;
+				volumeAbsorptionCoefficient = "__direct_callable__volume_absorption_coefficient_" + suffix;
+				volumeScatteringCoefficient = "__direct_callable__volume_scattering_coefficient_" + suffix;
+				volumeDirectionalBias = "__direct_callable__volume_directional_bias_" + suffix;
 
-			geometryCutoutOpacity = "__direct_callable__geometry_cutout_opacity_" + suffix;
+				geometryCutoutOpacity = "__direct_callable__geometry_cutout_opacity_" + suffix;
 
-			hairBsdf = "__direct_callable__hair_" + suffix;
+				hairBsdf = "__direct_callable__hair_" + suffix;
+			}
+			else
+			{
+				init = "init_" + suffix;
+				thinWalled = "thin_walled_" + suffix;
+
+				surfaceScattering = "surface_scattering_" + suffix;
+
+				surfaceEmissionEmission = "surface_emission_emission_" + suffix;
+				surfaceEmissionIntensity = "surface_emission_intensity_" + suffix;
+				surfaceEmissionMode = "surface_emission_mode_" + suffix;
+
+				backfaceScattering = "backface_scattering_" + suffix;
+
+				backfaceEmissionEmission = "backface_emission_emission_" + suffix;
+				backfaceEmissionIntensity = "backface_emission_intensity_" + suffix;
+				backfaceEmissionMode = "backface_emission_mode_" + suffix;
+
+				ior = "ior_" + suffix;
+
+				volumeAbsorptionCoefficient = "volume_absorption_coefficient_" + suffix;
+				volumeScatteringCoefficient = "volume_scattering_coefficient_" + suffix;
+				volumeDirectionalBias = "volume_directional_bias_" + suffix;
+
+				geometryCutoutOpacity = "geometry_cutout_opacity_" + suffix;
+
+				hairBsdf = "hair_" + suffix;
+			}
+			
 		}
+
 
 		std::string init;
 		std::string thinWalled;
@@ -169,6 +200,7 @@ namespace vtx::graph
 		void dispatchParameters(std::vector<shader::ParameterInfo> params);
 
 		std::string getMaterialDbName();
+		FunctionNames&         getFunctionNames(bool cuda = false);
 
 		//void accept(std::shared_ptr<NodeVisitor> visitor) override;
 
@@ -212,6 +244,7 @@ namespace vtx::graph
 
 		mi::base::Handle<mi::neuraylib::ITarget_value_layout const>   argLayout;
 		mi::base::Handle<mi::neuraylib::ITarget_argument_block const> argumentBlock;
+		FunctionNames fNames;
 	};
 
 	void computeMaterialCode();

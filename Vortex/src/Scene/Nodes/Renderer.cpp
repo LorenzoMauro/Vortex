@@ -12,10 +12,27 @@
 #include "cuda_runtime.h"
 #include "Device/DevicePrograms/CudaKernels.h"
 #include "Device/UploadCode/UploadFunctions.h"
+#include "Device/Wrappers/dWrapper.h"
 
 namespace vtx::graph
 {
 
+	enum RenderingStages
+	{
+		R_NOISE_COMPUTATION,
+		R_TRACE,
+		R_POSTPROCESSING,
+		R_DISPLAY,
+
+		R_COUNT
+	};
+
+	inline static const char* renderingStagesNames[] = {
+		"Rendering Noise Computation",
+		"Rendering Trace",
+		"Rendering Post Processing",
+		"Rendering Display"
+	};
 
 	Renderer::Renderer() :
 		Node(NT_RENDERER),
@@ -32,6 +49,9 @@ namespace vtx::graph
 		settings.maxSamples = getOptions()->maxSamples;
 		settings.samplingTechnique = getOptions()->samplingTechnique;
 		settings.displayBuffer = getOptions()->displayBuffer;
+		settings.useWavefront = getOptions()->useWavefront;
+		settings.useRussianRoulette = getOptions()->useRussianRoulette;
+		settings.fitWavefront = getOptions()->fitWavefront;
 
 		settings.minClamp = getOptions()->maxClamp;
 		settings.maxClamp = getOptions()->minClamp;
@@ -75,6 +95,8 @@ namespace vtx::graph
 		glClearColor(0.2f, 0.2f, 0.2f, 1.0f);
 		glClear(GL_COLOR_BUFFER_BIT);
 		displayFrameBuffer.unbind();
+
+		waveFrontIntegrator = WaveFrontIntegrator();
 	}
 
 	void Renderer::setCamera(const std::shared_ptr<Camera>& cameraNode) {
@@ -136,14 +158,31 @@ namespace vtx::graph
 		const LaunchParams& launchParams = UPLOAD_DATA->launchParams;
 		const CUDABuffer& launchParamsBuffer = UPLOAD_BUFFERS->launchParamsBuffer;
 
-		
-		if (launchParams.frameBuffer.frameSize.x == 0)
+
+		if (launchParams.frameBuffer.frameSize.x == 0 || launchParams.frameBuffer.frameSize.y == 0)
 		{
 			return;
 		}
 
+		if(!settings.accumulate)
 		{
-			timer.reset();
+			settings.iteration = 0;
+		}
+		if (settings.iteration == 0)
+		{
+			resetKernelStats();
+			totalTimeSeconds = 0;
+			noiseComputationTime = 0;
+			traceComputationTime = 0;
+			postProcessingComputationTime = 0;
+			displayComputationTime = 0;
+		}
+
+		{
+			//timer.reset();
+			const std::pair<cudaEvent_t, cudaEvent_t> events = GetProfilerEvents(renderingStagesNames[R_NOISE_COMPUTATION]);
+			cudaEventRecord(events.first);
+
 			if (settings.adaptiveSampling && settings.minAdaptiveSamples <= settings.iteration)
 			{
 				if (settings.adaptiveSampling && settings.iteration >= settings.minAdaptiveSamples)
@@ -162,37 +201,45 @@ namespace vtx::graph
 						width, height, settings.noiseKernelSize, settings.albedoNormalNoiseInfluence);
 				}
 			}
+			cudaEventRecord(events.second);
 
-			device::incrementFrame();
-			CUDA_SYNC_CHECK();
-			noiseComputationTime += timer.elapsedMillis();
+		}
+		device::incrementFrame();
+
+		{
+			const std::pair<cudaEvent_t, cudaEvent_t> events = GetProfilerEvents(renderingStagesNames[R_TRACE]);
+			cudaEventRecord(events.first);
+
+			if(!settings.useWavefront)
+			{
+				const optix::State& state = *(optix::getState());
+				const OptixPipeline& pipeline = optix::getRenderingPipeline()->getPipeline();
+				const OptixShaderBindingTable& sbt = optix::getRenderingPipeline()->getSbt();
+
+				const auto result = optixLaunch(/*! pipeline we're launching launch: */
+					pipeline, state.stream,
+					/*! parameters and SBT */
+					launchParamsBuffer.dPointer(),
+					launchParamsBuffer.bytesSize(),
+					&sbt,
+					/*! dimensions of the launch: */
+					launchParams.frameBuffer.frameSize.x,
+					launchParams.frameBuffer.frameSize.y,
+					1
+				);
+				OPTIX_CHECK(result);
+			}
+			else
+			{
+				waveFrontIntegrator.render(settings.fitWavefront, settings.iteration);
+			}
+			cudaEventRecord(events.second);
 		}
 
 		{
-			timer.reset();
-			const optix::State& state = *(optix::getState());
-			const OptixPipeline& pipeline = optix::getRenderingPipeline()->getPipeline();
-			const OptixShaderBindingTable& sbt = optix::getRenderingPipeline()->getSbt();
 
-			const auto result = optixLaunch(/*! pipeline we're launching launch: */
-				pipeline, state.stream,
-				/*! parameters and SBT */
-				launchParamsBuffer.dPointer(),
-				launchParamsBuffer.bytesSize(),
-				&sbt,
-				/*! dimensions of the launch: */
-				launchParams.frameBuffer.frameSize.x,
-				launchParams.frameBuffer.frameSize.y,
-				1
-			);
-			OPTIX_CHECK(result);
-			CUDA_SYNC_CHECK();
-			traceComputationTime += timer.elapsedMillis();
-		}
-
-		{
-			timer.reset();
-
+			const std::pair<cudaEvent_t, cudaEvent_t> events = GetProfilerEvents(renderingStagesNames[R_POSTPROCESSING]);
+			cudaEventRecord(events.first);
 			math::vec3f* beauty = nullptr;
 			if (settings.removeFireflies)
 			{
@@ -210,31 +257,29 @@ namespace vtx::graph
 				beauty = optix::getState()->denoiser.denoise(settings.denoiserBlend);
 			}
 
-			CUDA_SYNC_CHECK();
 			switchOutput(launchParamsBuffer.castedPointer<LaunchParams>(), width, height, beauty);
-			postProcessingComputationTime += timer.elapsedMillis();
+			cudaEventRecord(events.second);
 		}
 
 		{
-			timer.reset();
-			CUDA_SYNC_CHECK();
+			const std::pair<cudaEvent_t, cudaEvent_t> events = GetProfilerEvents(renderingStagesNames[R_DISPLAY]);
+			cudaEventRecord(events.first);
 			copyToGl();
-			displayComputationTime += timer.elapsedMillis();
+			cudaEventRecord(events.second);
 		}
 
-		if (settings.iteration == 0)
-		{
-			totalTimeSeconds = 0;
-			noiseComputationTime = 0;
-			traceComputationTime = 0;
-			postProcessingComputationTime = 0;
-			displayComputationTime = 0;
-		}
+		noiseComputationTime = GetKernelTimeMS(renderingStagesNames[R_NOISE_COMPUTATION]);
+		traceComputationTime = GetKernelTimeMS(renderingStagesNames[R_TRACE]);
+		postProcessingComputationTime = GetKernelTimeMS(renderingStagesNames[R_POSTPROCESSING]);
+		displayComputationTime = GetKernelTimeMS(renderingStagesNames[R_DISPLAY]);
+		
 		totalTimeSeconds = (noiseComputationTime + traceComputationTime + postProcessingComputationTime + displayComputationTime) / 1000.0f;
 
-		fps = (float)(settings.iteration + 1) / totalTimeSeconds;
-		sppS = ((float)width * (float)height * ((float)settings.iteration + 1)) / totalTimeSeconds;
-		averageFrameTime = (float)(settings.iteration + 1) / (totalTimeSeconds * 1000.0f);
+		int actualLaunches = GetKernelLaunches(renderingStagesNames[R_TRACE]);
+
+		fps = (float)(actualLaunches) / totalTimeSeconds;
+		sppS = ((float)width * (float)height * ((float)actualLaunches)) / totalTimeSeconds;
+		averageFrameTime = (totalTimeSeconds * 1000.0f)/ (float)(actualLaunches);
 	}
 
 	void Renderer::resize(uint32_t _width, uint32_t _height) {
@@ -249,7 +294,7 @@ namespace vtx::graph
 
 	void Renderer::copyToGl() {
 		// Update the GL buffer here
-		CUDA_SYNC_CHECK();
+		//CUDA_SYNC_CHECK();
 		const optix::State& state = *(optix::getState());
 		const LaunchParams& launchParams = UPLOAD_DATA->launchParams;
 
@@ -306,6 +351,16 @@ namespace vtx::graph
 		// Create a shared OpenGL context for the separate thread
 		glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE);
 		sharedContext = glfwCreateWindow(1, 1, "Shared Context", nullptr, window);
+	}
+
+	int Renderer::getWavefrontLaunches()
+	{
+		return GetKernelLaunches(renderingStagesNames[R_TRACE]);
+	}
+
+	KernelTimes& Renderer::getWaveFrontTimes()
+	{
+		return waveFrontIntegrator.getKernelTime();
 	}
 
 	GlFrameBuffer Renderer::getFrame() {

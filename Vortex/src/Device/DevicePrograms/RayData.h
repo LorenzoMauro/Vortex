@@ -22,7 +22,7 @@ namespace vtx {
 #define GREENCOLOR  math::vec3f(0.0f, 1.0f, 0.0f)
 #define BLUECOLOR  math::vec3f(0.0f, 0.0f, 1.0f)
 
-	enum TraceEvent
+	enum TraceType
 	{
 		TR_MISS,
 		TR_HIT,
@@ -105,8 +105,8 @@ namespace vtx {
 		math::vec3f						position;					//Current Hit Position
 		float							distance;					//Distance of hit Position to Ray origin
 		int								depth;
-		TraceEvent						traceResult;				// Bitfield with flags. See FLAG_* defines above for its contents.
-		TraceEvent						traceOperation = TR_HIT;	// Bitfield with flags. See FLAG_* defines above for its contents.
+		TraceType						traceResult;				// Bitfield with flags. See FLAG_* defines above for its contents.
+		TraceType						traceOperation = TR_HIT;	// Bitfield with flags. See FLAG_* defines above for its contents.
 
 		math::vec3f						wo;							//Outgoing direction, to observer in world space
 		math::vec3f						wi;							//Incoming direction, to light, in world space
@@ -135,11 +135,11 @@ namespace vtx {
 	// Alias the PerRayData pointer and an math::vec2f for the payload split and merge operations. This generates only move instructions.
 	typedef union
 	{
-		PerRayData* ptr;
+		void* ptr;
 		math::vec2ui dat{0,0};
 	} Payload;
 
-	__forceinline__ __device__ math::vec2ui splitPointer(PerRayData* ptr)
+	__forceinline__ __device__ math::vec2ui splitPointer(void* ptr)
 	{
 		Payload payload;
 
@@ -148,7 +148,7 @@ namespace vtx {
 		return payload.dat;
 	}
 
-	__forceinline__ __device__ PerRayData* mergePointer(const unsigned int p0, const unsigned int p1)
+	__forceinline__ __device__ void* mergePointer(const unsigned int p0, const unsigned int p1)
 	{
 		Payload payload;
 

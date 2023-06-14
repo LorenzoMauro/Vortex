@@ -25,11 +25,11 @@ namespace vtx {
         int size;
         int capacity;
         bool isUpdated;
-#ifndef __CUDACC__
+//#ifndef __CUDACC__
         CUDABuffer keyBuffer;
         CUDABuffer valueBuffer;
         CUDABuffer mapBuffer;
-#endif
+//#endif
 
 
         __host__ CudaMap() :
