@@ -204,15 +204,16 @@ namespace vtx::mdl
 			VTX_ASSERT_CLOSE(state.result == 0, "Error with texture runtime with derivatives");
 		}
 
-		if (getOptions()->isDebug) {
-			Sint32 result;
-			result = state.backend->set_option("opt_level", getOptions()->mdlOptLevel);
-			VTX_ASSERT_CLOSE((result == 0), "Error with opt level");
-			//result = state.backend->set_option("enable_exceptions", "on");
-		}
-		else {
-			VTX_ASSERT_CLOSE((state.backend->set_option("inline_aggressively", "on") == 0), "Error with inline aggressive");
-		}
+		VTX_ASSERT_CLOSE((state.backend->set_option("inline_aggressively", "on") == 0), "Error with inline aggressive");
+		//if (getOptions()->isDebug) {
+		//	Sint32 result;
+		//	result = state.backend->set_option("opt_level", getOptions()->mdlOptLevel);
+		//	VTX_ASSERT_CLOSE((result == 0), "Error with opt level");
+		//	//result = state.backend->set_option("enable_exceptions", "on");
+		//}
+		//else {
+		//	VTX_ASSERT_CLOSE((state.backend->set_option("inline_aggressively", "on") == 0), "Error with inline aggressive");
+		//}
 
 		// FIXME Determine what scene data the renderer needs to provide here.
 		// FIXME scene_data_names is not a supported option anymore!
@@ -264,13 +265,9 @@ namespace vtx::mdl
 		}
 		configure();
 		startInterfaces();
-		if(getOptions()->mdlCallType == MDL_INLINE)
+		if(getOptions()->mdlCallType == MDL_INLINE || getOptions()->mdlCallType == MDL_CUDA)
 		{
-			setRendererModule("./bc/MaterialInline.bc", "__direct_callable__EvaluateMaterial");
-		}
-		else if(getOptions()->mdlCallType == MDL_CUDA)
-		{
-			setRendererModule("./bc/MaterialDirectCallable.bc", "__replace__EvaluateMaterial");
+			setRendererModule("./bc/MaterialDirectCallable.bc", "__direct_callable__EvaluateMaterial,__replace__EvaluateMaterial");
 		}
 	}
 

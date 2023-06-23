@@ -82,7 +82,11 @@ static void context_log_cb(unsigned int level,
 
 #define CU_CHECK(call) checkCuResultError(call,__FILE__, __LINE__)
 
+#ifdef NDEBUG
 #define CUDA_SYNC_CHECK() cudaSynchonize(__FILE__, __LINE__, false)
+#else
+#define CUDA_SYNC_CHECK()
+#endif
 
 
 #define OPTIX_CHECK_CONTINUE(call) checkOptixError(call, #call, __FILE__, __LINE__, false)

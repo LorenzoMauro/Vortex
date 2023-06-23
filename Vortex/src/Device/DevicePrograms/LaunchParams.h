@@ -10,9 +10,6 @@
 #include "NoiseData.h"
 #include "Scene/DataStructs/VertexAttribute.h"
 #include "Scene/Nodes/LightTypes.h"
-#include <optix.h>
-#include "nvccUtils.h"
-#include "Device/UploadCode/UploadBuffers.h"
 #include "Device/Wrappers/SOA.h"
 
 namespace vtx {
@@ -77,6 +74,7 @@ namespace vtx {
 
         int idxCallEvaluateMaterialStandard = -1;
         int idxCallEvaluateMaterialWavefront = -1;
+        int idxCallEvaluateMaterialWavefrontCuda = -1;
 
         int idxCallInit = -1; // The material global init function.
 
@@ -179,6 +177,7 @@ namespace vtx {
 
     struct MaterialData
     {
+        int                         materialWorkQueue;
         char*                       argBlock;
         DeviceShaderConfiguration*  materialConfiguration;
         TextureHandler*             textureHandler;
@@ -244,20 +243,15 @@ namespace vtx {
         ///////////////////////////////////////////
         /////////////// Passes ////////////////////
         ///////////////////////////////////////////
-        math::vec3f* rawRadiance;
-        math::vec3f* directLight;
-        math::vec3f* diffuseIndirect;
-        math::vec3f* glossyIndirect;
-        math::vec3f* transmissionIndirect;
+        math::vec3f* radianceAccumulator;
+        math::vec3f* albedoAccumulator;
+        math::vec3f* normalAccumulator;
 
         math::vec3f* tmRadiance;
-        math::vec3f* tmDirectLight;
-        math::vec3f* tmDiffuseIndirect;
-        math::vec3f* tmGlossyIndirect;
-        math::vec3f* tmTransmissionIndirect;
+        math::vec3f* hdriRadiance;
+        math::vec3f* normalNormalized;
+        math::vec3f* albedoNormalized;
 
-        math::vec3f* albedo;
-        math::vec3f* normal;
         math::vec3f* trueNormal;
         math::vec3f* tangent;
         math::vec3f* orientation;
@@ -265,6 +259,7 @@ namespace vtx {
         math::vec3f* debugColor1;
 
         math::vec3f* fireflyPass;
+        int*         samples;
         NoiseData*   noiseBuffer;
         CUdeviceptr  outputBuffer{};
         math::vec2ui frameSize;
@@ -291,10 +286,6 @@ namespace vtx {
         {
             FB_BEAUTY,
             FB_NOISY,
-            FB_DIRECT_LIGHT,
-            FB_DIFFUSE_INDIRECT,
-            FB_GLOSSY_INDIRECT,
-            FB_TRANSMISSION_INDIRECT,
 
             FB_DIFFUSE,
             FB_ORIENTATION,
@@ -312,10 +303,6 @@ namespace vtx {
         inline static const char* displayBufferNames[] = {
 				"Beauty",
                 "Noisy",
-                "Direct Light",
-                "diffuse Indirect",
-                "Glossy Indirect",
-                "Transmission Indirect",
                 "Diffuse",
                 "Orientation",
                 "True Normal",
@@ -341,9 +328,14 @@ namespace vtx {
         int                 maxPixelSamples;
         float               noiseCutOff;
 
+        bool                useLongPathKernel;
+        float               longPathPercentage;
+        int                 maxTraceQueueSize;
+
         bool enableDenoiser;
         bool removeFirefly;
-		bool  useRussianRoulette;
+		bool useRussianRoulette;
+		int  parallelShade;
 	};
 
     struct ToneMapperSettings
@@ -356,6 +348,13 @@ namespace vtx {
         float 	 invGamma;
     };
 
+    struct Counters {
+        int traceQueueCounter = 0;
+        int shadeQueueCounter = 0;
+        int escapedQueueCounter = 0;
+        int accumulationQueueCounter = 0;
+        int shadowQueueCounter = 0;
+    };
 
 	struct LaunchParams
     {
@@ -372,32 +371,14 @@ namespace vtx {
 		LightData*              envLight = nullptr;
         LightData**             lights;
         int                     numberOfLights;
+        Counters*                queueCounters;
 
-        /*RayData*   rays;
-        int* radianceTraceQueueSize;
-        int* shadowTraceQueueSize;
-        int* shadeQueueSize;
-        int* escapedQueueSize;
-        int* accumulationQueueSize;
-        int* maxQueueSize;
-        RayData** radianceTraceQueue;
-        RayData** shadowTraceQueue;
-        RayData** shadeQueue;
-        RayData** escapedQueue;
-        RayData** accumulationQueue;*/
-
-        WorkQueueSOA<PixelWorkItem>* pixelQueue;
-        WorkQueueSOA<RayWorkItem>* radianceTraceQueue;
-        WorkQueueSOA<RayWorkItem>* shadeQueue;
-        WorkQueueSOA<RayWorkItem>* escapedQueue;
-        WorkQueueSOA<RayWorkItem>* accumulationQueue;
-        //WorkQueue* radianceTraceQueue = nullptr;
-        //WorkQueue* shadowTraceQueue = nullptr;
-        //WorkQueue* shadeQueue = nullptr;
-        //WorkQueue* escapedQueue = nullptr;
-        //WorkQueue* accumulationQueue = nullptr;
-
-	};
+		WorkQueueSOA<TraceWorkItem>*        radianceTraceQueue;
+		WorkQueueSOA<RayWorkItem>*          shadeQueue;
+		WorkQueueSOA<ShadowWorkItem>*       shadowQueue;
+		WorkQueueSOA<EscapedWorkItem>*      escapedQueue;
+		WorkQueueSOA<AccumulationWorkItem>* accumulationQueue;
+    };
 
     enum TypeRay
     {

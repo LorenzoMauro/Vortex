@@ -30,7 +30,6 @@ void vtx::shutDownOperations()
 	VTX_INFO("ShutDown: Render Threads exitedd");
 
 	UPLOAD_BUFFERS->shutDown();
-	UPLOAD_DATA->shutDown();
 
 	optix::shutDown();
 	mdl::shutDown();

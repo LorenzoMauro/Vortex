@@ -57,7 +57,7 @@ namespace vtx::importer
         }
     }
 
-    std::shared_ptr<graph::shader::PrincipledMaterial> createPrincipledMaterial(const AssimpMaterialProperties& properties)
+    std::shared_ptr<graph::shader::PrincipledMaterial> createPrincipledMaterial(const AssimpMaterialProperties& properties, bool* isEmissive)
     {
         auto principled = ops::createNode<graph::shader::PrincipledMaterial>();
 
@@ -165,21 +165,25 @@ namespace vtx::importer
 
         if (!properties.emissionIntensity.path.empty())
         {
+            *isEmissive = true;
             principled->connectInput(EMISSION_INTENSITY_SOCKET, ops::createNode<graph::shader::ColorTexture>(properties.emissionIntensity.path));
         }
         else if (properties.emissionIntensity.value >= 1.0f)
         {
+            *isEmissive = true;
             principled->setSocketValue(EMISSION_INTENSITY_SOCKET, mdl::createConstantFloat(properties.emissionIntensity.value));
         }
         if(!properties.emissionColor.path.empty())
         {
-        	principled->connectInput(EMISSION_COLOR_SOCKET, ops::createNode<graph::shader::ColorTexture>(properties.emissionColor.path));
+            *isEmissive = true;
+            principled->connectInput(EMISSION_COLOR_SOCKET, ops::createNode<graph::shader::ColorTexture>(properties.emissionColor.path));
 		}
 		else if(properties.emissionColor.value != math::vec3f(-1.0f))
 		{
             principled->setSocketValue(EMISSION_COLOR_SOCKET, mdl::createConstantColor(properties.emissionColor.value));
             if (properties.emissionColor.value != math::vec3f(0.0f))
             {
+                *isEmissive = true;
                 //HACK this is a hack to compensate for lack of blender to gltf intensity eport
                 principled->setSocketValue(EMISSION_INTENSITY_SOCKET, mdl::createConstantFloat(100.0f));
             }
@@ -359,9 +363,14 @@ namespace vtx::importer
 
             AssimpMaterialProperties properties;
             properties.determineProperties(aiMat, scenePath);
-            auto principled = createPrincipledMaterial(properties);
+            bool isEmissive = false;
+			std::shared_ptr<graph::shader::PrincipledMaterial> principled = createPrincipledMaterial(properties, &isEmissive);
             // You can now use the extracted variables within the function
             material->materialGraph = principled;
+            if(isEmissive)
+            {
+                material->useAsLight = true;
+            }
             materials.push_back(material);
         }
 
@@ -503,7 +512,7 @@ namespace vtx::importer
 			}
 			else if(fileFormat == "obj")
 			{
-				unitScaleFactor = 1.0;
+				unitScaleFactor = 0.01;
 			}
 			else
 			{

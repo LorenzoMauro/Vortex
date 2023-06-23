@@ -23,32 +23,37 @@ namespace vtx {
 		/////////////////// Rendering Settings /////////////////////////////////////////////
 		////////////////////////////////////////////////////////////////////////////////////
 
-		options.maxBounces = 1;
+		options.runOnSeparateThread = false;
+		options.maxBounces = 10;
 		options.maxSamples = 1000;
 		options.accumulate = true;
-		options.useWavefront = true;
 		options.useRussianRoulette = true;
-		options.fitWavefront = false;
 		options.samplingTechnique = RendererDeviceSettings::SamplingTechnique::S_MIS;
-		options.displayBuffer = RendererDeviceSettings::DisplayBuffer::FB_NOISY;
+		options.displayBuffer = RendererDeviceSettings::DisplayBuffer::FB_BEAUTY;
 		options.maxClamp = 0.01f;
 		options.minClamp = 1000.0f;
-
 		options.noiseKernelSize = 3;
+
 		options.adaptiveSampling = false;
 		options.minAdaptiveSamples = 100;
 		options.minPixelSamples = 1;
-		options.maxPixelSamples = 200;
+		options.maxPixelSamples = 1;
 		options.albedoNormalNoiseInfluence = 1.0f;
-		options.noiseCutOff = 0.00f;
-
+		options.noiseCutOff = 0.1f;
 		options.fireflyKernelSize = 3;
 		options.fireflyThreshold = 2.0f;
 		options.removeFireflies = false;
 
+		options.useWavefront = true;
+		options.optixShade = false;
+		options.parallelShade = false;
+		options.fitWavefront = false;
+		options.longPathPercentage = 0.25f;
+		options.useLongPathKernel = false;
+
 		options.enableDenoiser = false;
 		options.denoiserStart = 10;
-		options.denoiserBlend = 0.3f;
+		options.denoiserBlend = 0.1f;
 
 		options.whitePoint = { 1.0f, 1.0f, 1.0f };
 		options.colorBalance = { 1.0f, 1.0f, 1.0f };

@@ -9,38 +9,11 @@
 #include <mutex>
 #include <condition_variable>
 
+#include "RendererSettings.h"
 #include "Device/DevicePrograms/WavefrontIntegrator.h"
 
 namespace vtx::graph
 {
-	struct RendererSettings
-	{
-		int                                       iteration;
-		int                                       maxBounces;
-		int                                       maxSamples;
-		bool                                      accumulate;
-		RendererDeviceSettings::SamplingTechnique samplingTechnique;
-		RendererDeviceSettings::DisplayBuffer     displayBuffer;
-		bool                                      isUpdated;
-		float                                     minClamp;
-		float                                     maxClamp;
-		int                                       noiseKernelSize;
-		bool                                      adaptiveSampling;
-		int                                       minAdaptiveSamples;
-		int                                       minPixelSamples;
-		int                                       maxPixelSamples;
-		float                                     albedoNormalNoiseInfluence;
-		float                                     noiseCutOff;
-		int                                       fireflyKernelSize;
-		float                                     fireflyThreshold;
-		bool                                      removeFireflies;
-		bool                                      enableDenoiser;
-		int                                       denoiserStart;
-		float                                     denoiserBlend;
-		bool                                      useWavefront;
-		bool                                      useRussianRoulette;
-		bool                                       fitWavefront;
-	};
 
 	struct ToneMapperSettings
 	{
@@ -106,15 +79,17 @@ namespace vtx::graph
 
 		vtx::Timer timer;
 
-		float		noiseComputationTime;
-		float		traceComputationTime;
-		float		postProcessingComputationTime;
-		float		displayComputationTime;
-		float      frameTime;
-		float      fps;
-		float      totalTimeSeconds;
-		float      sppS;
-		float      averageFrameTime;
+		float noiseComputationTime;
+		float traceComputationTime;
+		float postProcessingComputationTime;
+		float displayComputationTime;
+		float frameTime;
+		float fps;
+		float totalTimeSeconds;
+		float sppS;
+		float averageFrameTime;
+		float overallTime;
+		int internalIteration = 0;
 
 		struct ThreadData {
 			template <typename Fn>
@@ -124,6 +99,7 @@ namespace vtx::graph
 				bufferUpdateReady(false){
 				renderThread = std::thread([this, renderFunction, instance] {
 					while (true) {
+						// start timer
 						std::unique_lock<std::mutex> lock(renderMutex);
 						renderCondition.wait(lock, [this] { return exitRenderThread || renderThreadBusy; });
 						if (exitRenderThread) {

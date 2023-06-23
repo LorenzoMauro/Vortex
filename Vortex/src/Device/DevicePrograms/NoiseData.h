@@ -9,7 +9,8 @@ namespace vtx
 	enum NoiseType
 	{
 		LUMINANCE,
-		COLOR
+		COLOR,
+		HUE
 	};
 
 	enum NoiseDataType
@@ -21,11 +22,10 @@ namespace vtx
 
     struct NoiseData
     {
-        float noise;
-        float radianceNoise;
-        float albedoNoise;
-        float normalNoise;
-        int samples;
+		float normalizedNoise;
+		float prevNoise = 0.0f;
+        float noiseAbsolute;
+        int	  adaptiveSamples = 1.0f;
     };
 }
 

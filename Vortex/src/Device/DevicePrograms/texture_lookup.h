@@ -1168,10 +1168,10 @@ extern "C" __device__ float df_bsdf_measurement_pdf(
 
 // Implementation of df::bsdf_measurement_albedos() for an MBSDF.
 extern "C" __device__ void df_bsdf_measurement_albedos(
-    float result[4], // output: [0] albedo refl. for theta_phi
-    // [1] max albedo refl. global
-    // [2] albedo trans. for theta_phi
-    // [3] max albedo trans. global
+    float result[4], // output: [0] albedoAccumulator refl. for theta_phi
+    // [1] max albedoAccumulator refl. global
+    // [2] albedoAccumulator trans. for theta_phi
+    // [3] max albedoAccumulator trans. global
     Texture_handler_base const* self_base,
     unsigned int bsdf_measurement_index,
     float const theta_phi[2])

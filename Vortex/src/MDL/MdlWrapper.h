@@ -1,4 +1,5 @@
 #pragma once
+#include <map>
 #include <mi/mdl_sdk.h>
 #include <mi/base/config.h>
 #include <mi/neuraylib/ineuray.h>
@@ -174,11 +175,11 @@ namespace vtx::mdl
 	/*Analyze target Code and extract all parameters, it sets the values of the argumentBlockClone, params list and mapEnumTypes*/	
 	std::vector<graph::shader::ParameterInfo> getArgumentBlockData(
 		const std::string&                                                   materialDbName,
-		const std::string&													functionDefinitionSignature,
+		const std::string&                                                   functionDefinitionSignature,
 		const mi::base::Handle<mi::neuraylib::ITarget_code const>&           targetCode,
 		mi::base::Handle<mi::neuraylib::ITarget_argument_block>&             argumentBlockClone,
 		std::map<std::string, std::shared_ptr<graph::shader::EnumTypeInfo>>& mapEnumTypes,
-		int materialAdditionIndex = 0);
+		int                                                                  materialAdditionIndex = 0);
 
 	std::shared_ptr<graph::Texture> createTextureFromFile(const std::string& filePath);
 

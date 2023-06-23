@@ -63,7 +63,7 @@ bool vtx::vtxImGui::ClippedText(const char* label)
     if(positionalWidth.back() > totalItemWidth)
     {
         size_t currentPosition = positionalWidth.size() - 1;
-        while (positionalWidth[currentPosition] + ellipsisWidth > totalItemWidth)
+    	while (currentPosition>0 && positionalWidth[currentPosition] + ellipsisWidth > totalItemWidth)
         {
             currentPosition--;
 		}

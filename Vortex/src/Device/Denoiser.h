@@ -8,10 +8,8 @@ namespace vtx::optix {
 	{
 	public:
 
-		~OptixDenoiserWrapper();
-
 		void setInputs(CUDABuffer& iRadiance, CUDABuffer& iAlbedo, CUDABuffer& iNormal);
-
+		void shutDown();
 		void resize(const unsigned cWidth, const unsigned cHeight);
 
 		math::vec3f* denoise(float blend) const;

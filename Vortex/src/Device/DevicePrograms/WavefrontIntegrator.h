@@ -1,22 +1,22 @@
 #include "LaunchParams.h"
-#include "Core/Timer.h"
+#include "Scene/Nodes/RendererSettings.h"
 
 namespace vtx
 {
 	struct KernelTimes
 	{
-		float genCameraRay           = 0.0f;
-		float traceRadianceRay       = 0.0f;
-		float reset                  = 0.0f;
-		float shadeRay               = 0.0f;
-		float handleEscapedRay       = 0.0f;
-		float accumulateRay          = 0.0f;
-		float fetchQueueSize         = 0.0f;
-		float pixelQueue			 = 0.0f;
+		float genCameraRay     = 0.0f;
+		float traceRadianceRay = 0.0f;
+		float reset            = 0.0f;
+		float shadeRay         = 0.0f;
+		float handleEscapedRay = 0.0f;
+		float accumulateRay    = 0.0f;
+		float fetchQueueSize   = 0.0f;
+		float setQueueCounters = 0.0f;
 
 		float totMs()
 		{
-			return genCameraRay + traceRadianceRay + reset + shadeRay + handleEscapedRay + accumulateRay + fetchQueueSize + pixelQueue;
+			return setQueueCounters + genCameraRay + traceRadianceRay + reset + shadeRay + handleEscapedRay + accumulateRay + fetchQueueSize;
 		}
 	};
 
@@ -26,32 +26,37 @@ namespace vtx
 		Q_SHADE,
 		Q_ESCAPED,
 		Q_ACCUMULATION,
-		Q_PIXEL
+		Q_PIXEL,
+		Q_SHADOW_TRACE
 	};
 
 	class WaveFrontIntegrator
 	{
 	public:
 
-		WaveFrontIntegrator();
+		WaveFrontIntegrator(graph::RendererSettings* settings);
 
 		KernelTimes& getKernelTime();
 
-		void cudaShade();
+		void render();
 
-		void render(bool fitKernelSize, int iteration);
+		void downloadCounters();
 
 		void generatePixelQueue();
 
-		void generateCameraRadianceRays();
+		void launchOptixKernel(math::vec2i launchDimension, std::string pipelineName);
 
 		void traceRadianceRays();
 
 		void resetQueue(Queue queue);
 
-		int fetchQueueSize(Queue queue);
+		void setCounters();
+
+		void resetCounters();
 
 		void shadeRays();
+
+		void handleShadowTrace();
 
 		void handleEscapedRays();
 
@@ -59,11 +64,12 @@ namespace vtx
 
 		LaunchParams* hostParams;
 		LaunchParams* deviceParams;
-		int           numberOfPixels;
+		int           maxTraceQueueSize;
 		KernelTimes   kernelTimes;
 		CUDABuffer    queueSizeRetrievalBuffer;
 		int*          queueSizeDevicePtr;
 		int           retrievedQueueSize;
-		bool           fitKernelSize;
+		graph::RendererSettings* settings;
+		Counters 	counters;
 	};
 }

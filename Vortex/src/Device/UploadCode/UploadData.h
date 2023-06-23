@@ -21,11 +21,6 @@ namespace vtx::device
 		UploadData& operator=(const UploadData&) = delete;  // Disable assignment operator
 		UploadData(UploadData&&) = delete;                  // Disable move constructor
 		UploadData& operator=(UploadData&&) = delete;       // Disable move assignment operator
-		
-		void shutDown()
-		{
-			
-		}
 
 		//This first Set of Data is used to manage the cuda memory buffer memory, not create a new memory everytime something changes.
 		// Each node will use its own buffer, and the buffer will be updated when the node is visited.
@@ -45,13 +40,13 @@ namespace vtx::device
 		CameraData								cameraData;
 		bool									isCameraUpdated;
 		FrameBufferData							frameBufferData;
-		bool									isFrameBufferUpdated = false;
+		bool									isFrameBufferUpdated = true;
 		int										frameId = 0;
-		bool									isFrameIdUpdated = false;
+		bool									isFrameIdUpdated = true;
 		RendererDeviceSettings					settings;
-		bool									isSettingsUpdated = false;
+		bool									isSettingsUpdated = true;
 		ToneMapperSettings						toneMapperSettings;
-		bool									isToneMapperSettingsUpdated = false;			
+		bool									isToneMapperSettingsUpdated = true;			
 
 		SbtProgramIdx							programs;
 

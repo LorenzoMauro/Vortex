@@ -10,6 +10,7 @@
 #include "UploadCode/UploadFunctions.h"
 #include "UploadCode/CUDAMap.h"
 
+
 namespace vtx::device
 {
 	void DeviceVisitor::visit(const std::shared_ptr<graph::Instance> instance)
@@ -64,7 +65,8 @@ namespace vtx::device
 	{
 		//TODO : Check if the texture has been updated
 		if (const vtxID materialId = material->getID(); (!UPLOAD_DATA->materialDataMap.contains(materialId) || material->isUpdated)) {
-			const std::tuple<MaterialData, MaterialData*> mat = createMaterialData(material);
+			int matQueueId = UPLOAD_DATA->materialDataMap.size;
+			const std::tuple<MaterialData, MaterialData*> mat = createMaterialData(material, matQueueId);
 			UPLOAD_DATA->materialDataMap.insert(materialId, mat);
 			material->isUpdated = false;
 		}
@@ -165,6 +167,7 @@ namespace vtx::device
 			uploadData->launchParams.topObject = optix::createInstanceAcceleration(uploadData->optixInstances);
 			uploadData->launchParams.instances = uploadBuffers->instancesBuffer.castedPointer<InstanceData*>();
 			isLaunchParamsUpdated = true;
+			uploadData->instanceDataMap.isUpdated = false;
 		}
 		if (uploadData->lightDataMap.isUpdated && uploadData->lightDataMap.size != 0)
 		{
@@ -181,6 +184,7 @@ namespace vtx::device
 			uploadData->launchParams.lights = uploadBuffers->lightsDataBuffer.castedPointer<LightData*>();
 			uploadData->launchParams.numberOfLights = lightData.size();
 			isLaunchParamsUpdated = true;
+			uploadData->lightDataMap.isUpdated = false;
 		}
 		if(uploadData->isCameraUpdated)
 		{
@@ -188,10 +192,34 @@ namespace vtx::device
 			uploadData->isCameraUpdated = false;
 			isLaunchParamsUpdated = true;
 		}
+		if (uploadData->materialDataMap.isUpdated)
+		{
+			uploadData->materialDataMap.isUpdated = false;
+			/*int maxQueueSize = uploadData->frameBufferData.frameSize.x* uploadData->frameBufferData.frameSize.x;
+			int materialQueueSize = uploadData->materialDataMap.size;
+
+			std::vector<WorkQueueSOA<RayWorkItem>*> materialQueueVector;
+			for(int i = 0; i< materialQueueSize; i++)
+			{
+				WorkQueueSOA<RayWorkItem> workQueue(maxQueueSize, "MaterialQueue");
+				CUDABuffer workQueueBuffer;
+				workQueueBuffer.upload(workQueue);
+				materialQueueVector.push_back(workQueueBuffer.castedPointer<WorkQueueSOA<RayWorkItem>>());
+			}
+
+			CUDABuffer materialQueueBufferArray;
+			materialQueueBufferArray.upload(materialQueueVector);
+			UPLOAD_DATA->launchParams.materialQueue = materialQueueBufferArray.castedPointer<WorkQueueSOA<RayWorkItem>*>();
+			optix::createMaterialStreamVector(uploadData->materialDataMap.size);
+			VTX_WARN("Material queue size : {}", materialQueueSize);
+			isLaunchParamsUpdated = true;*/
+		}
+
 		if(uploadData->isFrameBufferUpdated)
 		{
 			uploadData->launchParams.frameBuffer = uploadData->frameBufferData;
 			uploadData->isCameraUpdated = false;
+			uploadData->isFrameBufferUpdated = false;
 			isLaunchParamsUpdated = true;
 		}
 		if(uploadData->isFrameIdUpdated)
@@ -206,6 +234,7 @@ namespace vtx::device
 				uploadData->launchParams.frameID = uploadBuffers->frameIdBuffer.castedPointer<int>();
 				isLaunchParamsUpdated = true;
 			}
+			uploadData->isFrameIdUpdated = false;
 		}
 		if(uploadData->isSettingsUpdated)
 		{
@@ -216,6 +245,7 @@ namespace vtx::device
 				uploadData->launchParams.settings = uploadBuffers->rendererSettingsBuffer.castedPointer<RendererDeviceSettings>();
 				isLaunchParamsUpdated = true;
 			}
+			uploadData->isSettingsUpdated = false;
 		}
 
 		if (uploadData->isToneMapperSettingsUpdated)
@@ -226,6 +256,7 @@ namespace vtx::device
 				uploadData->launchParams.toneMapperSettings = uploadBuffers->toneMapperSettingsBuffer.castedPointer<ToneMapperSettings>();
 				isLaunchParamsUpdated = true;
 			}
+			uploadData->isToneMapperSettingsUpdated = false;
 		}
 
 		//ATTENTION We do this only once! (hence the no update) However, this might be a way to swap rendering pipeline by changing the set of programSbt
@@ -241,6 +272,7 @@ namespace vtx::device
 		{
 			uploadBuffers->launchParamsBuffer.upload(uploadData->launchParams);
 		}
+
 	}
 
 	void incrementFrame() {

@@ -29,18 +29,36 @@ namespace vtx {
             renderer->settings.iteration = -1;
             renderer->settings.isUpdated = true;
         }
-        if (renderer->isReady() && renderer->settings.iteration<= renderer->settings.maxSamples)
+        if(renderer->settings.runOnSeparateThread)
         {
-            renderer->settings.iteration++;
-            renderer->settings.isUpdated = true;
-			graph::computeMaterialsMultiThreadCode();
-            renderer->traverse({ std::dynamic_pointer_cast<NodeVisitor>(hostVisitor) });
-            renderer->traverse({ std::dynamic_pointer_cast<NodeVisitor>(deviceVisitor) });
-            device::incrementFrame();
-            device::finalizeUpload();
-            renderer->threadedRender();
-            //renderer->render();
+            if (renderer->isReady() && renderer->settings.iteration <= renderer->settings.maxSamples)
+            {
+                renderer->settings.iteration++;
+                renderer->settings.isUpdated = true;
+                graph::computeMaterialsMultiThreadCode();
+                renderer->traverse({ std::dynamic_pointer_cast<NodeVisitor>(hostVisitor) });
+                renderer->traverse({ std::dynamic_pointer_cast<NodeVisitor>(deviceVisitor) });
+                device::incrementFrame();
+                device::finalizeUpload();
+                renderer->threadedRender();
+                //renderer->render();
+            }
         }
+        else
+        {
+	        if (renderer->settings.iteration <= renderer->settings.maxSamples)
+	        {
+	        	renderer->settings.iteration++;
+				renderer->settings.isUpdated = true;
+				graph::computeMaterialsMultiThreadCode();
+				renderer->traverse({ std::dynamic_pointer_cast<NodeVisitor>(hostVisitor) });
+				renderer->traverse({ std::dynamic_pointer_cast<NodeVisitor>(deviceVisitor) });
+				device::incrementFrame();
+				device::finalizeUpload();
+				renderer->render();
+			}
+        }
+        
         
     }
 

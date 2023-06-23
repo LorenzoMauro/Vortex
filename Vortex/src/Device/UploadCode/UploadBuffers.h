@@ -165,6 +165,32 @@ namespace vtx::device
 			}
 		};
 
+		struct NoiseComputationBuffers
+		{
+			CUDABuffer radianceRangeBuffer;
+			CUDABuffer normalRangeBuffer;
+			CUDABuffer albedoRangeBuffer;
+			CUDABuffer globalRadianceRangeBuffer;
+			CUDABuffer globalAlbedoRangeBuffer;
+			CUDABuffer globalNormalRangeBuffer;
+			CUDABuffer noiseSumBuffer;
+			CUDABuffer remainingSamplesBuffer;
+
+			NoiseComputationBuffers() = default;
+			~NoiseComputationBuffers()
+			{
+				VTX_INFO("ShutDown: Noise Computation Buffers");
+				radianceRangeBuffer.free();
+				normalRangeBuffer.free();
+				albedoRangeBuffer.free();
+				globalRadianceRangeBuffer.free();
+				globalAlbedoRangeBuffer.free();
+				globalNormalRangeBuffer.free();
+				noiseSumBuffer.free();
+				remainingSamplesBuffer.free();
+			}
+		};
+
 		struct FrameBufferBuffers
 		{
 
@@ -175,9 +201,9 @@ namespace vtx::device
 			CUDABuffer transmissionIndirect;
 
 			CUDABuffer tmRadiance;
-			CUDABuffer tmDirectLight;
-			CUDABuffer tmDiffuseIndirect;
-			CUDABuffer tmGlossyIndirect;
+			CUDABuffer hdriRadiance;
+			CUDABuffer normalNormalized;
+			CUDABuffer albedoNormalized;
 			CUDABuffer tmTransmissionIndirect;
 
 			CUDABuffer albedo;
@@ -190,11 +216,9 @@ namespace vtx::device
 
 			CUDABuffer fireflyRemoval;
 
+			CUDABuffer samples;
 			CUDABuffer cudaOutputBuffer;
 			CUDABuffer noiseDataBuffer;
-			CUDABuffer radianceRangeBuffer;
-			CUDABuffer normalRangeBuffer;
-			CUDABuffer albedoRangeBuffer;
 
 
 			FrameBufferBuffers() = default;
@@ -208,9 +232,9 @@ namespace vtx::device
 				glossyIndirect.free();
 				transmissionIndirect.free();
 				tmRadiance.free();
-				tmDirectLight.free();
-				tmDiffuseIndirect.free();
-				tmGlossyIndirect.free();
+				hdriRadiance.free();
+				normalNormalized.free();
+				albedoNormalized.free();
 				tmTransmissionIndirect.free();
 				albedo.free();
 				normal.free();
@@ -222,9 +246,6 @@ namespace vtx::device
 				fireflyRemoval.free();
 				noiseDataBuffer.free();
 				noiseDataBuffer.free();
-				radianceRangeBuffer.free();
-				normalRangeBuffer.free();
-				albedoRangeBuffer.free();
 				directLight.free();
 				diffuseIndirect.free();
 				glossyIndirect.free();
@@ -323,6 +344,11 @@ namespace vtx::device
 			return getBufferCollectionElement(light, nodeId);
 		}
 
+		template<>
+		NoiseComputationBuffers& getBuffer(const vtxID nodeId) {
+			return getBufferCollectionElement(noiseComputationBuffer, nodeId);
+		}
+
 		std::map<vtxID, InstanceBuffers>     instance;
 		std::map<vtxID, GeometryBuffers>     geometry;
 		std::map<vtxID, MaterialBuffers>     material;
@@ -331,6 +357,7 @@ namespace vtx::device
 		std::map<vtxID, LightProfileBuffers> lightProfile;
 		std::map<vtxID, FrameBufferBuffers>  frameBuffer;
 		std::map<vtxID, LightBuffers>        light;
+		std::map<vtxID, NoiseComputationBuffers>        noiseComputationBuffer;
 		CUDABuffer                           frameIdBuffer;
 		CUDABuffer                           launchParamsBuffer;
 		CUDABuffer                           rendererSettingsBuffer;

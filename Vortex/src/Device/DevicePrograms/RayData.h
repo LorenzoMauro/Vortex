@@ -52,6 +52,7 @@ namespace vtx {
 		math::vec3f             position;
 		math::vec3f             direction;
 		float                   distance;
+		math::vec3f    mediumIor;
 
 		//Transformations
 		math::affine3f        objectToWorld;
@@ -76,8 +77,8 @@ namespace vtx {
 		bool isFrontFace;
 		unsigned  seed;
 
-		float4					oTwF4[3];
-		float4					wToF4[3];
+		float4 oTwF4[3];
+		float4 wToF4[3];
 	};
 
 	struct MaterialStack

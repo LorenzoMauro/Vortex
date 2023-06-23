@@ -29,8 +29,9 @@ namespace vtx::optix
 		OptixPipelineCompileOptions		pipelineCompileOptions{};
 		OptixPipelineLinkOptions		pipelineLinkOptions{};
 
-		bool							isValid = false;
-		OptixDenoiserWrapper			denoiser{};
+		bool                 isValid = false;
+		OptixDenoiserWrapper denoiser{};
+		std::vector<CUstream>             materialStreams;
 	};
 
 	// index 1 is global, index 2 is local
@@ -117,7 +118,6 @@ namespace vtx::optix
 
 		void initSbtMap();
 		std::vector<OptixProgramGroup> getProgramGroups();
-		void computeStackSize();
 		void createSbt();
 		void registerProgram(std::shared_ptr<ProgramOptix> program);
 		const OptixShaderBindingTable& getSbt();
@@ -131,6 +131,8 @@ namespace vtx::optix
 		void registerProgram(std::shared_ptr<ProgramOptix> program, std::vector<std::string> sbtNames = {""});
 
 		std::vector<OptixProgramGroup> getAllProgramGroups();
+
+		void computeStackSize();
 
 		void createPipeline();
 
@@ -173,6 +175,8 @@ namespace vtx::optix
 	void setPipelineLinkOptions();
 
 	void createRenderingPipeline();
+
+	std::vector<cudaStream_t>& createMaterialStreamVector(const int size);
 
 	/*Utility to directly create a direct callable program from a function name and module*/
 	std::shared_ptr<ProgramOptix> createDcProgram(std::shared_ptr<ModuleOptix> module, std::string functionName, vtxID id = 0, std::vector<std::string> sbtName = {""});

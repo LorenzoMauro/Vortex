@@ -23,7 +23,7 @@ namespace vtx::graph
 				materialSlot.meshLight->attributes->init();
 				materialSlot.isMeshLightEvaluated = true;
 			}
-			if(materialSlot.meshLight->attributes->isValid)
+			if(materialSlot.meshLight->attributes->isValid )
 			{
 				materialSlot.meshLight->traverse(orderedVisitors);
 			}

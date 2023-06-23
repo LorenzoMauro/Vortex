@@ -1,7 +1,9 @@
 #pragma once
 #ifndef MDL_DECLARATIONS_H
 #define MDL_DECLARATIONS_H
-
+#define TEX_SUPPORT_NO_VTABLES
+#define TEX_SUPPORT_NO_DUMMY_SCENEDATA
+#include "../texture_lookup.h"  // texture runtime
 #include "MdlStructs.h"
 //
 // Functions needed by texture runtime when this file is compiled with Clang

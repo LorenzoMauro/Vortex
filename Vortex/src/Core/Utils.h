@@ -8,6 +8,10 @@
 
 namespace utl{
 
+	std::string replaceFunctionNameInPTX(const std::string& ptxCode,
+		const std::string& oldFunctionName,
+		const std::string& newFunctionName);
+
 	std::vector<std::string> splitString(const std::string& input, const std::string separator);
 
 	std::string absolutePath(const std::string& relativePath, const std::string& folderPath = "");

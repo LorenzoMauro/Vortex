@@ -1,6 +1,6 @@
 ﻿#pragma once
 #include "MdlWrapper.h"
-
+#include <map>
 namespace vtx::mdl
 {
     // Return a textual representation of the given value.

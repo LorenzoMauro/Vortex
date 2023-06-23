@@ -323,16 +323,17 @@ namespace vtx::device
 		}
 		else if( getOptions()->mdlCallType == MDL_INLINE)
 		{
+			
+		}
+		else if (getOptions()->mdlCallType == MDL_CUDA || getOptions()->mdlCallType == MDL_INLINE)
+		{
 			if (dp.pgEvaluateMaterial) {
 				dvConfig.idxCallEvaluateMaterialStandard = rp->getProgramSbt(dp.pgEvaluateMaterial->name);
 				dvConfig.idxCallEvaluateMaterialWavefront = rp->getProgramSbt(dp.pgEvaluateMaterial->name, "wfShade");
 				VTX_WARN("Fetching Shader {} EvaluateMaterial STANDARD program {} with SBT {}", material->name, dp.pgEvaluateMaterial->name, dvConfig.idxCallEvaluateMaterialStandard);
 				VTX_WARN("Fetching Shader {} EvaluateMaterial WAVEFRONT program {} with SBT {}", material->name, dp.pgEvaluateMaterial->name, dvConfig.idxCallEvaluateMaterialWavefront);
 			}
-		}
-		else if (getOptions()->mdlCallType == MDL_CUDA)
-		{
-			dvConfig.idxCallEvaluateMaterialWavefront = mdl::getMdlCudaLinker().getMdlFunctionIndices(material->name);
+			dvConfig.idxCallEvaluateMaterialWavefrontCuda = mdl::getMdlCudaLinker().getMdlFunctionIndices(material->name);
 		}
 
 
@@ -444,7 +445,7 @@ namespace vtx::device
 		
 	}
 
-	std::tuple<MaterialData, MaterialData*> createMaterialData(std::shared_ptr<graph::Material> material)
+	std::tuple<MaterialData, MaterialData*> createMaterialData(std::shared_ptr<graph::Material> material, int matQueueId)
 	{
 
 		//CUDA_SYNC_CHECK();
@@ -462,6 +463,7 @@ namespace vtx::device
 
 		materialData.argBlock = argBlockBuffer.castedPointer<char>();
 
+		materialData.materialWorkQueue = matQueueId;
 		CUDABuffer& materialDataBuffer = GET_BUFFER(Buffers::MaterialBuffers, material->getID(), materialDataBuffer);
 		materialDataBuffer.upload(materialData);
 
@@ -727,6 +729,7 @@ namespace vtx::device
 		//
 		//const math::affine3f objectToWorld(tt);
 
+		bool updateQueues = false;
 		if (rendererNode->resized) {
 
 			rendererNode->threadData.bufferUpdateReady = false;
@@ -736,44 +739,55 @@ namespace vtx::device
 			UPLOAD_DATA->frameBufferData.outputBuffer = cudaOutputBuffer.dPointer();
 
 
-			PREPARE_BUFFER(rawRadiance, rawRadiance, math::vec3f);
-			PREPARE_BUFFER(directLight, directLight, math::vec3f);
-			PREPARE_BUFFER(diffuseIndirect, diffuseIndirect, math::vec3f);
-			PREPARE_BUFFER(glossyIndirect, glossyIndirect, math::vec3f);
-			PREPARE_BUFFER(transmissionIndirect, transmissionIndirect, math::vec3f);
+			PREPARE_BUFFER(rawRadiance, radianceAccumulator, math::vec3f);
+			PREPARE_BUFFER(albedo, albedoAccumulator, math::vec3f);
+			PREPARE_BUFFER(normal, normalAccumulator, math::vec3f);
+
+			//PREPARE_BUFFER(directLight, directLight, math::vec3f);
+			//PREPARE_BUFFER(diffuseIndirect, diffuseIndirect, math::vec3f);
+			//PREPARE_BUFFER(glossyIndirect, glossyIndirect, math::vec3f);
+			//PREPARE_BUFFER(transmissionIndirect, transmissionIndirect, math::vec3f);
 			PREPARE_BUFFER(tmRadiance, tmRadiance, math::vec3f);
-			PREPARE_BUFFER(tmDirectLight, tmDirectLight, math::vec3f);
-			PREPARE_BUFFER(tmDiffuseIndirect, tmDiffuseIndirect, math::vec3f);
-			PREPARE_BUFFER(tmGlossyIndirect, tmGlossyIndirect, math::vec3f);
-			PREPARE_BUFFER(tmTransmissionIndirect, tmTransmissionIndirect, math::vec3f);
-			PREPARE_BUFFER(albedo, albedo, math::vec3f);
-			PREPARE_BUFFER(normal, normal, math::vec3f);
+			PREPARE_BUFFER(hdriRadiance, hdriRadiance, math::vec3f);
+			PREPARE_BUFFER(normalNormalized, normalNormalized, math::vec3f);
+			PREPARE_BUFFER(albedoNormalized, albedoNormalized, math::vec3f);
+			//PREPARE_BUFFER(tmTransmissionIndirect, tmTransmissionIndirect, math::vec3f);
 			PREPARE_BUFFER(trueNormal, trueNormal, math::vec3f);
 			PREPARE_BUFFER(tangent, tangent, math::vec3f);
 			PREPARE_BUFFER(orientation, orientation, math::vec3f);
 			PREPARE_BUFFER(uv, uv, math::vec3f);
 			PREPARE_BUFFER(debugColor1, debugColor1, math::vec3f);
 			PREPARE_BUFFER(fireflyRemoval, fireflyPass, math::vec3f);
+			PREPARE_BUFFER(samples, samples, int);
 
 			optix::getState()->denoiser.resize(rendererNode->width, rendererNode->height);
 
 			//TODO Smarter way to set these value, I don't want to waste memory if we are not using adaptive samplig
 			{
-				//PREPARE_BUFFER(toneMappedRadianceBuffer, toneMappedRadiance, math::vec3f);
 				PREPARE_BUFFER(noiseDataBuffer, noiseBuffer, NoiseData);
 
 				const int size = rendererNode->width * rendererNode->height;
 				constexpr int threadsPerBlock = 256;
 				const int numBlocks = (size + threadsPerBlock - 1) / threadsPerBlock;
 
-				CUDABuffer& radianceRangeBuffer = GET_BUFFER(Buffers::FrameBufferBuffers, rendererNode->getID(), radianceRangeBuffer);
+				CUDABuffer& radianceRangeBuffer = GET_BUFFER(Buffers::NoiseComputationBuffers, rendererNode->getID(), radianceRangeBuffer);
 				radianceRangeBuffer.resize(numBlocks * sizeof(math::vec2f));
 
-				CUDABuffer& albedoRangeBuffer = GET_BUFFER(Buffers::FrameBufferBuffers, rendererNode->getID(), albedoRangeBuffer);
+				CUDABuffer& albedoRangeBuffer = GET_BUFFER(Buffers::NoiseComputationBuffers, rendererNode->getID(), albedoRangeBuffer);
 				albedoRangeBuffer.resize(numBlocks * sizeof(math::vec2f));
 
-				CUDABuffer& normalRangeBuffer = GET_BUFFER(Buffers::FrameBufferBuffers, rendererNode->getID(), normalRangeBuffer);
+				CUDABuffer& normalRangeBuffer = GET_BUFFER(Buffers::NoiseComputationBuffers, rendererNode->getID(), normalRangeBuffer);
 				normalRangeBuffer.resize(numBlocks * sizeof(math::vec2f));
+
+				CUDABuffer& globalRadianceRangeBuffer = GET_BUFFER(Buffers::NoiseComputationBuffers, rendererNode->getID(), globalRadianceRangeBuffer);
+				if(globalRadianceRangeBuffer.castedPointer<void>() == nullptr)
+				{
+					globalRadianceRangeBuffer.alloc(sizeof(math::vec2f));
+					CUDABuffer& globalAlbedoRangeBuffer = GET_BUFFER(Buffers::NoiseComputationBuffers, rendererNode->getID(), globalAlbedoRangeBuffer);
+					globalAlbedoRangeBuffer.alloc(sizeof(math::vec2f));
+					CUDABuffer& globalNormalRangeBuffer = GET_BUFFER(Buffers::NoiseComputationBuffers, rendererNode->getID(), globalNormalRangeBuffer);
+					globalNormalRangeBuffer.alloc(sizeof(math::vec2f));
+				}
 
 			}
 
@@ -783,111 +797,8 @@ namespace vtx::device
 			rendererNode->resized             = false;
 			UPLOAD_DATA->isFrameBufferUpdated = true;
 			rendererNode->resizeGlBuffer      = true;
-
-			{
-				int maxQueueSize = rendererNode->width * rendererNode->height;
-
-				CUDABufferManager::deallocateAll();
-				const WorkQueueSOA<PixelWorkItem> pixelQueue(maxQueueSize, "pixelQueue");
-				CUDABuffer pixelQueueBuffer;
-				pixelQueueBuffer.upload(pixelQueue);
-				UPLOAD_DATA->launchParams.pixelQueue = pixelQueueBuffer.castedPointer<WorkQueueSOA<PixelWorkItem>>();
-
-				const WorkQueueSOA<RayWorkItem> radianceTraceQueue(maxQueueSize, "radianceTraceQueue");
-				CUDABuffer radianceTraceQueueBuffer;
-				radianceTraceQueueBuffer.upload(radianceTraceQueue);
-				UPLOAD_DATA->launchParams.radianceTraceQueue = radianceTraceQueueBuffer.castedPointer<WorkQueueSOA<RayWorkItem>>();
-
-				const WorkQueueSOA<RayWorkItem> shadeQueue(maxQueueSize, "shadeQueue");
-				CUDABuffer shadeQueueBuffer;
-				shadeQueueBuffer.upload(shadeQueue);
-				UPLOAD_DATA->launchParams.shadeQueue = shadeQueueBuffer.castedPointer<WorkQueueSOA<RayWorkItem>>();
-
-				const WorkQueueSOA<RayWorkItem> escapedQueue(maxQueueSize, "escapedQueue");
-				CUDABuffer escapedQueueBuffer;
-				escapedQueueBuffer.upload(escapedQueue);
-				UPLOAD_DATA->launchParams.escapedQueue = escapedQueueBuffer.castedPointer<WorkQueueSOA<RayWorkItem>>();
-
-				const WorkQueueSOA<RayWorkItem> accumulationQueue(maxQueueSize, "accumulationQueue");
-				CUDABuffer accumulationQueueBuffer;
-				accumulationQueueBuffer.upload(accumulationQueue);
-				UPLOAD_DATA->launchParams.accumulationQueue = accumulationQueueBuffer.castedPointer<WorkQueueSOA<RayWorkItem>>();
-
-
-				//CUDABuffer rayDataBuffer;
-				//rayDataBuffer.alloc(sizeof(RayData) * maxQueueSize);
-				//UPLOAD_DATA->launchParams.rays = rayDataBuffer.castedPointer<RayData>();
-
-				//CUDABuffer raydataMissBuffer;
-				//raydataMissBuffer.alloc(sizeof(RayData*) * maxQueueSize);
-				//UPLOAD_DATA->launchParams.escapedQueue = raydataMissBuffer.castedPointer<RayData*>();
-				////CUDABuffer missQueueBuffer;
-				////WorkQueue missQueue;
-				////missQueue.maxSize = maxQueueSize;
-				////missQueueBuffer.upload(missQueue);
-				////UPLOAD_DATA->launchParams.escapedQueue = missQueueBuffer.castedPointer<WorkQueue>();
-
-				//CUDABuffer raydataHitBuffer;
-				//raydataHitBuffer.alloc(sizeof(RayData*) * maxQueueSize);
-				//UPLOAD_DATA->launchParams.shadeQueue = raydataHitBuffer.castedPointer<RayData*>();
-				////CUDABuffer hitQueueBuffer;
-				////WorkQueue hitQueue;
-				////hitQueue.maxSize = maxQueueSize;
-				////hitQueueBuffer.upload(hitQueue);
-				////UPLOAD_DATA->launchParams.shadeQueue = hitQueueBuffer.castedPointer<WorkQueue>();
-
-				//CUDABuffer traceHitBuffer;
-				//traceHitBuffer.alloc(sizeof(RayData*) * maxQueueSize);
-				//UPLOAD_DATA->launchParams.radianceTraceQueue = traceHitBuffer.castedPointer<RayData*>();
-				////CUDABuffer traceHitQueueBuffer;
-				////WorkQueue traceHitQueue;
-				////traceHitQueue.maxSize = maxQueueSize;
-				////traceHitQueueBuffer.upload(traceHitQueue);
-				////UPLOAD_DATA->launchParams.radianceTraceQueue = traceHitQueueBuffer.castedPointer<WorkQueue>();
-
-				//CUDABuffer traceShadowBuffer;
-				//traceShadowBuffer.alloc(sizeof(RayData*) * maxQueueSize);
-				//UPLOAD_DATA->launchParams.shadowTraceQueue = traceShadowBuffer.castedPointer<RayData*>();
-				////CUDABuffer traceShadowQueueBuffer;
-				////WorkQueue traceShadowQueue;
-				////traceShadowQueue.maxSize = maxQueueSize;
-				////traceShadowQueueBuffer.upload(traceShadowQueue);
-				////UPLOAD_DATA->launchParams.shadowTraceQueue = traceShadowQueueBuffer.castedPointer<WorkQueue>();
-
-				//CUDABuffer accumulationDataBuffer;
-				//accumulationDataBuffer.alloc(sizeof(RayData*) * maxQueueSize);
-				//UPLOAD_DATA->launchParams.accumulationQueue = accumulationDataBuffer.castedPointer<RayData*>();
-				////CUDABuffer accumulationQueueBuffer;
-				////WorkQueue accumulationQueue;
-				////accumulationQueue.maxSize = maxQueueSize;
-				////accumulationQueueBuffer.upload(accumulationQueue);
-				////UPLOAD_DATA->launchParams.accumulationQueue = accumulationQueueBuffer.castedPointer<WorkQueue>();
-
-				//constexpr int startSize = 0;
-				//CUDABuffer radianceTraceQueueSizeBuffer;
-				//radianceTraceQueueSizeBuffer.upload(startSize);
-				//UPLOAD_DATA->launchParams.radianceTraceQueueSize = radianceTraceQueueSizeBuffer.castedPointer<int>();
-
-				//CUDABuffer shadowTraceQueueSizeBuffer;
-				//shadowTraceQueueSizeBuffer.upload(startSize);
-				//UPLOAD_DATA->launchParams.shadowTraceQueueSize = shadowTraceQueueSizeBuffer.castedPointer<int>();
-
-				//CUDABuffer shadeQueueSizeBuffer;
-				//shadeQueueSizeBuffer.upload(startSize);
-				//UPLOAD_DATA->launchParams.shadeQueueSize = shadeQueueSizeBuffer.castedPointer<int>();
-
-				//CUDABuffer escapedQueueSizeBuffer;
-				//escapedQueueSizeBuffer.upload(startSize);
-				//UPLOAD_DATA->launchParams.escapedQueueSize = escapedQueueSizeBuffer.castedPointer<int>();
-
-				//CUDABuffer accumulationQueueSizeBuffer;
-				//accumulationQueueSizeBuffer.upload(startSize);
-				//UPLOAD_DATA->launchParams.accumulationQueueSize = accumulationQueueSizeBuffer.castedPointer<int>();
-
-				//CUDABuffer maxQueueSizeBuffer;
-				//maxQueueSizeBuffer.upload(maxQueueSize);
-				//UPLOAD_DATA->launchParams.maxQueueSize = maxQueueSizeBuffer.castedPointer<int>();
-			}
+			UPLOAD_DATA->isSettingsUpdated = true;
+			updateQueues = true;
 		}
 
 		if(rendererNode->settings.isUpdated)
@@ -900,15 +811,30 @@ namespace vtx::device
 			UPLOAD_DATA->settings.samplingTechnique = rendererNode->settings.samplingTechnique;
 			UPLOAD_DATA->settings.minClamp          = rendererNode->settings.minClamp;
 			UPLOAD_DATA->settings.maxClamp          = rendererNode->settings.maxClamp;
+			UPLOAD_DATA->settings.parallelShade = rendererNode->settings.parallelShade;
+
+
+			if (rendererNode->settings.adaptiveSampling != UPLOAD_DATA->settings.adaptiveSampling)
+			{
+				updateQueues = true;
+			}
 
 			UPLOAD_DATA->settings.adaptiveSampling = rendererNode->settings.adaptiveSampling;
 			UPLOAD_DATA->settings.minAdaptiveSamples = rendererNode->settings.minAdaptiveSamples;
 			UPLOAD_DATA->settings.minPixelSamples = rendererNode->settings.minPixelSamples;
+
+			if(rendererNode->settings.maxPixelSamples != UPLOAD_DATA->settings.maxPixelSamples)
+			{
+				updateQueues = true;
+			}
 			UPLOAD_DATA->settings.maxPixelSamples = rendererNode->settings.maxPixelSamples;
 			UPLOAD_DATA->settings.noiseCutOff = rendererNode->settings.noiseCutOff;
 			UPLOAD_DATA->settings.removeFirefly = rendererNode->settings.removeFireflies;
 			UPLOAD_DATA->settings.enableDenoiser = rendererNode->settings.enableDenoiser;
 			UPLOAD_DATA->settings.useRussianRoulette = rendererNode->settings.useRussianRoulette;
+
+			UPLOAD_DATA->settings.useLongPathKernel = rendererNode->settings.useLongPathKernel;
+			UPLOAD_DATA->settings.longPathPercentage = rendererNode->settings.longPathPercentage;
 
 			UPLOAD_DATA->isSettingsUpdated   = true;
 			rendererNode->settings.isUpdated = false;
@@ -927,6 +853,51 @@ namespace vtx::device
 			rendererNode->toneMapperSettings.isUpdated = false;
 		}
 
+		if(updateQueues)
+		{
+			int maxPixelSamples = rendererNode->width * rendererNode->height;
+			/*if(UPLOAD_DATA->settings.adaptiveSampling)
+			{
+				maxPixelSamples *= 2;
+			}*/
+			UPLOAD_DATA->settings.maxTraceQueueSize = maxPixelSamples;
+			UPLOAD_DATA->isSettingsUpdated = true;
+
+			const int maxShadowQueue = maxPixelSamples * (rendererNode->settings.maxBounces + 1);
+			const int maxAccumulationQueue = maxPixelSamples * (rendererNode->settings.maxBounces + 1);
+
+			CUDABufferManager::deallocateAll();
+
+			const WorkQueueSOA<TraceWorkItem> radianceTraceQueue(maxPixelSamples, "radianceTraceQueue");
+			CUDABuffer radianceTraceQueueBuffer;
+			radianceTraceQueueBuffer.upload(radianceTraceQueue);
+			UPLOAD_DATA->launchParams.radianceTraceQueue = radianceTraceQueueBuffer.castedPointer<WorkQueueSOA<TraceWorkItem>>();
+
+			const WorkQueueSOA<RayWorkItem> shadeQueue(maxPixelSamples, "shadeQueue");
+			CUDABuffer shadeQueueBuffer;
+			shadeQueueBuffer.upload(shadeQueue);
+			UPLOAD_DATA->launchParams.shadeQueue = shadeQueueBuffer.castedPointer<WorkQueueSOA<RayWorkItem>>();
+
+			const WorkQueueSOA<EscapedWorkItem> escapedQueue(maxPixelSamples, "escapedQueue");
+			CUDABuffer escapedQueueBuffer;
+			escapedQueueBuffer.upload(escapedQueue);
+			UPLOAD_DATA->launchParams.escapedQueue = escapedQueueBuffer.castedPointer<WorkQueueSOA<EscapedWorkItem>>();
+
+			const WorkQueueSOA<AccumulationWorkItem> accumulationQueue(maxShadowQueue, "accumulationQueue");
+			CUDABuffer accumulationQueueBuffer;
+			accumulationQueueBuffer.upload(accumulationQueue);
+			UPLOAD_DATA->launchParams.accumulationQueue = accumulationQueueBuffer.castedPointer<WorkQueueSOA<AccumulationWorkItem>>();
+
+			const WorkQueueSOA<ShadowWorkItem> shadowQueue(maxAccumulationQueue, "shadowQueue");
+			CUDABuffer shadowQueueBuffer;
+			shadowQueueBuffer.upload(shadowQueue);
+			UPLOAD_DATA->launchParams.shadowQueue = shadowQueueBuffer.castedPointer<WorkQueueSOA<ShadowWorkItem>>();
+
+			Counters counters{};
+			CUDABuffer countersBuffer;
+			countersBuffer.upload(counters);
+			UPLOAD_DATA->launchParams.queueCounters = countersBuffer.castedPointer<Counters>();
+		}
 
 	}
 

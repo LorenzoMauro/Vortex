@@ -197,7 +197,7 @@ namespace vtx::graph
 	{
 		auto module = std::make_shared<optix::ModuleOptix>();
 		module->name = name;
-		module->code = targetCode->get_code();
+		module->code = utl::replaceFunctionNameInPTX(targetCode->get_code(), "__replace__EvaluateMaterial", "unused_" + std::to_string(getID())); ;
 		if (getOptions()->mdlCallType == MDL_DIRECT_CALL)
 		{
 			const auto fNames = graph::FunctionNames(std::to_string(getID()));
@@ -319,12 +319,9 @@ namespace vtx::graph
 				devicePrograms.pgHairEval = optix::createDcProgram(module, (fNames.hairBsdf + "_evaluate"));
 			}
 		}
-		else if(getOptions()->mdlCallType== MDL_INLINE)
+		else if(getOptions()->mdlCallType== MDL_INLINE || getOptions()->mdlCallType == MDL_CUDA)
 		{
-			devicePrograms.pgEvaluateMaterial = optix::createDcProgram(module, "__direct_callable__EvaluateMaterial", getID(), {"Default", "wfShade"});
-		}
-		else
-		{
+			devicePrograms.pgEvaluateMaterial = optix::createDcProgram(module, "__direct_callable__EvaluateMaterial", getID(), {"Default", "wfShade", "wfRadianceTrace"});
 			mdl::getMdlCudaLinker().submitTargetCode(targetCode, name);
 		}
 	}
@@ -442,7 +439,6 @@ namespace vtx::graph
 		}
 		return config.useCutoutOpacity;
 	};
-
 
 	void processMaterial(std::shared_ptr<Material>& material)
 	{

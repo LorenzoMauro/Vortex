@@ -9,23 +9,99 @@ namespace vtx {
 		///////////////////////////////////////////////////////////////////
 		/////////////////////// Modules ///////////////////////////////////
 		///////////////////////////////////////////////////////////////////
+		optix::PipelineOptix* pipeline = optix::getRenderingPipeline();
 
+		//////////////////////////////////////////////////////////////////////
+		////////////////// Module ////////////////////////////////////////////
+		//////////////////////////////////////////////////////////////////////
+		
 		auto deviceProgramModule = std::make_shared<optix::ModuleOptix>();
 		deviceProgramModule->name = "deviceProgram";
 		deviceProgramModule->path = "./ptx/devicePrograms.optixir";
 
-		auto cameraFunctionsModule = std::make_shared<optix::ModuleOptix>();
-		cameraFunctionsModule->name = "cameraFunctions";
-		cameraFunctionsModule->path = "./ptx/CameraFunctions.optixir";
 
-		auto lightSamplingModule = std::make_shared<optix::ModuleOptix>();
-		lightSamplingModule->name = "deviceProgram";
-		lightSamplingModule->path = "./ptx/devicePrograms.optixir";
-		lightSamplingModule->name = "lightSampling";
-		lightSamplingModule->path = "./ptx/lightSampling.optixir";
+
+
+		//////////////////////////////////////////////////////////////////////
+		////////////////// Exception /////////////////////////////////////////
+		//////////////////////////////////////////////////////////////////////
+		
+		auto exceptionFunction = std::make_shared<optix::FunctionOptix>();
+		exceptionFunction->name = "__exception__all";
+		exceptionFunction->module = deviceProgramModule;
+		exceptionFunction->type = optix::OptixFunctionType::F_Exception;
+
+		auto exceptionProgram = std::make_shared<optix::ProgramOptix>();
+		exceptionProgram->name = "exception";
+		exceptionProgram->type = optix::OptixProgramType::P_Exception;
+		exceptionProgram->exceptionFunction = exceptionFunction;
+
 
 		///////////////////////////////////////////////////////////////////
-		/////////////////////// Functions /////////////////////////////////
+		/////////////////////// Radiance Trace Functions //////////////////
+		///////////////////////////////////////////////////////////////////
+		
+		auto closestHitFunction = std::make_shared<optix::FunctionOptix>();
+		closestHitFunction->name = "__closesthit__radiance";
+		closestHitFunction->module = deviceProgramModule;
+		closestHitFunction->type = optix::OptixFunctionType::F_ClosestHit;
+
+
+		auto missFunction = std::make_shared<optix::FunctionOptix>();
+		missFunction->name = "__miss__radiance";
+		missFunction->module = deviceProgramModule;
+		missFunction->type = optix::OptixFunctionType::F_Miss;
+
+		//////////////////////////////////////////////////////////////////////
+		////////////////// Shadow Trace //////////////////////////////////////
+		//////////////////////////////////////////////////////////////////////
+
+
+		auto shadowMissF = std::make_shared<optix::FunctionOptix>();
+		shadowMissF->name = "__miss__shadowMiss";
+		shadowMissF->module = deviceProgramModule;
+		shadowMissF->type = optix::OptixFunctionType::F_Miss;
+
+		auto shadowHitF = std::make_shared<optix::FunctionOptix>();
+		shadowHitF->name = "__anyhit__shadowHit";
+		shadowHitF->module = deviceProgramModule;
+		shadowHitF->type = optix::OptixFunctionType::F_AnyHit;
+
+
+		//////////////////////////////////////////////////////////////////////
+		/////////////////// Radiance Trace Programs //////////////////////////
+		//////////////////////////////////////////////////////////////////////
+
+
+		auto radianceMissP = std::make_shared<optix::ProgramOptix>();
+		radianceMissP->name = "radianceMiss";
+		radianceMissP->type = optix::OptixProgramType::P_Miss;
+		radianceMissP->missFunction = missFunction;
+
+		auto radianceHitP = std::make_shared<optix::ProgramOptix>();
+		radianceHitP->name = "radianceHit";
+		radianceHitP->type = optix::OptixProgramType::P_Hit;
+		radianceHitP->closestHitFunction = closestHitFunction;
+		radianceHitP->anyHitFunction = shadowHitF;
+
+
+		//////////////////////////////////////////////////////////////////////
+		/////////////////// Shadow Trace Programs ////////////////////////////
+		//////////////////////////////////////////////////////////////////////
+
+		auto shadowMissP = std::make_shared<optix::ProgramOptix>();
+		shadowMissP->name = "shadowMiss";
+		shadowMissP->type = optix::OptixProgramType::P_Miss;
+		shadowMissP->missFunction = shadowMissF;
+
+		auto shadowHitP = std::make_shared<optix::ProgramOptix>();
+		shadowHitP->name = "shadowHit";
+		shadowHitP->type = optix::OptixProgramType::P_Hit;
+		shadowHitP->closestHitFunction = closestHitFunction;
+		shadowHitP->anyHitFunction = shadowHitF;
+
+		///////////////////////////////////////////////////////////////////
+		/////////////////////// Full Optix Pipeline ///////////////////////
 		///////////////////////////////////////////////////////////////////
 
 		auto renderFrameFunction = std::make_shared<optix::FunctionOptix>();
@@ -34,173 +110,83 @@ namespace vtx {
 		renderFrameFunction->type = optix::OptixFunctionType::F_Raygen;
 
 
-
-		auto exceptionFunction = std::make_shared<optix::FunctionOptix>();
-		exceptionFunction->name = "__exception__all";
-		exceptionFunction->module = deviceProgramModule;
-		exceptionFunction->type = optix::OptixFunctionType::F_Exception;
-
-		auto missFunction = std::make_shared<optix::FunctionOptix>();
-		missFunction->name = "__miss__radiance";
-		missFunction->module = deviceProgramModule;
-		missFunction->type = optix::OptixFunctionType::F_Miss;
-
-		auto closestHitFunction = std::make_shared<optix::FunctionOptix>();
-		closestHitFunction->name = "__closesthit__radiance";
-		closestHitFunction->module = deviceProgramModule;
-		closestHitFunction->type = optix::OptixFunctionType::F_ClosestHit;
-
-		auto anyHitFunction = std::make_shared<optix::FunctionOptix>();
-		anyHitFunction->name = "__anyhit__radiance";
-		anyHitFunction->module = deviceProgramModule;
-		anyHitFunction->type = optix::OptixFunctionType::F_AnyHit;
-
-		//auto pinholeFunction = std::make_shared<optix::FunctionOptix>();
-		//pinholeFunction->name = "__direct_callable__pinhole";
-		//pinholeFunction->module = cameraFunctionsModule;
-		//pinholeFunction->type = optix::OptixFunctionType::F_DirectCallable;
-
-		///////////////////////////////////////////////////////////////////
-		/////////////////////// Programs //////////////////////////////////
-		///////////////////////////////////////////////////////////////////
-
 		auto rayGenProgram = std::make_shared<optix::ProgramOptix>();
 		rayGenProgram->name = "raygen";
 		rayGenProgram->type = optix::OptixProgramType::P_Raygen;
 		rayGenProgram->raygenFunction = renderFrameFunction;
 
-
-		auto exceptionProgram = std::make_shared<optix::ProgramOptix>();
-		exceptionProgram->name = "exception";
-		exceptionProgram->type = optix::OptixProgramType::P_Exception;
-		exceptionProgram->exceptionFunction = exceptionFunction;
-
-		auto missProgram = std::make_shared<optix::ProgramOptix>();
-		missProgram->name = "miss";
-		missProgram->type = optix::OptixProgramType::P_Miss;
-		missProgram->missFunction = missFunction;
-
-		auto hitProgram = std::make_shared<optix::ProgramOptix>();
-		hitProgram->name = "hit";
-		hitProgram->type = optix::OptixProgramType::P_Hit;
-		hitProgram->closestHitFunction = closestHitFunction;
-		hitProgram->anyHitFunction = anyHitFunction;
-
-
-		//auto pinholeProgram = std::make_shared<optix::ProgramOptix>();
-		//pinholeProgram->name = "pinHole";
-		//pinholeProgram->type = optix::OptixProgramType::P_DirectCallable;
-		//pinholeProgram->directCallableFunction = pinholeFunction;
-
-		optix::PipelineOptix* pipeline = optix::getRenderingPipeline();
-
 		pipeline->registerProgram(rayGenProgram);
 		pipeline->registerProgram(exceptionProgram);
-		pipeline->registerProgram(missProgram);
-		pipeline->registerProgram(hitProgram);
-		//pipeline->registerProgram(pinholeProgram);
-
-		optix::createDcProgram(deviceProgramModule, "__direct_callable__pinhole");
-		optix::createDcProgram(deviceProgramModule, "__direct_callable__meshLightSample");
-		optix::createDcProgram(deviceProgramModule, "__direct_callable__envLightSample");
+		pipeline->registerProgram(radianceMissP);
+		pipeline->registerProgram(radianceHitP);
+		pipeline->registerProgram(shadowMissP);
+		pipeline->registerProgram(shadowHitP);
 
 		///////////////////////////////////////////////////////////////////
-		///////////////// WaveFront Radiance Trace ////////////////////////
+		///////////////// WaveFront Trace /////////////////////////////////
 		///////////////////////////////////////////////////////////////////
 
-		auto rtRaygenF= std::make_shared<optix::FunctionOptix>();
-		rtRaygenF->name = "__raygen__rtRaygen";
-		rtRaygenF->module = deviceProgramModule;
-		rtRaygenF->type = optix::OptixFunctionType::F_Raygen;
+		auto wfRadianceTraceF= std::make_shared<optix::FunctionOptix>();
+		wfRadianceTraceF->name = "__raygen__trace";
+		wfRadianceTraceF->module = deviceProgramModule;
+		wfRadianceTraceF->type = optix::OptixFunctionType::F_Raygen;
 
-		auto rtMissF = std::make_shared<optix::FunctionOptix>();
-		rtMissF->name = "__miss__rtMiss";
-		rtMissF->module = deviceProgramModule;
-		rtMissF->type = optix::OptixFunctionType::F_Miss;
+		auto wfRadianceTraceP = std::make_shared<optix::ProgramOptix>();
+		wfRadianceTraceP->name = "wfRadianceTrace";
+		wfRadianceTraceP->type = optix::OptixProgramType::P_Raygen;
+		wfRadianceTraceP->raygenFunction = wfRadianceTraceF;
 
-		auto rtClosestF = std::make_shared<optix::FunctionOptix>();
-		rtClosestF->name = "__closesthit__rtClosest";
-		rtClosestF->module = deviceProgramModule;
-		rtClosestF->type = optix::OptixFunctionType::F_ClosestHit;
-
-		auto rtAnyF = std::make_shared<optix::FunctionOptix>();
-		rtAnyF->name = "__anyhit__dummyAnyHit";
-		rtAnyF->module = deviceProgramModule;
-		rtAnyF->type = optix::OptixFunctionType::F_AnyHit;
-
-
-		auto rtRaygenP = std::make_shared<optix::ProgramOptix>();
-		rtRaygenP->name = "rtRaygen";
-		rtRaygenP->type = optix::OptixProgramType::P_Raygen;
-		rtRaygenP->raygenFunction = rtRaygenF;
-
-		auto rtMissP = std::make_shared<optix::ProgramOptix>();
-		rtMissP->name = "rtMiss";
-		rtMissP->type = optix::OptixProgramType::P_Miss;
-		rtMissP->missFunction = rtMissF;
-
-		auto rtHitP = std::make_shared<optix::ProgramOptix>();
-		rtHitP->name = "rtHit";
-		rtHitP->type = optix::OptixProgramType::P_Hit;
-		rtHitP->closestHitFunction = rtClosestF;
-		rtHitP->anyHitFunction = rtAnyF;
-
-		pipeline->registerProgram(rtRaygenP, { "wfRadianceTrace" });
-		pipeline->registerProgram(rtMissP, { "wfRadianceTrace" });
-		pipeline->registerProgram(rtHitP, { "wfRadianceTrace" });
-		//pipeline->registerProgram(exceptionProgram, { "WaveFront_ClosestHit" }); //TODO Handle Duplicate Programs in pipeline Creation
+		pipeline->registerProgram(wfRadianceTraceP, { "wfRadianceTrace" });
+		pipeline->registerProgram(radianceMissP, { "wfRadianceTrace" });
+		pipeline->registerProgram(radianceHitP, { "wfRadianceTrace" });
+		pipeline->registerProgram(shadowMissP, { "wfRadianceTrace" });
+		pipeline->registerProgram(shadowHitP, { "wfRadianceTrace" });
 
 
 		///////////////////////////////////////////////////////////////////
-		///////////////// WaveFront Radiance Trace ////////////////////////
+		///////////////// WaveFront Trace /////////////////////////////////
 		///////////////////////////////////////////////////////////////////
 
+		auto wfShadowTraceF = std::make_shared<optix::FunctionOptix>();
+		wfShadowTraceF->name = "__raygen__shadow";
+		wfShadowTraceF->module = deviceProgramModule;
+		wfShadowTraceF->type = optix::OptixFunctionType::F_Raygen;
 
-		mdl::MdlCudaLinker& mdlCudaLinker = mdl::getMdlCudaLinker();
-		mdlCudaLinker.ptxFile = "./ptx/shadeKernel.ptx";
-		mdlCudaLinker.kernelFunctionName = "shadeKernel";
+		auto wfShadowTraceP = std::make_shared<optix::ProgramOptix>();
+		wfShadowTraceP->name = "wfShadowTrace";
+		wfShadowTraceP->type = optix::OptixProgramType::P_Raygen;
+		wfShadowTraceP->raygenFunction = wfShadowTraceF;
 
+		pipeline->registerProgram(wfShadowTraceP, { "wfShadowTrace" });
+		pipeline->registerProgram(radianceMissP, { "wfShadowTrace" });
+		pipeline->registerProgram(radianceHitP, { "wfShadowTrace" });
+		pipeline->registerProgram(shadowMissP, { "wfShadowTrace" });
+		pipeline->registerProgram(shadowHitP, { "wfShadowTrace" });
+
+		///////////////////////////////////////////////////////////////////
+		///////////////// WaveFront Shade /////////////////////////////////
+		///////////////////////////////////////////////////////////////////
+		
 		auto shadeRaygenF= std::make_shared<optix::FunctionOptix>();
 		shadeRaygenF->name = "__raygen__shade";
 		shadeRaygenF->module = deviceProgramModule;
 		shadeRaygenF->type = optix::OptixFunctionType::F_Raygen;
-
-		auto shadeMissF = std::make_shared<optix::FunctionOptix>();
-		shadeMissF->name = "__miss__shadeShadowMiss";
-		shadeMissF->module = deviceProgramModule;
-		shadeMissF->type = optix::OptixFunctionType::F_Miss;
-
-		auto shadeClosestF = std::make_shared<optix::FunctionOptix>();
-		shadeClosestF->name = "__closesthit__shadeDummy";
-		shadeClosestF->module = deviceProgramModule;
-		shadeClosestF->type = optix::OptixFunctionType::F_ClosestHit;
-
-		auto shadeAnyF = std::make_shared<optix::FunctionOptix>();
-		shadeAnyF->name = "__anyhit__shadeShadowHit";
-		shadeAnyF->module = deviceProgramModule;
-		shadeAnyF->type = optix::OptixFunctionType::F_AnyHit;
-
 
 		auto shadeRaygenP = std::make_shared<optix::ProgramOptix>();
 		shadeRaygenP->name = "shadeRaygen";
 		shadeRaygenP->type = optix::OptixProgramType::P_Raygen;
 		shadeRaygenP->raygenFunction = shadeRaygenF;
 
-		auto shadeMissP = std::make_shared<optix::ProgramOptix>();
-		shadeMissP->name = "shadeMiss";
-		shadeMissP->type = optix::OptixProgramType::P_Miss;
-		shadeMissP->missFunction = shadeMissF;
-
-		auto shadeHitP = std::make_shared<optix::ProgramOptix>();
-		shadeHitP->name = "shadeHit";
-		shadeHitP->type = optix::OptixProgramType::P_Hit;
-		shadeHitP->closestHitFunction = shadeClosestF;
-		shadeHitP->anyHitFunction = shadeAnyF;
-
 		pipeline->registerProgram(shadeRaygenP, { "wfShade" });
-		pipeline->registerProgram(shadeMissP, { "wfShade" });
-		pipeline->registerProgram(shadeHitP, { "wfShade" });
-		//pipeline->registerProgram(exceptionProgram, { "WaveFront_ClosestHit" }); //TODO Handle Duplicate Programs in pipeline Creation
+		pipeline->registerProgram(shadowMissP, { "wfShade" });
+		pipeline->registerProgram(shadowHitP, { "wfShade" });
+
+		///////////////////////////////////////////////////////////////////
+		///////////////// Cuda Mdl Linker /////////////////////////////////
+		///////////////////////////////////////////////////////////////////
+		mdl::MdlCudaLinker& mdlCudaLinker = mdl::getMdlCudaLinker();
+		mdlCudaLinker.ptxFile = "./ptx/shadeKernel.ptx";
+		mdlCudaLinker.kernelFunctionName = "wfShadeEntry";
 		
 	}
 }

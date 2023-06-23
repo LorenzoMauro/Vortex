@@ -82,11 +82,8 @@ namespace vtx {
 
         cudaEventRecord(events.first);
         int gridSize = (nItems + blockSize - 1) / blockSize;
-        //VTX_WARN("About to launch {} with: \n\t ItemSize:{}\n\t BlockSize {}\n\t GridSize {}", description, nItems, blockSize, gridSize);
         kernel<<<gridSize, blockSize>>>(func, nItems);
         cudaEventRecord(events.second);
-        //CUDA_SYNC_CHECK();
-        //LOG_VERBOSE("Post-sync %s", description);
     }
 
     template <typename F>

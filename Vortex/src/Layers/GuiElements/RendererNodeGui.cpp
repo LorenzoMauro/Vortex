@@ -1,11 +1,9 @@
 ﻿#include "RendererNodeGui.h"
 
 #include "imgui.h"
-#include "Core/ImGuiOp.h"
 #include "Core/CustomImGui/CustomImGui.h"
 #include "Scene/Nodes/Renderer.h"
 #include "Device/DevicePrograms/LaunchParams.h"
-#include "Device/Wrappers/dWrapper.h"
 
 namespace vtx::gui
 {
@@ -22,6 +20,12 @@ namespace vtx::gui
 		std::string hiddenLabel = "##hidden";
         int displayBufferItem = renderNode->settings.displayBuffer;
 
+		if (vtxImGui::HalfSpaceWidget("Separate Thread", ImGui::Checkbox, (hiddenLabel + "_Separate Thread").c_str(), &(renderNode->settings.runOnSeparateThread)))
+		{
+			renderNode->settings.iteration = -1;
+			renderNode->settings.isUpdated = true;
+		}
+
         if (vtxImGui::HalfSpaceWidget("Display Buffer Type", (ComboFuncType)ImGui::Combo, (hiddenLabel + "_Display Buffer Type").c_str(), &displayBufferItem, RendererDeviceSettings::displayBufferNames, RendererDeviceSettings::DisplayBuffer::FB_COUNT, -1))
         {
             renderNode->settings.displayBuffer = static_cast<RendererDeviceSettings::DisplayBuffer>(displayBufferItem);
@@ -37,33 +41,12 @@ namespace vtx::gui
             renderNode->settings.isUpdated = true;
         }
 
-		if (vtxImGui::HalfSpaceWidget("Wavefront", ImGui::Checkbox, (hiddenLabel + "_Use Wavefront").c_str(), &(renderNode->settings.useWavefront)))
-		{
-			renderNode->settings.iteration = -1;
-			renderNode->settings.isUpdated = true;
-		}
-
-		if (vtxImGui::HalfSpaceWidget("Russian Roulette", ImGui::Checkbox, (hiddenLabel + "_Use Russian Roulette").c_str(), &(renderNode->settings.useRussianRoulette)))
-		{
-			renderNode->settings.iteration = -1;
-			renderNode->settings.isUpdated = true;
-		}
-
-
-		if (vtxImGui::HalfSpaceWidget("Wavefront Fit Kernel Launch", ImGui::Checkbox, (hiddenLabel + "_Wavefront Fit Kernel Launch").c_str(), &(renderNode->settings.fitWavefront)))
-		{
-			renderNode->settings.iteration = -1;
-			renderNode->settings.isUpdated = true;
-		}
-
-		ImGui::Separator();
-
-		if (vtxImGui::HalfSpaceWidget("Max Samples", ImGui::SliderInt,(hiddenLabel + "_Max Samples").c_str(), &(renderNode->settings.maxSamples), 0, 100000, "%d", 0))
+		if (vtxImGui::HalfSpaceWidget("Max Samples", ImGui::SliderInt, (hiddenLabel + "_Max Samples").c_str(), &(renderNode->settings.maxSamples), 0, 100000, "%d", 0))
 		{
 			//renderNode->settings.iteration = -1;
 			renderNode->settings.isUpdated = true;
 		};
-		if (vtxImGui::HalfSpaceWidget("Max Bounces", ImGui::SliderInt, (hiddenLabel + "_Max Bounces").c_str(), &(renderNode->settings.maxBounces), 0, 35, "%d", 0))
+		if (vtxImGui::HalfSpaceWidget("Max Bounces", ImGui::SliderInt, (hiddenLabel + "_Max Bounces").c_str(), &(renderNode->settings.maxBounces), 1, 35, "%d", 0))
 		{
 			renderNode->settings.iteration = -1;
 			renderNode->settings.isUpdated = true;
@@ -85,6 +68,48 @@ namespace vtx::gui
 		};
 
 		ImGui::Separator();
+
+		ImGui::SetNextItemOpen(true, ImGuiCond_Once);
+		if (ImGui::CollapsingHeader("WaveFront Settings"))
+		{
+			if (vtxImGui::HalfSpaceWidget("Use WaveFront", ImGui::Checkbox, (hiddenLabel + "_Use Wavefront").c_str(), &(renderNode->settings.useWavefront)))
+			{
+				renderNode->settings.iteration = -1;
+				renderNode->settings.isUpdated = true;
+			}
+
+			if (vtxImGui::HalfSpaceWidget("Long Path Mega Kernel", ImGui::Checkbox, (hiddenLabel + "_Long Path Mega Kernel").c_str(), &(renderNode->settings.useLongPathKernel)))
+			{
+				renderNode->settings.iteration = -1;
+				renderNode->settings.isUpdated = true;
+			}
+
+			if (vtxImGui::HalfSpaceWidget("Wavefront Long Path Kernel Start", ImGui::DragFloat, (hiddenLabel + "_Wavefront Long Path Kernel Start").c_str(), &(renderNode->settings.longPathPercentage), 0.01, 0, 1, "%.3f", 0))
+			{
+				renderNode->settings.iteration = -1;
+				renderNode->settings.isUpdated = true;
+			}
+
+			if (vtxImGui::HalfSpaceWidget("Fit Kernel Launch", ImGui::Checkbox, (hiddenLabel + "_Fit Kernel Launch").c_str(), &(renderNode->settings.fitWavefront)))
+			{
+				renderNode->settings.iteration = -1;
+				renderNode->settings.isUpdated = true;
+			}
+
+			if (vtxImGui::HalfSpaceWidget("Use Optix Shader Kernel", ImGui::Checkbox, (hiddenLabel + "_Use Optix Shader Kernel").c_str(), &(renderNode->settings.optixShade)))
+			{
+				renderNode->settings.iteration = -1;
+				renderNode->settings.isUpdated = true;
+			}
+
+			if (vtxImGui::HalfSpaceWidget("Russian Roulette", ImGui::Checkbox, (hiddenLabel + "_Use Russian Roulette").c_str(), &(renderNode->settings.useRussianRoulette)))
+			{
+				renderNode->settings.iteration = -1;
+				renderNode->settings.isUpdated = true;
+			}
+		}
+
+		ImGui::Separator();
 		ImGui::SetNextItemOpen(true, ImGuiCond_Once);
 		if (ImGui::CollapsingHeader("Adaptive Sampling Settings"))
 		{
@@ -102,7 +127,7 @@ namespace vtx::gui
 				renderNode->settings.iteration = -1;
 				renderNode->settings.isUpdated = true;
 			}
-			if (vtxImGui::HalfSpaceWidget("Adaptive Min Pixel Sample", ImGui::DragInt, (hiddenLabel + "_Adaptive Min Pixel Sample").c_str(), &(renderNode->settings.minPixelSamples), 1, 0, 20, "%d", 0))
+			/*if (vtxImGui::HalfSpaceWidget("Adaptive Min Pixel Sample", ImGui::DragInt, (hiddenLabel + "_Adaptive Min Pixel Sample").c_str(), &(renderNode->settings.minPixelSamples), 1, 0, 20, "%d", 0))
 			{
 				renderNode->settings.iteration = -1;
 				renderNode->settings.isUpdated = true;
@@ -111,15 +136,15 @@ namespace vtx::gui
 			{
 				renderNode->settings.iteration = -1;
 				renderNode->settings.isUpdated = true;
-			}
+			}*/
 			if (vtxImGui::HalfSpaceWidget("Albedo-Normal Noise Influence", ImGui::DragFloat, (hiddenLabel + "_Albedo-Normal Noise Influence").c_str(), &(renderNode->settings.albedoNormalNoiseInfluence), 0.01f, 0.0f, 1.0f, "%.3f", 0))
 			{
 				renderNode->settings.iteration = -1;
 			}
-			if (vtxImGui::HalfSpaceWidget("Noise Threshold", ImGui::DragFloat, (hiddenLabel + "_Noise Threshold").c_str(), &(renderNode->settings.noiseCutOff), 0.00001f, 0.0f, 1.0f, "%.3f", 0))
+			/*if (vtxImGui::HalfSpaceWidget("Noise Threshold", ImGui::DragFloat, (hiddenLabel + "_Noise Threshold").c_str(), &(renderNode->settings.noiseCutOff), 0.00001f, 0.0f, 1.0f, "%.3f", 0))
 			{
 				renderNode->settings.iteration = -1;
-			}
+			}*/
 		}
 
 		ImGui::Separator();
@@ -189,36 +214,41 @@ namespace vtx::gui
 
         ///////// INFO /////////////
         ////////////////////////////
-        ImGui::Separator();
-        vtxImGui::HalfSpaceWidget("Total Time:", vtxImGui::booleanText, "%.3f s", renderNode->totalTimeSeconds);
-		vtxImGui::HalfSpaceWidget("Samples Per Pixels:", vtxImGui::booleanText, "%d", renderNode->settings.iteration);
-		vtxImGui::HalfSpaceWidget("SPP per Seconds:", vtxImGui::booleanText, "%.3f", renderNode->sppS);
-		vtxImGui::HalfSpaceWidget("Frame Time:", vtxImGui::booleanText, "%.3f ms", renderNode->averageFrameTime);
-		vtxImGui::HalfSpaceWidget("Fps:", vtxImGui::booleanText, "%.3f", renderNode->fps);
-
-		float toPercent = 100.0f / (1000.0f * renderNode->totalTimeSeconds);
-		vtxImGui::HalfSpaceWidget("Noise   Computation % ", vtxImGui::booleanText, "%.2f", (toPercent*renderNode->noiseComputationTime ));
-		vtxImGui::HalfSpaceWidget("Trace   Computation % ", vtxImGui::booleanText, "%.2f", (toPercent*renderNode->traceComputationTime ));
-		vtxImGui::HalfSpaceWidget("Post	   Computation % ", vtxImGui::booleanText, "%.2f", (toPercent*renderNode->postProcessingComputationTime ));
-		vtxImGui::HalfSpaceWidget("Display Computation % ", vtxImGui::booleanText, "%.2f", (toPercent*renderNode->displayComputationTime ));
-        ImGui::Separator();
-
-		KernelTimes& kernelTimes = renderNode->getWaveFrontTimes();
-		float factor = 100.0f / kernelTimes.totMs();
-		int actualLaunches = renderNode->getWavefrontLaunches();
-		factor = 1.0f/(float)actualLaunches;
-
-		vtxImGui::HalfSpaceWidget("Manage Pixel", vtxImGui::booleanText, "%.2f %", kernelTimes.pixelQueue* factor);
-		vtxImGui::HalfSpaceWidget("Generate Camera Ray", vtxImGui::booleanText, "%.2f %" , kernelTimes.genCameraRay*factor);
-		vtxImGui::HalfSpaceWidget("Trace Ray", vtxImGui::booleanText, "%.2f %", kernelTimes.traceRadianceRay*factor);
-		vtxImGui::HalfSpaceWidget("Reset Trace Ray", vtxImGui::booleanText, "%.2f %", kernelTimes.reset*factor);
-		vtxImGui::HalfSpaceWidget("Shade Rays", vtxImGui::booleanText, "%.2f %", kernelTimes.shadeRay*factor);
-		vtxImGui::HalfSpaceWidget("Handle Escaped Ray", vtxImGui::booleanText, "%.2f %", kernelTimes.handleEscapedRay*factor);
-		vtxImGui::HalfSpaceWidget("Accumulate Ray", vtxImGui::booleanText, "%.2f %", kernelTimes.accumulateRay*factor);
-		vtxImGui::HalfSpaceWidget("Reset Kernels", vtxImGui::booleanText, "%.2f %", kernelTimes.reset* factor);
-		vtxImGui::HalfSpaceWidget("Fetch Queue Size", vtxImGui::booleanText, "%.2f %", kernelTimes.fetchQueueSize*factor);
 		ImGui::Separator();
+		ImGui::SetNextItemOpen(true, ImGuiCond_Once);
+		if (ImGui::CollapsingHeader("Statistics"))
+		{
+			vtxImGui::HalfSpaceWidget("Total Time:", vtxImGui::booleanText, "%.3f s", renderNode->totalTimeSeconds);
+			vtxImGui::HalfSpaceWidget("Samples Per Pixels:", vtxImGui::booleanText, "%d", renderNode->settings.iteration);
+			vtxImGui::HalfSpaceWidget("SPP per Seconds:", vtxImGui::booleanText, "%.3f", renderNode->sppS);
+			vtxImGui::HalfSpaceWidget("Frame Time:", vtxImGui::booleanText, "%.3f ms", renderNode->averageFrameTime);
+			vtxImGui::HalfSpaceWidget("Fps:", vtxImGui::booleanText, "%.3f", renderNode->fps);
+			ImGui::Separator();
 
+			float internalFps = ((1000.0f) * (float)(renderNode->internalIteration)) / renderNode->overallTime;
+			float totTimeInternal = renderNode->overallTime / 1000.0f;
+			vtxImGui::HalfSpaceWidget("CPU Fps:", vtxImGui::booleanText, "%.3f", internalFps);
+			vtxImGui::HalfSpaceWidget("CPU Tot Time:", vtxImGui::booleanText, "%.3f", totTimeInternal);
+			ImGui::Separator();
+
+			KernelTimes& kernelTimes = renderNode->getWaveFrontTimes();
+			int actualLaunches = renderNode->getWavefrontLaunches();
+			float factor = 1.0f / (float)actualLaunches;
+
+			vtxImGui::HalfSpaceWidget("Renderer Noise				", vtxImGui::booleanText, "%.2f ms", factor* renderNode->noiseComputationTime);
+			vtxImGui::HalfSpaceWidget("Renderer Trace				", vtxImGui::booleanText, "%.2f ms", factor* renderNode->traceComputationTime);
+			vtxImGui::HalfSpaceWidget("Renderer Post				", vtxImGui::booleanText, "%.2f ms", factor* renderNode->postProcessingComputationTime);
+			vtxImGui::HalfSpaceWidget("Renderer Display				", vtxImGui::booleanText, "%.2f ms", factor* renderNode->displayComputationTime);
+			ImGui::Separator();
+			vtxImGui::HalfSpaceWidget("WaveFront Generate Ray		", vtxImGui::booleanText, "%.2f ms", factor* kernelTimes.genCameraRay);
+			vtxImGui::HalfSpaceWidget("WaveFront Trace				", vtxImGui::booleanText, "%.2f ms", factor* kernelTimes.traceRadianceRay);
+			vtxImGui::HalfSpaceWidget("WaveFront Shade				", vtxImGui::booleanText, "%.2f ms", factor* kernelTimes.shadeRay);
+			vtxImGui::HalfSpaceWidget("WaveFront Escaped			", vtxImGui::booleanText, "%.2f ms", factor* kernelTimes.handleEscapedRay);
+			vtxImGui::HalfSpaceWidget("WaveFront Accumulate			", vtxImGui::booleanText, "%.2f ms", factor* kernelTimes.accumulateRay);
+			vtxImGui::HalfSpaceWidget("WaveFront Reset				", vtxImGui::booleanText, "%.2f ms", factor* kernelTimes.reset);
+			vtxImGui::HalfSpaceWidget("WaveFront Fetch Queue Size	", vtxImGui::booleanText, "%.2f ms", factor * kernelTimes.fetchQueueSize);
+		}
+        
 		ImGui::PopItemWidth();
         ImGui::End();
     }

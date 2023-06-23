@@ -29,16 +29,24 @@ namespace vtx
             CUDA_CHECK(cudaEventSynchronize(start));
             CUDA_CHECK(cudaEventSynchronize(stop));
 
-            float ms = 0;
-            CUDA_CHECK(cudaEventElapsedTime(&ms, start, stop));
-
-            ++stats->numLaunches;
-            if (stats->numLaunches == 1)
-                stats->sumMS = stats->minMS = stats->maxMS = ms;
-            else {
-                stats->sumMS += ms;
-                stats->minMS = std::min(stats->minMS, ms);
-                stats->maxMS = std::max(stats->maxMS, ms);
+            float       ms  = 0;
+			cudaError_t err = cudaEventElapsedTime(&ms, start, stop);
+            if(err!=cudaSuccess)
+            {
+                VTX_INFO("Profiler Event Sync Fail on Kernle: {} Launches: {}", stats->description, stats->numLaunches);
+                CUDA_CHECK_CONTINUE(err);
+			}
+            else
+            {
+                ++stats->numLaunches;
+                if (stats->numLaunches == 1)
+                    stats->sumMS = stats->minMS = stats->maxMS = ms;
+                else {
+                    stats->sumMS += ms;
+                    stats->minMS = std::min(stats->minMS, ms);
+                    stats->maxMS = std::max(stats->maxMS, ms);
+                }
+	            
             }
 
             active = false;
@@ -53,7 +61,7 @@ namespace vtx
     // Ring buffer
     static std::vector<ProfilerEvent> eventPool;
     static size_t eventPoolOffset = 0;
-    static int maxPoolSize = 1024;
+    static int maxPoolSize = 100;
     bool hasLooped = false;
 
     std::pair<cudaEvent_t, cudaEvent_t> vtx::GetProfilerEvents(const char* description) {

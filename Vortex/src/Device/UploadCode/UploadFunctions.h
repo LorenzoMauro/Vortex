@@ -30,7 +30,7 @@ namespace vtx::device
 
 	void uploadMaps();
 
-	std::tuple<MaterialData, MaterialData*>createMaterialData(std::shared_ptr<graph::Material> material);
+	std::tuple<MaterialData, MaterialData*>createMaterialData(std::shared_ptr<graph::Material> material, int matQueueId);
 
 	DeviceShaderConfiguration createDeviceShaderConfiguration(std::shared_ptr<graph::Shader> shader);
 

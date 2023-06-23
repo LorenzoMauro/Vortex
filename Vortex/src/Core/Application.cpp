@@ -78,7 +78,7 @@ namespace vtx
 		{
 			VTX_ERROR("Failed to create GLFW window");
 		}
-		glfwSwapInterval(1); // Enable vsync
+		glfwSwapInterval(0); // Enable vsync
 		// Initialize the window
 		glfwSetWindowUserPointer(window, this);
 		//glfwSetFramebufferSizeCallback(m_Window, FramebufferResizeCallback);

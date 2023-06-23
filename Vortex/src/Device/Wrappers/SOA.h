@@ -15,6 +15,24 @@ namespace vtx::mdl
 
 namespace vtx
 {
+
+    __forceinline__ __both__ void assertF(bool condition, char* message="")
+    {
+	    if (!condition)
+	    {
+	    	printf("Assertion failed! %s\n", message);
+		}
+    }
+
+#define USE_ASSERT
+#ifdef USE_ASSERT
+#define vtxAssert(condition) assertF(condition)
+#define vtxAssertMsg(condition, msg) assertF(condition, msg)
+#else
+#define vtxAssert(condition)
+#define vtxAssertMsg(condition, msg)
+#endif
+
     class CUDABufferManager {
     public:
 
@@ -63,64 +81,144 @@ namespace vtx
         int nAlloc;
     };
 
-    template<>
-    struct SOA<math::vec3f> {
-        SOA() = default;
-
-        SOA(int n) : nAlloc(n) {
-            this->x = CUDABufferManager::allocate<float>(n);
-            this->y = CUDABufferManager::allocate<float>(n);
-            this->z = CUDABufferManager::allocate<float>(n);
-        }
-
-        SOA& operator=(const SOA& s) {
-            nAlloc = s.nAlloc;
-            this->x = s.x;
-            this->y = s.y;
-            this->z = s.z;
-            return *this;
-        }
-
-        struct Proxy {
-            // Conversion operator to retrieve math::vec3f from SOA
-            __device__ __host__ operator math::vec3f() const {
-                math::vec3f r;
-                r.x = soa->x[i];
-                r.y = soa->y[i];
-                r.z = soa->z[i];
-                return r;
-            }
-
-            // Assignment operator to set values in SOA from math::vec3f
-            __device__ __host__ void operator=(const math::vec3f& a) {
-                soa->x[i] = a.x;
-                soa->y[i] = a.y;
-                soa->z[i] = a.z;
-            }
-
-            SOA* soa;
-            int i;
-        };
-
-        __device__ __host__ Proxy operator[](int i) {
-            assert(i < nAlloc); // Ensure the index is in range
-            return Proxy{ this, i };
-        }
-
-        __device__ __host__ math::vec3f operator[](int i) const {
-            assert(i < nAlloc); // Ensure the index is in range
-            math::vec3f r;
-            r.x = this->x[i];
-            r.y = this->y[i];
-            r.z = this->z[i];
-            return r;
-        }
-
-        int nAlloc;
-        float* __restrict x;
-        float* __restrict y;
-        float* __restrict z;
+    struct AccumulationWorkItem
+    {
+        int originPixel;
+        math::vec3f radiance;
+        int depth;
     };
+
+
+    struct ShadowWorkItem
+    {
+        math::vec3f origin;
+        float distance = -1;
+        math::vec3f direction;
+        int originPixel;
+        math::vec3f radiance;
+        int depth;
+    };
+
+    struct RayWorkItem
+    {
+        unsigned seed;
+        int originPixel;
+        int depth;
+        math::vec3f origin;
+        math::vec3f direction;
+        math::vec3f radiance;
+        math::vec3f throughput;
+        math::vec3f mediumIor;
+        math::vec3f hitBaricenter;
+        unsigned hitInstanceId;
+        unsigned hitTriangleId;
+        mdl::BsdfEventType eventType;
+        float pdf;
+        float hitDistance;
+    };
+
+    struct TraceWorkItem
+    {
+        unsigned seed;
+        int originPixel;
+        int depth;
+        math::vec3f origin;
+        math::vec3f direction;
+        math::vec3f radiance;
+        math::vec3f throughput;
+        math::vec3f mediumIor;
+        mdl::BsdfEventType eventType;
+        float pdf;
+        bool extendRay;
+    };
+
+    struct EscapedWorkItem
+    {
+        unsigned seed;
+        int originPixel;
+        int depth;
+        math::vec3f direction;
+        math::vec3f radiance;
+        math::vec3f throughput;
+        mdl::BsdfEventType eventType;
+        float pdf;
+    };
+
+	template <>
+	struct SOA<math::vec3f>
+	{
+		SOA() = default;
+
+		SOA(int n) : nAlloc(n)
+		{
+			this->x = CUDABufferManager::allocate<float>(n * 3);
+			this->y = this->x + n;
+			this->z = this->y + n;
+		}
+
+		/*SOA(float* ptr, int n) : nAlloc(n)
+		{
+			this->x = ptr;
+			this->y = this->x + n;
+			this->z = this->y + n;
+		}*/
+
+		SOA& operator=(const SOA& s)
+		{
+			nAlloc  = s.nAlloc;
+			this->x = s.x;
+			this->y = s.y;
+			this->z = s.z;
+			return *this;
+		}
+
+		struct Proxy
+		{
+			// Conversion operator to retrieve math::vec3f from SOA
+			__forceinline__ __device__ operator math::vec3f() const
+			{
+				//vtxAssert(i < soa->nAlloc); // Ensure the index is in range
+				//math::vec3f r;
+				//r.x = soa->x[i];
+				//r.y = soa->y[i];
+				//r.z = soa->z[i];
+				return {soa->x[i], soa->y[i], soa->z[i]};
+			}
+
+			// Assignment operator to set values in SOA from math::vec3f
+			__forceinline__ __device__ void operator=(const math::vec3f& a)
+			{
+				//vtxAssert(i < soa->nAlloc); // Ensure the index is in range
+				soa->x[i] = a.x;
+				soa->y[i] = a.y;
+				soa->z[i] = a.z;
+			}
+
+			SOA* soa;
+			int  i;
+		};
+
+		__forceinline__ __device__ Proxy operator[](int i)
+		{
+			vtxAssert(i < nAlloc); // Ensure the index is in range
+			return Proxy{this, i};
+		}
+
+		__forceinline__ __device__ math::vec3f operator[](int i) const
+		{
+			//vtxAssert(i < nAlloc); // Ensure the index is in range
+			//math::vec3f r;
+			//r.x = this->x[i];
+			//r.y = this->y[i];
+			//r.z = this->z[i];
+			return { this->x[i], this->y[i], this->z[i] };
+		}
+
+		int               nAlloc;
+		float* __restrict x;
+		float* __restrict y;
+		float* __restrict z;
+	};
 
     template<>
     struct SOA<math::affine3f> {
@@ -128,23 +226,35 @@ namespace vtx
 
         SOA(int n) : nAlloc(n) {
             // Linear Part
-            m00 = CUDABufferManager::allocate<float>(n);
-            m01 = CUDABufferManager::allocate<float>(n);
-            m02 = CUDABufferManager::allocate<float>(n);
-
-            m10 = CUDABufferManager::allocate<float>(n);
-            m11 = CUDABufferManager::allocate<float>(n);
-            m12 = CUDABufferManager::allocate<float>(n);
-
-            m20 = CUDABufferManager::allocate<float>(n);
-            m21 = CUDABufferManager::allocate<float>(n);
-            m22 = CUDABufferManager::allocate<float>(n);
-
-            // Affine Part
-            m30 = CUDABufferManager::allocate<float>(n);
-            m31 = CUDABufferManager::allocate<float>(n);
-            m32 = CUDABufferManager::allocate<float>(n);
+            this->m00 = CUDABufferManager::allocate<float>(n * 12);
+            this->m01 = this->m00 + n;
+            this->m02 = this->m01 + n;
+            this->m10 = this->m02 + n;
+            this->m11 = this->m10 + n;
+            this->m12 = this->m11 + n;
+            this->m20 = this->m12 + n;
+            this->m21 = this->m20 + n;
+            this->m22 = this->m21 + n;
+            this->m30 = this->m22 + n;
+            this->m31 = this->m30 + n;
+            this->m32 = this->m31 + n;
         }
+
+        /*SOA(float* ptr, int n) : nAlloc(n)
+        {
+            this->m00 = ptr;
+            this->m01 = this->m00 + n;
+            this->m02 = this->m01 + n;
+            this->m10 = this->m02 + n;
+            this->m11 = this->m10 + n;
+            this->m12 = this->m11 + n;
+            this->m20 = this->m12 + n;
+            this->m21 = this->m20 + n;
+            this->m22 = this->m21 + n;
+            this->m30 = this->m22 + n;
+            this->m31 = this->m30 + n;
+            this->m32 = this->m31 + n;
+        }*/
 
         SOA& operator=(const SOA& s) {
             nAlloc = s.nAlloc;
@@ -168,7 +278,8 @@ namespace vtx
 
         struct Proxy {
             // Conversion operator to retrieve math::affine3f from SOA
-            __device__ __host__ operator math::affine3f() const {
+            __forceinline__ __device__ operator math::affine3f() const {
+                vtxAssert(i < soa->nAlloc); // Ensure the index is in range
                 math::affine3f r;
 
                 math::vec3f& c0 = r.l.vx;
@@ -184,7 +295,8 @@ namespace vtx
             }
 
             // Assignment operator to set values in SOA from math::affine3f
-            __device__ __host__ void operator=(const math::affine3f& a) {
+            __forceinline__ __device__ void operator=(const math::affine3f& a) {
+                vtxAssert(i < soa->nAlloc); // Ensure the index is in range
                 soa->m00[i] = a.l.vx.x;
                 soa->m01[i] = a.l.vx.y;
                 soa->m02[i] = a.l.vx.z;
@@ -207,13 +319,13 @@ namespace vtx
         };
 
 
-        __device__ __host__ Proxy operator[](int i) {
-            assert(i < nAlloc); // Ensure the index is in range
+        __forceinline__ __device__ Proxy operator[](int i) {
+            vtxAssert(i < nAlloc); // Ensure the index is in range
             return Proxy{ this, i };
         }
 
-        __device__ __host__ math::affine3f operator[](int i) const {
-            assert(i < nAlloc); // Ensure the index is in range
+        __forceinline__ __device__ math::affine3f operator[](int i) const {
+            vtxAssert(i < nAlloc); // Ensure the index is in range
             math::affine3f r;
 
             math::vec3f& c0 = r.l.vx;
@@ -248,6 +360,513 @@ namespace vtx
         float* __restrict m32;
     };
 
+    template <> struct SOA<AccumulationWorkItem> {
+        SOA() = default;
+
+        SOA(int n) : nAlloc(n) {
+
+            originPixel = CUDABufferManager::allocate<int>(n);
+            depth = CUDABufferManager::allocate<int>(n);
+            radiance = SOA<math::vec3f>(n);
+        }
+
+        SOA& operator=(const SOA& s) {
+            nAlloc = s.nAlloc;
+
+            this->originPixel = s.originPixel;
+            this->depth = s.depth;
+            this->radiance = s.radiance;
+
+            return *this;
+        }
+
+        struct Proxy {
+            __forceinline__ __device__ operator AccumulationWorkItem() const {
+                AccumulationWorkItem r;
+                r.originPixel = soa->originPixel[i];
+                r.radiance = soa->radiance[i];
+                r.depth = soa->depth[i];
+                return r;
+            }
+
+            __forceinline__ __device__ void operator=(const AccumulationWorkItem& a) {
+                vtxAssert(i < soa->nAlloc); // Ensure the index is in range
+                soa->originPixel[i] = a.originPixel;
+                soa->radiance[i] = a.radiance;
+                soa->depth[i] = a.depth;
+            }
+
+            SOA* soa;
+            int i;
+        };
+
+        __forceinline__ __device__ Proxy operator[](int i) {
+            vtxAssert(i < nAlloc); // Ensure the index is in range
+            return Proxy{ this, i };
+        }
+        __forceinline__ __device__ AccumulationWorkItem operator[](int i) const {
+            vtxAssert(i < nAlloc); // Ensure the index is in range
+            AccumulationWorkItem r;
+
+            r.originPixel = this->originPixel[i];
+            r.radiance = this->radiance[i];
+            r.depth = this->depth[i];
+            return r;
+        }
+
+
+        int nAlloc;
+        int* __restrict                originPixel;
+        int* __restrict                depth;
+        SOA<math::vec3f>               radiance;
+    };
+
+    template <> struct SOA<TraceWorkItem> {
+        SOA() = default;
+
+        SOA(int n) : nAlloc(n) {
+            originPixel = CUDABufferManager::allocate<int>(n);
+            depth = CUDABufferManager::allocate<int>(n);
+            pdf = CUDABufferManager::allocate<float>(n);
+            seed = CUDABufferManager::allocate<unsigned>(n);
+            extendRay = CUDABufferManager::allocate<bool>(n);
+            eventType = CUDABufferManager::allocate<mdl::BsdfEventType>(n);
+            origin = SOA<math::vec3f>(n);
+            direction = SOA<math::vec3f>(n);
+            radiance = SOA<math::vec3f>(n);
+            throughput = SOA<math::vec3f>(n);
+            mediumIor = SOA<math::vec3f>(n);
+        }
+
+        SOA& operator=(const SOA& s) {
+            nAlloc = s.nAlloc;
+
+            this->originPixel = s.originPixel;
+            this->seed = s.seed;
+            this->origin = s.origin;
+            this->direction = s.direction;
+            this->depth = s.depth;
+            this->pdf = s.pdf;
+            this->radiance = s.radiance;
+            this->throughput = s.throughput;
+            this->mediumIor = s.mediumIor;
+            this->eventType = s.eventType;
+            this->extendRay = s.extendRay;
+
+            return *this;
+        }
+
+        struct Proxy {
+            __forceinline__ __device__ operator TraceWorkItem() const {
+                TraceWorkItem r{};
+                r.originPixel = soa->originPixel[i];
+                r.seed = soa->seed[i];
+                r.origin = soa->origin[i];
+                r.direction = soa->direction[i];
+                r.depth = soa->depth[i];
+                r.pdf = soa->pdf[i];
+                r.radiance = soa->radiance[i];
+                r.throughput = soa->throughput[i];
+                r.mediumIor = soa->mediumIor[i];
+                r.eventType = soa->eventType[i];
+                r.extendRay = soa->extendRay[i];
+
+                return r;
+            }
+
+            __forceinline__ __device__ void operator=(const TraceWorkItem& a) {
+                vtxAssert(i < soa->nAlloc); // Ensure the index is in range
+                soa->originPixel[i] = a.originPixel;
+                soa->seed[i] = a.seed;
+                soa->origin[i] = a.origin;
+                soa->direction[i] = a.direction;
+                soa->depth[i] = a.depth;
+                soa->pdf[i] = a.pdf;
+                soa->radiance[i] = a.radiance;
+                soa->throughput[i] = a.throughput;
+                soa->mediumIor[i] = a.mediumIor;
+                soa->eventType[i] = a.eventType;
+                soa->extendRay[i] = a.extendRay;
+            }
+
+            SOA* soa;
+            int i;
+        };
+
+        __forceinline__ __device__ Proxy operator[](int i) {
+            vtxAssert(i < nAlloc); // Ensure the index is in range
+            return Proxy{ this, i };
+        }
+        __forceinline__ __device__ TraceWorkItem operator[](int i)const {
+            vtxAssert(i < nAlloc); // Ensure the index is in range
+            TraceWorkItem r;
+            r.originPixel = this->originPixel[i];
+            r.seed = this->seed[i];
+            r.origin = this->origin[i];
+            r.direction = this->direction[i];
+            r.depth = this->depth[i];
+            r.pdf = this->pdf[i];
+            r.radiance = this->radiance[i];
+            r.throughput = this->throughput[i];
+            r.mediumIor = this->mediumIor[i];
+            r.eventType = this->eventType[i];
+            r.extendRay = this->extendRay[i];
+            return r;
+        }
+
+        int nAlloc;
+        int* __restrict                originPixel;
+        unsigned* __restrict           seed;
+        SOA<math::vec3f>               origin;
+        SOA<math::vec3f>               direction;
+        int* __restrict                depth;
+        float* __restrict              pdf;
+        SOA<math::vec3f>               radiance;
+        SOA<math::vec3f>               throughput;
+        SOA<math::vec3f>               mediumIor;
+        mdl::BsdfEventType* __restrict eventType;
+        bool* __restrict extendRay;
+    };
+
+    template <> struct SOA<ShadowWorkItem> {
+        SOA() = default;
+
+        SOA(int n) : nAlloc(n) {
+
+            distance = CUDABufferManager::allocate<float>(n);
+            originPixel = CUDABufferManager::allocate<int>(n);
+            depth = CUDABufferManager::allocate<int>(n);
+
+            radiance = SOA<math::vec3f>(n);
+            direction = SOA<math::vec3f>(n);
+            origin = SOA<math::vec3f>(n);
+        }
+
+        SOA& operator=(const SOA& s) {
+            nAlloc = s.nAlloc;
+
+            this->originPixel = s.originPixel;
+            this->distance = s.distance;
+            this->depth = s.depth;
+            this->radiance = s.radiance;
+            this->direction = s.direction;
+            this->origin = s.origin;
+
+            return *this;
+        }
+
+        struct Proxy {
+            __forceinline__ __device__ operator ShadowWorkItem() const {
+                ShadowWorkItem r;
+                r.originPixel = soa->originPixel[i];
+                r.origin = soa->origin[i];
+                r.direction = soa->direction[i];
+                r.radiance = soa->radiance[i];
+                r.depth = soa->depth[i];
+                r.distance = soa->distance[i];
+                return r;
+            }
+
+            __forceinline__ __device__ void operator=(const ShadowWorkItem& a) {
+                vtxAssert(i < soa->nAlloc); // Ensure the index is in range
+                soa->originPixel[i] = a.originPixel;
+                soa->origin[i] = a.origin;
+                soa->direction[i] = a.direction;
+                soa->radiance[i] = a.radiance;
+                soa->depth[i] = a.depth;
+                soa->distance[i] = a.distance;
+            }
+
+            SOA* soa;
+            int i;
+        };
+
+        __forceinline__ __device__ Proxy operator[](int i) {
+            vtxAssert(i < nAlloc); // Ensure the index is in range
+            return Proxy{ this, i };
+        }
+        __forceinline__ __device__ ShadowWorkItem operator[](int i) const {
+            vtxAssert(i < nAlloc); // Ensure the index is in range
+            ShadowWorkItem r;
+
+            r.originPixel = this->originPixel[i];
+            r.origin = this->origin[i];
+            r.direction = this->direction[i];
+            r.radiance = this->radiance[i];
+            r.depth = this->depth[i];
+            r.distance = this->distance[i];
+            return r;
+        }
+
+
+        int nAlloc;
+        int* __restrict                originPixel;
+        int* __restrict                depth;
+        float* __restrict              distance;
+        SOA<math::vec3f>               radiance;
+        SOA<math::vec3f>               origin;
+        SOA<math::vec3f>               direction;
+    };
+
+    template <> struct SOA<RayWorkItem> {
+        SOA() = default;
+
+        SOA(int n) : nAlloc(n) {
+
+            originPixel = CUDABufferManager::allocate<int>(n);
+            depth = CUDABufferManager::allocate<int>(n);
+
+            pdf = CUDABufferManager::allocate<float>(n);
+            hitDistance = CUDABufferManager::allocate<float>(n);
+            //shadowDistance = CUDABufferManager::allocate<float>(n);
+
+            seed = CUDABufferManager::allocate<unsigned>(n);
+            hitInstanceId = CUDABufferManager::allocate<unsigned>(n);
+            hitTriangleId = CUDABufferManager::allocate<unsigned>(n);
+
+            //shadowTrace = CUDABufferManager::allocate<bool>(n);
+            //extendRay = CUDABufferManager::allocate<bool>(n);
+
+            eventType = CUDABufferManager::allocate<mdl::BsdfEventType>(n);
+            //firstHitType = CUDABufferManager::allocate<mdl::BsdfEventType>(n);
+
+            /*hitWTO = SOA<math::affine3f>(n);
+            hitOTW = SOA<math::affine3f>(n);*/
+
+            origin = SOA<math::vec3f>(n);
+            direction = SOA<math::vec3f>(n);
+            radiance = SOA<math::vec3f>(n);
+            throughput = SOA<math::vec3f>(n);
+            mediumIor = SOA<math::vec3f>(n);
+            //hitPosition = SOA<math::vec3f>(n);
+            hitBaricenter = SOA<math::vec3f>(n);
+            //radianceDirect = SOA<math::vec3f>(n);
+            //shadowDirection = SOA<math::vec3f>(n);
+
+        }
+
+        SOA& operator=(const SOA& s) {
+            nAlloc = s.nAlloc;
+
+            this->originPixel = s.originPixel;
+            this->seed = s.seed;
+            this->origin = s.origin;
+            this->direction = s.direction;
+            this->depth = s.depth;
+            this->pdf = s.pdf;
+            this->radiance = s.radiance;
+            this->throughput = s.throughput;
+            this->mediumIor = s.mediumIor;
+            this->eventType = s.eventType;
+
+            //this->hitPosition = s.hitPosition;
+            this->hitDistance = s.hitDistance;
+            this->hitBaricenter = s.hitBaricenter;
+            this->hitInstanceId = s.hitInstanceId;
+            this->hitTriangleId = s.hitTriangleId;
+            /*this->hitWTO = s.hitWTO;
+            this->hitOTW = s.hitOTW;*/
+
+            //this->firstHitType = s.firstHitType;
+
+            //this->radianceDirect = s.radianceDirect;
+            //this->shadowTrace = s.shadowTrace;
+            //this->shadowDirection = s.shadowDirection;
+            //this->shadowDistance = s.shadowDistance;
+
+            //this->extendRay = s.extendRay;
+
+            return *this;
+        }
+
+        struct Proxy {
+            __forceinline__ __device__ operator RayWorkItem() const {
+                RayWorkItem r{};
+                r.originPixel = soa->originPixel[i];
+                r.seed = soa->seed[i];
+                r.origin = soa->origin[i];
+                r.direction = soa->direction[i];
+                r.depth = soa->depth[i];
+                r.pdf = soa->pdf[i];
+                r.radiance = soa->radiance[i];
+                r.throughput = soa->throughput[i];
+                r.mediumIor = soa->mediumIor[i];
+                r.eventType = soa->eventType[i];
+
+                r.hitDistance = soa->hitDistance[i];
+                r.hitBaricenter = soa->hitBaricenter[i];
+                r.hitInstanceId = soa->hitInstanceId[i];
+                r.hitTriangleId = soa->hitTriangleId[i];
+
+                return r;
+            }
+
+            __forceinline__ __device__ void operator=(const RayWorkItem& a) {
+                vtxAssert(i < soa->nAlloc); // Ensure the index is in range
+
+                soa->originPixel[i] = a.originPixel;
+                soa->seed[i] = a.seed;
+                soa->origin[i] = a.origin;
+                soa->direction[i] = a.direction;
+                soa->depth[i] = a.depth;
+                soa->pdf[i] = a.pdf;
+                soa->radiance[i] = a.radiance;
+                soa->throughput[i] = a.throughput;
+                soa->mediumIor[i] = a.mediumIor;
+                soa->eventType[i] = a.eventType;
+
+                soa->hitDistance[i] = a.hitDistance;
+                soa->hitBaricenter[i] = a.hitBaricenter;
+                soa->hitInstanceId[i] = a.hitInstanceId;
+                soa->hitTriangleId[i] = a.hitTriangleId;
+            }
+
+            SOA* soa;
+            int i;
+        };
+
+        __forceinline__ __device__ Proxy operator[](int i) {
+            vtxAssert(i < nAlloc); // Ensure the index is in range
+            return Proxy{ this, i };
+        }
+        __forceinline__ __device__ RayWorkItem operator[](int i)const {
+            vtxAssert(i < nAlloc); // Ensure the index is in range
+            RayWorkItem r;
+
+            r.originPixel = this->originPixel[i];
+            r.seed = this->seed[i];
+            r.origin = this->origin[i];
+            r.direction = this->direction[i];
+            r.depth = this->depth[i];
+            r.pdf = this->pdf[i];
+            r.radiance = this->radiance[i];
+            r.throughput = this->throughput[i];
+            r.mediumIor = this->mediumIor[i];
+            r.eventType = this->eventType[i];
+
+            r.hitDistance = this->hitDistance[i];
+            r.hitBaricenter = this->hitBaricenter[i];
+            r.hitInstanceId = this->hitInstanceId[i];
+            r.hitTriangleId = this->hitTriangleId[i];
+
+            return r;
+        }
+
+
+        int nAlloc;
+        int* __restrict                originPixel;
+        unsigned* __restrict           seed;
+        SOA<math::vec3f>               origin;
+        SOA<math::vec3f>               direction;
+        int* __restrict                depth;
+        float* __restrict              pdf;
+        SOA<math::vec3f>               radiance;
+        SOA<math::vec3f>               throughput;
+        SOA<math::vec3f>               mediumIor;
+        mdl::BsdfEventType* __restrict eventType;
+
+
+        float* __restrict    hitDistance;
+        SOA<math::vec3f>     hitBaricenter;
+        unsigned* __restrict hitInstanceId;
+        unsigned* __restrict hitTriangleId;
+
+        SOA<math::vec3f>     compressedHit;
+    };
+
+    template <> struct SOA<EscapedWorkItem> {
+        SOA() = default;
+
+        SOA(int n) : nAlloc(n) {
+
+            originPixel = CUDABufferManager::allocate<int>(n);
+            depth = CUDABufferManager::allocate<int>(n);
+            pdf = CUDABufferManager::allocate<float>(n);
+            seed = CUDABufferManager::allocate<unsigned>(n);
+            eventType = CUDABufferManager::allocate<mdl::BsdfEventType>(n);
+            direction = SOA<math::vec3f>(n);
+            radiance = SOA<math::vec3f>(n);
+            throughput = SOA<math::vec3f>(n);
+
+        }
+
+        SOA& operator=(const SOA& s) {
+            nAlloc = s.nAlloc;
+
+            this->originPixel = s.originPixel;
+            this->seed = s.seed;
+            this->direction = s.direction;
+            this->depth = s.depth;
+            this->pdf = s.pdf;
+            this->radiance = s.radiance;
+            this->throughput = s.throughput;
+            this->eventType = s.eventType;
+            return *this;
+        }
+
+        struct Proxy {
+            __forceinline__ __device__ operator EscapedWorkItem() const {
+                EscapedWorkItem r{};
+                r.originPixel = soa->originPixel[i];
+                r.seed = soa->seed[i];
+                r.direction = soa->direction[i];
+                r.depth = soa->depth[i];
+                r.pdf = soa->pdf[i];
+                r.radiance = soa->radiance[i];
+                r.throughput = soa->throughput[i];
+                r.eventType = soa->eventType[i];
+                return r;
+            }
+
+            __forceinline__ __device__ void operator=(const EscapedWorkItem& a) {
+                vtxAssert(i < soa->nAlloc); // Ensure the index is in range
+
+                soa->originPixel[i] = a.originPixel;
+                soa->seed[i] = a.seed;
+                soa->direction[i] = a.direction;
+                soa->depth[i] = a.depth;
+                soa->pdf[i] = a.pdf;
+                soa->radiance[i] = a.radiance;
+                soa->throughput[i] = a.throughput;
+                soa->eventType[i] = a.eventType;
+            }
+
+            SOA* soa;
+            int i;
+        };
+
+        __forceinline__ __device__ Proxy operator[](int i) {
+            vtxAssert(i < nAlloc); // Ensure the index is in range
+            return Proxy{ this, i };
+        }
+        __forceinline__ __device__ EscapedWorkItem operator[](int i)const {
+            vtxAssert(i < nAlloc); // Ensure the index is in range
+            EscapedWorkItem r;
+
+            r.originPixel = this->originPixel[i];
+            r.seed = this->seed[i];
+            r.direction = this->direction[i];
+            r.depth = this->depth[i];
+            r.pdf = this->pdf[i];
+            r.radiance = this->radiance[i];
+            r.throughput = this->throughput[i];
+            r.eventType = this->eventType[i];
+
+            return r;
+        }
+
+
+        int nAlloc;
+        int* __restrict                originPixel;
+        unsigned* __restrict           seed;
+        SOA<math::vec3f>               direction;
+        int* __restrict                depth;
+        float* __restrict              pdf;
+        SOA<math::vec3f>               radiance;
+        SOA<math::vec3f>               throughput;
+        mdl::BsdfEventType* __restrict eventType;
+    };
+
 
     // WorkQueueSOA Definition
     template <typename WorkItem>
@@ -268,370 +887,45 @@ namespace vtx
             size = w.size;
             return *this;
         }
-
-        __device__ __host__ int Size() const {
-            return size;
+        __forceinline__ __device__ void setCounter(int* counter)
+        {
+        	size = counter;
+		}
+        __forceinline__ __device__ int Size() const {
+            return *size;
         }
-        __device__ __host__ void Reset() {
-            size = 0;
+
+    	__forceinline__ __device__ void Reset() {
+            *size = 0;
         }
 
-        __device__ __host__ int Push(WorkItem w) {
+        __forceinline__ __device__ int Push(WorkItem w) {
             int index = AllocateEntry();
-            if (index >= nAlloc)
-            {
-                printf("WorkQueueSOA::Push() - %s - index %d >= nAlloc %d\n", name, index, nAlloc);
-                return -1;
-            }
+            //printf("Pushing %s %d\n", name, index);
+            vtxAssertMsg(index < nAlloc, name); // Ensure the index is in range
             (*this)[index] = w;
             return index;
+        }
+
+        __forceinline__ __device__ int maxSize()
+        {
+	        return nAlloc;
         }
 
 
     protected:
         // WorkQueueSOA Protected Methods
-        __device__ __host__ int AllocateEntry() {
-            return cuAtomicAdd(&size, 1);
+        __forceinline__ __device__ int AllocateEntry() {
+            return cuAtomicAdd(size, 1);
         }
 
     private:
         // WorkQueueSOA Private Members
-        int size = 0;
+        int* size = nullptr;
         int nAlloc;
         char* name;
     };
 
-    struct alignas(16) RayWorkItem
-    {
-        // Assuming math::affine3f is large, place these at the top
-        math::affine3f hitWTO;
-        math::affine3f hitOTW;
-
-        // Assuming math::vec3f is 12 bytes, group them with smaller members
-        math::vec3f origin;
-        float pdf;
-
-        math::vec3f direction;
-        float hitDistance;
-
-        math::vec3f radiance;
-        unsigned seed;
-
-        math::vec3f throughput;
-        unsigned hitInstanceId;
-
-        math::vec3f mediumIor;
-        unsigned hitTriangleId;
-
-        math::vec3f hitPosition;
-        int originPixel;
-
-        math::vec3f hitBaricenter;
-        int depth;
-
-        math::vec3f colorsDirectLight;
-        mdl::BsdfEventType eventType;
-
-        math::vec3f colorsTrueNormal;
-        mdl::BsdfEventType firstHitType;
-
-        math::vec3f colorsShadingNormal;
-        bool shadowTrace; // you can still name it padding if no other variable fits here
-
-        math::vec3f colorsBounceDiffuse;
-        float padding2;
-
-        math::vec3f colorsTangent;
-        float padding3;
-
-        math::vec3f colorsUv;
-        float padding4;
-
-        math::vec3f colorsOrientation;
-        float padding5;
-
-        math::vec3f colorsDebugColor1;
-        float       padding6;
-
-        math::vec3f radianceDirect;
-	};
-
-    template <> struct SOA<RayWorkItem> {
-        SOA() = default;
-
-        SOA(int n) : nAlloc(n) {
-
-			originPixel = CUDABufferManager::allocate<int>(n);
-			seed        = CUDABufferManager::allocate<unsigned>(n);
-			origin      = SOA<math::vec3f>(n);
-			direction   = SOA<math::vec3f>(n);
-			depth       = CUDABufferManager::allocate<int>(n);
-			pdf         = CUDABufferManager::allocate<float>(n);
-            radiance    = SOA<math::vec3f>(n);
-            radianceDirect    = SOA<math::vec3f>(n);
-            shadowTrace = CUDABufferManager::allocate<bool>(n);
-            throughput  = SOA<math::vec3f>(n);
-			mediumIor   = SOA<math::vec3f>(n);
-			eventType   = CUDABufferManager::allocate<mdl::BsdfEventType>(n);
-
-			hitPosition   = SOA<math::vec3f>(n);
-			hitDistance   = CUDABufferManager::allocate<float>(n);
-			hitBaricenter = SOA<math::vec3f>(n);
-			hitInstanceId = CUDABufferManager::allocate<unsigned>(n);
-			hitTriangleId = CUDABufferManager::allocate<unsigned>(n);
-			hitWTO        = SOA<math::affine3f>(n);
-			hitOTW        = SOA<math::affine3f>(n);
-
-            firstHitType        = CUDABufferManager::allocate<mdl::BsdfEventType>(n);
-            colorsDirectLight   = SOA<math::vec3f>(n);
-            colorsTrueNormal    = SOA<math::vec3f>(n);
-			colorsShadingNormal = SOA<math::vec3f>(n);
-			colorsBounceDiffuse = SOA<math::vec3f>(n);
-			colorsTangent       = SOA<math::vec3f>(n);
-			colorsUv            = SOA<math::vec3f>(n);
-			colorsOrientation   = SOA<math::vec3f>(n);
-			colorsDebugColor1   = SOA<math::vec3f>(n);
-        }
-
-        SOA& operator=(const SOA& s) {
-            nAlloc = s.nAlloc;
-
-            this->originPixel = s.originPixel;
-            this->seed = s.seed;
-            this->origin = s.origin;
-            this->direction = s.direction;
-            this->depth = s.depth;
-            this->pdf = s.pdf;
-            this->radiance = s.radiance;
-            this->throughput = s.throughput;
-            this->mediumIor = s.mediumIor;
-            this->eventType = s.eventType;
-
-            this->hitPosition = s.hitPosition;
-            this->hitDistance = s.hitDistance;
-            this->hitBaricenter = s.hitBaricenter;
-            this->hitInstanceId = s.hitInstanceId;
-            this->hitTriangleId = s.hitTriangleId;
-            this->hitWTO = s.hitWTO;
-            this->hitOTW = s.hitOTW;
-
-            this->firstHitType = s.firstHitType;
-            this->colorsDirectLight = s.colorsDirectLight;
-            this->colorsTrueNormal = s.colorsTrueNormal;
-            this->colorsShadingNormal = s.colorsShadingNormal;
-            this->colorsBounceDiffuse = s.colorsBounceDiffuse;
-            this->colorsTangent = s.colorsTangent;
-            this->colorsUv = s.colorsUv;
-            this->colorsOrientation = s.colorsOrientation;
-            this->colorsDebugColor1 = s.colorsDebugColor1;
-
-            return *this;
-        }
-
-    	struct Proxy {
-            __device__ __host__ operator RayWorkItem() const {
-                RayWorkItem r;
-                r.originPixel = soa->originPixel[i];
-                r.seed = soa->seed[i];
-                r.origin = soa->origin[i];
-                r.direction = soa->direction[i];
-                r.depth = soa->depth[i];
-                r.pdf = soa->pdf[i];
-                r.radiance = soa->radiance[i];
-                r.throughput = soa->throughput[i];
-                r.mediumIor = soa->mediumIor[i];
-                r.eventType = soa->eventType[i];
-                r.shadowTrace = soa->shadowTrace[i];
-                r.radianceDirect = soa->radianceDirect[i];
-
-                r.hitPosition = soa->hitPosition[i];
-                r.hitDistance = soa->hitDistance[i];
-                r.hitBaricenter = soa->hitBaricenter[i];
-                r.hitInstanceId = soa->hitInstanceId[i];
-                r.hitTriangleId = soa->hitTriangleId[i];
-                r.hitWTO = soa->hitWTO[i];
-                r.hitOTW = soa->hitOTW[i];
-
-                r.firstHitType = soa->firstHitType[i];
-                r.colorsDirectLight = soa->colorsDirectLight[i];
-                r.colorsTrueNormal = soa->colorsTrueNormal[i];
-                r.colorsShadingNormal = soa->colorsShadingNormal[i];
-                r.colorsBounceDiffuse = soa->colorsBounceDiffuse[i];
-                r.colorsTangent = soa->colorsTangent[i];
-                r.colorsUv = soa->colorsUv[i];
-                r.colorsOrientation = soa->colorsOrientation[i];
-                r.colorsDebugColor1 = soa->colorsDebugColor1[i];
-                return r;
-            }
-
-        	__device__ __host__ void operator=(const RayWorkItem& a) {
-                assert(i < soa->nAlloc); // Ensure the index is in range
-                soa->originPixel[i] = a.originPixel;
-                soa->seed[i] = a.seed;
-                soa->origin[i] = a.origin;
-                soa->direction[i] = a.direction;
-                soa->depth[i] = a.depth;
-                soa->pdf[i] = a.pdf;
-                soa->radiance[i] = a.radiance;
-                soa->throughput[i] = a.throughput;
-                soa->mediumIor[i] = a.mediumIor;
-                soa->eventType[i] = a.eventType;
-                soa->shadowTrace[i] = a.shadowTrace;
-                soa->radianceDirect[i] = a.radianceDirect;
-
-                soa->hitPosition[i] = a.hitPosition;
-                soa->hitDistance[i] = a.hitDistance;
-                soa->hitBaricenter[i] = a.hitBaricenter;
-                soa->hitInstanceId[i] = a.hitInstanceId;
-                soa->hitTriangleId[i] = a.hitTriangleId;
-                soa->hitWTO[i] = a.hitWTO;
-                soa->hitOTW[i] = a.hitOTW;
-
-                soa->firstHitType[i] = a.firstHitType;
-                soa->colorsDirectLight[i] = a.colorsDirectLight;
-                soa->colorsTrueNormal[i] = a.colorsTrueNormal;
-                soa->colorsShadingNormal[i] = a.colorsShadingNormal;
-                soa->colorsBounceDiffuse[i] = a.colorsBounceDiffuse;
-                soa->colorsTangent[i] = a.colorsTangent;
-                soa->colorsUv[i] = a.colorsUv;
-                soa->colorsOrientation[i] = a.colorsOrientation;
-                soa->colorsDebugColor1[i] = a.colorsDebugColor1;
-            }
-
-            SOA* soa;
-            int i;
-        };
-
-        __device__ __host__ Proxy operator[](int i) {
-            assert(i < nAlloc); // Ensure the index is in range
-            return Proxy{ this, i };
-        }
-        __device__ __host__ RayWorkItem operator[](int i) const {
-            assert(i < nAlloc); // Ensure the index is in range
-            RayWorkItem r;
-
-            r.originPixel = this->originPixel[i];
-            r.seed = this->seed[i];
-            r.origin = this->origin[i];
-            r.direction = this->direction[i];
-            r.depth = this->depth[i];
-            r.pdf = this->pdf[i];
-            r.radiance = this->radiance[i];
-            r.throughput = this->throughput[i];
-            r.mediumIor = this->mediumIor[i];
-            r.eventType = this->eventType[i];
-            r.shadowTrace = this->shadowTrace[i];
-            r.radianceDirect = this->radianceDirect[i];
-
-            r.hitPosition = this->hitPosition[i];
-            r.hitDistance = this->hitDistance[i];
-            r.hitBaricenter = this->hitBaricenter[i];
-            r.hitInstanceId = this->hitInstanceId[i];
-            r.hitTriangleId = this->hitTriangleId[i];
-            r.hitWTO = this->hitWTO[i];
-            r.hitOTW = this->hitOTW[i];
-
-            r.firstHitType = this->firstHitType[i];
-            r.colorsDirectLight = this->colorsDirectLight[i];
-            r.colorsTrueNormal = this->colorsTrueNormal[i];
-            r.colorsShadingNormal = this->colorsShadingNormal[i];
-            r.colorsBounceDiffuse = this->colorsBounceDiffuse[i];
-            r.colorsTangent = this->colorsTangent[i];
-            r.colorsUv = this->colorsUv[i];
-            r.colorsOrientation = this->colorsOrientation[i];
-            r.colorsDebugColor1 = this->colorsDebugColor1[i];
-
-            return r;
-        }
-
-
-        int nAlloc;
-        int* __restrict                originPixel;
-		unsigned* __restrict           seed;
-		SOA<math::vec3f>               origin;
-		SOA<math::vec3f>               direction;
-		int* __restrict                depth;
-		float* __restrict              pdf;
-		SOA<math::vec3f>               radiance;
-		SOA<math::vec3f>               throughput;
-		SOA<math::vec3f>               mediumIor;
-		mdl::BsdfEventType* __restrict eventType;
-
-        SOA<math::vec3f>  radianceDirect;
-        bool* __restrict shadowTrace;
-
-		SOA<math::vec3f>     hitPosition;
-		float* __restrict    hitDistance;
-		SOA<math::vec3f>     hitBaricenter;
-		unsigned* __restrict hitInstanceId;
-		unsigned* __restrict hitTriangleId;
-		SOA<math::affine3f>  hitWTO;
-		SOA<math::affine3f>  hitOTW;
-
-        mdl::BsdfEventType* __restrict firstHitType;
-        SOA<math::vec3f> colorsDirectLight;
-        SOA<math::vec3f> colorsTrueNormal;
-		SOA<math::vec3f> colorsShadingNormal;
-		SOA<math::vec3f> colorsBounceDiffuse;
-		SOA<math::vec3f> colorsTangent;
-		SOA<math::vec3f> colorsUv;
-		SOA<math::vec3f> colorsOrientation;
-		SOA<math::vec3f> colorsDebugColor1;
-    };
-
-
-    struct PixelWorkItem
-    {
-        int         pixelId;
-    };
-
-    template <> struct SOA<PixelWorkItem> {
-        SOA() = default;
-
-        SOA(int n) : nAlloc(n) {
-
-            originPixel = CUDABufferManager::allocate<int>(n);
-        }
-
-        SOA& operator=(const SOA& s) {
-            nAlloc = s.nAlloc;
-
-            this->originPixel = s.originPixel;
-            return *this;
-        }
-
-        struct Proxy {
-            __device__ __host__ operator PixelWorkItem() const {
-                PixelWorkItem r;
-                r.pixelId = soa->originPixel[i];
-                return r;
-            }
-            __device__ __host__ void operator=(const PixelWorkItem& a) {
-                assert(i < soa->nAlloc); // Ensure the index is in range
-                soa->originPixel[i] = a.pixelId;
-            }
-
-            SOA* soa;
-            int i;
-        };
-
-        __device__ __host__ Proxy operator[](int i) {
-            assert(i < nAlloc); // Ensure the index is in range
-            return Proxy{ this, i };
-        }
-        __device__ __host__ PixelWorkItem operator[](int i) const {
-            assert(i < nAlloc); // Ensure the index is in range
-            PixelWorkItem r;
-
-            r.pixelId = this->originPixel[i];
-
-            return r;
-        }
-
-        int nAlloc;
-
-        int* __restrict                originPixel;
-    };
 
 }
 #endif

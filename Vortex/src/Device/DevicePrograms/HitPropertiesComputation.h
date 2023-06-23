@@ -1,20 +1,15 @@
 ﻿#pragma once
-
-#include "Utils.h"
 #include <optix_device.h>
-
-//#include "DataFetcher.h"
 #include "LaunchParams.h"
 #include "RayData.h"
-#include <optix_device.h>
 #include "CudaDebugHelper.h"
 
 namespace vtx::utl
 {
 
-	__forceinline__ __device__ void getInstanceAndGeometry(HitProperties* hitP, const vtxID& instanceId, const LaunchParams& optixLaunchParams)
+	__forceinline__ __device__ void getInstanceAndGeometry(HitProperties* hitP, const vtxID& instanceId, const LaunchParams& params)
 	{
-		hitP->instance = optixLaunchParams.instances[instanceId];
+		hitP->instance = params.instances[instanceId];
 		hitP->geometry = (hitP->instance->geometryData);
 	}
 
@@ -49,20 +44,6 @@ namespace vtx::utl
 		hitP->direction /= hitP->distance;
 	}
 
-	__forceinline__ __device__ void fetchTransformsFromHandle(HitProperties* hitP)
-	{
-		const OptixTraversableHandle handle = optixGetTransformListHandle(0);
-		// UNSURE IF THIS IS CORRECT! WE ALWAYS HAVE THE TRANSFORM FROM THE INSTANCE DATA IN CASE
-		const float4* wTo = optixGetInstanceInverseTransformFromHandle(handle);
-		const float4* oTw = optixGetInstanceTransformFromHandle(handle);
-
-		hitP->objectToWorld = math::affine3f(oTw);
-		hitP->worldToObject = math::affine3f(wTo);
-
-		hitP->objectToWorld.toFloat4(hitP->oTwF4);
-		hitP->worldToObject.toFloat4(hitP->wToF4);
-	}
-
 	__forceinline__ __device__ void fetchTransformsFromInstance(HitProperties* hitP)
 	{
 		hitP->objectToWorld = hitP->instance->transform;
@@ -71,15 +52,37 @@ namespace vtx::utl
 		hitP->worldToObject.toFloat4(hitP->wToF4);
 	}
 
-
-	__forceinline__ __device__ void setTransform(HitProperties* hitP, RayWorkItem* prd)
+	__forceinline__ __device__ void fetchTransformsFromHandle(HitProperties* hitP)
 	{
-		hitP->objectToWorld = math::affine3f(prd->hitOTW);
-		hitP->worldToObject = math::affine3f(prd->hitWTO);
+		fetchTransformsFromInstance(hitP);
+			//const OptixTraversableHandle handle = optixGetTransformListHandle(0);
+			//{
+			//	const OptixTraversableHandle handle = hitP->instance->geometryData->traversable;
+			//	// UNSURE IF THIS IS CORRECT! WE ALWAYS HAVE THE TRANSFORM FROM THE INSTANCE DATA IN CASE
+			//	const float4* wTo = optixGetInstanceInverseTransformFromHandle(handle);
+			//	const float4* oTw = optixGetInstanceTransformFromHandle(handle);
 
-		hitP->objectToWorld.toFloat4(hitP->oTwF4);
-		hitP->worldToObject.toFloat4(hitP->wToF4);
+			//	hitP->objectToWorld = math::affine3f(oTw);
+			//	hitP->worldToObject = math::affine3f(wTo);
+
+			//	hitP->objectToWorld.toFloat4(hitP->oTwF4);
+			//	hitP->worldToObject.toFloat4(hitP->wToF4);
+			//}
 	}
+
+	__forceinline__ __device__ void setTransform(HitProperties* hitP)
+	{
+		fetchTransformsFromInstance(hitP);
+		/*{
+			hitP->objectToWorld = math::affine3f(prd->hitOTW);
+			hitP->worldToObject = math::affine3f(prd->hitWTO);
+
+			hitP->objectToWorld.toFloat4(hitP->oTwF4);
+			hitP->worldToObject.toFloat4(hitP->wToF4);
+		}*/
+		
+	}
+
 	__forceinline__ __device__ void computeGeometricHitProperties(HitProperties* hitP, const unsigned int triangleId, const bool useInstanceData = false)
 	{
 		if (hitP->geometry == nullptr)

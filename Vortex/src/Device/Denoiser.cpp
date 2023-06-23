@@ -6,7 +6,7 @@
 namespace vtx::optix
 {
 
-	OptixDenoiserWrapper::~OptixDenoiserWrapper()
+	void OptixDenoiserWrapper::shutDown()
 	{
 		if (denoiser)
 		{
@@ -16,7 +16,6 @@ namespace vtx::optix
 		intensity.free();
 		state.free();
 	}
-
 	void OptixDenoiserWrapper::setInputs(CUDABuffer& iRadiance, CUDABuffer& iAlbedo, CUDABuffer& iNormal)
 	{
 		inputLayers.clear();

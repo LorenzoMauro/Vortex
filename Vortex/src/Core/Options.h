@@ -27,16 +27,22 @@ namespace vtx
 		/////////////////// Rendering Settings /////////////////////////////////////////////
 		////////////////////////////////////////////////////////////////////////////////////
 
+		bool         runOnSeparateThread;
 		uint32_t                                  maxBounces;
 		uint32_t                                  maxSamples;
 		bool                                      accumulate;
-		int										  useWavefront;
-		bool									  fitWavefront;
 		bool									  useRussianRoulette;
 		RendererDeviceSettings::SamplingTechnique samplingTechnique;
 		RendererDeviceSettings::DisplayBuffer     displayBuffer;
 		float                                     maxClamp;
 		float                                     minClamp;
+
+		int										  useWavefront;
+		bool									  fitWavefront;
+		bool										optixShade;
+		bool         parallelShade;
+		float         longPathPercentage;
+		bool			useLongPathKernel;
 
 		int   noiseKernelSize;
 		int   adaptiveSampling;

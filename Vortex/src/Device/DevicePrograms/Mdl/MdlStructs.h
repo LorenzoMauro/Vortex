@@ -1,10 +1,7 @@
 ﻿#pragma once
 #ifndef MDL_STRUCT_H
 #define MDL_STRUCT_H
-#define TEX_SUPPORT_NO_VTABLES
-#define TEX_SUPPORT_NO_DUMMY_SCENEDATA
 #include "Device/DevicePrograms/RayData.h"
-#include "../texture_lookup.h"  // texture runtime
 
 namespace vtx::mdl
 {
@@ -90,24 +87,33 @@ namespace vtx::mdl
         float            opacity;
         bool             isThinWalled;
 
+        // We export these as well to not compute them twice
+        bool             isFrontFace;
+        math::vec3f      trueNormal;
+        math::vec3f tangent;
+        math::vec3f uv;
     };
 
     struct MdlRequest
     {
-        HitProperties* hitP;
-        bool bsdfEvaluation = false;
-        bool bsdfSample = false;
-        bool auxiliary = false;
-        bool edf = false;
-        bool opacity = false;
-        bool ior = false;
-
-        math::vec3f lastRayDirection;
-        math::vec3f toSampledLight;
-        math::vec3f surroundingIor;
+        bool                                       bsdfEvaluation = false;
+        bool                                       bsdfSample     = false;
+        bool                                       auxiliary      = false;
+        bool                                       edf            = false;
+        bool                                       opacity        = false;
+        bool                                       ior            = false;
+        math::vec3f                                position;
+        math::vec3f                                baricenter;
+        math::vec3f                                outgoingDirection;
+        math::vec3f                                toSampledLight;
+        math::vec3f                                surroundingIor;
+        const InstanceData*                        instance;
+        const GeometryData*                        geometry;
+        TextureHandler*                             textureHandler;
+        char* argBlock;
+        int                                        triangleId;
+        unsigned*                                   seed;
 
     };
-
-
 }
 #endif

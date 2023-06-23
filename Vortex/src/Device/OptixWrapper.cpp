@@ -47,6 +47,7 @@ namespace vtx::optix
 	void shutDown()
 	{
 		VTX_INFO("ShuttingDown: Optix");
+		state.denoiser.shutDown();
 		CU_CHECK_CONTINUE(cuCtxSetCurrent(state.cudaContext)); // Activate this CUDA context. Not using activate() because this needs a no-throw check.
 		CU_CHECK_CONTINUE(cuCtxSynchronize());
 
@@ -89,6 +90,18 @@ namespace vtx::optix
 		{
 			OPTIX_CHECK(optixDeviceContextSetCacheEnabled(state.optixContext, 0));
 		}
+	}
+
+	std::vector<cudaStream_t>& createMaterialStreamVector(const int size)
+	{
+		state.materialStreams = std::vector<CUstream>();
+		state.materialStreams.resize(size);
+		//state.materialStreams[0] = state.stream;
+		for (int i = 0; i < size; i++)
+		{
+			CUDA_CHECK(cudaStreamCreate(&state.materialStreams[i]));
+		}
+		return state.materialStreams;
 	}
 
 	void setModuleCompilersOptions()
@@ -336,7 +349,6 @@ namespace vtx::optix
 
 	void SbtPipeline::initSbtMap()
 	{
-		computeStackSize();
 		createSbt();
 		isDirty = false;
 	}
@@ -371,52 +383,6 @@ namespace vtx::optix
 		return programGroups;
 	}
 
-	void SbtPipeline::computeStackSize()
-	{
-		VTX_INFO("Optix Wrapper: Computing Stack Sizes");
-
-		const OptixPipelineLinkOptions& pipelineLinkOptions = optix::getState()->pipelineLinkOptions;
-		const std::vector<OptixProgramGroup>& pgs = getProgramGroups();
-		const OptixPipeline& pipe = getRenderingPipeline()->getPipeline();
-
-		OptixStackSizes ssp = {}; // Whole Program Stack Size
-		for (const OptixProgramGroup pg : pgs) {
-			OptixStackSizes ss;
-
-			OPTIX_CHECK(optixProgramGroupGetStackSize(pg, &ss, pipe));
-
-			ssp.cssRG = std::max(ssp.cssRG, ss.cssRG);
-			ssp.cssMS = std::max(ssp.cssMS, ss.cssMS);
-			ssp.cssCH = std::max(ssp.cssCH, ss.cssCH);
-			ssp.cssAH = std::max(ssp.cssAH, ss.cssAH);
-			ssp.cssIS = std::max(ssp.cssIS, ss.cssIS);
-			ssp.cssCC = std::max(ssp.cssCC, ss.cssCC);
-			ssp.dssDC = std::max(ssp.dssDC, ss.dssDC);
-		}
-
-		// Temporaries
-		const unsigned int cssCcTree = ssp.cssCC;
-		const unsigned int cssChOrMsPlusCcTree = std::max(ssp.cssCH, ssp.cssMS) + cssCcTree;
-		const unsigned int maxDcDepth = getOptions()->maxDcDepth;
-
-		// Arguments
-		const unsigned int directCallableStackSizeFromTraversal = ssp.dssDC * maxDcDepth; // FromTraversal: DC is invoked from IS or AH.    // Possible stack size optimizations.
-		const unsigned int directCallableStackSizeFromState = ssp.dssDC * maxDcDepth; // FromState:     DC is invoked from RG, MS, or CH. // Possible stack size optimizations.
-		const unsigned int continuationStackSize =
-			ssp.cssRG +
-			cssCcTree +
-			cssChOrMsPlusCcTree * (std::max(1u, pipelineLinkOptions.maxTraceDepth) - 1u) +
-			std::min(1u, pipelineLinkOptions.maxTraceDepth) * std::max(cssChOrMsPlusCcTree, ssp.cssAH + ssp.cssIS);
-		const unsigned int maxTraversableGraphDepth = getOptions()->maxTraversableGraphDepth;
-
-		const OptixResult result = optixPipelineSetStackSize(pipe,
-			directCallableStackSizeFromTraversal,
-			directCallableStackSizeFromState,
-			continuationStackSize,
-			maxTraversableGraphDepth);
-
-		OPTIX_CHECK(result);
-	}
 
 	void SbtPipeline::createSbt()
 	{
@@ -560,6 +526,54 @@ namespace vtx::optix
 		return allProgramGroups;
 	}
 
+
+	void PipelineOptix::computeStackSize()
+	{
+		VTX_INFO("Optix Wrapper: Computing Stack Sizes");
+
+		const OptixPipelineLinkOptions& pipelineLinkOptions = optix::getState()->pipelineLinkOptions;
+		const std::vector<OptixProgramGroup>& pgs = getAllProgramGroups();
+		const OptixPipeline& pipe = getRenderingPipeline()->getPipeline();
+
+		OptixStackSizes ssp = {}; // Whole Program Stack Size
+		for (const OptixProgramGroup pg : pgs) {
+			OptixStackSizes ss;
+
+			OPTIX_CHECK(optixProgramGroupGetStackSize(pg, &ss, pipe));
+
+			ssp.cssRG = std::max(ssp.cssRG, ss.cssRG);
+			ssp.cssMS = std::max(ssp.cssMS, ss.cssMS);
+			ssp.cssCH = std::max(ssp.cssCH, ss.cssCH);
+			ssp.cssAH = std::max(ssp.cssAH, ss.cssAH);
+			ssp.cssIS = std::max(ssp.cssIS, ss.cssIS);
+			ssp.cssCC = std::max(ssp.cssCC, ss.cssCC);
+			ssp.dssDC = std::max(ssp.dssDC, ss.dssDC);
+		}
+
+		// Temporaries
+		const unsigned int cssCcTree = ssp.cssCC;
+		const unsigned int cssChOrMsPlusCcTree = std::max(ssp.cssCH, ssp.cssMS) + cssCcTree;
+		const unsigned int maxDcDepth = getOptions()->maxDcDepth;
+
+		// Arguments
+		const unsigned int directCallableStackSizeFromTraversal = ssp.dssDC * maxDcDepth; // FromTraversal: DC is invoked from IS or AH.    // Possible stack size optimizations.
+		const unsigned int directCallableStackSizeFromState = ssp.dssDC * maxDcDepth; // FromState:     DC is invoked from RG, MS, or CH. // Possible stack size optimizations.
+		const unsigned int continuationStackSize =
+			ssp.cssRG +
+			cssCcTree +
+			cssChOrMsPlusCcTree * (std::max(1u, pipelineLinkOptions.maxTraceDepth) - 1u) +
+			std::min(1u, pipelineLinkOptions.maxTraceDepth) * std::max(cssChOrMsPlusCcTree, ssp.cssAH + ssp.cssIS);
+		const unsigned int maxTraversableGraphDepth = getOptions()->maxTraversableGraphDepth;
+
+		const OptixResult result = optixPipelineSetStackSize(pipe,
+			directCallableStackSizeFromTraversal,
+			directCallableStackSizeFromState,
+			continuationStackSize,
+			maxTraversableGraphDepth);
+
+		OPTIX_CHECK(result);
+	}
+
 	void PipelineOptix::createPipeline()
 	{
 		const std::vector<OptixProgramGroup>& pgs = getAllProgramGroups();
@@ -582,6 +596,8 @@ namespace vtx::optix
 													   &pipeline);
 		//VTX_ASSERT_CONTINUE(logSize <= 1, log);
 		OPTIX_CHECK(result);
+
+		computeStackSize();
 
 		for(auto& [sbtName, sbtPipe] : sbtPipelines)
 		{

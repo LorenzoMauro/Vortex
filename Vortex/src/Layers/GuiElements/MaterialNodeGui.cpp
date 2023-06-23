@@ -206,7 +206,15 @@ namespace vtx::gui {
                 int textureId = param.data<int>();
                 std::string inputText = material->textures[textureId - 1]->filePath;
 
-            	vtxImGui::HalfSpaceWidget("Texture:", vtxImGui::ClippedText, inputText.c_str());
+                if(inputText.empty())
+                {
+                    inputText = material->textures[textureId - 1]->databaseName;
+                }
+                if (!inputText.empty())
+                {
+	                
+                    vtxImGui::HalfSpaceWidget("Texture:", vtxImGui::ClippedText, inputText.c_str());
+                }
             }
             case graph::shader::ParameterInfo::PK_LIGHT_PROFILE:
             case graph::shader::ParameterInfo::PK_BSDF_MEASUREMENT:

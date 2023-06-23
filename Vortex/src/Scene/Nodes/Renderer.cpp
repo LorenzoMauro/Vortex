@@ -11,7 +11,6 @@
 #include "device_launch_parameters.h"
 #include "cuda_runtime.h"
 #include "Device/DevicePrograms/CudaKernels.h"
-#include "Device/UploadCode/UploadFunctions.h"
 #include "Device/Wrappers/dWrapper.h"
 
 namespace vtx::graph
@@ -23,6 +22,7 @@ namespace vtx::graph
 		R_TRACE,
 		R_POSTPROCESSING,
 		R_DISPLAY,
+		R_TONE_MAP_RADIANCE,
 
 		R_COUNT
 	};
@@ -31,32 +31,37 @@ namespace vtx::graph
 		"Rendering Noise Computation",
 		"Rendering Trace",
 		"Rendering Post Processing",
-		"Rendering Display"
+		"Rendering Display",
+		"Rendering Tone Mapping Radiance"
 	};
 
 	Renderer::Renderer() :
 		Node(NT_RENDERER),
 		width(getOptions()->width),
 		height(getOptions()->height),
-		threadData(&Renderer::render, this)
+		threadData(&Renderer::render, this),
+		settings(),
+		waveFrontIntegrator(&settings)
 	{
-		
-
-		settings = RendererSettings();
+		settings.runOnSeparateThread = getOptions()->runOnSeparateThread;
 		settings.iteration = 0;
 		settings.maxBounces = getOptions()->maxBounces;
 		settings.accumulate = getOptions()->accumulate;
 		settings.maxSamples = getOptions()->maxSamples;
 		settings.samplingTechnique = getOptions()->samplingTechnique;
 		settings.displayBuffer = getOptions()->displayBuffer;
-		settings.useWavefront = getOptions()->useWavefront;
 		settings.useRussianRoulette = getOptions()->useRussianRoulette;
-		settings.fitWavefront = getOptions()->fitWavefront;
-
 		settings.minClamp = getOptions()->maxClamp;
 		settings.maxClamp = getOptions()->minClamp;
 		settings.isUpdated = true;
 
+		settings.useWavefront = getOptions()->useWavefront;
+		settings.optixShade = getOptions()->optixShade;
+		settings.fitWavefront = getOptions()->fitWavefront;
+		settings.parallelShade = getOptions()->parallelShade;
+
+		settings.useLongPathKernel = getOptions()->useLongPathKernel;
+		settings.longPathPercentage = getOptions()->longPathPercentage;
 
 		settings.noiseKernelSize = getOptions()->noiseKernelSize;
 		settings.adaptiveSampling = getOptions()->adaptiveSampling;
@@ -66,7 +71,7 @@ namespace vtx::graph
 		settings.albedoNormalNoiseInfluence = getOptions()->albedoNormalNoiseInfluence;
 		settings.noiseCutOff = getOptions()->noiseCutOff;
 
-
+		 
 		settings.fireflyKernelSize = getOptions()->fireflyKernelSize;
 		settings.fireflyThreshold = getOptions()->fireflyThreshold;
 		settings.removeFireflies = getOptions()->removeFireflies;
@@ -96,7 +101,6 @@ namespace vtx::graph
 		glClear(GL_COLOR_BUFFER_BIT);
 		displayFrameBuffer.unbind();
 
-		waveFrontIntegrator = WaveFrontIntegrator();
 	}
 
 	void Renderer::setCamera(const std::shared_ptr<Camera>& cameraNode) {
@@ -176,6 +180,8 @@ namespace vtx::graph
 			traceComputationTime = 0;
 			postProcessingComputationTime = 0;
 			displayComputationTime = 0;
+			timer.reset();
+			internalIteration = 0;
 		}
 
 		{
@@ -187,24 +193,12 @@ namespace vtx::graph
 			{
 				if (settings.adaptiveSampling && settings.iteration >= settings.minAdaptiveSamples)
 				{
-					const auto* radianceBuffer      = GET_BUFFER(device::Buffers::FrameBufferBuffers, getID(), tmRadiance).castedPointer<math::vec3f>();
-					const auto* normalBuffer        = GET_BUFFER(device::Buffers::FrameBufferBuffers, getID(), normal).castedPointer<math::vec3f>();
-					const auto* albedoBuffer        = GET_BUFFER(device::Buffers::FrameBufferBuffers, getID(), albedo).castedPointer<math::vec3f>();
-					auto*       noiseBuffer         = GET_BUFFER(device::Buffers::FrameBufferBuffers, getID(), noiseDataBuffer).castedPointer<NoiseData>();
-					auto*       radianceRangeBuffer = GET_BUFFER(device::Buffers::FrameBufferBuffers, getID(), radianceRangeBuffer).castedPointer<math::vec2f>();
-					auto*       albedoRangeBuffer   = GET_BUFFER(device::Buffers::FrameBufferBuffers, getID(), albedoRangeBuffer).castedPointer<math::vec2f>();
-					auto*       normalRangeBuffer   = GET_BUFFER(device::Buffers::FrameBufferBuffers, getID(), normalRangeBuffer).castedPointer<math::vec2f>();
-
-					noiseComputation(noiseBuffer,
-						radianceBuffer, albedoBuffer, normalBuffer,
-						radianceRangeBuffer, albedoRangeBuffer, normalRangeBuffer,
-						width, height, settings.noiseKernelSize, settings.albedoNormalNoiseInfluence);
+					noiseComputation(launchParamsBuffer.castedPointer<LaunchParams>(),settings,getID());
 				}
 			}
 			cudaEventRecord(events.second);
 
 		}
-		device::incrementFrame();
 
 		{
 			const std::pair<cudaEvent_t, cudaEvent_t> events = GetProfilerEvents(renderingStagesNames[R_TRACE]);
@@ -231,7 +225,7 @@ namespace vtx::graph
 			}
 			else
 			{
-				waveFrontIntegrator.render(settings.fitWavefront, settings.iteration);
+				waveFrontIntegrator.render();
 			}
 			cudaEventRecord(events.second);
 		}
@@ -240,19 +234,21 @@ namespace vtx::graph
 
 			const std::pair<cudaEvent_t, cudaEvent_t> events = GetProfilerEvents(renderingStagesNames[R_POSTPROCESSING]);
 			cudaEventRecord(events.first);
+
+			toneMapRadianceKernel(launchParamsBuffer.castedPointer<LaunchParams>(), width, height, renderingStagesNames[R_TONE_MAP_RADIANCE]);
 			math::vec3f* beauty = nullptr;
 			if (settings.removeFireflies)
 			{
 				removeFireflies(launchParamsBuffer.castedPointer<LaunchParams>(), settings.fireflyKernelSize, settings.fireflyThreshold, width, height);
 				beauty = GET_BUFFER(device::Buffers::FrameBufferBuffers, getID(), fireflyRemoval).castedPointer<math::vec3f>();
-				CUDA_SYNC_CHECK();
+				//CUDA_SYNC_CHECK();
 			}
 
 			if(settings.enableDenoiser && settings.iteration>settings.denoiserStart)
 			{
-				CUDABuffer& denoiserRadianceInput = settings.removeFireflies ? GET_BUFFER(device::Buffers::FrameBufferBuffers, getID(), fireflyRemoval) : GET_BUFFER(device::Buffers::FrameBufferBuffers, getID(), rawRadiance);
-				CUDABuffer& albedoBuffer = GET_BUFFER(device::Buffers::FrameBufferBuffers, getID(), albedo);
-				CUDABuffer& normalBuffer = GET_BUFFER(device::Buffers::FrameBufferBuffers, getID(), normal);
+				CUDABuffer& denoiserRadianceInput = settings.removeFireflies ? GET_BUFFER(device::Buffers::FrameBufferBuffers, getID(), fireflyRemoval) : GET_BUFFER(device::Buffers::FrameBufferBuffers, getID(), hdriRadiance);
+				CUDABuffer& albedoBuffer = GET_BUFFER(device::Buffers::FrameBufferBuffers, getID(), albedoNormalized);
+				CUDABuffer& normalBuffer = GET_BUFFER(device::Buffers::FrameBufferBuffers, getID(), normalNormalized);
 				optix::getState()->denoiser.setInputs(denoiserRadianceInput, albedoBuffer, normalBuffer);
 				beauty = optix::getState()->denoiser.denoise(settings.denoiserBlend);
 			}
@@ -344,6 +340,8 @@ namespace vtx::graph
 		//auto* tempBuffer = updatedFrameBuffer;
 		displayFrameBuffer.copyToThis(drawFrameBuffer);
 		//currentFrameBuffer = tempBuffer;
+		overallTime = timer.elapsedMillis();
+		internalIteration++;
 	}
 
 	void Renderer::setWindow(GLFWwindow* window)

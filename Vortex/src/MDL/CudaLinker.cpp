@@ -4,17 +4,6 @@
 namespace vtx::mdl
 {
 
-    std::string replaceFunctionNameInPTX(const std::string& ptxCode,
-        const std::string& oldFunctionName,
-        const std::string& newFunctionName) {
-        std::string result = ptxCode;
-        size_t pos = 0;
-        while ((pos = result.find(oldFunctionName, pos)) != std::string::npos) {
-            result.replace(pos, oldFunctionName.length(), newFunctionName);
-            pos += newFunctionName.length();
-        }
-        return result;
-    }
 
     std::string extractFunctionPrototype(const std::string& ptxCode, const std::string& functionName, const std::string& newModifier = "") {
         // Search for the function name
@@ -140,7 +129,7 @@ namespace vtx::mdl
             {
                 functionNames += ", ";
             }
-            std::string newCode = replaceFunctionNameInPTX(target_code->get_code(), "__replace__EvaluateMaterial", newEvaluateMaterialNameFunction);
+            std::string newCode   = utl::replaceFunctionNameInPTX(target_code->get_code(), "__replace__EvaluateMaterial", newEvaluateMaterialNameFunction);
             std::string prototype = extractFunctionPrototype(newCode, newEvaluateMaterialNameFunction, ".extern");
             src += prototype + ";\n";
             functionNames += newEvaluateMaterialNameFunction;
@@ -211,7 +200,8 @@ namespace vtx::mdl
             for (size_t i = 0, numTargetCodes = targetCodes.size(); i < numTargetCodes; ++i) {
 				const char* code = targetCodes[i]->get_code();
 
-				std::string newCode = replaceFunctionNameInPTX(code, "__replace__EvaluateMaterial", "evaluateMaterial_" + std::to_string(i));
+                std::string newCode = utl::replaceFunctionNameInPTX(code, "__replace__EvaluateMaterial", "evaluateMaterial_" + std::to_string(i));
+                newCode             = utl::replaceFunctionNameInPTX(newCode, "__direct_callable__EvaluateMaterial", "unusedDirectCallable_" + std::to_string(i));
                 linkResult          = cuLinkAddData(
                     cudaLinkState, CU_JIT_INPUT_PTX,
                     newCode.data(), //const_cast<char*>(),
