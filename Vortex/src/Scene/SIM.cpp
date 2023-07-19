@@ -29,6 +29,10 @@ namespace vtx::graph
 		const auto sim = Get();
 
 		const std::shared_ptr<Node> nodePtr = (*sim)[id];
+		if(nodePtr == nullptr)
+		{
+			return;
+		}
 		const NodeType              type    = nodePtr->getType();
 		auto&                       vector  = sim->vectorsOfNodes[type];
 

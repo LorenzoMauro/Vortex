@@ -6,6 +6,8 @@
 #include "Scene/Nodes/RendererSettings.h"
 #include <curand_kernel.h>
 
+#include "Device/UploadCode/UploadData.h"
+
 namespace vtx
 {
 
@@ -97,8 +99,8 @@ namespace vtx
 					}
 					else
 					{
-						value = math::length<float>(buffer[ny * width + nx] - 0.0f);
-						diff = math::length<float>(buffer[ny * width + nx] - buffer[y * width + x]);
+						value = math::length(buffer[ny * width + nx] - 0.0f);
+						diff = math::length(buffer[ny * width + nx] - buffer[y * width + x]);
 						count++;
 					}
 					maxDiff = fmaxf(maxDiff, diff);  // Update maxDiff if this difference is larger
@@ -241,7 +243,7 @@ namespace vtx
 					value = luminance(inputBuffer[i]);
 					break;
 			case COLOR:
-					value = math::length<float>(inputBuffer[i] - math::vec3f(0.0f));
+					value = math::length(inputBuffer[i] - math::vec3f(0.0f));
 					break;
 			}
 

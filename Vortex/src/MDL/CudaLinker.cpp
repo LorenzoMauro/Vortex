@@ -1,4 +1,7 @@
 #include "CudaLinker.h"
+#include <cuda.h>
+
+#include "Device/CUDAChecks.h"
 
 
 namespace vtx::mdl
@@ -212,6 +215,7 @@ namespace vtx::mdl
                 if (linkResult != CUDA_SUCCESS) break;
             }
             if (linkResult != CUDA_SUCCESS) break;
+
 
             // Add the "mdl_expr_functions" array PTX module
             linkResult = cuLinkAddData(

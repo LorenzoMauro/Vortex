@@ -5,9 +5,13 @@
 #include "Scene/Nodes/Renderer.h"
 #include <cudaGL.h>
 
-#include "Device/WorkQueues.h"
+#include "Device/Wrappers/SoaWorkItems.h"
+#include "Device/Wrappers/WorkItems.h"
+
 #include "Device/DevicePrograms/CudaKernels.h"
+#include "Device/DevicePrograms/randomNumberGenerator.h"
 #include "MDL/CudaLinker.h"
+#include "NeuralNetworks/ReplayBuffer.h"
 #include "Scene/SIM.h"
 #include "Scene/Nodes/Shader/Texture.h"
 
@@ -15,7 +19,7 @@ namespace vtx::device
 {
 	std::tuple<InstanceData, InstanceData*> createInstanceData(std::shared_ptr<graph::Instance> instanceNode, const math::affine3f& transform)
 	{
-		CUDA_SYNC_CHECK();
+		//CUDA_SYNC_CHECK();
 
 		const vtxID& instanceId = instanceNode->getID();
 		VTX_INFO("Device Visitor: Creating Instance {} data", instanceId);
@@ -165,7 +169,7 @@ namespace vtx::device
 	{
 		VTX_INFO("Computing BLAS");
 
-		CUDA_SYNC_CHECK();
+		//CUDA_SYNC_CHECK();
 
 		OptixDeviceContext& optixContext = optix::getState()->optixContext;
 		CUstream&           stream       = optix::getState()->stream;
@@ -712,12 +716,11 @@ namespace vtx::device
 		return { lightProfileData, bsdfDataBuffer.castedPointer<LightProfileData>() };
 	}
 
-
 #define PREPARE_BUFFER(cudaBuffer, bufferPoitner, dataType)\
 	CUDABuffer& cudaBuffer = GET_BUFFER(Buffers::FrameBufferBuffers, rendererNode->getID(), cudaBuffer); \
 	cudaBuffer.resize((size_t)rendererNode->width* (size_t)rendererNode->height * sizeof(dataType)); \
 	UPLOAD_DATA->frameBufferData.bufferPoitner = cudaBuffer.castedPointer<dataType>()\
-	
+
 	void setRendererData(std::shared_ptr<graph::Renderer> rendererNode)
 	{
 		//auto* tW = new float4[3];
@@ -827,6 +830,7 @@ namespace vtx::device
 			{
 				updateQueues = true;
 			}
+
 			UPLOAD_DATA->settings.maxPixelSamples = rendererNode->settings.maxPixelSamples;
 			UPLOAD_DATA->settings.noiseCutOff = rendererNode->settings.noiseCutOff;
 			UPLOAD_DATA->settings.removeFirefly = rendererNode->settings.removeFireflies;
@@ -835,6 +839,21 @@ namespace vtx::device
 
 			UPLOAD_DATA->settings.useLongPathKernel = rendererNode->settings.useLongPathKernel;
 			UPLOAD_DATA->settings.longPathPercentage = rendererNode->settings.longPathPercentage;
+
+			UPLOAD_DATA->settings.useNetwork            = rendererNode->settings.useNetwork;
+			network::NetworkSettings& neuralSettings = rendererNode->waveFrontIntegrator.network.getNeuralNetSettings();
+			UPLOAD_DATA->settings.neuralInferenceStart  = neuralSettings.inferenceIterationStart;
+			UPLOAD_DATA->settings.doInference = neuralSettings.doInference;
+			UPLOAD_DATA->settings.clearOnInferenceStart = neuralSettings.clearOnInferenceStart;
+			if(rendererNode->waveFrontIntegrator.network.type == network::NT_SAC)
+			{
+				network::SacSettings& sacSettings = static_cast<network::SacSettings&>(neuralSettings);
+				UPLOAD_DATA->settings.neuralSampleFraction = sacSettings.neuralSampleFraction;
+			}
+			else if( rendererNode->waveFrontIntegrator.network.type == network::NT_NGP)
+			{
+				
+			}
 
 			UPLOAD_DATA->isSettingsUpdated   = true;
 			rendererNode->settings.isUpdated = false;
@@ -864,7 +883,7 @@ namespace vtx::device
 			UPLOAD_DATA->isSettingsUpdated = true;
 
 			const int maxShadowQueue = maxPixelSamples * (rendererNode->settings.maxBounces + 1);
-			const int maxAccumulationQueue = maxPixelSamples * (rendererNode->settings.maxBounces + 1);
+			const int maxAccumulationQueue = maxPixelSamples * (rendererNode->settings.maxBounces + 1); // each bounce can produce an emissive hit
 
 			CUDABufferManager::deallocateAll();
 
@@ -897,8 +916,13 @@ namespace vtx::device
 			CUDABuffer countersBuffer;
 			countersBuffer.upload(counters);
 			UPLOAD_DATA->launchParams.queueCounters = countersBuffer.castedPointer<Counters>();
-		}
 
+			network::NetworkSettings nnSettings = rendererNode->waveFrontIntegrator.network.getNeuralNetSettings();
+			NetworkInterface networkInterface(maxPixelSamples, nnSettings.batchSize* nnSettings.maxTrainingStepPerFrame, UPLOAD_DATA->settings.maxBounces, UPLOAD_DATA->frameId);
+			CUDABuffer& networkInterfaceBuffer = UPLOAD_BUFFERS->networkInterfaceBuffer.networkInterfaceBuffer;
+			networkInterfaceBuffer.upload(networkInterface);
+			UPLOAD_DATA->launchParams.networkInterface = networkInterfaceBuffer.castedPointer<NetworkInterface>();
+		}
 	}
 
 	void setCameraData(std::shared_ptr<graph::Camera> cameraNode)
@@ -912,7 +936,6 @@ namespace vtx::device
 			UPLOAD_DATA->isCameraUpdated       = true;
 		}
 	}
-
 
 	SbtProgramIdx setProgramsSbt()
 	{

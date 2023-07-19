@@ -11,7 +11,7 @@ namespace vtx::utl
 
 	__forceinline__ __device__ bool isNan(const math::vec3f& vec)
 	{
-		return (isnan(vec.x) && isnan(vec.y) && isnan(vec.z));
+		return (isnan(vec.x) || isnan(vec.y) || isnan(vec.z));
 	}
 
 

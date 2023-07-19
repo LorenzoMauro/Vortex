@@ -1,25 +1,9 @@
 #include "LaunchParams.h"
+#include "NeuralNetworks/NeuralNetwork.h"
 #include "Scene/Nodes/RendererSettings.h"
 
 namespace vtx
 {
-	struct KernelTimes
-	{
-		float genCameraRay     = 0.0f;
-		float traceRadianceRay = 0.0f;
-		float reset            = 0.0f;
-		float shadeRay         = 0.0f;
-		float handleEscapedRay = 0.0f;
-		float accumulateRay    = 0.0f;
-		float fetchQueueSize   = 0.0f;
-		float setQueueCounters = 0.0f;
-
-		float totMs()
-		{
-			return setQueueCounters + genCameraRay + traceRadianceRay + reset + shadeRay + handleEscapedRay + accumulateRay + fetchQueueSize;
-		}
-	};
-
 	enum Queue
 	{
 		Q_RADIANCE_TRACE,
@@ -34,9 +18,12 @@ namespace vtx
 	{
 	public:
 
-		WaveFrontIntegrator(graph::RendererSettings* settings);
-
-		KernelTimes& getKernelTime();
+		WaveFrontIntegrator(graph::RendererSettings* rendererSettings)
+		{
+			queueSizeRetrievalBuffer.alloc(sizeof(int));
+			queueSizeDevicePtr = queueSizeRetrievalBuffer.castedPointer<int>();
+			this->settings = rendererSettings;
+		}
 
 		void render();
 
@@ -65,11 +52,14 @@ namespace vtx
 		LaunchParams* hostParams;
 		LaunchParams* deviceParams;
 		int           maxTraceQueueSize;
-		KernelTimes   kernelTimes;
 		CUDABuffer    queueSizeRetrievalBuffer;
 		int*          queueSizeDevicePtr;
 		int           retrievedQueueSize;
 		graph::RendererSettings* settings;
 		Counters 	counters;
+
+		CUDABuffer tmpIndicesBuffer;
+		int* tmpIndices;
+		network::Network network;
 	};
 }

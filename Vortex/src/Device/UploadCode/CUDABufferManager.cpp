@@ -1,10 +1,8 @@
-#include "SOA.h"
+#include "CUDABufferManager.h"
 
 
 namespace vtx
 {
-
-
     // Initialize static members
     std::vector<CUDABuffer*> CUDABufferManager::buffers;
     std::mutex CUDABufferManager::mutex;

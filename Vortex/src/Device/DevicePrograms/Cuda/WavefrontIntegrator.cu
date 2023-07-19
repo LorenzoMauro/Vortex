@@ -1,7 +1,8 @@
-#include "WavefrontIntegrator.h"
-#include "randomNumberGenerator.h"
+#include "../WavefrontIntegrator.h"
+#include "../randomNumberGenerator.h"
 #define ARCHITECTURE_OPTIX
-#include "rendererFunctions.h"
+#include "../rendererFunctions.h"
+#include "Device/KernelInfos.h"
 #include "Device/OptixWrapper.h"
 #include "Device/UploadCode/UploadBuffers.h"
 #include "Device/UploadCode/UploadData.h"
@@ -10,61 +11,7 @@
 
 namespace vtx
 {
-	enum KernelType
-	{
-		K_SET_QUEUE_COUNTERS,
-		K_GEN_CAMERA_RAY,
-		K_TRACE_RADIANCE_RAY,
-		K_SHADE_RAY,
-		K_HANDLE_ESCAPED_RAY,
-		K_ACCUMULATE_RAY,
-		K_RETRIEVE_QUEUE_SIZE,
-		K_RESET,
-
-		K_COUNT
-	};
-
-	inline static const char* KernelNames[] = {
-		"setQueueCounters",
-		"genCameraRay",
-		"traceRadianceRay",
-		"shadeRay",
-		"handleEscapedRay",
-		"accumulateRay",
-		"retrieveQueueSize",
-		"reset"
-	};
-
-
-	WaveFrontIntegrator::WaveFrontIntegrator(graph::RendererSettings* rendererSettings)
-	{
-		queueSizeRetrievalBuffer.alloc(sizeof(int));
-		queueSizeDevicePtr = queueSizeRetrievalBuffer.castedPointer<int>();
-		this->settings = rendererSettings;
-	}
-
-	KernelTimes& WaveFrontIntegrator::getKernelTime()
-	{
-		kernelTimes.setQueueCounters = GetKernelTimeMS(KernelNames[K_SET_QUEUE_COUNTERS]);
-
-		kernelTimes.genCameraRay = GetKernelTimeMS(KernelNames[K_GEN_CAMERA_RAY]);
-
-		kernelTimes.traceRadianceRay = GetKernelTimeMS(KernelNames[K_TRACE_RADIANCE_RAY]);
-
-		kernelTimes.reset = GetKernelTimeMS(KernelNames[K_RESET]);
-
-		kernelTimes.shadeRay = GetKernelTimeMS(KernelNames[K_SHADE_RAY]);
-
-		kernelTimes.handleEscapedRay = GetKernelTimeMS(KernelNames[K_HANDLE_ESCAPED_RAY]);
-
-		kernelTimes.accumulateRay = GetKernelTimeMS(KernelNames[K_ACCUMULATE_RAY]);
-
-		kernelTimes.fetchQueueSize = GetKernelTimeMS(KernelNames[K_RETRIEVE_QUEUE_SIZE]);
-
-		return kernelTimes;
-	}
-
-
+	
 	void WaveFrontIntegrator::launchOptixKernel(math::vec2i launchDimension, std::string pipelineName)
 	{
 		const optix::State& state = *(optix::getState());
@@ -95,60 +42,73 @@ namespace vtx
 		if(settings->iteration <= 0)
 		{
 			setCounters();
+			//CUDA_SYNC_CHECK();
 		}
 
 		resetCounters();
+		//CUDA_SYNC_CHECK();
 		generatePixelQueue();
+		//CUDA_SYNC_CHECK();
 
 		for (int frameBounces = 0; frameBounces < settings->maxBounces; frameBounces++)
 		{
 			traceRadianceRays();
+			//CUDA_SYNC_CHECK();
+			network.inference();
+			//CUDA_SYNC_CHECK();
 			shadeRays();
+			//CUDA_SYNC_CHECK();
 			downloadCounters();
+			//CUDA_SYNC_CHECK();
 		}
 		handleShadowTrace();
+		//CUDA_SYNC_CHECK();
 		handleEscapedRays();
+		//CUDA_SYNC_CHECK();
 		accumulateRays();
+		//CUDA_SYNC_CHECK();
+		network.train();
 	}
 
 	void WaveFrontIntegrator::resetQueue(Queue queue)
 	{
+		auto deviceParamsCopy = deviceParams;
 		switch (queue)
 		{
 		case Q_RADIANCE_TRACE:
 		{
-			Do(KernelNames[K_RESET], [=, *this] __device__()
+			Do(eventNames[K_RESET], [deviceParamsCopy] __device__()
 			{
-				deviceParams->radianceTraceQueue->Reset();
+				deviceParamsCopy->radianceTraceQueue->Reset();
 			});
 		} break;
 		case Q_SHADE:
 		{
 			const int materialQueuesSize = UPLOAD_DATA->materialDataMap.size;
-			Do(KernelNames[K_RESET], [=, *this] __device__()
+			Do(eventNames[K_RESET], [deviceParamsCopy] __device__()
 			{
-				deviceParams->shadeQueue->Reset();
+				deviceParamsCopy->shadeQueue->Reset();
 			});
 		} break;
 		case Q_ESCAPED:
 		{
-			Do(KernelNames[K_RESET], [=, *this] __device__()
+			Do(eventNames[K_RESET], [deviceParamsCopy] __device__()
 			{
-				deviceParams->escapedQueue->Reset();
+				deviceParamsCopy->escapedQueue->Reset();
 			});
 		} break;
 		case Q_ACCUMULATION:
 		{
-			Do(KernelNames[K_RESET], [=, *this] __device__()
+			Do(eventNames[K_RESET], [deviceParamsCopy] __device__()
 			{
-				deviceParams->accumulationQueue->Reset();
+				deviceParamsCopy->accumulationQueue->Reset();
 			});
 		} break;
 		case Q_SHADOW_TRACE:
 		{
-			Do(KernelNames[K_RESET], [=, *this] __device__()
+			Do(eventNames[K_RESET], [deviceParamsCopy] __device__()
 			{
-				deviceParams->shadowQueue->Reset();
+				deviceParamsCopy->shadowQueue->Reset();
 			});
 		} break;
 		}
@@ -156,30 +116,32 @@ namespace vtx
 
 	void WaveFrontIntegrator::setCounters()
 	{
-		Do(KernelNames[K_SET_QUEUE_COUNTERS], [=, *this] __device__()
+		auto deviceParamsCopy = deviceParams;
+		Do(eventNames[K_SET_QUEUE_COUNTERS], [deviceParamsCopy] __device__()
 		{
-			deviceParams->radianceTraceQueue->setCounter(&deviceParams->queueCounters->traceQueueCounter);
-			deviceParams->shadeQueue->setCounter(&deviceParams->queueCounters->shadeQueueCounter);
-			deviceParams->escapedQueue->setCounter(&deviceParams->queueCounters->escapedQueueCounter);
-			deviceParams->accumulationQueue->setCounter(&deviceParams->queueCounters->accumulationQueueCounter);
-			deviceParams->shadowQueue->setCounter(&deviceParams->queueCounters->shadowQueueCounter);
+			deviceParamsCopy->radianceTraceQueue->setCounter(&deviceParamsCopy->queueCounters->traceQueueCounter);
+			deviceParamsCopy->shadeQueue->setCounter(&deviceParamsCopy->queueCounters->shadeQueueCounter);
+			deviceParamsCopy->escapedQueue->setCounter(&deviceParamsCopy->queueCounters->escapedQueueCounter);
+			deviceParamsCopy->accumulationQueue->setCounter(&deviceParamsCopy->queueCounters->accumulationQueueCounter);
+			deviceParamsCopy->shadowQueue->setCounter(&deviceParamsCopy->queueCounters->shadowQueueCounter);
 		});
 	}
 
 	void WaveFrontIntegrator::resetCounters()
 	{
-		counters.accumulationQueueCounter = maxTraceQueueSize * (settings->maxBounces+1);
-		counters.shadowQueueCounter = maxTraceQueueSize * (settings->maxBounces+1);
+		counters.accumulationQueueCounter = maxTraceQueueSize * (settings->maxBounces + 1);
+		counters.shadowQueueCounter = maxTraceQueueSize * (settings->maxBounces + 1);
 		counters.shadeQueueCounter = maxTraceQueueSize;
 		counters.traceQueueCounter = maxTraceQueueSize;
 		counters.escapedQueueCounter = maxTraceQueueSize;
+
 	}
 
 	void WaveFrontIntegrator::downloadCounters()
 	{
 		if (settings->fitWavefront)
 		{
-			const std::pair<cudaEvent_t, cudaEvent_t> events = GetProfilerEvents(KernelNames[K_RETRIEVE_QUEUE_SIZE]);
+			const std::pair<cudaEvent_t, cudaEvent_t> events = GetProfilerEvents(eventNames[K_RETRIEVE_QUEUE_SIZE]);
 			cudaEventRecord(events.first, nullptr);
 
 			CUDA_CHECK(cudaMemcpy((void*)&counters, UPLOAD_DATA->launchParams.queueCounters, sizeof(Counters), cudaMemcpyDeviceToHost));
@@ -191,11 +153,12 @@ namespace vtx
 
 	void WaveFrontIntegrator::generatePixelQueue()
 	{
-		gpuParallelFor(KernelNames[K_GEN_CAMERA_RAY],
+		auto deviceParamsCopy = deviceParams;
+		gpuParallelFor(eventNames[K_GEN_CAMERA_RAY],
 			counters.traceQueueCounter,
-			[=, *this] __device__(int id)
+			[deviceParamsCopy] __device__(int id)
 		{
-			wfInitRayEntry(id, deviceParams);
+			wfInitRayEntry(id, deviceParamsCopy);
 		});
 	}
 
@@ -204,7 +167,7 @@ namespace vtx
 		if (counters.traceQueueCounter == 0)
 			return;
 
-		const std::pair<cudaEvent_t, cudaEvent_t> events = GetProfilerEvents(KernelNames[K_TRACE_RADIANCE_RAY]);
+		const std::pair<cudaEvent_t, cudaEvent_t> events = GetProfilerEvents(eventNames[K_TRACE_RADIANCE_RAY]);
 		cudaEventRecord(events.first, nullptr);
 
 		launchOptixKernel(math::vec2i(counters.traceQueueCounter, 1), "wfRadianceTrace");
@@ -214,14 +177,14 @@ namespace vtx
 
 	void WaveFrontIntegrator::shadeRays()
 	{
-		
+
 
 		if (counters.shadeQueueCounter == 0)
 		{
 			return;
 		}
 
-		const std::pair<cudaEvent_t, cudaEvent_t> events = GetProfilerEvents(KernelNames[K_SHADE_RAY]);
+		const std::pair<cudaEvent_t, cudaEvent_t> events = GetProfilerEvents(eventNames[K_SHADE_RAY]);
 		cudaEventRecord(events.first);
 		if (settings->optixShade)
 		{
@@ -248,13 +211,13 @@ namespace vtx
 
 	void WaveFrontIntegrator::handleShadowTrace()
 	{
-		if(counters.shadowQueueCounter ==0)
+		if (counters.shadowQueueCounter == 0)
 		{
 			VTX_INFO("NO Shadow Queue");
 			return;
 		}
 
-		const std::pair<cudaEvent_t, cudaEvent_t> events = GetProfilerEvents(KernelNames[Q_SHADOW_TRACE]);
+		const std::pair<cudaEvent_t, cudaEvent_t> events = GetProfilerEvents(eventNames[Q_SHADOW_TRACE]);
 		cudaEventRecord(events.first, nullptr);
 
 		launchOptixKernel(math::vec2i(counters.shadowQueueCounter, 1), "wfShadowTrace");
@@ -264,31 +227,32 @@ namespace vtx
 
 	void WaveFrontIntegrator::handleEscapedRays()
 	{
-		if(counters.escapedQueueCounter == 0)
+		auto deviceParamsCopy = deviceParams;
+		if (counters.escapedQueueCounter == 0)
 		{
 			return;
 		}
-		gpuParallelFor(KernelNames[K_HANDLE_ESCAPED_RAY],
+		gpuParallelFor(eventNames[K_HANDLE_ESCAPED_RAY],
 			counters.escapedQueueCounter,
-			[=, *this] __device__(int id)
+			[deviceParamsCopy] __device__(int id)
 		{
-			wfEscapedEntry(id, deviceParams);
+			wfEscapedEntry(id, deviceParamsCopy);
 		});
 	}
 
 	void WaveFrontIntegrator::accumulateRays()
 	{
-		if(counters.accumulationQueueCounter == 0)
+		if (counters.accumulationQueueCounter == 0)
 		{
 			return;
 		}
 
-		gpuParallelFor(KernelNames[K_ACCUMULATE_RAY],
+		auto deviceParamsCopy = deviceParams;
+		gpuParallelFor(eventNames[K_ACCUMULATE_RAY],
 			counters.accumulationQueueCounter,
-			[=, *this] __device__(int id)
+			[deviceParamsCopy] __device__(int id)
 		{
-			wfAccumulateEntry(id, deviceParams);
+			wfAccumulateEntry(id, deviceParamsCopy);
 		});
 	}
 }
-

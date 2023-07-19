@@ -1,21 +1,25 @@
-#pragma once
-
 #ifndef LAUNCH_PARAMS_H
 #define LAUNCH_PARAMS_H
+#pragma once
 
 #include "Core/Math.h"
 #include "Core/VortexID.h"
 #include "cuda.h"
 #include <mi/neuraylib/target_code_types.h>
 #include "NoiseData.h"
+#include "Device/Wrappers/WorkQueue.h"
+#include "NeuralNetworks/NetworkSettings.h"
 #include "Scene/DataStructs/VertexAttribute.h"
 #include "Scene/Nodes/LightTypes.h"
-#include "Device/Wrappers/SOA.h"
 
 namespace vtx {
+	struct NetworkInterface;
+	struct AccumulationWorkItem;
+	struct EscapedWorkItem;
+	struct ShadowWorkItem;
+	struct RayWorkItem;
+	struct TraceWorkItem;
 	struct RayData;
-
-	class WorkQueue;
 
     struct SbtProgramIdx
     {
@@ -265,39 +269,51 @@ namespace vtx {
         math::vec2ui frameSize;
 	};
 
+    enum SamplingTechnique
+    {
+        S_BSDF,
+        S_DIRECT_LIGHT,
+        S_MIS,
+
+        S_COUNT
+    };
+
+    enum DisplayBuffer
+    {
+        FB_BEAUTY,
+        FB_NOISY,
+
+        FB_DIFFUSE,
+        FB_ORIENTATION,
+        FB_TRUE_NORMAL,
+        FB_SHADING_NORMAL,
+        FB_TANGENT,
+        FB_UV,
+        FB_NOISE,
+        FB_SAMPLES,
+        FB_DEBUG_1,
+
+        FB_NETWORK_INFERENCE_STATE_POSITION,
+        FB_NETWORK_INFERENCE_STATE_NORMAL,
+        FB_NETWORK_INFERENCE_OUTGOING_DIRECTION,
+        FB_NETWORK_INFERENCE_MEAN,
+        FB_NETWORK_INFERENCE_CONCENTRATION,
+        FB_NETWORK_INFERENCE_SAMPLE,
+        FB_NETWORK_INFERENCE_PDF,
+        FB_NETWORK_INFERENCE_IS_FRONT_FACE,
+
+        FB_NETWORK_REPLAY_BUFFER_REWARD,
+        FB_NETWORK_REPLAY_BUFFER_SAMPLES,
+
+        FB_COUNT,
+    };
+
     struct RendererDeviceSettings
     {
-        enum SamplingTechnique
-        {
-	        S_BSDF,
-            S_DIRECT_LIGHT,
-            S_MIS,
-
-            S_COUNT
-        };
-
         inline static const char* samplingTechniqueNames[] = {
                 "Bsdf Sampling",
                 "Light Sampling",
                 "Multiple Importance Sampling",
-        };
-
-        enum DisplayBuffer
-        {
-            FB_BEAUTY,
-            FB_NOISY,
-
-            FB_DIFFUSE,
-            FB_ORIENTATION,
-            FB_TRUE_NORMAL,
-            FB_SHADING_NORMAL,
-            FB_TANGENT,
-            FB_UV,
-            FB_NOISE,
-            FB_SAMPLES,
-            FB_DEBUG_1,
-
-            FB_COUNT,
         };
 
         inline static const char* displayBufferNames[] = {
@@ -311,7 +327,17 @@ namespace vtx {
                 "Uv",
 				"Noise",
 				"Samples",
-                "Debug1"
+                "Debug1",
+				"Network Inference State Position",
+				"Network Inference State Normal",
+				"Network Inference Outgoing Direction",
+				"Network Inference Mean",
+				"Network Inference Concentration",
+				"Network Inference Sample",
+				"Network Inference Pdf",
+				"Network Inference Is Front Face",
+				"Network Replay Buffer Reward",
+				"Network Replay Buffer Samples",
         };
 
         int                 iteration;
@@ -336,6 +362,13 @@ namespace vtx {
         bool removeFirefly;
 		bool useRussianRoulette;
 		int  parallelShade;
+
+		bool                 useNetwork;
+		network::NetworkType networkType;
+		int                  neuralInferenceStart;
+		bool                 clearOnInferenceStart;
+        bool                 doInference;
+		float                neuralSampleFraction = 0.5f;
 	};
 
     struct ToneMapperSettings
@@ -359,26 +392,28 @@ namespace vtx {
 	struct LaunchParams
     {
 		int*                    frameID;
-        int 				    nextPixel = 0;
-        int                     remainingBounces;
+		int                     nextPixel = 0;
+		int                     remainingBounces;
 		FrameBufferData         frameBuffer;
 		CameraData              cameraData;
 		RendererDeviceSettings* settings;
-        ToneMapperSettings*     toneMapperSettings;
+		ToneMapperSettings*     toneMapperSettings;
 		SbtProgramIdx*          programs;
 		OptixTraversableHandle  topObject;
 		InstanceData**          instances;
 		LightData*              envLight = nullptr;
-        LightData**             lights;
-        int                     numberOfLights;
-        Counters*                queueCounters;
+		LightData**             lights;
+		int                     numberOfLights;
+		Counters*               queueCounters;
 
 		WorkQueueSOA<TraceWorkItem>*        radianceTraceQueue;
 		WorkQueueSOA<RayWorkItem>*          shadeQueue;
 		WorkQueueSOA<ShadowWorkItem>*       shadowQueue;
 		WorkQueueSOA<EscapedWorkItem>*      escapedQueue;
 		WorkQueueSOA<AccumulationWorkItem>* accumulationQueue;
-    };
+
+		NetworkInterface* networkInterface;
+	};
 
     enum TypeRay
     {

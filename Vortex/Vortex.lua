@@ -1,86 +1,5 @@
+include "../PremakeScripts/scripts.lua"
 include "../PremakeScripts/path.lua"
---"C:\Program Files\LLVM-15\bin\clang.exe" -std=c++17 test.cu -O3 -ffast-math -fcuda-flush-denormals-to-zero -fno-vectorize --cuda-gpu-arch=sm_60 --cuda-path="C:\\Program Files\\NVIDIA GPU Computing Toolkit\\CUDA\\v8.0" -c -o test.bc
-function genNvccCommand(cu_file, ptx_file, cuda_path, include_dirs, debug, ptx)
-    local nvcc_path = '"' .. path.join(cuda_path, "bin/nvcc.exe") .. '"'
-    CudaCompileCommand = nvcc_path
-    CudaCompileCommand = CudaCompileCommand .. " " .. cu_file
-    if(ptx) then
-        CudaCompileCommand = CudaCompileCommand .. " -ptx"
-    else
-        CudaCompileCommand = CudaCompileCommand .. " --optix-ir"
-    end
-    CudaCompileCommand = CudaCompileCommand .. " --use_fast_math"
-    CudaCompileCommand = CudaCompileCommand .. " --keep"
-    CudaCompileCommand = CudaCompileCommand .. " -Wno-deprecated-gpu-targets"
-    CudaCompileCommand = CudaCompileCommand .. " --std=c++17"
-    CudaCompileCommand = CudaCompileCommand .. " -m64"
-    CudaCompileCommand = CudaCompileCommand .. " -arch=sm_70"
-    CudaCompileCommand = CudaCompileCommand .. " --keep-device-functions"
-    CudaCompileCommand = CudaCompileCommand .. " --relocatable-device-code=true"
-    CudaCompileCommand = CudaCompileCommand .. " --generate-line-info"
-    if(debug) then 
-        CudaCompileCommand = CudaCompileCommand .. " -G"
-    else
-        CudaCompileCommand = CudaCompileCommand .. " -O3"
-    end
-    CudaCompileCommand = CudaCompileCommand .. " -o " .. ptx_file
-    
-    -- Add additional include directories
-    if include_dirs and type(include_dirs) == "table" then
-        for _, include_dir in ipairs(include_dirs) do
-            -- if path is not an absolute path get absolute
-            if path.isabsolute(include_dir) then
-                include_path = include_dir
-            else
-                include_path = path.getabsolute(include_dir)
-            end
-            include_path = '"' .. include_path .. '"'
-            CudaCompileCommand = CudaCompileCommand .. " -I" .. include_path
-        end
-    end
-
-    return CudaCompileCommand
-end
-
-function genClangCommand(cu_file, bc_file,d_file, clang_path, cuda_path, include_dirs, debug)
-    ClangCompileCommand = '"' .. clang_path .. '"'
-    
-    -- Add additional include directories
-    if include_dirs and type(include_dirs) == "table" then
-        for _, include_dir in ipairs(include_dirs) do
-            -- if path is not an absolute path get absolute
-            if path.isabsolute(include_dir) then
-                include_path = include_dir
-            else
-                include_path = path.getabsolute(include_dir)
-            end
-            include_path = '"' .. include_path .. '"'
-            ClangCompileCommand = ClangCompileCommand .. " -I" .. include_path
-        end
-    end
-
-    --ClangCompileCommand = ClangCompileCommand .. " --cuda-gpu-arch=sm_60  --cuda-gpu-arch=sm_75" -- example GPU architecture, replace with your actual architecture
-    ClangCompileCommand = ClangCompileCommand .. " --cuda-path=" .. '"' .. cuda_path .. '"'
-    ClangCompileCommand = ClangCompileCommand .. " -D_ALLOW_COMPILER_AND_STL_VERSION_MISMATCH"
-    ClangCompileCommand = ClangCompileCommand .. " -std=c++17"
-    ClangCompileCommand = ClangCompileCommand .. " -emit-llvm"
-    ClangCompileCommand = ClangCompileCommand .. " -c"
-    ClangCompileCommand = ClangCompileCommand .. " -w"
-    ClangCompileCommand = ClangCompileCommand .. " -O3"
-    ClangCompileCommand = ClangCompileCommand .. " -m64"
-    ClangCompileCommand = ClangCompileCommand .. " -ffast-math"
-    ClangCompileCommand = ClangCompileCommand .. " -fcuda-flush-denormals-to-zero"
-    ClangCompileCommand = ClangCompileCommand .. " -fno-vectorize"
-    ClangCompileCommand = ClangCompileCommand .. " --cuda-device-only"
-    ClangCompileCommand = ClangCompileCommand .. " " .. cu_file
-    ClangCompileCommand = ClangCompileCommand .. " -o" .. bc_file
-    ClangCompileCommand = ClangCompileCommand .. " -MD -MT".. bc_file
-    ClangCompileCommand = ClangCompileCommand .. " -MP -MF".. d_file
-
-
-    return ClangCompileCommand
-end
-
 
 project "OptixApp"
     kind "ConsoleApp"
@@ -88,36 +7,72 @@ project "OptixApp"
     cppdialect "C++17"
     targetdir (TARGET_DIR)
     objdir (OBJ_DIR)
-    buildcustomizations "BuildCustomizations/CUDA 12.1"
-    buildoptions { "--std=c++17" }
+    buildcustomizations "BuildCustomizations/CUDA 11.7"
+    configurations {"Debug", "Release"}
 
     files{
         "%{IncludeDir.gdt}/**.h",
         "%{IncludeDir.gdt}/**.cpp",
         "src/**.h",
         "src/**.cpp",
-        "src/Device/DevicePrograms/**.cu",
-        "src/Device/DevicePrograms/Cuda/**.cu"
+        "src/**.cu"
     }
 
-    includedirs{
-        "src",
-        "%{IncludeDir.GLFW}",
-        "%{IncludeDir.GLAD}",
-        "%{IncludeDir.ImGui}",
-        "%{IncludeDir.spdlog}",
-        "%{IncludeDir.OPTIX}",
-        "%{IncludeDir.CUDA}",
-        "%{IncludeDir.gdt}",
-        "%{IncludeDir.MDL}",
-        "%{IncludeDir.ASSIMP}",
-        "%{IncludeDir.ImNode}"
+    local relativeIncludeDirsCommon = {
+        "src/",
+        IncludeDir["GLFW"],
+        IncludeDir["GLAD"],
+        IncludeDir["ImGui"],
+        IncludeDir["spdlog"],
+        IncludeDir["OPTIX"],
+        IncludeDir["CUDA"],
+        IncludeDir["gdt"],
+        IncludeDir["MDL"],
+        IncludeDir["ASSIMP"],
+        IncludeDir["ImNode"],
+        IncludeDir["ImPlot"],
+        IncludeDir["NVTOOLS"]
     }
-    
-    libdirs {
-        "%{LibDir.CUDA}",
-        "%{LibDir.ASSIMP}"
+
+    local relativeIncludeDirsDebug = {table.unpack(relativeIncludeDirsCommon)}
+    table.insert(relativeIncludeDirsDebug, IncludeDir["LibTorch_Debug"])
+    table.insert(relativeIncludeDirsDebug, IncludeDir["LibTorch_Debug_API"])
+
+    local relativeIncludeDirsRelease = {table.unpack(relativeIncludeDirsCommon)}
+    table.insert(relativeIncludeDirsRelease, IncludeDir["LibTorch_Release"])
+    table.insert(relativeIncludeDirsRelease, IncludeDir["LibTorch_Release_API"])
+
+    local absoluteIncludeDirsDebug = toAbsolutePaths(relativeIncludeDirsDebug)
+    local absoluteIncludeDirsRelease = toAbsolutePaths(relativeIncludeDirsRelease)
+
+    local clangInclude = toAbsolutePaths(
+        {
+            IncludeDir["OPTIX"],
+            IncludeDir["spdlog"],
+            IncludeDir["MDL"],
+            "src/",
+            "../ext/gdt/"
+        }
+    )
+
+    local preprocessorDefinesCommon = {
+        "GLFW_INCLUDE_NONE",
+        "WIN32",
+        "_WINDOWS",
+        "NOMINMAX",
+        --"C10_MACROS_CMAKE_MACROS_H_",
+        "_UNICODE",
+        "UNICODE"
     }
+
+    local preprocessorDefinesDebug = {table.unpack(preprocessorDefinesCommon)}
+    table.insert(preprocessorDefinesDebug, "DEBUG")
+
+    local preprocessorDefinesRelease = {table.unpack(preprocessorDefinesCommon)}
+    table.insert(preprocessorDefinesRelease, "NDEBUG")
+
+    local postBuildDebug = generatePostBuildCommands(true, useMdlDebug)
+    local postBuildRelease = generatePostBuildCommands(false, false)
 
     links {
         "cudart_static",
@@ -127,163 +82,286 @@ project "OptixApp"
         "opengl32.lib",
         "ImGui",
         "ImNode",
+        "ImPlot",
         "mdl_sdk.lib",
         "mdl_core.lib",
         "nv_freeimage.lib",
         "dds.lib",
-        "assimp-vc143-mt"
+        "assimp-vc143-mt",
+        -- Links For LibTorch
+        "caffe2_nvrtc",
+        "c10",
+        "c10_cuda",
+        "kineto",
+        "torch",
+        "torch_cpu",
+        "torch_cuda",
+        "cublas",
+        "cudart",
+        "cudnn",
+        "cufft",
+        "curand",
+        "nvToolsExt64_1",
+        "kernel32",
+        "user32",
+        "gdi32",
+        "winspool",
+        "shell32",
+        "ole32",
+        "oleaut32",
+        "uuid",
+        "comdlg32",
+        "advapi32"
     }
 
     linkoptions {
-        "/NODEFAULTLIB:LIBCMT"
+        "/NODEFAULTLIB:LIBCMT",
+        -- Link Options For LibTorch
+        "-INCLUDE:?warp_size@cuda@at@@YAHXZ",
+        "/machine:x64"
     }
 
-    useMdlDebug = true
+    useMdlDebug = false
 
-    -- Add build options to the CUDA configuration
-    filter { "action:vs*", "language:Cuda" }
-        filter { "CUDA" }
-            buildoptions { "/std:c++17" }
+    local ptxOutput     = "%{cfg.targetdir}/ptx/%{file.basename}.ptx"
+    local optixIrOutput = "%{cfg.targetdir}/ptx/%{file.basename}.optixir"
+    local objOutput     = "%{cfg.targetdir}/obj/%{file.basename}.obj"
+    local bcOutput      = "%{cfg.targetdir}/bc/%{file.basename}.bc"
+    local dOutput       = "%{cfg.targetdir}/bc/%{file.basename}.d"
 
+    local CudaCompileCommandDebug = nvccCompile("%{file.relpath}", objOutput, CUDA_TOOLKIT_PATH_11, ccbin_path, absoluteIncludeDirsDebug,preprocessorDefinesDebug, true)
+    local ptxCompileForCudaLinkerDebug = nvccCompileToIntermediate("%{file.relpath}", ptxOutput, "ptx", CUDA_TOOLKIT_PATH_11, absoluteIncludeDirsDebug,preprocessorDefinesDebug, true)
+    local optixirCompileCommandDebug = nvccCompileToIntermediate("%{file.relpath}", optixIrOutput, "optix-ir", CUDA_TOOLKIT_PATH_11, absoluteIncludeDirsDebug,preprocessorDefinesDebug, true)
+    local clangCompileCommandDebug = clangCompileCu("%{file.relpath}", bcOutput, dOutput, clang12, CUDA_TOOLKIT_PATH_8, clangInclude,preprocessorDefinesDebug, true)
+    
+    local CudaCompileCommandRelease = nvccCompile("%{file.relpath}", objOutput, CUDA_TOOLKIT_PATH_11, ccbin_path, absoluteIncludeDirsRelease,preprocessorDefinesRelease, false)
+    local ptxCompileForCudaLinkerRelease = nvccCompileToIntermediate("%{file.relpath}", ptxOutput, "ptx", CUDA_TOOLKIT_PATH_11, absoluteIncludeDirsRelease,preprocessorDefinesRelease, false)
+    local optixirCompileCommandRelease = nvccCompileToIntermediate("%{file.relpath}", optixIrOutput, "optix-ir", CUDA_TOOLKIT_PATH_11, absoluteIncludeDirsRelease,preprocessorDefinesRelease, false)
+    local clangCompileCommandRelease = clangCompileCu("%{file.relpath}", bcOutput, dOutput, clang12, CUDA_TOOLKIT_PATH_8,clangInclude ,preprocessorDefinesRelease, false)
+    
     filter "configurations:Debug"
-        defines{"GLFW_INCLUDE_NONE"}
-
-        if useMdlDebug then
-            postbuildcommands {
-                --"{COPY} %{wks.location}/VortexOptix/src/data %{cfg.targetdir}/data/",
-                "{MKDIR} %{cfg.targetdir}/lib",
-                "{COPY} %{wks.location}ext/MDL/debug/bin/libmdl_sdk.dll %{cfg.targetdir}/lib",
-                "{COPY} %{wks.location}ext/MDL/debug/bin/nv_freeimage.dll %{cfg.targetdir}/lib",
-                "{COPY} %{wks.location}ext/MDL/debug/bin/freeimage.dll %{cfg.targetdir}/lib",
-                "{COPY} %{wks.location}ext/MDL/debug/bin/dds.dll %{cfg.targetdir}/lib"
-            }
-            libdirs {
-                "%{LibDir.MDL_Debug}"
-            }
-        else
-            postbuildcommands {
-                --"{COPY} %{wks.location}/VortexOptix/src/data %{cfg.targetdir}/data/",
-                "{MKDIR} %{cfg.targetdir}/lib",
-                "{COPY} %{wks.location}ext/MDL/release/bin/libmdl_sdk.dll %{cfg.targetdir}/lib",
-                "{COPY} %{wks.location}ext/MDL/release/bin/nv_freeimage.dll %{cfg.targetdir}/lib",
-                "{COPY} %{wks.location}ext/MDL/release/bin/freeimage.dll %{cfg.targetdir}/lib",
-                "{COPY} %{wks.location}ext/MDL/release/bin/dds.dll %{cfg.targetdir}/lib"
-            }
-    
-            libdirs {
-                "%{LibDir.ASSIMP}",
-                "%{LibDir.MDL_Release}"
-            }
-        end
-
-    filter "configurations:Release"
-        defines{"GLFW_INCLUDE_NONE"}
-
+        includedirs{
+            relativeIncludeDirsDebug
+        }
         postbuildcommands {
-            -- "{COPY} %{wks.location}/VortexOptix/src/data %{cfg.targetdir}/data/",
-            "{MKDIR} %{cfg.targetdir}/lib",
-            "{COPY} %{wks.location}ext/MDL/release/bin/libmdl_sdk.dll %{cfg.targetdir}/lib",
-            "{COPY} %{wks.location}ext/MDL/release/bin/nv_freeimage.dll %{cfg.targetdir}/lib",
-            "{COPY} %{wks.location}ext/MDL/release/bin/freeimage.dll %{cfg.targetdir}/lib",
-            "{COPY} %{wks.location}ext/MDL/release/bin/dds.dll %{cfg.targetdir}/lib"
+            generatePostBuildCommands(true, useMdlDebug)
         }
-
         libdirs {
-            "%{LibDir.ASSIMP}",
-            "%{LibDir.MDL_Release}"
+            getLibDirs(true, useMdlDebug)
         }
+        defines{
+            preprocessorDefinesDebug
+        }
+    filter "configurations:Release"
+        includedirs{
+            relativeIncludeDirsRelease
+        }
+        postbuildcommands {
+            generatePostBuildCommands(false, false)
+        }
+        libdirs {
+            getLibDirs(false, false)
+        }
+        defines{
+            preprocessorDefinesRelease
+        }
+
+    filter {"configurations:Release", "files:src/Device/DevicePrograms/ptx/*.cu"}
+        buildcommands {
+            'echo "Running NVCC:"' .. ptxCompileForCudaLinkerRelease .. '"',
+            ptxCompileForCudaLinkerRelease,
+        }
+        buildoutputs {
+            ptxOutput,
+        }
+        buildinputs{
+            "src/NeuralNetworks/ReplayBuffer.h",
+            "src/Device/DevicePrograms/LaunchParams.h",
+            "src/Device/DevicePrograms/rendererFunctions.h"
+            
+        }
+        flags { "MultiProcessorCompile" }
+
+    filter {"configurations:Release", "files:src/Device/DevicePrograms/Cuda/*.cu"}
+        buildcommands {
+            'echo "Running NVCC:"' .. CudaCompileCommandRelease .. '"',
+            CudaCompileCommandRelease,
+        }
+        buildoutputs {
+            objOutput,
+        }
+        buildinputs{
+            "src/NeuralNetworks/ReplayBuffer.h",
+            "src/Device/DevicePrograms/LaunchParams.h",
+            "src/Device/DevicePrograms/rendererFunctions.h"
+            
+        }
+        flags { "MultiProcessorCompile" }
+    filter {"configurations:Release","files:src/NeuralNetworks/*.cu"}
+        buildcommands {
+            'echo "Running NVCC:"' .. CudaCompileCommandRelease .. '"',
+            CudaCompileCommandRelease,
+        }
+        buildoutputs {
+            objOutput,
+        }
+        buildinputs{
+            "src/NeuralNetworks/ReplayBuffer.h",
+            "src/NeuralNetworks/Encodings.h",
+            "src/NeuralNetworks/NetworkImplementation.h",
+            "src/NeuralNetworks/NetworkSettings.h",
+            "src/NeuralNetworks/NeuralNetworkGraphs.h",
+            "src/NeuralNetworks/tools.h",
+            "src/NeuralNetworks/tools.cpp",
+            "src/NeuralNetworks/Networks/Sac.h",
+            "src/NeuralNetworks/Distributions/GaussianToSphere.h",
+            "src/NeuralNetworks/Distributions/SphericalGaussian.h",
+            "src/Device/DevicePrograms/LaunchParams.h"
+            
+        }
+        flags { "MultiProcessorCompile" }
+
+    filter {"configurations:Release", "files:src/Device/DevicePrograms/optixIr/*.cu"}
+
+        buildcommands {
+            'echo "Running NVCC:"' .. optixirCompileCommandRelease .. '"',
+            optixirCompileCommandRelease,
+        }
+        buildoutputs {
+            optixIrOutput,
+        }
+        buildinputs{
+            "src/NeuralNetworks/ReplayBuffer.h",
+            "src/Device/DevicePrograms/LaunchParams.h",
+            "src/Device/DevicePrograms/rendererFunctions.h"
+            
+        }
+        flags { "MultiProcessorCompile" }
+
+    filter {"configurations:Release", "files:src/Device/DevicePrograms/Clang/*.cu"}
+        buildcommands {
+            'echo "Running Clang:"' .. clangCompileCommandRelease .. '"',
+            clangCompileCommandRelease,
+        }
+        buildoutputs {
+            bcOutput,
+            dOutput
+        }
+        buildinputs{
+            "src/NeuralNetworks/ReplayBuffer.h",
+            "src/Device/DevicePrograms/LaunchParams.h",
+            "src/Device/DevicePrograms/rendererFunctions.h"
+            
+        }
+        flags { "MultiProcessorCompile" }
     
-    local cu_file = "%{file.relpath}"
-    local ptx_file = "%{cfg.targetdir}/ptx/%{file.basename}.ptx"
-    local optixIr_file = "%{cfg.targetdir}/ptx/%{file.basename}.optixir"
-    local bc_file = "%{cfg.targetdir}/bc/%{file.basename}.bc"
-    local d_file = "%{cfg.targetdir}/bc/%{file.basename}.d"
-
-    -- include dirs for the compilation of ptx files
-    local include_dirs = {
-        IncludeDir["OPTIX"],
-        IncludeDir["spdlog"],
-        IncludeDir["MDL"],
-        "src/",
-        "../ext/gdt/"
-    }
-
-    -- Custom build step to compile .cu files to .ptx files
-    filter {"configurations:Debug", "files:src/Device/DevicePrograms/Ptx/**.cu"}
+    
         
-        cudaCompileCommand = genNvccCommand(cu_file, ptx_file, CUDA_TOOLKIT_PATH, include_dirs, true, true)
-        
-        printf("Optix Compile Debug command:\n %s", cudaCompileCommand)
+    filter {"configurations:Debug", "files:src/Device/DevicePrograms/Cuda/*.cu"}
 
         buildcommands {
-            'echo "Running NVCC:"' .. CudaCompileCommand .. '"',
-            CudaCompileCommand,
+            'echo "Running NVCC:"' .. CudaCompileCommandDebug .. '"',
+            CudaCompileCommandDebug,
         }
         buildoutputs {
-            ptx_file,
+            objOutput,
         }
-
-    -- Custom build step to compile .cu files to .ptx files
-    filter {"configurations:Release", "files:src/Device/DevicePrograms/Ptx/**.cu"}
-
-        cudaCompileCommand = genNvccCommand(cu_file, ptx_file, CUDA_TOOLKIT_PATH, include_dirs, false, true)
-        
-        printf("Optix Compile Release command:\n %s", cudaCompileCommand)
+        buildinputs{
+            "src/NeuralNetworks/ReplayBuffer.h",
+            "src/Device/DevicePrograms/LaunchParams.h",
+            "src/Device/DevicePrograms/rendererFunctions.h"
+            
+        }
+        flags { "MultiProcessorCompile" }
+    filter {"configurations:Debug", "files:src/NeuralNetworks/*.cu"}
 
         buildcommands {
-            'echo "Running NVCC:"' .. CudaCompileCommand .. '"',
-            CudaCompileCommand,
+            'echo "Running NVCC:"' .. CudaCompileCommandDebug .. '"',
+            CudaCompileCommandDebug,
         }
         buildoutputs {
-            ptx_file,
+            objOutput,
         }
-
-        
-    -- Custom build step to compile .cu files to .ptx files
-    filter {"configurations:Debug", "files:src/Device/DevicePrograms/optixIr/**.cu"}
-        
-        cudaCompileCommand = genNvccCommand(cu_file, optixIr_file, CUDA_TOOLKIT_PATH, include_dirs, true, false)
-        
-        printf("Optix Compile Debug command:\n %s", cudaCompileCommand)
-
+        buildinputs{
+            "src/NeuralNetworks/ReplayBuffer.h",
+            "src/NeuralNetworks/Encodings.h",
+            "src/NeuralNetworks/NetworkImplementation.h",
+            "src/NeuralNetworks/NetworkSettings.h",
+            "src/NeuralNetworks/NeuralNetworkGraphs.h",
+            "src/NeuralNetworks/tools.h",
+            "src/NeuralNetworks/tools.cpp",
+            "src/NeuralNetworks/Networks/Sac.h",
+            "src/NeuralNetworks/Distributions/GaussianToSphere.h",
+            "src/NeuralNetworks/Distributions/SphericalGaussian.h",
+            "src/Device/DevicePrograms/LaunchParams.h"
+        }
+        flags { "MultiProcessorCompile" }
+    
+    filter {"configurations:Debug", "files:src/Device/DevicePrograms/ptx/*.cu"}
         buildcommands {
-            'echo "Running NVCC:"' .. CudaCompileCommand .. '"',
-            CudaCompileCommand,
+            'echo "Running NVCC:"' .. ptxCompileForCudaLinkerDebug .. '"',
+            ptxCompileForCudaLinkerDebug,
         }
         buildoutputs {
-            ptx_file,
+            ptxOutput,
         }
+        buildinputs{
+            "src/NeuralNetworks/ReplayBuffer.h",
+            "src/Device/DevicePrograms/LaunchParams.h",
+            "src/Device/DevicePrograms/rendererFunctions.h"
+            
+        }
+        flags { "MultiProcessorCompile" }
 
-    -- Custom build step to compile .cu files to .ptx files
-    filter {"configurations:Release", "files:src/Device/DevicePrograms/optixIr/**.cu"}
-
-        cudaCompileCommand = genNvccCommand(cu_file, optixIr_file, CUDA_TOOLKIT_PATH, include_dirs, false, false)
-        
-        printf("Optix Compile Release command:\n %s", cudaCompileCommand)
-
+    filter {"configurations:Debug", "files:src/Device/DevicePrograms/optixIr/*.cu"}
         buildcommands {
-            'echo "Running NVCC:"' .. CudaCompileCommand .. '"',
-            CudaCompileCommand,
+            'echo "Running NVCC:"' .. optixirCompileCommandDebug .. '"',
+            optixirCompileCommandDebug,
         }
         buildoutputs {
-            ptx_file,
+            optixIrOutput,
         }
+        buildinputs{
+            "src/NeuralNetworks/ReplayBuffer.h",
+            "src/Device/DevicePrograms/LaunchParams.h",
+            "src/Device/DevicePrograms/rendererFunctions.h"
+            
+        }
+        flags { "MultiProcessorCompile" }
 
-    clang12 = "C:/Program Files (x86)/LLVM/bin/clang.exe"
-    clang15 = "C:/Program Files/LLVM-15/bin/clang.exe"
-    clangCudaPath = CUDA_TOOLKIT_PATH
-    -- Custom build step to compile .cu files to .bc files
-    filter {"files:src/Device/DevicePrograms/Clang/**.cu"}
-
-        clangCompileCommand = genClangCommand(cu_file, bc_file,d_file, clang12, CUDA_TOOLKIT_PATH_8, include_dirs, true)
-
-        printf("Clang cu Compile command:\n %s", clangCompileCommand)
-
+    filter {"configurations:Debug", "files:src/Device/DevicePrograms/Clang/*.cu"}
         buildcommands {
-            'echo "Running Clang:"' .. clangCompileCommand .. '"',
-            clangCompileCommand,
+            'echo "Running Clang:"' .. clangCompileCommandDebug .. '"',
+            clangCompileCommandDebug,
         }
         buildoutputs {
-            bc_file,
-            d_file
+            bcOutput,
+            dOutput
         }
+        buildinputs{
+            "src/NeuralNetworks/ReplayBuffer.h",
+            "src/Device/DevicePrograms/LaunchParams.h",
+            "src/Device/DevicePrograms/rendererFunctions.h"
+            
+        }
+        flags { "MultiProcessorCompile" }
+
+    --Debug Print
+    printTable("\nDEBUG: Defines:\n", preprocessorDefinesDebug)
+    printTable("\nDEBUG: Include Dirs:\n", absoluteIncludeDirsDebug)
+    printTable("\nDEBUG: Post Build Commands:\n", postBuildDebug)
+    printf("\nDEBUG: Compile Command for standard Cuda:\n %s", CudaCompileCommandDebug)
+    printf("\nDEBUG: Compile Command for Ptx for cuda Linker:\n %s", ptxCompileForCudaLinkerDebug)
+    printf("\nDEBUG: Compile Command for optix pipeline:\n %s", optixirCompileCommandDebug)
+    printf("\nRELEASE: Compile Command for clang:\n %s", clangCompileCommandDebug)
+    
+    printTable("\nRELEASE: Defines:\n", preprocessorDefinesRelease)
+    printTable("\nRELEASE: Include Dirs:\n", absoluteIncludeDirsRelease)
+    printTable("\nRELEASE: Post Build Commands:\n", postBuildRelease)
+    printf("\nRELEASE: Compile Command for standard Cuda:\n %s", CudaCompileCommandRelease)
+    printf("\nRELEASE: Compile Command for Ptx for cuda Linker:\n %s", ptxCompileForCudaLinkerRelease)
+    printf("\nRELEASE: Compile Command for optix pipeline:\n %s", optixirCompileCommandRelease)
+    printf("\nRELEASE: Compile Command for clang:\n %s", clangCompileCommandRelease)
+
+    
+

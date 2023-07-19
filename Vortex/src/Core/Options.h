@@ -1,8 +1,7 @@
 #pragma once
-#include "optix.h"
 #include <string>
 #include <vector>
-#include "Device/DevicePrograms/LaunchParams.h"
+#include "Core/Math.h"
 
 namespace vtx
 {
@@ -12,6 +11,15 @@ namespace vtx
 		MDL_INLINE,
 		MDL_CUDA
 	};
+
+	enum SamplingTechnique;
+	enum DisplayBuffer;
+
+	namespace network
+	{
+		enum NetworkType;
+	}
+
 	struct Options
 	{
 		bool        initialized = false;
@@ -32,8 +40,8 @@ namespace vtx
 		uint32_t                                  maxSamples;
 		bool                                      accumulate;
 		bool									  useRussianRoulette;
-		RendererDeviceSettings::SamplingTechnique samplingTechnique;
-		RendererDeviceSettings::DisplayBuffer     displayBuffer;
+		SamplingTechnique samplingTechnique;
+		DisplayBuffer     displayBuffer;
 		float                                     maxClamp;
 		float                                     minClamp;
 
@@ -43,6 +51,8 @@ namespace vtx
 		bool         parallelShade;
 		float         longPathPercentage;
 		bool			useLongPathKernel;
+
+		bool         useNetwork;
 
 		int   noiseKernelSize;
 		int   adaptiveSampling;
@@ -68,6 +78,24 @@ namespace vtx
 		float       gamma;
 
 		////////////////////////////////////////////////////////////////////////////////////
+		/////////////////// Neural Network Options /////////////////////////////////////////
+		////////////////////////////////////////////////////////////////////////////////////
+		int batchSize;
+		int maxTrainingStepPerFrame;
+		float polyakFactor;
+		float logAlphaStart;
+		bool doInference;
+		int inferenceIterationStart;
+		bool clearOnInferenceStart;
+		float neuralGamma;
+		float         neuralSampleFraction;
+
+		float policyLr;
+		float qLr ;
+		float alphaLr ;
+		float autoencoderLr ;
+
+		////////////////////////////////////////////////////////////////////////////////////
 		/////////////////// Optix Options //////////////////////////////////////////////////
 		////////////////////////////////////////////////////////////////////////////////////
 		int         OptixVersion;
@@ -90,8 +118,9 @@ namespace vtx
 		////////////////////////////////////////////////////////////////////////////////////
 		/////////////////// Gui Options ////////////////////////////////////////////////////
 		////////////////////////////////////////////////////////////////////////////////////
-		float       nodeWidth;
-		std::string fontPath;
+		float                nodeWidth;
+		std::string          fontPath;
+		network::NetworkType networkType;
 	};
 
 	Options* getOptions();

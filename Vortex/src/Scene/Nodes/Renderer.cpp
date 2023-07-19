@@ -10,31 +10,11 @@
 #include "Scene/Traversal.h"
 #include "device_launch_parameters.h"
 #include "cuda_runtime.h"
+#include "Device/KernelInfos.h"
 #include "Device/DevicePrograms/CudaKernels.h"
 #include "Device/Wrappers/dWrapper.h"
-
 namespace vtx::graph
 {
-
-	enum RenderingStages
-	{
-		R_NOISE_COMPUTATION,
-		R_TRACE,
-		R_POSTPROCESSING,
-		R_DISPLAY,
-		R_TONE_MAP_RADIANCE,
-
-		R_COUNT
-	};
-
-	inline static const char* renderingStagesNames[] = {
-		"Rendering Noise Computation",
-		"Rendering Trace",
-		"Rendering Post Processing",
-		"Rendering Display",
-		"Rendering Tone Mapping Radiance"
-	};
-
 	Renderer::Renderer() :
 		Node(NT_RENDERER),
 		width(getOptions()->width),
@@ -59,9 +39,10 @@ namespace vtx::graph
 		settings.optixShade = getOptions()->optixShade;
 		settings.fitWavefront = getOptions()->fitWavefront;
 		settings.parallelShade = getOptions()->parallelShade;
-
 		settings.useLongPathKernel = getOptions()->useLongPathKernel;
 		settings.longPathPercentage = getOptions()->longPathPercentage;
+
+		settings.useNetwork = getOptions()->useNetwork;
 
 		settings.noiseKernelSize = getOptions()->noiseKernelSize;
 		settings.adaptiveSampling = getOptions()->adaptiveSampling;
@@ -167,7 +148,6 @@ namespace vtx::graph
 		{
 			return;
 		}
-
 		if(!settings.accumulate)
 		{
 			settings.iteration = 0;
@@ -175,18 +155,13 @@ namespace vtx::graph
 		if (settings.iteration == 0)
 		{
 			resetKernelStats();
-			totalTimeSeconds = 0;
-			noiseComputationTime = 0;
-			traceComputationTime = 0;
-			postProcessingComputationTime = 0;
-			displayComputationTime = 0;
 			timer.reset();
 			internalIteration = 0;
 		}
 
 		{
 			//timer.reset();
-			const std::pair<cudaEvent_t, cudaEvent_t> events = GetProfilerEvents(renderingStagesNames[R_NOISE_COMPUTATION]);
+			const std::pair<cudaEvent_t, cudaEvent_t> events = GetProfilerEvents(eventNames[R_NOISE_COMPUTATION]);
 			cudaEventRecord(events.first);
 
 			if (settings.adaptiveSampling && settings.minAdaptiveSamples <= settings.iteration)
@@ -201,7 +176,7 @@ namespace vtx::graph
 		}
 
 		{
-			const std::pair<cudaEvent_t, cudaEvent_t> events = GetProfilerEvents(renderingStagesNames[R_TRACE]);
+			const std::pair<cudaEvent_t, cudaEvent_t> events = GetProfilerEvents(eventNames[R_TRACE]);
 			cudaEventRecord(events.first);
 
 			if(!settings.useWavefront)
@@ -232,10 +207,10 @@ namespace vtx::graph
 
 		{
 
-			const std::pair<cudaEvent_t, cudaEvent_t> events = GetProfilerEvents(renderingStagesNames[R_POSTPROCESSING]);
+			const std::pair<cudaEvent_t, cudaEvent_t> events = GetProfilerEvents(eventNames[R_POSTPROCESSING]);
 			cudaEventRecord(events.first);
 
-			toneMapRadianceKernel(launchParamsBuffer.castedPointer<LaunchParams>(), width, height, renderingStagesNames[R_TONE_MAP_RADIANCE]);
+			toneMapRadianceKernel(launchParamsBuffer.castedPointer<LaunchParams>(), width, height, eventNames[R_TONE_MAP_RADIANCE]);
 			math::vec3f* beauty = nullptr;
 			if (settings.removeFireflies)
 			{
@@ -258,24 +233,13 @@ namespace vtx::graph
 		}
 
 		{
-			const std::pair<cudaEvent_t, cudaEvent_t> events = GetProfilerEvents(renderingStagesNames[R_DISPLAY]);
+			const std::pair<cudaEvent_t, cudaEvent_t> events = GetProfilerEvents(eventNames[R_DISPLAY]);
 			cudaEventRecord(events.first);
 			copyToGl();
 			cudaEventRecord(events.second);
 		}
 
-		noiseComputationTime = GetKernelTimeMS(renderingStagesNames[R_NOISE_COMPUTATION]);
-		traceComputationTime = GetKernelTimeMS(renderingStagesNames[R_TRACE]);
-		postProcessingComputationTime = GetKernelTimeMS(renderingStagesNames[R_POSTPROCESSING]);
-		displayComputationTime = GetKernelTimeMS(renderingStagesNames[R_DISPLAY]);
-		
-		totalTimeSeconds = (noiseComputationTime + traceComputationTime + postProcessingComputationTime + displayComputationTime) / 1000.0f;
-
-		int actualLaunches = GetKernelLaunches(renderingStagesNames[R_TRACE]);
-
-		fps = (float)(actualLaunches) / totalTimeSeconds;
-		sppS = ((float)width * (float)height * ((float)actualLaunches)) / totalTimeSeconds;
-		averageFrameTime = (totalTimeSeconds * 1000.0f)/ (float)(actualLaunches);
+		CudaEventTimes cuTimes = getCudaEventTimes();
 	}
 
 	void Renderer::resize(uint32_t _width, uint32_t _height) {
@@ -349,16 +313,6 @@ namespace vtx::graph
 		// Create a shared OpenGL context for the separate thread
 		glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE);
 		sharedContext = glfwCreateWindow(1, 1, "Shared Context", nullptr, window);
-	}
-
-	int Renderer::getWavefrontLaunches()
-	{
-		return GetKernelLaunches(renderingStagesNames[R_TRACE]);
-	}
-
-	KernelTimes& Renderer::getWaveFrontTimes()
-	{
-		return waveFrontIntegrator.getKernelTime();
 	}
 
 	GlFrameBuffer Renderer::getFrame() {

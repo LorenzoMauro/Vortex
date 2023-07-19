@@ -3,11 +3,12 @@
 #define RENDERER_FUNCTIONS_H
 
 #include "Utils.h"
-#include "Device/DevicePrograms/HitPropertiesComputation.h"
 #include "Core/Math.h"
 #include "Device/DevicePrograms/randomNumberGenerator.h"
-#include "Device/DevicePrograms/Mdl/MdlStructs.h"
+#include "Device/DevicePrograms/MdlStructs.h"
 #include "Device/DevicePrograms/ToneMapper.h"
+#include "Device/Wrappers/SoaWorkItems.h"
+#include "NeuralNetworks/ReplayBuffer.h"
 
 #ifdef ARCHITECTURE_OPTIX
 #include <optix_device.h>
@@ -38,37 +39,17 @@ namespace vtx
 #define GREEN   math::vec3f(0.0f, 1.0f, 0.0f)
 #define BLUE    math::vec3f(0.0f, 0.0f, 1.0f)
 
-    __forceinline__ __device__ void getMaterialData(const InstanceData* instance, const GeometryData* geometry, const int& triangleId,
-        int& programCall, bool& hasEdf, char** argBlock, TextureHandler** textureHandler)
+#define NEURAL_SAMPLE_DIRECTION(idx) math::normalize(params.replayBuffer->inferenceInputs.action[idx])
+
+    __forceinline__ __device__ bool neuralSamplingActivated(const LaunchParams* params, const int& depth)
     {
-        const unsigned& materialSlotIndex = geometry->faceAttributeData[triangleId].materialSlotId;
-        InstanceData::SlotIds slotIds = instance->materialSlots[materialSlotIndex];
+        const bool doSampleNeural =
+            params->settings->useNetwork
+			&& params->settings->doInference
+            && params->settings->iteration >= params->settings->neuralInferenceStart
+            && depth + 1 < params->settings->maxBounces;
 
-        *textureHandler = slotIds.material->textureHandler;
-        *argBlock = slotIds.material->argBlock;
-
-#ifdef ARCHITECTURE_OPTIX
-        programCall = slotIds.material->materialConfiguration->idxCallEvaluateMaterialWavefront;
-#else
-        programCall = slotIds.material->materialConfiguration->idxCallEvaluateMaterialWavefrontCuda;
-#endif
-        if (slotIds.meshLight != nullptr)
-        {
-            hasEdf = true;
-        }
-    }
-
-    __forceinline__ __device__ bool hasMaterial(LaunchParams* params, RayWorkItem& prd)
-    {
-        InstanceData* instance = params->instances[prd.hitInstanceId];
-        GeometryData* geometry = (instance->geometryData);
-        const unsigned& materialSlotIndex = geometry->faceAttributeData[prd.hitTriangleId].materialSlotId;
-        InstanceData::SlotIds slotIds = instance->materialSlots[materialSlotIndex];
-        if (slotIds.material != nullptr)
-        {
-            return true;
-        }
-        return false;
+        return doSampleNeural;
     }
 
     __forceinline__ __device__ void evaluateMaterial(const int& programCallId, mdl::MdlRequest* request, mdl::MaterialEvaluation* matEval)
@@ -81,16 +62,11 @@ namespace vtx
     }
 
     __forceinline__ __device__ void nanCheckAdd(const math::vec3f& input, math::vec3f& buffer)
-	{
+    {
         if (!utl::isNan(input))
         {
             buffer += input;
         }
-	}
-
-    __forceinline__ __device__ void addDebug(math::vec3f color, int pixelId, LaunchParams* params)
-    {
-        nanCheckAdd(color, params->frameBuffer.debugColor1[pixelId]);
     }
 
     __forceinline__ __device__ void nanCheckAddAtomic(const math::vec3f& input, math::vec3f& buffer)
@@ -104,9 +80,21 @@ namespace vtx
         }
     }
 
+    __forceinline__ __device__ void addDebug(math::vec3f color, int pixelId, LaunchParams* params)
+    {
+        if (params->settings->adaptiveSampling && params->settings->minAdaptiveSamples <= params->settings->iteration)
+        {
+            nanCheckAddAtomic(color, params->frameBuffer.debugColor1[pixelId]);
+        }
+        else
+        {
+            nanCheckAdd(color, params->frameBuffer.debugColor1[pixelId]);
+        }
+    }
+
     __forceinline__ __device__ void accumulateRay(const AccumulationWorkItem& awi, const LaunchParams* params)
     {
-        if(params->settings->adaptiveSampling && params->settings->minAdaptiveSamples <= params->settings->iteration)
+        if (params->settings->adaptiveSampling && params->settings->minAdaptiveSamples <= params->settings->iteration)
         {
             nanCheckAddAtomic(awi.radiance, params->frameBuffer.radianceAccumulator[awi.originPixel]);
         }
@@ -116,9 +104,11 @@ namespace vtx
         }
     }
 
-    __forceinline__ __device__ void cleanFrameBuffer(int id, LaunchParams* params)
+
+	__forceinline__ __device__ void cleanFrameBuffer(int id, LaunchParams* params)
     {
-        if (params->settings->iteration <= 0)
+        bool cleanOnInferenceStart = params->settings->iteration == params->settings->neuralInferenceStart && params->settings->useNetwork && params->settings->doInference;
+        if (params->settings->iteration <= 0 || !params->settings->accumulate || cleanOnInferenceStart)
         {
             FrameBufferData* frameBuffer = &params->frameBuffer;
             frameBuffer->radianceAccumulator[id] = 0.0f;
@@ -137,10 +127,13 @@ namespace vtx
             frameBuffer->samples[id] = 0;
             reinterpret_cast<math::vec4f*>(frameBuffer->outputBuffer)[id] = math::vec4f(0.0f);
             frameBuffer->noiseBuffer[id].adaptiveSamples = 1;
+            params->networkInterface->debugBuffer1[id] = 0.0f;
+            params->networkInterface->debugBuffer2[id] = 0.0f;
+            params->networkInterface->debugBuffer3[id] = 0.0f;
         }
     }
 
-	__forceinline__ __device__ void generateCameraRay(int id, LaunchParams* params, TraceWorkItem& twi) {
+    __forceinline__ __device__ void generateCameraRay(int id, LaunchParams* params, TraceWorkItem& twi) {
 
         math::vec2f pixel = math::vec2f((float)(id % params->frameBuffer.frameSize.x), (float)(id / params->frameBuffer.frameSize.x));
         math::vec2f screen {(float)params->frameBuffer.frameSize.x, (float)params->frameBuffer.frameSize.y };
@@ -151,10 +144,11 @@ namespace vtx
         const CameraData camera = params->cameraData;
 
         math::vec3f origin = camera.position;
-        math::vec3f direction = math::normalize<float>(camera.horizontal * ndc.x + camera.vertical * ndc.y + camera.direction);
-
+        math::vec3f direction = camera.horizontal * ndc.x + camera.vertical * ndc.y + camera.direction;
+        math::vec3f normalizedDirection = math::normalize(direction);
+        
         twi.origin = origin;
-        twi.direction = direction;
+        twi.direction = normalizedDirection;
         twi.originPixel = id;
         twi.radiance = math::vec3f(0.0f);
         twi.pdf = 0.0f;
@@ -163,12 +157,12 @@ namespace vtx
         twi.depth = 0;
         twi.mediumIor = math::vec3f(1.0f);
         twi.extendRay = true;
-
         params->frameBuffer.samples[id] += 1;
     }
 
-    __forceinline__ __device__ void missShader(EscapedWorkItem& ewi, LaunchParams* params)
+    __forceinline__ __device__ math::vec3f missShader(EscapedWorkItem& ewi, LaunchParams* params)
     {
+        math::vec3f emission = 0.0f;
         if (params->envLight != nullptr)
         {
             const LightData* envLight = params->envLight;
@@ -194,14 +188,14 @@ namespace vtx
 
                 const auto x = math::min<unsigned>((unsigned int)(u * (float)texture->dimension.x), texture->dimension.x - 1);
                 const auto y = math::min<unsigned>((unsigned int)(v * (float)texture->dimension.y), texture->dimension.y - 1);
-                math::vec3f emission = tex2D<float4>(texture->texObj, u, v);
+                emission = tex2D<float4>(texture->texObj, u, v);
                 //emission = emission; *attrib.envIntensity;
 
                 // to incorporate the point light selection probability
                 float misWeight = 1.0f;
                 // If the last surface intersection was a diffuse event which was directly lit with multiple importance sampling,
                 // then calculate light emission with multiple importance sampling for this implicit light hit as well.
-                bool MiSCondition = (params->settings->samplingTechnique == RendererDeviceSettings::S_MIS && (ewi.eventType & (mi::neuraylib::BSDF_EVENT_DIFFUSE | mi::neuraylib::BSDF_EVENT_GLOSSY)));
+                bool MiSCondition = (params->settings->samplingTechnique == S_MIS && (ewi.eventType & (mi::neuraylib::BSDF_EVENT_DIFFUSE | mi::neuraylib::BSDF_EVENT_GLOSSY)));
                 if (ewi.pdf > 0.0f && MiSCondition)
                 {
                     float envSamplePdf = attrib.aliasMap[y * texture->dimension.x + x].pdf;
@@ -209,13 +203,14 @@ namespace vtx
                     //misWeight = ewi.pdf / (ewi.pdf + envSamplePdf);
                 }
                 ewi.radiance += ewi.throughput * emission * misWeight;
-                if(ewi.depth == 0)
+                if (ewi.depth == 0)
                 {
                     params->frameBuffer.noiseBuffer[ewi.originPixel].adaptiveSamples = -1; //Let's inform adaptive not to sample again a direct miss;
                     nanCheckAdd(math::normalize(emission), params->frameBuffer.albedoAccumulator[ewi.originPixel]);
                 }
             }
         }
+        return emission;
     }
 
     __forceinline__ __device__ LightSample sampleMeshLight(const LightData& light, RayWorkItem& prd, LaunchParams& params)
@@ -231,59 +226,45 @@ namespace vtx
         // Uniformly sample the triangles over their surface area.
         // Note that zero-area triangles (e.g. at the poles of spheres) are automatically never sampled with this method!
         // The cdfU is one bigger than res.y.
-
         unsigned int idxTriangle = utl::binarySearchCdf(cdfArea, meshLightAttributes.size, sample3D.z);
         idxTriangle = meshLightAttributes.actualTriangleIndices[idxTriangle];
+        unsigned instanceId = meshLightAttributes.instanceId;
 
-        mdl::MdlRequest request;
-        request.instance = params.instances[meshLightAttributes.instanceId];
-        request.geometry = request.instance->geometryData;
-        int programCallId;
-        getMaterialData(request.instance, request.geometry, idxTriangle, programCallId, request.edf, &request.argBlock, &request.textureHandler);
-        if (request.edf != true)
+        // Barycentric coordinates.
+        const float sqrtSampleX = sqrtf(sample3D.x);
+        const float alpha = 1.0f - sqrtSampleX;
+        const float beta = sample3D.y * sqrtSampleX;
+        const float gamma = 1.0f - alpha - beta;
+        const auto& baricenter = math::vec3f(alpha, beta, gamma);
+
+        HitProperties hitP;
+        hitP.init(instanceId, idxTriangle, baricenter, 0.0f); // zero because position needs to be calculated
+        hitP.determineMaterialInfo(&params);
+        if (hitP.hasEdf != true)
+        {
+	        // sampled Triangle doesn't have light, well that's weird, however we return
+            return lightSample;
+        }
+        hitP.calculateForMeshLightSampling(&params, prd.hitProperties.position, &lightSample.direction, &lightSample.distance);
+        lightSample.position = hitP.position;
+        lightSample.normal = hitP.shadingNormal;
+        if (lightSample.distance < DENOMINATOR_EPSILON)
         {
             return lightSample;
         }
 
-        // Compute mesh Light hit
-	    {
-            // Unit square to triangle via barycentric coordinates.
-            const float sqrtSampleX = sqrtf(sample3D.x);
-            // Barycentric coordinates.
-            const float alpha = 1.0f - sqrtSampleX;
-            const float beta = sample3D.y * sqrtSampleX;
-            const float gamma = 1.0f - alpha - beta;
-            request.baricenter = math::vec3f(alpha, beta, gamma);
-            //printf("Baricenter Instance %d: %.3f,%.3f,%.3f\n", meshLightAttributes.instanceId, request.baricenter.x, request.baricenter.y, request.baricenter.z);
-		    const math::vec3ui  triVerticesIndices = reinterpret_cast<math::vec3ui*>(request.geometry->indicesData)[idxTriangle];
-        	graph::VertexAttributes* vertices[3]{ nullptr, nullptr, nullptr };
-        	vertices[0] = &(request.geometry->vertexAttributeData[triVerticesIndices.x]);
-        	vertices[1] = &(request.geometry->vertexAttributeData[triVerticesIndices.y]);
-        	vertices[2] = &(request.geometry->vertexAttributeData[triVerticesIndices.z]);
-        	// Object space vertex attributes at the hit point.
-        	lightSample.position = vertices[0]->position * request.baricenter.x + vertices[1]->position * request.baricenter.y + vertices[2]->position * request.baricenter.z;
-            lightSample.position = math::transformPoint3F(request.instance->transform, lightSample.position);
-            //printMath("Sample Transform:", request.instance->transform);
-            lightSample.direction = lightSample.position - prd.origin;
-        	lightSample.distance = math::length<float>(lightSample.direction);
-        	if (lightSample.distance < DENOMINATOR_EPSILON)
-        	{
-        		return lightSample;
-        	}
-        	lightSample.direction /= lightSample.distance;
-        	//lightSample.direction -= lightSample.distance;
-	    }
+        mdl::MdlRequest request;
 
         request.opacity = true;
         request.outgoingDirection = -lightSample.direction;
         request.surroundingIor = 1.0f;
-        request.position = lightSample.position;
         request.seed = &prd.seed;
-        request.triangleId = idxTriangle;
+        request.hitProperties = &hitP;
+        request.edf = true;
 
         mdl::MaterialEvaluation matEval;
 
-        evaluateMaterial(programCallId, &request, &matEval);
+        evaluateMaterial(hitP.programCall, &request, &matEval);
 
         if (matEval.opacity <= 0.0f)
         {
@@ -294,11 +275,7 @@ namespace vtx
         {
             const float totArea = meshLightAttributes.totalArea;
 
-            // Modulate the emission with the cutout opacity value to get the correct value.
-            // The opacity value must not be greater than one here, which could happen for HDR textures.
-            float opacity = math::min(matEval.opacity, 1.0f);
-
-            // Power (flux) [W] divided by light area gives radiant exitance [W/m^2].
+        	// Power (flux) [W] divided by light area gives radiant exitance [W/m^2].
             const float factor = (matEval.edf.mode == 0) ? matEval.opacity : matEval.opacity / totArea;
 
             lightSample.pdf = lightSample.distance * lightSample.distance / (totArea * matEval.edf.cos); // Solid angle measure.
@@ -359,9 +336,9 @@ namespace vtx
         math::vec3f dir{ x, y, z };
         // Now rotate that normalized object space direction into world space. 
         lightSample.direction = math::transformNormal3F(attrib.transformation, dir);
-
         lightSample.distance = params.settings->maxClamp; // Environment light.
-
+        lightSample.position = prd.hitProperties.position + lightSample.direction * lightSample.distance;
+        lightSample.normal = -lightSample.direction;
         // Get the emission from the spherical environment texture.
         math::vec3f emission = tex2D<float4>(texture->texObj, u, v);
         // For simplicity we pretend that we perfectly importance-sampled the actual texture-filtered environment map
@@ -420,35 +397,19 @@ namespace vtx
         return lightSample;
     }
 
-    __forceinline__ __device__ void prepareHitProperties(HitProperties* hitP, RayWorkItem& prd, const LaunchParams& params)
-    {
-        prd.origin = prd.origin + prd.direction * prd.hitDistance;
-        hitP->position = prd.origin;
-        hitP->direction = prd.direction;
-        hitP->baricenter = prd.hitBaricenter;
-        hitP->seed = prd.seed;
-        hitP->mediumIor = prd.mediumIor;
-
-        utl::getInstanceAndGeometry(hitP, prd.hitInstanceId, params);
-        utl::getVertices(hitP, prd.hitTriangleId);
-        utl::setTransform(hitP);
-        utl::computeGeometricHitProperties(hitP, prd.hitTriangleId);
-        utl::determineMaterialHitProperties(hitP, prd.hitTriangleId);
-    }
-
-    __forceinline__ __device__ void setAuxiliaryRenderPassData(RayWorkItem& prd, const mdl::MaterialEvaluation& matEval, LaunchParams* params)
+    __forceinline__ __device__ void setAuxiliaryRenderPassData(const RayWorkItem& prd, const mdl::MaterialEvaluation& matEval, const LaunchParams* params)
     {
         //Auxiliary Data
         if (prd.depth == 0)
         {
-            math::vec3f colorsTrueNormal = 0.5f * (matEval.trueNormal + 1.0f);
-            math::vec3f colorsUv = matEval.uv;
-            math::vec3f colorsOrientation = matEval.isFrontFace ? math::vec3f(0.0f, 0.0f, 1.0f) : math::vec3f(1.0f, 0.0f, 0.0f);
-            math::vec3f colorsTangent = 0.5f * (matEval.tangent + 1.0f);
-            if(matEval.aux.isValid)
-			{
-                math::vec3f colorsBounceDiffuse = matEval.aux.albedo;
-                math::vec3f colorsShadingNormal = 0.5f * (matEval.aux.normal + 1.0f);
+            const math::vec3f colorsTrueNormal = 0.5f * (prd.hitProperties.trueNormal + 1.0f);
+            const math::vec3f colorsUv = prd.hitProperties.uv;
+            const math::vec3f colorsOrientation = prd.hitProperties.isFrontFace ? math::vec3f(0.0f, 0.0f, 1.0f) : math::vec3f(1.0f, 0.0f, 0.0f);
+            const math::vec3f colorsTangent = 0.5f * (prd.hitProperties.tangent + 1.0f);
+            if (matEval.aux.isValid)
+            {
+                const math::vec3f colorsBounceDiffuse = matEval.aux.albedo;
+                const math::vec3f colorsShadingNormal = 0.5f * (matEval.aux.normal + 1.0f);
                 if (params->settings->adaptiveSampling && params->settings->minAdaptiveSamples <= params->settings->iteration)
                 {
                     nanCheckAddAtomic(colorsBounceDiffuse, params->frameBuffer.albedoAccumulator[prd.originPixel]);
@@ -459,7 +420,7 @@ namespace vtx
                     nanCheckAdd(colorsBounceDiffuse, params->frameBuffer.albedoAccumulator[prd.originPixel]);
                     nanCheckAdd(colorsShadingNormal, params->frameBuffer.normalAccumulator[prd.originPixel]);
                 }
-			}
+            }
             if (params->settings->adaptiveSampling && params->settings->minAdaptiveSamples <= params->settings->iteration)
             {
                 nanCheckAddAtomic(colorsTrueNormal, params->frameBuffer.trueNormal[prd.originPixel]);
@@ -477,28 +438,177 @@ namespace vtx
         }
     }
 
+    __forceinline__ __device__ void auxiliaryNetworkInference(
+        const LaunchParams* params,
+        const int& originPixel, const int& depth, const int& shadeQueueIndex,
+        const math::vec3f& sample, const float& pdf, const float& cosineDirection)
+    {
+
+        if (depth != 0)
+        {
+            return;
+        }
+
+		math::vec3f*       debugBuffer       = params->networkInterface->debugBuffer2;
+		InferenceQueries* inferenceQueries   = params->networkInterface->inferenceQueries;
+
+	    switch(params->settings->displayBuffer)
+	    {
+		case(FB_NETWORK_INFERENCE_STATE_POSITION):
+			{
+            debugBuffer[originPixel] = inferenceQueries->getStatePosition(shadeQueueIndex);
+			}
+			break;
+		case(FB_NETWORK_INFERENCE_STATE_NORMAL):
+			{
+            debugBuffer[originPixel] = (inferenceQueries->getStateNormal(shadeQueueIndex)+1.0f)*0.5f;
+			}
+			break;
+		case(FB_NETWORK_INFERENCE_OUTGOING_DIRECTION):
+			{
+            debugBuffer[originPixel] = (inferenceQueries->getStateDirection(shadeQueueIndex)+1.0f)*0.5f;
+			}
+			break;
+		case(FB_NETWORK_INFERENCE_MEAN):
+			{
+            debugBuffer[originPixel] = (inferenceQueries->getMean(shadeQueueIndex)+1.0f)*0.5f;
+			}
+			break;
+		case(FB_NETWORK_INFERENCE_CONCENTRATION):
+			{
+            debugBuffer[originPixel] = floatToScientificRGB(fminf(1.0f, inferenceQueries->getConcentration(shadeQueueIndex)));
+			}
+			break;
+		case(FB_NETWORK_INFERENCE_SAMPLE):
+			{
+            debugBuffer[originPixel] = (sample + 1.0f) * 0.5f;
+			}
+			break;
+		case(FB_NETWORK_INFERENCE_PDF):
+			{
+				debugBuffer[originPixel] = math::vec3f(floatToScientificRGB(fminf(1.0f, pdf)));
+			}
+			break;
+        case(FB_NETWORK_INFERENCE_IS_FRONT_FACE):
+	        {
+            debugBuffer[originPixel] = math::vec3f(floatToScientificRGB((cosineDirection+1.0f)*0.5f));
+
+	        }
+		}
+    }
+    __forceinline__ __device__ void correctBsdfSampling(const LaunchParams& params, mdl::MaterialEvaluation* matEval, const RayWorkItem& prd, const math::vec4f& neuralSample, const bool& doNeuralSample, const int& shadeQueueIndex)
+    {
+        
+        auto originalSample = matEval->bsdfSample;
+        // If the bsdf sample is specular, we don't use the neural sampling.
+        const float& samplingFraction = params.settings->neuralSampleFraction;
+
+        if (matEval->bsdfSample.eventType & mi::neuraylib::BSDF_EVENT_SPECULAR)
+        {
+            return;
+        }
+
+        math::vec3f bsdf;
+        float bsdfPdf;
+        float neuralPdf;
+        if (doNeuralSample)
+        {
+            bsdf = matEval->neuralBsdfEvaluation.diffuse + matEval->neuralBsdfEvaluation.glossy;
+            const math::vec3f neuralDirection = { neuralSample.x, neuralSample.y, neuralSample.z };
+            const float cosineDirection = dot(neuralDirection, prd.hitProperties.trueNormal);
+            const bool isFrontFace = 0.0f <= cosineDirection;
+
+            auxiliaryNetworkInference(&params, prd.originPixel, prd.depth, shadeQueueIndex, neuralDirection, neuralSample.w, cosineDirection);
+
+            if (bsdf == math::vec3f(0.0f) || isNan(neuralDirection) || !isFrontFace)
+            {
+                matEval->bsdfSample.eventType = mi::neuraylib::BSDF_EVENT_ABSORB;
+            }
+            else
+            {
+                matEval->bsdfSample.eventType = (mdl::BsdfEventType)(mi::neuraylib::BSDF_EVENT_DIFFUSE | mi::neuraylib::BSDF_EVENT_GLOSSY);
+            }
+            bsdfPdf = matEval->neuralBsdfEvaluation.pdf;
+            neuralPdf = neuralSample.z;
+            matEval->bsdfSample.nextDirection = neuralDirection;
+        }
+        else
+        {
+            if (matEval->bsdfSample.eventType == mi::neuraylib::BSDF_EVENT_ABSORB)
+            {
+                return;
+            }
+            bsdf = matEval->bsdfSample.bsdfOverPdf * matEval->bsdfSample.pdf;
+            bsdfPdf = matEval->bsdfSample.pdf;
+            neuralPdf = params.networkInterface->inferenceQueries->evaluate(shadeQueueIndex, matEval->bsdfSample.nextDirection);
+        }
+        matEval->bsdfSample.isValid = true;
+        const float finalPdf = bsdfPdf * (1.0f - samplingFraction) + neuralPdf * samplingFraction;
+        matEval->bsdfSample.pdf = finalPdf;
+        matEval->bsdfSample.bsdfOverPdf = bsdf / finalPdf;
+
+        /*printf(
+            "Neural Pdf                     %.6f                Sampling Fraction                    %.6f\n"
+            "originalSample.bsdfOverPdf     %.6f %.6f %.6f      matEval->bsdfSample.bsdfOverPdf      %.6f %.6f %.6f\n"
+	        "originalSample.nextDirection   %.6f %.6f %.6f      matEval->bsdfSample.nextDirection    %.6f %.6f %.6f\n"
+	        "originalSample.pdf             %.6f                matEval->bsdfSample.pdf              %.3f\n"
+	        "originalSample.eventType       %.d                 matEval->bsdfSample.eventType        %.d\n"
+	        "originalSample.isValid         %.d                 matEval->bsdfSample.isValid          %.d\n"
+	        "originalSample.isComputed      %.d                 matEval->bsdfSample.isComputed       %.d\n",
+            neuralPdf,
+            samplingFraction,
+	        originalSample.bsdfOverPdf.x,
+	        originalSample.bsdfOverPdf.y,
+	        originalSample.bsdfOverPdf.z,
+	        matEval->bsdfSample.bsdfOverPdf.x,
+	        matEval->bsdfSample.bsdfOverPdf.y,
+	        matEval->bsdfSample.bsdfOverPdf.z,
+	        originalSample.nextDirection.x,
+	        originalSample.nextDirection.y,
+	        originalSample.nextDirection.z,
+	        matEval->bsdfSample.nextDirection.x,
+	        matEval->bsdfSample.nextDirection.y,
+	        matEval->bsdfSample.nextDirection.z,
+	        originalSample.pdf,
+	        matEval->bsdfSample.pdf,
+	        originalSample.eventType,
+	        matEval->bsdfSample.eventType,
+	        originalSample.isValid,
+	        matEval->bsdfSample.isValid,
+	        originalSample.isComputed,
+	        matEval->bsdfSample.isComputed);*/
+    }
+
+    __forceinline__ __device__ void correctLightSample(LaunchParams & params, mdl::MaterialEvaluation * matEval, const math::vec3f & lightDirection, const int& shadeQueueIndex) {
+        if (matEval->bsdfEvaluation.isValid) {
+            if(matEval->bsdfEvaluation.diffuse+matEval->bsdfEvaluation.glossy == math::vec3f(0.0f))
+            {
+                matEval->bsdfEvaluation.isValid = false;
+                return;
+            }
+            const float& samplingFraction = params.settings->neuralSampleFraction;
+            const float neuralPdf = params.networkInterface->inferenceQueries->evaluate(shadeQueueIndex, lightDirection);
+            matEval->bsdfEvaluation.pdf = matEval->bsdfEvaluation.pdf * (1.0f - samplingFraction) + neuralPdf * samplingFraction;
+        }
+    }
+
     __forceinline__ __device__ void evaluateMaterialAndSampleLight(
         mdl::MaterialEvaluation* matEval, LightSample* lightSample, LaunchParams& params,
-        RayWorkItem& prd)
+        RayWorkItem& prd, int shadeQueueIndex)
     {
         mdl::MdlRequest request;
-        request.instance = params.instances[prd.hitInstanceId];
-        request.geometry = request.instance->geometryData;
-        int programCallId;
-        getMaterialData(request.instance, request.geometry, prd.hitTriangleId, programCallId, request.edf, &request.argBlock, &request.textureHandler);
-        prd.depth==0 ? request.auxiliary = true : request.auxiliary = false;
+        prd.depth == 0 ? request.auxiliary = true : request.auxiliary = false;
         request.ior = true;
         request.outgoingDirection = -prd.direction;
         request.surroundingIor = prd.mediumIor;
         request.opacity = false;
-        request.position = prd.origin;
-        request.baricenter = prd.hitBaricenter;
         request.seed = &prd.seed;
-        request.triangleId = prd.hitTriangleId;
+        request.hitProperties = &prd.hitProperties;
+        request.edf = prd.hitProperties.hasEdf;
 
-        RendererDeviceSettings::SamplingTechnique& samplingTechnique = params.settings->samplingTechnique;
-        const bool doSampleLight = samplingTechnique == RendererDeviceSettings::S_DIRECT_LIGHT || samplingTechnique == RendererDeviceSettings::S_MIS;
-        const bool doSampleBsdf = samplingTechnique == RendererDeviceSettings::S_MIS || samplingTechnique == RendererDeviceSettings::S_BSDF;
+        SamplingTechnique& samplingTechnique = params.settings->samplingTechnique;
+        const bool doSampleLight = samplingTechnique == S_DIRECT_LIGHT || samplingTechnique == S_MIS;
+        const bool doSampleBsdf = samplingTechnique == S_MIS || samplingTechnique == S_BSDF;
 
         if (doSampleLight)
         {
@@ -510,35 +620,72 @@ namespace vtx
             }
         }
 
-        if (doSampleBsdf)
+        math::vec4f neuralSample = math::vec4f(0.0f);
+        bool isNeuralSamplingActivated = neuralSamplingActivated(&params, prd.depth);
+        bool doNeuralSample = false;
+        if(doSampleBsdf)
         {
             request.bsdfSample = true;
+            if(isNeuralSamplingActivated)
+            {
+                if (const float uniformSample = rng(prd.seed); uniformSample > params.settings->neuralSampleFraction)
+                {
+                    doNeuralSample = false;
+                }
+                else
+                {
+                    doNeuralSample = true;
+                    request.evalOnNeuralSampling = true;
+                    neuralSample = params.networkInterface->inferenceQueries->sample(shadeQueueIndex, prd.seed);
+                    request.toNeuralSample = {neuralSample.x, neuralSample.y, neuralSample.z};
+                }
+            }
+        }
+        
+        evaluateMaterial(prd.hitProperties.programCall, &request, matEval);
+
+        if(utl::isNan(matEval->bsdfSample.nextDirection))
+        {
+	     // //TODO: check why this happens
+            matEval->bsdfSample.eventType = mi::neuraylib::BSDF_EVENT_ABSORB;
         }
 
-        evaluateMaterial(programCallId, &request, matEval);
+        if (isNeuralSamplingActivated)
+        {
+            if(doSampleBsdf)
+            {
+                correctBsdfSampling(params, matEval, prd, neuralSample, doNeuralSample, shadeQueueIndex);
+            }
+            if(doSampleLight)
+            {
+                correctLightSample(params, matEval, lightSample->direction, shadeQueueIndex);
+            }
+        }
+            
     }
 
     __forceinline__ __device__ ShadowWorkItem nextEventEstimation(const mdl::MaterialEvaluation& matEval, LightSample& lightSample, RayWorkItem& prd, LaunchParams& params)
     {
-        RendererDeviceSettings::SamplingTechnique& samplingTechnique = params.settings->samplingTechnique;
-        ShadowWorkItem shadowWorkItem;
-        shadowWorkItem.distance = -1; //invalid
+        SamplingTechnique& samplingTechnique = params.settings->samplingTechnique;
+        ShadowWorkItem swi;
+        swi.distance = -1; //invalid
 
         //Direct Light Sampling
         //prd.shadowTrace = false;
-        if ((samplingTechnique == RendererDeviceSettings::S_MIS || samplingTechnique == RendererDeviceSettings::S_DIRECT_LIGHT) && lightSample.isValid)
+        if ((samplingTechnique == S_MIS || samplingTechnique == S_DIRECT_LIGHT) && lightSample.isValid)
         {
             //printf("number of tries: %d\n", numberOfTries);
             auto bxdf = math::vec3f(0.0f, 0.0f, 0.0f);
             bxdf += matEval.bsdfEvaluation.diffuse;
             bxdf += matEval.bsdfEvaluation.glossy;
 
+            bool isBsdfValid = false;
             if (0.0f < matEval.bsdfEvaluation.pdf && bxdf != math::vec3f(0.0f, 0.0f, 0.0f))
             {
                 // Pass the current payload registers through to the shadow ray.
-
+                isBsdfValid = true;
                 float weightMis = 1.0f;
-                if ((lightSample.typeLight == L_MESH || lightSample.typeLight == L_ENV) && samplingTechnique == RendererDeviceSettings::S_MIS)
+                if ((lightSample.typeLight == L_MESH || lightSample.typeLight == L_ENV) && samplingTechnique == S_MIS)
                 {
                     weightMis = utl::heuristic(lightSample.pdf, matEval.bsdfEvaluation.pdf);
                 }
@@ -547,28 +694,41 @@ namespace vtx
                 // Selecting one of many lights means the inverse of 1.0f / numLights.
                 // This is using the path throughput before the sampling modulated it above.
 
-                shadowWorkItem.radiance = prd.throughput * bxdf * lightSample.radianceOverPdf * weightMis * (float)params.numberOfLights; // *float(numLights);
-                shadowWorkItem.direction = lightSample.direction;
-                shadowWorkItem.distance = lightSample.distance - params.settings->minClamp;
-                shadowWorkItem.depth = prd.depth+1;
-                shadowWorkItem.originPixel = prd.originPixel;
-                shadowWorkItem.origin = prd.origin;
+                swi.radiance = prd.throughput * bxdf * lightSample.radianceOverPdf * weightMis * (float)params.numberOfLights; // *float(numLights);
+                swi.direction = lightSample.direction;
+                swi.distance = lightSample.distance - params.settings->minClamp;
+                swi.depth = prd.depth + 1;
+                swi.originPixel = prd.originPixel;
+                swi.origin = prd.hitProperties.position;
+
+                if (params.settings->useNetwork)
+                {
+                    math::vec3f stepRadiance = 0.0f;
+                    if(isBsdfValid)
+                    {
+                        stepRadiance = lightSample.radianceOverPdf * lightSample.pdf;
+                    }
+                    else
+                    {
+                        bxdf = 0.0f;
+                    }
+
+                    params.networkInterface->paths->recordLightSample(prd.originPixel, prd.depth + 1, bxdf, stepRadiance, lightSample.position, lightSample.normal);
+                }
             }
         }
 
-        return shadowWorkItem;
+        return swi;
     }
 
-    __forceinline__ __device__ void evaluateEmission(mdl::MaterialEvaluation& matEval, RayWorkItem& prd, LaunchParams& params)
+    __forceinline__ __device__ void evaluateEmission(mdl::MaterialEvaluation& matEval, RayWorkItem& prd, const LaunchParams& params)
     {
-        RendererDeviceSettings::SamplingTechnique& samplingTechnique = params.settings->samplingTechnique;
+        const SamplingTechnique& samplingTechnique = params.settings->samplingTechnique;
+
+        math::vec3f stepRadiance = 0.0f;
         if (matEval.edf.isValid)
         {
-            const InstanceData* instance = params.instances[prd.hitInstanceId];
-            const GeometryData* geometry = (instance->geometryData);
-            const unsigned& materialSlotIndex = geometry->faceAttributeData[prd.hitTriangleId].materialSlotId;
-            const LightData* lightData = instance->materialSlots[materialSlotIndex].meshLight;
-            const MeshLightAttributesData* attributes = reinterpret_cast<MeshLightAttributesData*>(lightData->attributes);
+            const MeshLightAttributesData* attributes = reinterpret_cast<MeshLightAttributesData*>(prd.hitProperties.lightData->attributes);
             const float area = attributes->totalArea;
             matEval.edf.pdf = prd.hitDistance * prd.hitDistance / (area * matEval.edf.cos);
             // Solid angle measure.
@@ -576,17 +736,23 @@ namespace vtx
             float misWeight = 1.0f;
 
             // If the last event was diffuse or glossy, calculate the opposite MIS weight for this implicit light hit.
-            if (samplingTechnique == RendererDeviceSettings::S_MIS && prd.eventType & (mi::neuraylib::BSDF_EVENT_DIFFUSE | mi::neuraylib::BSDF_EVENT_GLOSSY))
+            if (samplingTechnique == S_MIS && prd.eventType & (mi::neuraylib::BSDF_EVENT_DIFFUSE | mi::neuraylib::BSDF_EVENT_GLOSSY))
             {
                 misWeight = utl::heuristic(prd.pdf, matEval.edf.pdf);
             }
             // Power (flux) [W] divided by light area gives radiant exitance [W/m^2].
             const float factor = (matEval.edf.mode == 0) ? 1.0f : 1.0f / area;
-            prd.radiance += prd.throughput * matEval.edf.intensity * matEval.edf.edf * (factor * misWeight);
+            stepRadiance = matEval.edf.intensity * matEval.edf.edf * factor;
+            prd.radiance += prd.throughput * stepRadiance * misWeight;
+        }
+
+        if (prd.depth > 0 && params.settings->useNetwork)
+        {
+            params.networkInterface->paths->recordBsRadiance(stepRadiance, prd);
         }
     }
 
-    __forceinline__ __device__ bool russianRoulette(RayWorkItem& prd, LaunchParams& params)
+    __forceinline__ __device__ bool russianRoulette(RayWorkItem& prd, const LaunchParams& params)
     {
         if (params.settings->useRussianRoulette && 2 <= prd.depth) // Start termination after a minimum number of bounces.
         {
@@ -603,14 +769,19 @@ namespace vtx
 
     __forceinline__ __device__ bool bsdfSample(RayWorkItem& prd, const mdl::MaterialEvaluation& matEval, LaunchParams& params)
     {
-        RendererDeviceSettings::SamplingTechnique& samplingTechnique = params.settings->samplingTechnique;
-        if ((samplingTechnique == RendererDeviceSettings::S_MIS || samplingTechnique == RendererDeviceSettings::S_BSDF)
-            && prd.depth + 1 < params.settings->maxBounces
-            && matEval.bsdfSample.eventType != mi::neuraylib::BSDF_EVENT_ABSORB)
+        SamplingTechnique& samplingTechnique = params.settings->samplingTechnique;
+
+        const bool doNextBounce = (samplingTechnique == S_MIS || samplingTechnique == S_BSDF) && prd.depth + 1 < params.settings->maxBounces;
+        if (doNextBounce && (matEval.bsdfSample.eventType != mi::neuraylib::BSDF_EVENT_ABSORB))
         {
+            //if(matEval.bsdfSample.eventType == 0)
+            //{
+            //    printf("We should not be here\n");
+            //}
             //prd.origin = prd.origin;
             prd.direction = matEval.bsdfSample.nextDirection; // Continuation direction.
             prd.throughput *= matEval.bsdfSample.bsdfOverPdf;
+            //prd.previousThroughput = matEval.bsdfSample.bsdfOverPdf * matEval.bsdfSample.pdf;
             // Adjust the path throughput for all following incident lighting.
             prd.pdf = matEval.bsdfSample.pdf;
             // Note that specular events return pdf == 0.0f! (=> Not a path termination condition.)
@@ -618,7 +789,7 @@ namespace vtx
 
             if (!matEval.isThinWalled && (prd.eventType & mi::neuraylib::BSDF_EVENT_TRANSMISSION) != 0)
             {
-                if (matEval.isFrontFace) // Entered a volume. 
+                if (prd.hitProperties.isFrontFace) // Entered a volume. 
                 {
                     prd.mediumIor = matEval.ior;
                 }
@@ -627,8 +798,21 @@ namespace vtx
                     prd.mediumIor = 1.0f;
                 }
             }
+
+            if(params.settings->useNetwork)
+            {
+	            params.networkInterface->paths->recordBsdfSample(matEval.bsdfSample.bsdfOverPdf * matEval.bsdfSample.pdf, prd, false);
+			}
+
             return true;
         }
+        else if(doNextBounce && params.settings->useNetwork)
+        {
+            RayWorkItem prd2 = prd;
+            prd2.direction = matEval.bsdfSample.nextDirection; // Continuation direction.
+            params.networkInterface->paths->recordBsdfSample(math::vec3f(0.0f), prd2, true);
+        }
+
         return false;
     }
 
@@ -652,20 +836,22 @@ namespace vtx
 		}
     }
 
-    __forceinline__ __device__ void shade(LaunchParams* params, RayWorkItem& prd, ShadowWorkItem& swi, TraceWorkItem& twi)
+    __forceinline__ __device__ void shade(LaunchParams* params, RayWorkItem& prd, ShadowWorkItem& swi, TraceWorkItem& twi, const int& shadeQueueIndex = 0)
     {
-        /*HitProperties hitP;
-
-        prepareHitProperties(&hitP, prd, *params);*/
+        prd.hitProperties.calculate(params, prd.direction);
+        if(params->settings->useNetwork)
+        {
+            params->networkInterface->paths->recordHit(prd);
+        }
 
         mdl::MaterialEvaluation matEval{};
         twi.extendRay = false;
         LightSample lightSample{};
         bool extend = false;
 
-        if (hasMaterial(params, prd))
+        if (prd.hitProperties.hasMaterial)
         {
-            evaluateMaterialAndSampleLight(&matEval, &lightSample, *params, prd);
+            evaluateMaterialAndSampleLight(&matEval, &lightSample, *params, prd, shadeQueueIndex);
 
             swi = nextEventEstimation(matEval, lightSample, prd, *params);
 
@@ -684,7 +870,7 @@ namespace vtx
         twi.seed = prd.seed;
         twi.originPixel = prd.originPixel;
         twi.depth = prd.depth;
-        twi.origin = prd.origin;
+        twi.origin = prd.hitProperties.position;
         twi.direction = prd.direction;
         twi.radiance = prd.radiance;
         twi.throughput = prd.throughput;
@@ -697,15 +883,12 @@ namespace vtx
 
     __forceinline__ __device__ bool transparentAnyHit(RayWorkItem* prd, LaunchParams* params)
     {
+        prd->hitProperties.calculate(params, prd->direction);
         mdl::MdlRequest request;
-        request.instance = params->instances[prd->hitInstanceId];
-        if (request.instance->hasOpacity)
+        if (prd->hitProperties.hasOpacity)
         {
             mdl::MaterialEvaluation matEval;
-            request.geometry = request.instance->geometryData;
-            int programCallId;
-            getMaterialData(request.instance, request.geometry, prd->hitTriangleId, programCallId, request.edf, &request.argBlock, &request.textureHandler);
-            if(request.argBlock == nullptr)
+            if (prd->hitProperties.argBlock == nullptr)
             {
                 optixIgnoreIntersection();
                 return false;
@@ -714,12 +897,10 @@ namespace vtx
             request.outgoingDirection = -prd->direction;
             request.surroundingIor = prd->mediumIor;
             request.opacity = true;
-            request.position = prd->origin;
-            request.baricenter = prd->hitBaricenter;
             request.seed = &prd->seed;
-            request.triangleId = prd->hitTriangleId;
+            request.hitProperties = &prd->hitProperties;
 
-            evaluateMaterial(programCallId, &request, &matEval);
+            evaluateMaterial(prd->hitProperties.programCall, &request, &matEval);
 
             // Stochastic alpha test to get an alpha blend effect.
             // No need to calculate an expensive random number if the test is going to fail anyway.
@@ -728,7 +909,7 @@ namespace vtx
                 optixIgnoreIntersection();
                 return false;
             }
-        	return true;
+            return true;
         }
         return false;
     }
@@ -741,7 +922,7 @@ namespace vtx
             if (params->settings->minAdaptiveSamples <= params->settings->iteration)
             {
                 samplesPerLaunch = params->frameBuffer.noiseBuffer[fbIndex].adaptiveSamples;
-                if(samplesPerLaunch <= 0) //direct miss
+                if (samplesPerLaunch <= 0) //direct miss
                 {
                     return 0;
                 }
@@ -756,13 +937,15 @@ namespace vtx
 
     __forceinline__ __device__ void wfInitRayEntry(int id, LaunchParams* params)
     {
-        if(id==0)
+        if (id == 0)
         {
             params->radianceTraceQueue->Reset();
             params->shadeQueue->Reset();
             params->shadowQueue->Reset();
             params->escapedQueue->Reset();
             params->accumulationQueue->Reset();
+            params->networkInterface->inferenceQueries->reset();
+            params->networkInterface->paths->resetValidPixels();
         }
         cleanFrameBuffer(id, params);
         const int samplesPerLaunch = getAdaptiveSampleCount(id, params);
@@ -770,8 +953,9 @@ namespace vtx
         TraceWorkItem                twi;
         for (int i = 0; i < samplesPerLaunch; i++)
         {
-            twi.seed = tea<4>(id + i, params->settings->iteration+*params->frameID);
+            twi.seed = tea<4>(id + i, params->settings->iteration + *params->frameID);
             generateCameraRay(id, params, twi);
+            
             params->radianceTraceQueue->Push(twi);
         }
     }
@@ -789,7 +973,7 @@ namespace vtx
         RayWorkItem prd = (*params.shadeQueue)[queueWorkId];
         ShadowWorkItem swi;
         TraceWorkItem twi;
-        shade(&params, prd, swi, twi);
+        shade(&params, prd, swi, twi, queueWorkId);
         nextWork(twi, swi, params);
     }
 
@@ -814,34 +998,32 @@ namespace vtx
 
         EscapedWorkItem                ewi = (*params->escapedQueue)[id];
 
-        missShader(ewi, params);
+        const math::vec3f stepRadiance = missShader(ewi, params);
 
         AccumulationWorkItem awi;
         awi.originPixel = ewi.originPixel;
         awi.radiance = ewi.radiance;
         awi.depth = ewi.depth;
         params->accumulationQueue->Push(awi);
+
+        if (params->settings->useNetwork && ewi.depth > 0)
+        {
+            params->networkInterface->paths->recordRadianceMiss(stepRadiance, ewi, params->settings->maxClamp);
+        }
     }
+
+
 
 
 #ifdef ARCHITECTURE_OPTIX
 
-    __forceinline__ __device__ RayWorkItem optixHitProperties(RayWorkItem* prd)
+    __forceinline__ __device__ void optixHitProperties(RayWorkItem* prd)
     {
-        prd->hitInstanceId = optixGetInstanceId();
-        prd->hitTriangleId = optixGetPrimitiveIndex();
-        prd->hitDistance = optixGetRayTmax();
-        float2 bari = optixGetTriangleBarycentrics();
-        prd->hitBaricenter = math::vec3f(1.0f - bari.x - bari.y, bari.x, bari.y);
-        prd->origin = prd->origin + prd->direction * prd->hitDistance;
-
-        //const OptixTraversableHandle handle = optixGetTransformListHandle(0);
-        //// UNSURE IF THIS IS CORRECT! WE ALWAYS HAVE THE TRANSFORM FROM THE INSTANCE DATA IN CASE
-        //const float4* wTo = optixGetInstanceInverseTransformFromHandle(handle);
-        //const float4* oTw = optixGetInstanceTransformFromHandle(handle);
-
-        //prd->hitOTW = math::affine3f(oTw);
-        //prd->hitWTO = math::affine3f(wTo);
+		const float2 baricenter2D = optixGetTriangleBarycentrics();
+		prd->hitDistance = optixGetRayTmax();
+		const auto baricenter = math::vec3f(1.0f - baricenter2D.x - baricenter2D.y, baricenter2D.x, baricenter2D.y);
+		const math::vec3f position = prd->hitProperties.position + prd->direction * prd->hitDistance;
+		prd->hitProperties.init(optixGetInstanceId(), optixGetPrimitiveIndex(), baricenter, position);
     }
 
     template <typename T>
@@ -886,45 +1068,12 @@ namespace vtx
             else
             {
                 params.accumulationQueue->Push(awi);
-            }
-            //printf("Shadow Trace Hit\n");
-            addDebug(RED, swi.originPixel, &params);
-        }
-        else
-        {
-            //printf("Shadow Trace Miss\n");
-            addDebug(BLUE, swi.originPixel, &params);
-        }
-        /*if (hit == false)
-        {
-            AccumulationWorkItem awi;
-            awi.radiance = math::vec3f(1.0f, 0.0f, 0.0f);
-            awi.depth = swi.depth;
-            awi.originPixel = swi.originPixel;
-            if (architecture == A_FULL_OPTIX)
-            {
-                accumulateRay(awi, &params);
-            }
-            else
-            {
-                params.accumulationQueue->Push(awi);
+                if (params.settings->useNetwork)
+                {
+                    params.networkInterface->paths->validateLightSample(swi);
+                }
             }
         }
-        else
-        {
-            AccumulationWorkItem awi;
-            awi.radiance = math::vec3f(0.0f, 0.0f, 1.0f);
-            awi.depth = swi.depth;
-            awi.originPixel = swi.originPixel;
-            if (architecture == A_FULL_OPTIX)
-            {
-                accumulateRay(awi, &params);
-            }
-            else
-            {
-                params.accumulationQueue->Push(awi);
-            }
-        }*/
     }
 
     __forceinline__ __device__ void elaborateRadianceTrace(TraceWorkItem& twi, LaunchParams& params, ArchitectureType architecture = A_WAVEFRONT_CUDA_SHADE)
@@ -933,7 +1082,7 @@ namespace vtx
         prd.seed = twi.seed;
         prd.originPixel = twi.originPixel;
         prd.depth = twi.depth;
-        prd.origin = twi.origin;
+        prd.hitProperties.position = twi.origin;
         prd.direction = twi.direction;
         prd.radiance = twi.radiance;
         prd.throughput = twi.throughput;
@@ -985,7 +1134,13 @@ namespace vtx
         {
             if (hit)
             {
-                params.shadeQueue->Push(prd);
+                int shadeQueueIndex = params.shadeQueue->Push(prd);
+
+                if(neuralSamplingActivated(&params, prd.depth))
+                {
+                    prd.hitProperties.calculateForInferenceQuery(&params);
+                    int inferenceQueueIndex = params.networkInterface->inferenceQueries->addInferenceQuery(prd, shadeQueueIndex);
+                }
             }
             else
             {
@@ -1008,6 +1163,7 @@ namespace vtx
         if (queueWorkId == 0)
         {
             params.shadeQueue->Reset();
+            params.networkInterface->inferenceQueries->reset();
         }
 
         int radianceTraceQueueSize = params.radianceTraceQueue->Size();

@@ -84,7 +84,11 @@ namespace vtx::optix
 		CUresult  cuRes = cuCtxGetCurrent(&state.cudaContext);
 		VTX_ASSERT_CLOSE(cuRes == CUDA_SUCCESS, "Optix Wrapper : Error querying current context: error code {}", cuRes);
 
-		OPTIX_CHECK(optixDeviceContextCreate(state.cudaContext, nullptr, &state.optixContext));
+		OptixDeviceContextOptions options = {};
+		options.validationMode = OPTIX_DEVICE_CONTEXT_VALIDATION_MODE_ALL;
+		options.logCallbackFunction = &context_log_cb;
+		options.logCallbackLevel = 4;
+		OPTIX_CHECK(optixDeviceContextCreate(state.cudaContext, &options, &state.optixContext));
 		OPTIX_CHECK(optixDeviceContextSetLogCallback(state.optixContext, context_log_cb, nullptr, 4));
 		if((getOptions()->isDebug && !(getOptions()->enableCache)) || !getOptions()->enableCache)
 		{
@@ -639,7 +643,7 @@ namespace vtx::optix
 	{
 		VTX_INFO("Optix Wrapper: Computing BLAS");
 
-		CUDA_SYNC_CHECK();
+		//CUDA_SYNC_CHECK();
 
 		OptixDeviceContext& optixContext = getState()->optixContext;
 		CUstream& stream = getState()->stream;
@@ -705,7 +709,7 @@ namespace vtx::optix
 									outputBuffer.bytesSize(),
 									&traversable,
 									&emitDesc, 1));
-		CUDA_SYNC_CHECK();
+		//CUDA_SYNC_CHECK();
 
 		/// Compaction ///
 		uint64_t compactedSize;
@@ -725,7 +729,7 @@ namespace vtx::optix
 
 			auto savedBytes = outputBuffer.bytesSize() - compactedSize;
 			VTX_INFO("Optix Wrapper: Compacted GAS, saved {} bytes", savedBytes);
-			CUDA_SYNC_CHECK();
+			//CUDA_SYNC_CHECK();
 			outputBuffer.free(); // << the UNcompacted, temporary output buffer
 		}
 
@@ -761,7 +765,7 @@ namespace vtx::optix
 
 	OptixTraversableHandle createInstanceAcceleration(const std::vector<OptixInstance>& optixInstances)
 	{
-		CUDA_SYNC_CHECK();
+		//CUDA_SYNC_CHECK();
 		VTX_INFO("Optix Wrapper: Computing TLAS");
 
 		auto& optixContext = optix::getState()->optixContext;
@@ -815,7 +819,7 @@ namespace vtx::optix
 									&TopTraversable,
 									nullptr, 0));
 
-		CUDA_SYNC_CHECK();
+		//CUDA_SYNC_CHECK();
 
 		/// Clean Up ///
 		tempBuffer.free();

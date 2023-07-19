@@ -2,11 +2,9 @@ include "PremakeScripts/path.lua"
 
 
 workspace "Vortex"
-
-    configurations { "Debug", "Release" }
+    configurations {"Debug", "Release"}
     architecture "x64"
     startproject "OptixApp"
-
     
 	filter "system:windows"
     systemversion "latest"
@@ -21,19 +19,13 @@ workspace "Vortex"
         runtime "Release"
         optimize "on"
         defines { "NDEBUG" }
-
-    filter "configurations:Dist"
-        runtime "Release"
-        optimize "on"
-        symbols "off"
-        defines { "NDEBUG" }
-
     
 group "Dependencies"
     include "ext/glfw/glfw.lua"
     include "ext/imgui/imgui.lua"
     include "ext/glad/glad.lua"
     include "ext/imnodes/imnode.lua"
+    include "ext/implot/implot.lua"
 group ""
 
 group "Core"

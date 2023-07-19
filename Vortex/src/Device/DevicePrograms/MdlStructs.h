@@ -2,6 +2,7 @@
 #ifndef MDL_STRUCT_H
 #define MDL_STRUCT_H
 #include "Device/DevicePrograms/RayData.h"
+#include "Device/DevicePrograms/HitProperties.h"
 
 namespace vtx::mdl
 {
@@ -86,34 +87,26 @@ namespace vtx::mdl
         math::vec3f      ior;
         float            opacity;
         bool             isThinWalled;
-
         // We export these as well to not compute them twice
-        bool             isFrontFace;
-        math::vec3f      trueNormal;
-        math::vec3f tangent;
-        math::vec3f uv;
-    };
+        BsdfEvalResult         neuralBsdfEvaluation;
+
+	};
 
     struct MdlRequest
     {
-        bool                                       bsdfEvaluation = false;
-        bool                                       bsdfSample     = false;
-        bool                                       auxiliary      = false;
-        bool                                       edf            = false;
-        bool                                       opacity        = false;
-        bool                                       ior            = false;
-        math::vec3f                                position;
-        math::vec3f                                baricenter;
-        math::vec3f                                outgoingDirection;
-        math::vec3f                                toSampledLight;
-        math::vec3f                                surroundingIor;
-        const InstanceData*                        instance;
-        const GeometryData*                        geometry;
-        TextureHandler*                             textureHandler;
-        char* argBlock;
-        int                                        triangleId;
-        unsigned*                                   seed;
-
-    };
+		bool           bsdfEvaluation = false;
+		bool           bsdfSample     = false;
+		bool           auxiliary      = false;
+		bool           edf            = false;
+		bool           opacity        = false;
+		bool           ior            = false;
+		math::vec3f    outgoingDirection;
+		math::vec3f    toSampledLight;
+		math::vec3f    surroundingIor;
+		unsigned*      seed;
+		HitProperties* hitProperties;
+		bool           evalOnNeuralSampling = false;
+		math::vec3f    toNeuralSample;
+	};
 }
 #endif

@@ -1,6 +1,5 @@
 ﻿#pragma once
 #include "Device/DevicePrograms/LaunchParams.h"
-#include "Device/UploadCode/UploadData.h"
 
 
 namespace vtx::graph
@@ -11,8 +10,8 @@ namespace vtx::graph
 		int                                       maxBounces;
 		int                                       maxSamples;
 		bool                                      accumulate;
-		RendererDeviceSettings::SamplingTechnique samplingTechnique;
-		RendererDeviceSettings::DisplayBuffer     displayBuffer;
+		SamplingTechnique samplingTechnique;
+		DisplayBuffer     displayBuffer;
 		bool                                      isUpdated;
 		float                                     minClamp;
 		float                                     maxClamp;
@@ -37,5 +36,6 @@ namespace vtx::graph
 		bool                                      runOnSeparateThread;
 		float                                     longPathPercentage;
 		bool                                      useLongPathKernel;
+		bool                                      useNetwork;
 	};
 }

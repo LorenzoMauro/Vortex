@@ -165,6 +165,134 @@ namespace vtx::device
 			}
 		};
 
+		struct PathsBuffer
+		{
+			CUDABuffer pathStructBuffer;
+			CUDABuffer positionBuffer;
+			CUDABuffer normalBuffer;
+			CUDABuffer woBuffer;
+			CUDABuffer bsWiBuffer;
+			CUDABuffer bsBsdfBuffer;
+			CUDABuffer bsRadianceBuffer;
+			CUDABuffer isBsValidBuffer;
+			CUDABuffer lsPositionBuffer;
+			CUDABuffer lsBsdfBuffer;
+			CUDABuffer lsRadianceBuffer;
+			CUDABuffer isLsValidBuffer;
+			CUDABuffer isBounceValidBuffer;
+			CUDABuffer maxActualDepthBuffer;
+			CUDABuffer validPixelsBuffer;
+			CUDABuffer lsNormalBuffer;
+
+			~PathsBuffer()
+			{
+				pathStructBuffer.free();
+				positionBuffer.free();
+				normalBuffer.free();
+				woBuffer.free();
+				bsWiBuffer.free();
+				bsBsdfBuffer.free();
+				bsRadianceBuffer.free();
+				isBsValidBuffer.free();
+				lsPositionBuffer.free();
+				lsBsdfBuffer.free();
+				lsRadianceBuffer.free();
+				isLsValidBuffer.free();
+				isBounceValidBuffer.free();
+				maxActualDepthBuffer.free();
+				validPixelsBuffer.free();
+			}
+		};
+
+		struct NetworkStateBuffers
+		{
+			CUDABuffer networkStateStructBuffer;
+			CUDABuffer positionBuffer;
+			CUDABuffer normalBuffer;
+			CUDABuffer woBuffer;
+			CUDABuffer encodedPositionBuffer;
+			CUDABuffer encodedNormalBuffer;
+			CUDABuffer encodedWoBuffer;
+
+			~NetworkStateBuffers()
+			{
+				networkStateStructBuffer.free();
+				positionBuffer.free();
+				normalBuffer.free();
+				woBuffer.free();
+				encodedPositionBuffer.free();
+				encodedNormalBuffer.free();
+				encodedWoBuffer.free();
+			}
+		};
+
+		struct ReplayBufferBuffers
+		{
+			CUDABuffer replayBufferStructBuffer;
+			CUDABuffer actionBuffer;
+			CUDABuffer rewardBuffer;
+			CUDABuffer nextActionBuffer;
+			CUDABuffer doneBuffer;
+			CUDABuffer maxSize;
+			NetworkStateBuffers stateBuffer;
+			NetworkStateBuffers nextStatesBuffer;
+
+			~ReplayBufferBuffers()
+			{
+				replayBufferStructBuffer.free();
+				actionBuffer.free();
+				rewardBuffer.free();
+				nextActionBuffer.free();
+				doneBuffer.free();
+				maxSize.free();
+			}
+		};
+
+		struct InferenceBuffers
+		{
+			CUDABuffer inferenceStructBuffer;
+			NetworkStateBuffers stateBuffer;
+			CUDABuffer meanBuffer;
+			CUDABuffer concentrationBuffer;
+			CUDABuffer inferenceSize;
+			CUDABuffer decodedStateBuffer;
+
+			~InferenceBuffers()
+			{
+				inferenceStructBuffer.free();
+				meanBuffer.free();
+				concentrationBuffer.free();
+				inferenceSize.free();
+				decodedStateBuffer.free();
+			}
+		};
+
+		struct NetworkInterfaceBuffer
+		{
+			PathsBuffer pathsBuffers;
+			ReplayBufferBuffers replayBufferBuffers;
+			InferenceBuffers inferenceBuffers;
+
+			CUDABuffer networkInterfaceBuffer;
+			CUDABuffer        seedsBuffer;
+
+			CUDABuffer debugBuffer1Buffer;
+			CUDABuffer debugBuffer2Buffer;
+			CUDABuffer debugBuffer3Buffer;
+
+			~NetworkInterfaceBuffer()
+			{
+				pathsBuffers.~PathsBuffer();
+				replayBufferBuffers.~ReplayBufferBuffers();
+				inferenceBuffers.~InferenceBuffers();
+				networkInterfaceBuffer.free();
+				seedsBuffer.free();
+				debugBuffer1Buffer.free();
+				debugBuffer2Buffer.free();
+				debugBuffer3Buffer.free();
+			}
+		};
+
 		struct NoiseComputationBuffers
 		{
 			CUDABuffer radianceRangeBuffer;
@@ -358,6 +486,7 @@ namespace vtx::device
 		std::map<vtxID, FrameBufferBuffers>  frameBuffer;
 		std::map<vtxID, LightBuffers>        light;
 		std::map<vtxID, NoiseComputationBuffers>        noiseComputationBuffer;
+		NetworkInterfaceBuffer								networkInterfaceBuffer;
 		CUDABuffer                           frameIdBuffer;
 		CUDABuffer                           launchParamsBuffer;
 		CUDABuffer                           rendererSettingsBuffer;

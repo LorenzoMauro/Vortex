@@ -4,6 +4,7 @@
 #include "Device/DevicePrograms/ToneMapper.h"
 #include "Device/DevicePrograms/LaunchParams.h"
 #include "Device/Wrappers/dWrapper.h"
+#include "NeuralNetworks/ReplayBuffer.h"
 
 namespace vtx
 {
@@ -114,22 +115,22 @@ namespace vtx
 		switch (settings->displayBuffer)
 		{
 
-		case(RendererDeviceSettings::DisplayBuffer::FB_BEAUTY):
+		case(FB_BEAUTY):
 		{
-				if(beauty!= nullptr)
-				{
-					input = beauty;
-					dotoneMap = true;
-				}
-				else
-				{
-					input = frameBuffer->tmRadiance;
-					dotoneMap = false;
-				}
-				normalizeBySamples = false;
+			if (beauty != nullptr)
+			{
+				input = beauty;
+				dotoneMap = true;
+			}
+			else
+			{
+				input = frameBuffer->tmRadiance;
+				dotoneMap = false;
+			}
+			normalizeBySamples = false;
 		}
 		break;
-		case(RendererDeviceSettings::DisplayBuffer::FB_NOISY):
+		case(FB_NOISY):
 		{
 			input = frameBuffer->tmRadiance;
 			dotoneMap = false;
@@ -137,72 +138,88 @@ namespace vtx
 		}
 		break;
 
-		case(RendererDeviceSettings::DisplayBuffer::FB_DIFFUSE):
+		case(FB_DIFFUSE):
 		{
-				input = frameBuffer->albedoNormalized;
-				dotoneMap = false;
-				normalizeBySamples = false;
+			input = frameBuffer->albedoNormalized;
+			dotoneMap = false;
+			normalizeBySamples = false;
 		}
 		break;
-		case(RendererDeviceSettings::DisplayBuffer::FB_ORIENTATION):
+		case(FB_ORIENTATION):
 		{
-				input = frameBuffer->orientation;
-				dotoneMap = false;
+			input = frameBuffer->orientation;
+			dotoneMap = false;
 		}
 		break;
-		case(RendererDeviceSettings::DisplayBuffer::FB_TRUE_NORMAL):
+		case(FB_TRUE_NORMAL):
 		{
-				input = frameBuffer->trueNormal;
-				dotoneMap = false;
+			input = frameBuffer->trueNormal;
+			dotoneMap = false;
 		}
 		break;
-		case(RendererDeviceSettings::DisplayBuffer::FB_SHADING_NORMAL):
+		case(FB_SHADING_NORMAL):
 		{
-				input = frameBuffer->normalNormalized;
-				dotoneMap = false;
-				normalizeBySamples = false;
+			input = frameBuffer->normalNormalized;
+			dotoneMap = false;
+			normalizeBySamples = false;
 		}
 		break;
-		case(RendererDeviceSettings::DisplayBuffer::FB_TANGENT):
+		case(FB_TANGENT):
 		{
-				input = frameBuffer->tangent;
-				dotoneMap = false;
+			input = frameBuffer->tangent;
+			dotoneMap = false;
 		}
 		break;
-		case(RendererDeviceSettings::DisplayBuffer::FB_UV):
+		case(FB_UV):
 		{
-				input = frameBuffer->uv;
-				dotoneMap = false;
+			input = frameBuffer->uv;
+			dotoneMap = false;
 		}
 		break;
-		case(RendererDeviceSettings::DisplayBuffer::FB_NOISE):
+		case(FB_NOISE):
 		{
-			math:: vec3f value = floatToScientificRGB(frameBuffer->noiseBuffer[fbIndex].noiseAbsolute);
+			math::vec3f value = floatToScientificRGB(frameBuffer->noiseBuffer[fbIndex].noiseAbsolute);
 			outputBuffer[fbIndex] = math::vec4f(value, 1.0f);
 		}
 		break;
-		case(RendererDeviceSettings::DisplayBuffer::FB_SAMPLES):
+		case(FB_SAMPLES):
 		{
-			//const int maxPossibleSample = (launchParams->frameBuffer.frameSize.x * launchParams->frameBuffer.frameSize.y) * (launchParams->settings->iteration - launchParams->settings->minAdaptiveSamples) + launchParams->settings->iteration;
-			//const int samplesDeltaRange = maxPossibleSample - launchParams->settings->minAdaptiveSamples;
-			//const int samplesDelta = frameBuffer->samples[fbIndex] - launchParams->settings->minAdaptiveSamples;
-			//float sampleMetric = (float)samplesDelta / (float)samplesDeltaRange;
-			float sampleMetric = (float)(frameBuffer->samples[fbIndex] - launchParams->settings->minAdaptiveSamples)/ (float)(launchParams->settings->iteration- launchParams->settings->minAdaptiveSamples);
+			float sampleMetric = (float)(frameBuffer->samples[fbIndex] - launchParams->settings->minAdaptiveSamples) / (float)(launchParams->settings->iteration - launchParams->settings->minAdaptiveSamples);
 			sampleMetric *= 0.01f;
 			sampleMetric = toneMap(launchParams->toneMapperSettings, math::vec3f(sampleMetric)).x;
-			//sampleMetric = toneMap(launchParams->toneMapperSettings, math::vec3f(launchParams->frameBuffer.noiseBuffer[fbIndex].adaptiveSamples)).x;
 
 			math::vec3f value = floatToScientificRGB(sampleMetric);
-			//math::vec3f value = floatToScientificRGB(ACESFitted(frameBuffer->noiseBuffer[fbIndex].adaptiveSamples).x);
 			outputBuffer[fbIndex] = math::vec4f(value, 1.0f);
 		}
 		break;
-		case(RendererDeviceSettings::DisplayBuffer::FB_DEBUG_1):
+		case(FB_DEBUG_1):
 		{
 			outputBuffer[fbIndex] = math::vec4f(frameBuffer->debugColor1[fbIndex], 1.0f);
 			dotoneMap = false;
 		}
 		break;
+		case(FB_NETWORK_INFERENCE_STATE_POSITION):
+		case(FB_NETWORK_INFERENCE_STATE_NORMAL):
+		case(FB_NETWORK_INFERENCE_OUTGOING_DIRECTION):
+		case(FB_NETWORK_INFERENCE_MEAN):
+		case(FB_NETWORK_INFERENCE_CONCENTRATION):
+		case(FB_NETWORK_INFERENCE_SAMPLE):
+		case(FB_NETWORK_INFERENCE_PDF):
+		case(FB_NETWORK_INFERENCE_IS_FRONT_FACE):
+		{
+			outputBuffer[fbIndex] = math::vec4f{ launchParams->networkInterface->debugBuffer2[fbIndex], 1.0f };
+		}
+		break;
+		case(FB_NETWORK_REPLAY_BUFFER_REWARD):
+		{
+			const float value = launchParams->networkInterface->debugBuffer1[fbIndex].x / (float)launchParams->networkInterface->debugBuffer1[fbIndex].z;
+			outputBuffer[fbIndex] = math::vec4f(floatToScientificRGB(value), 1.0f);
+		}
+		break;
+		case(FB_NETWORK_REPLAY_BUFFER_SAMPLES):
+		{
+			outputBuffer[fbIndex] = math::vec4f(launchParams->networkInterface->debugBuffer3[fbIndex], 1.0f);
+		}
 		}
 
 		if(input!=nullptr)

@@ -3,6 +3,7 @@
 #include "Core/Log.h"
 #include "imgui.h"
 #include "imnodes.h"
+#include "implot.h"
 #include "Core/ImguiBackEnds/imgui_impl_glfw.h"
 #include "Core/ImguiBackEnds/imgui_impl_opengl3.h"
 #include "Core/Options.h"
@@ -82,6 +83,7 @@ namespace vtx {
         IMGUI_CHECKVERSION();
         ImGui::CreateContext();
         ImNodes::CreateContext();
+        ImPlot::CreateContext();
 
         ImGuiIO& io = ImGui::GetIO();
         io.DeltaTime = 1.0f / 1000000.0f;
@@ -308,6 +310,7 @@ namespace vtx {
         ImGui_ImplGlfw_Shutdown();
         ImNodes::DestroyContext();
         ImGui::DestroyContext();
+        ImPlot::DestroyContext();
 
         IMGUI_API
     }

@@ -1,4 +1,5 @@
 ﻿#pragma once
+#include <cuda.h>
 #include "MdlWrapper.h"
 #include <map>
 namespace vtx::mdl

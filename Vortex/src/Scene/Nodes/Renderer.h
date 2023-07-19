@@ -11,7 +11,6 @@
 
 #include "RendererSettings.h"
 #include "Device/DevicePrograms/WavefrontIntegrator.h"
-
 namespace vtx::graph
 {
 
@@ -57,9 +56,6 @@ namespace vtx::graph
 		void copyToGl();
 		void  setWindow(GLFWwindow* window);
 
-		int getWavefrontLaunches();
-		KernelTimes& getWaveFrontTimes();
-
 	public:
 		//GL Interop
 		WaveFrontIntegrator								waveFrontIntegrator;
@@ -79,15 +75,6 @@ namespace vtx::graph
 
 		vtx::Timer timer;
 
-		float noiseComputationTime;
-		float traceComputationTime;
-		float postProcessingComputationTime;
-		float displayComputationTime;
-		float frameTime;
-		float fps;
-		float totalTimeSeconds;
-		float sppS;
-		float averageFrameTime;
 		float overallTime;
 		int internalIteration = 0;
 

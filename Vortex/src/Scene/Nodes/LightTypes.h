@@ -21,6 +21,7 @@ namespace vtx
 		math::vec3f position;
 		math::vec3f direction;
 		math::vec3f radianceOverPdf;
+		math::vec3f normal;
 		float       distance;
 		float       pdf;
 		bool        isValid = false;

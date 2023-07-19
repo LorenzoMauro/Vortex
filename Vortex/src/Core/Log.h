@@ -1,8 +1,8 @@
 #pragma once
-#include "spdlog/spdlog.h"
-#include "spdlog/sinks/stdout_color_sinks.h"
 #include <memory>
 #include <iostream>
+#include "spdlog/spdlog.h"
+#include "spdlog/sinks/stdout_color_sinks.h"
 
 namespace vtx
 {
@@ -34,29 +34,10 @@ inline void waitAndClose() {
     std::exit(EXIT_FAILURE);
 }
 
-//#define VTX_ASSERT(successCondition, operation, ...) do { \
-//    if (!successCondition) { \
-//        switch(operation) \
-//		{\
-//			case CLOSE: \
-//				VTX_ERROR(__VA_ARGS__); \
-//				waitAndClose(); \
-//				break; \
-//			case RETURN: \
-//				VTX_WARN(__VA_ARGS__); \
-//				return; \
-//				break; \
-//			case CONTINUE: \
-//				break; \
-//		}\
-//    }\
-//} while(0)
-
-
-
 #define VTX_ASSERT_CLOSE(successCondition, ...) do { \
     if (!(successCondition)) { \
 		VTX_ERROR(__VA_ARGS__); \
+		__debugbreak(); \
 		waitAndClose(); \
 	}\
 } while(0)

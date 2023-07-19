@@ -1,6 +1,5 @@
 #include "DeviceVisitor.h"
 #include "CUDAChecks.h"
-#include "WorkQueues.h"
 #include "MDL/mdlWrapper.h"
 #include "Device/OptixWrapper.h"
 #include "Scene/Graph.h"
@@ -195,24 +194,6 @@ namespace vtx::device
 		if (uploadData->materialDataMap.isUpdated)
 		{
 			uploadData->materialDataMap.isUpdated = false;
-			/*int maxQueueSize = uploadData->frameBufferData.frameSize.x* uploadData->frameBufferData.frameSize.x;
-			int materialQueueSize = uploadData->materialDataMap.size;
-
-			std::vector<WorkQueueSOA<RayWorkItem>*> materialQueueVector;
-			for(int i = 0; i< materialQueueSize; i++)
-			{
-				WorkQueueSOA<RayWorkItem> workQueue(maxQueueSize, "MaterialQueue");
-				CUDABuffer workQueueBuffer;
-				workQueueBuffer.upload(workQueue);
-				materialQueueVector.push_back(workQueueBuffer.castedPointer<WorkQueueSOA<RayWorkItem>>());
-			}
-
-			CUDABuffer materialQueueBufferArray;
-			materialQueueBufferArray.upload(materialQueueVector);
-			UPLOAD_DATA->launchParams.materialQueue = materialQueueBufferArray.castedPointer<WorkQueueSOA<RayWorkItem>*>();
-			optix::createMaterialStreamVector(uploadData->materialDataMap.size);
-			VTX_WARN("Material queue size : {}", materialQueueSize);
-			isLaunchParamsUpdated = true;*/
 		}
 
 		if(uploadData->isFrameBufferUpdated)

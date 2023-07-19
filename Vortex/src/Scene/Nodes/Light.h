@@ -3,6 +3,7 @@
 #include "Material.h"
 #include "Mesh.h"
 #include "Transform.h"
+#include "Device/DevicePrograms/LaunchParams.h"
 #include "MDL/MdlWrapper.h"
 #include "Scene/Node.h"
 #include "Scene/Utility/Operations.h"
@@ -132,7 +133,7 @@ namespace vtx::graph
 
 
 				// The triangle area is half of the parallelogram area (length of cross product).
-				const float area = math::length<float>(cross(e0, e1)) * 0.5f;
+				const float area = math::length(cross(e0, e1)) * 0.5f;
 				//const float area = dp::math::length(e0 ^ e1) * 0.5f;
 
 				areaSurface += area;

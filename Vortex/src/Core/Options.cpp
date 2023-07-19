@@ -1,4 +1,5 @@
 #include "Options.h"
+#include "Device/DevicePrograms/LaunchParams.h"
 
 namespace vtx {
 
@@ -25,11 +26,12 @@ namespace vtx {
 
 		options.runOnSeparateThread = false;
 		options.maxBounces = 10;
-		options.maxSamples = 1000;
+		options.maxSamples = 100000;
 		options.accumulate = true;
 		options.useRussianRoulette = true;
-		options.samplingTechnique = RendererDeviceSettings::SamplingTechnique::S_MIS;
-		options.displayBuffer = RendererDeviceSettings::DisplayBuffer::FB_BEAUTY;
+		options.samplingTechnique = SamplingTechnique::S_BSDF
+		;
+		options.displayBuffer = DisplayBuffer::FB_BEAUTY;
 		options.maxClamp = 0.01f;
 		options.minClamp = 1000.0f;
 		options.noiseKernelSize = 3;
@@ -51,6 +53,8 @@ namespace vtx {
 		options.longPathPercentage = 0.25f;
 		options.useLongPathKernel = false;
 
+		options.useNetwork = true;
+
 		options.enableDenoiser = false;
 		options.denoiserStart = 10;
 		options.denoiserBlend = 0.1f;
@@ -61,6 +65,29 @@ namespace vtx {
 		options.crushBlacks = 1.0f;
 		options.saturation = 1.0f;
 		options.gamma = 2.2f; // Typical gamma value for sRGB color space
+
+		////////////////////////////////////////////////////////////////////////////////////
+		/////////////////// Neural Network Options /////////////////////////////////////////
+		////////////////////////////////////////////////////////////////////////////////////
+		options.networkType = network::NetworkType::NT_SAC;
+		options.batchSize   = 100000;
+
+		options.polyakFactor = 0.00001f;
+		options.maxTrainingStepPerFrame = 1;
+		options.inferenceIterationStart = 0;
+		options.clearOnInferenceStart = true;
+		options.logAlphaStart = 0.0f;
+		options.neuralGamma = 0.99f;
+		options.doInference = false;
+		options.neuralSampleFraction = 0.9f;
+
+		float errorPopLr = 1.0f;
+		float goodLr = 0.00001f;
+		options.policyLr = goodLr;
+		options.qLr = options.policyLr;
+		options.alphaLr = options.policyLr;
+
+		options.autoencoderLr = 0.0001f;
 
 		////////////////////////////////////////////////////////////////////////////////////
 		/////////////////// Optix Options //////////////////////////////////////////////////
