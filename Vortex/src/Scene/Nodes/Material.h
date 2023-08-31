@@ -189,26 +189,28 @@ namespace vtx::graph
 		{
 		}
 
-		void init();
+		void init() override;
 
 		size_t getArgumentBlockSize();
 
 		char* getArgumentBlockData();
 
-		void traverse(const std::vector<std::shared_ptr<NodeVisitor>>& orderedVisitors) override;
 
 		void dispatchParameters(std::vector<shader::ParameterInfo> params);
 
 		std::string getMaterialDbName();
 		FunctionNames&         getFunctionNames(bool cuda = false);
 
-		//void accept(std::shared_ptr<NodeVisitor> visitor) override;
+		std::vector<std::shared_ptr<Node>> getChildren() const override;
 
+	protected:
+		void accept(NodeVisitor& visitor) override;
+		//void traverseChildren(NodeVisitor& visitor) override;
+	public:
 		std::shared_ptr<graph::shader::ShaderNode>                   materialGraph;
 		mi::base::Handle<mi::neuraylib::ITarget_argument_block>      argBlock;
 		//std::map<std::string, std::vector<graph::ParamInfo>>         params;
 		std::map<std::string, std::shared_ptr<shader::EnumTypeInfo>> mapEnumTypes;
-		bool                                                         isInitialized = false;
 		bool                                                         useAsLight    = false;
 
 

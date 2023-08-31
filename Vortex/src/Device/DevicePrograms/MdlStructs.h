@@ -14,6 +14,24 @@ namespace vtx::mdl
 
     typedef mi::neuraylib::Bsdf_event_type BsdfEventType;
 
+    __forceinline__ __device__ const char* bsdfEventTypeName(const BsdfEventType& eventType) {
+        switch (eventType) {
+        case mi::neuraylib::BSDF_EVENT_ABSORB: return "BSDF_EVENT_ABSORB";
+        case mi::neuraylib::BSDF_EVENT_DIFFUSE: return "BSDF_EVENT_DIFFUSE";
+        case mi::neuraylib::BSDF_EVENT_GLOSSY: return "BSDF_EVENT_GLOSSY";
+        case mi::neuraylib::BSDF_EVENT_SPECULAR: return "BSDF_EVENT_SPECULAR";
+        case mi::neuraylib::BSDF_EVENT_REFLECTION: return "BSDF_EVENT_REFLECTION";
+        case mi::neuraylib::BSDF_EVENT_TRANSMISSION: return "BSDF_EVENT_TRANSMISSION";
+        case mi::neuraylib::BSDF_EVENT_DIFFUSE_REFLECTION: return "BSDF_EVENT_DIFFUSE_REFLECTION";
+        case mi::neuraylib::BSDF_EVENT_DIFFUSE_TRANSMISSION: return "BSDF_EVENT_DIFFUSE_TRANSMISSION";
+        case mi::neuraylib::BSDF_EVENT_GLOSSY_REFLECTION: return "BSDF_EVENT_GLOSSY_REFLECTION";
+        case mi::neuraylib::BSDF_EVENT_GLOSSY_TRANSMISSION: return "BSDF_EVENT_GLOSSY_TRANSMISSION";
+        case mi::neuraylib::BSDF_EVENT_SPECULAR_REFLECTION: return "BSDF_EVENT_SPECULAR_REFLECTION";
+        case mi::neuraylib::BSDF_EVENT_SPECULAR_TRANSMISSION: return "BSDF_EVENT_SPECULAR_TRANSMISSION";
+        case mi::neuraylib::BSDF_EVENT_FORCE_32_BIT: return "BSDF_EVENT_FORCE_32_BIT";
+        default: return "UNKNOWN_BSDF_EVENT_TYPE";
+        }
+    }
 
     struct MdlData
     {
@@ -40,6 +58,7 @@ namespace vtx::mdl
         math::vec3f diffuse;
         math::vec3f glossy;
         float       pdf;
+        float       bsdfPdf;
         bool        isValid = false;
     };
 
@@ -47,6 +66,7 @@ namespace vtx::mdl
     {
         math::vec3f   nextDirection;
         float         pdf;
+        float         bsdfPdf;
         math::vec3f   bsdfOverPdf;
         BsdfEventType eventType = mi::neuraylib::BSDF_EVENT_ABSORB;
         bool          isValid = false;

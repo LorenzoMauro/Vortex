@@ -2,8 +2,10 @@
 
 #include "ModelLoader.h"
 #include "Core/Math.h"
+#include "Serialization/Serializer.h"
 #include "MDL/ShaderVisitor.h"
 #include "Scene/Graph.h"
+#include "Scene/Scene.h"
 #include "Scene/Nodes/Shader/mdl/ShaderNodes.h"
 
 namespace vtx::ops
@@ -165,6 +167,18 @@ namespace vtx::ops
 		return mesh;
 	}
 
+	std::shared_ptr<graph::Camera> standardCamera()
+	{
+		std::shared_ptr<Camera> camera = ops::createNode<Camera>();
+		camera->transform->rotateDegree(math::xAxis, 90.0f);
+		camera->transform->rotateDegree(camera->horizontal, -15.0f);
+		camera->transform->translate(math::yAxis, -2.0f*3);
+		camera->transform->rotateDegree(math::zAxis, -90.0f);
+		camera->transform->translate(math::zAxis, 2.0f);
+		camera->updateDirections();
+		return camera;
+	}
+
 	//    // A simple unit cube built from 12 triangles.
 	//    std::shared_ptr<Mesh> createBox()
 	//    {
@@ -318,12 +332,6 @@ namespace vtx::ops
 	//        computeTangents(mesh->vertices, mesh->indices);
 	//        return mesh;
 	//    }
-
-	void applyTransformation(graph::TransformAttribute& transformation, const math::affine3f& affine)
-	{
-		transformation.affineTransform = transformation.affineTransform * affine;
-		transformation.updateFromAffine();
-	}
 
 	std::shared_ptr<graph::Mesh> createPlane(float width, float height)
 	{
@@ -531,20 +539,17 @@ namespace vtx::ops
 	{
 		VTX_INFO("Computing vertex tangents Space for Mesh {}", mesh->getID());
 		std::vector<VertexAttributes>& vertices = mesh->vertices;
-		std::vector<vtxID>&            indices  = mesh->indices;
+		std::vector<vtxID>& indices = mesh->indices;
 		// Initialize normals, tangents, and bitangents to zero
-		for (auto& vertex : mesh->vertices)
+		for (auto& vertex : vertices)
 		{
-			vertex.normal    = math::vec3f(0.0f, 0.0f, 0.0f);
-			vertex.tangent   = math::vec3f(0.0f, 0.0f, 0.0f);
+			vertex.normal = math::vec3f(0.0f, 0.0f, 0.0f);
+			vertex.tangent = math::vec3f(0.0f, 0.0f, 0.0f);
 			vertex.bitangent = math::vec3f(0.0f, 0.0f, 0.0f);
 		}
 
 		for (size_t i = 0; i < indices.size(); i += 3)
 		{
-			int             faceIndex = i / 3;
-			FaceAttributes& faceAttr  = mesh->faceAttributes[faceIndex];
-
 			// Get triangle mesh->vertices
 			VertexAttributes& v0 = vertices[indices[i]];
 			VertexAttributes& v1 = vertices[indices[i + 1]];
@@ -557,7 +562,7 @@ namespace vtx::ops
 
 			// Compute face normal
 			math::vec3f normal = cross(e1, e2);
-			normal             = math::normalize(normal);
+			normal = math::normalize(normal);
 
 			// Update face attributes
 			//FaceAttributes faceAttr;
@@ -566,48 +571,30 @@ namespace vtx::ops
 			math::vec3f deltaUv1 = v1.texCoord - v0.texCoord;
 			math::vec3f deltaUv2 = v2.texCoord - v0.texCoord;
 
-			if (deltaUv1.x == 0.0f && deltaUv1.y == 0.0f && deltaUv1.z == 0.0f)
+			if (
+				deltaUv1 == deltaUv2 ||
+				math::isZero(deltaUv1) || math::isZero(deltaUv2) ||
+				math::isZero(cross(deltaUv1, deltaUv2)))
 			{
 				deltaUv1 = math::vec3f(1.0f, 0.0f, 0.0f);
-			}
-			if (deltaUv2.x == 0.0f && deltaUv2.y == 0.0f && deltaUv2.z == 0.0f)
-			{
 				deltaUv2 = math::vec3f(0.0f, 1.0f, 0.0f);
 			}
 
 			// Compute tangent and bitangent
 			float determinant = deltaUv1.x * deltaUv2.y - deltaUv1.y * deltaUv2.x;
 			float f           = 1.0f / determinant;
-			//float f = 1.0f / (deltaUv1.x * deltaUv2.y - deltaUv2.x * deltaUv1.y);
 			math::vec3f tangent = (e1 * deltaUv2.y - e2 * deltaUv1.y) * f;
 
 			math::vec3f bitangent;
-			if (true)
+			bitangent = cross(normal, tangent);
+
+			if (determinant < 0.0f)
 			{
-				bitangent = cross(normal, tangent);
-
-				if (determinant < 0.0f)
-				{
-					tangent *= -1.0f;
-					//bitangent *= -1.0f;
-				}
-				//tangent = math::normalize(tangent);
-
-
-				float handedness = (dot(cross(normal, tangent), bitangent) < 0.0f) ? -1.0f : 1.0f;
-				//float handedness = (dot(cross(normal, tangent), bitangent) * determinant < 0.0f) ? -1.0f : 1.0f;
-
-				//if(determinant < 0.0f)
-				//{
-				//    handedness *= -1.0f;
-				//}
-				bitangent *= handedness;
-			}
-			else
-			{
-				bitangent = (e2 * deltaUv1.x - e1 * deltaUv2.x) * f;
+				tangent *= -1.0f;
 			}
 
+			float handedness = (dot(cross(normal, tangent), bitangent) < 0.0f) ? -1.0f : 1.0f;
+			bitangent *= handedness;
 
 			// Accumulate normals, tangents, and bitangents at each vertex
 			v0.normal += normal;
@@ -624,33 +611,58 @@ namespace vtx::ops
 		}
 
 		// Normalize and orthogonalize vertex normals and tangents
+		int i = 0;
 		for (auto& vertex : vertices)
 		{
 			math::vec3f& n = vertex.normal;
 			math::vec3f& t = vertex.tangent;
 			math::vec3f& b = vertex.bitangent;
-			n              = math::normalize(n);
 
-			if (true)
+			if(math::isZero(n))
 			{
-				t -= n * dot(n, t);
-				t = math::normalize(t);
+				n = math::vec3f(0.0f, 0.0f, 1.0f);
+				VTX_WARN("Normal Vector was Zero in mesh Id: {}, vertex index {}", mesh->getID(), i);
+			}
+			if(math::isZero(t))
+			{
+				t = math::vec3f(1.0f, 0.0f, 0.0f);
+				VTX_WARN("Tangent Vector was Zero in mesh Id: {}, vertex index {}", mesh->getID(), i);
+			}
+			if (math::isZero(b))
+			{
+				b = math::vec3f(0.0f, 1.0f, 0.0f);
+				VTX_WARN("Bitangent Vector was Zero in mesh Id: {}, vertex index {}", mesh->getID(), i);
+			}
 
-				b -= n * dot(n, b);
-				b = math::normalize(b);
-			}
-			else
+			n = math::normalize(n);
+			if (math::isNan(n))
 			{
-				//n = math::normalize(n);
-				////t = math::normalize(t);
-				////b = math::normalize(b);
-				t = math::normalize(t - dot(n, t) * t);
-				b = math::normalize(b - dot(n, b) * n - dot(t, b) * t);
-				//float handedness = (dot(cross(t, b), n) > 0.0f) ? 1.0f : -1.0f;
-				//b = handedness*cross(n, t);
+				n = math::vec3f(0.0f, 0.0f, 1.0f);
+				VTX_WARN("Normal Vector was Nan in mesh Id: {}, vertex index {}", mesh->getID(), i);
 			}
+
+			t -= n * dot(n, t);
+			t = math::normalize(t);
+
+			b -= n * dot(n, b);
+			b = math::normalize(b);
+
+			if (math::isNan(t))
+			{
+				t = math::vec3f(1.0f, 0.0f, 0.0f);
+				VTX_WARN("Tangent Vector was Nan in mesh Id: {}, vertex index {}", mesh->getID(), i);
+			}
+			if (math::isNan(b))
+			{
+				b = math::vec3f(0.0f, 1.0f, 0.0f);
+				VTX_WARN("Bitangent Vector was Nan in mesh Id: {}, vertex index {}", mesh->getID(), i);
+			}
+
+			VTX_ASSERT_CLOSE(!math::isNan(n));
+			VTX_ASSERT_CLOSE(!math::isNan(t));
+			VTX_ASSERT_CLOSE(!math::isNan(b));
+			i++;
 		}
-
 		mesh->status.hasTangents = true;
 		mesh->status.hasNormals  = true;
 	}
@@ -730,9 +742,8 @@ namespace vtx::ops
 		//std::string envMapPath =  getOptions()->dataFolder  + "16x16-in-1024x1024.png";
 		//std::string envMapPath =  getOptions()->dataFolder  + "sunset03_EXR.exr";
 		//std::string envMapPath =  getOptions()->dataFolder  + "morning07_EXR.exr";
-		const std::shared_ptr<Light> envLight = ops::createNode<Light>();
-		const auto                   attrib   = std::make_shared<EvnLightAttributes>(envMapPath);
-		envLight->attributes                  = attrib;
+		const std::shared_ptr<EnvironmentLight> envLight = ops::createNode<EnvironmentLight>();
+		envLight->envTexture                  = ops::createNode<Texture>(envMapPath);
 		sceneRoot->addChild(envLight);
 		//std::string envMapPath = getOptions()->dataFolder + "belfast_sunset_puresky_4k.hdr";
 		//std::string envMapPath = getOptions()->dataFolder + "mpumalanga_veld_puresky_4k.hdr";
@@ -749,7 +760,7 @@ namespace vtx::ops
 	}
 
 
-	std::shared_ptr<graph::Group> importedScene()
+	std::tuple<std::shared_ptr<graph::Group>, std::shared_ptr<graph::Camera>> importedScene()
 	{
 		enum TestType
 		{
@@ -794,7 +805,7 @@ namespace vtx::ops
 		{
 			case BLENDER_TEST:
 			{
-				scenePath = getOptions()->dataFolder + "models/Blender/blenderTest11.gltf";
+				scenePath = getOptions()->dataFolder + "models/Blender/blenderTest13.gltf";
 			}break;
 			case SPONZA_OBJ:
 			{
@@ -806,7 +817,17 @@ namespace vtx::ops
 			}break;
 		}
 
-		const std::shared_ptr<graph::Group> sceneRoot = importer::importSceneFile(scenePath);
+		const auto [sceneRoot, cameras] = importer::importSceneFile(scenePath);
+
+		std::shared_ptr<graph::Camera> camera;
+		if(cameras.size() != 0)
+		{
+			camera = cameras[0];
+		}
+		else
+		{
+			camera = standardCamera();
+		}
 
 		switch (testType)
 		{
@@ -908,12 +929,20 @@ namespace vtx::ops
 			case STUDIO_SMALL_03: {envMapPath = getOptions()->dataFolder + "Hdri/" + "studio_small_03_1k.hdr"; } break;
 			}
 
-			const std::shared_ptr<Light> envLight = ops::createNode<Light>();
-			const auto                   attrib   = std::make_shared<EvnLightAttributes>(envMapPath);
-			envLight->attributes                  = attrib;
-			//sceneRoot->addChild(envLight);
+			const std::shared_ptr<EnvironmentLight> envLight = ops::createNode<EnvironmentLight>();
+			envLight->envTexture = ops::createNode<Texture>(envMapPath);
+			sceneRoot->addChild(envLight);
 		}
 
-		return sceneRoot;
+		return {sceneRoot, camera};
+	}
+
+	void startUpOperations()
+	{
+		std::shared_ptr<Scene> scene = Scene::getScene();
+
+		std::string yamlPath = "E:/Dev/VortexOptix/data/Yaml/test01.yaml";
+		
+		serializer::deserialize(yamlPath, scene);
 	}
 }

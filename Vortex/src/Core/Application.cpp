@@ -6,6 +6,7 @@
 #include "Device/PipelineConfiguration.h"
 #include "Layers/MaterialEditorLayer.h"
 #include "Layers/ViewportLayer.h"
+#include "Layers/ExperimentsLayer.h"
 
 namespace vtx
 {
@@ -26,11 +27,11 @@ namespace vtx
 
 		createLayer<AppLayer>();
 
-		scene.start();
-		scene.renderer->setWindow(window);
+		ops::startUpOperations();
+		graph::Scene::getScene()->renderer->setWindow(window);
 		createLayer<MaterialEditorLayer>();
-		createLayer<ViewportLayer>(scene.renderer);
-		//m_scene.renderer->ElaborateScene();
+		createLayer<ViewportLayer>();
+		createLayer<ExperimentsLayer>();
 	}
 
 	void Application::shutDown() {
@@ -81,6 +82,14 @@ namespace vtx
 		glfwSwapInterval(0); // Enable vsync
 		// Initialize the window
 		glfwSetWindowUserPointer(window, this);
+		glfwSetScrollCallback(window, 
+			[](GLFWwindow* window, double xOffset, double yOffset)
+			{
+				ImGuiIO& io = ImGui::GetIO();
+				io.MouseWheelH += (float)xOffset;
+				io.MouseWheel += (float)yOffset;
+			}
+		);
 		//glfwSetFramebufferSizeCallback(m_Window, FramebufferResizeCallback);
 	}
 

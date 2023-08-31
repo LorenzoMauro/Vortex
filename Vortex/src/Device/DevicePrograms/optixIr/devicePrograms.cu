@@ -81,9 +81,9 @@ namespace vtx
 
 		for (int i = 0; i < samplesPerLaunch; i++)
 		{
-			twi.seed = tea<4>(fbIndex + i, optixLaunchParams.settings->iteration + *optixLaunchParams.frameID);
+			twi.seed = tea<4>(fbIndex + i, optixLaunchParams.settings->renderer.iteration + *optixLaunchParams.frameID);
 			generateCameraRay(fbIndex, &optixLaunchParams, twi);
-			for (int i = 0; i < optixLaunchParams.settings->maxBounces; i++)
+			for (int i = 0; i < optixLaunchParams.settings->renderer.maxBounces; i++)
 			{
 				elaborateRadianceTrace(twi, optixLaunchParams, A_FULL_OPTIX);
 				if(!twi.extendRay)

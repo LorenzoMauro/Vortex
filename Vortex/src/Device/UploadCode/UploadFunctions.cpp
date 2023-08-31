@@ -1,19 +1,15 @@
 ﻿#include "UploadFunctions.h"
 #include "UploadData.h"
 #include "Device/CUDAChecks.h"
-#include "Scene/Nodes/Instance.h"
-#include "Scene/Nodes/Renderer.h"
+#include "Scene/Graph.h"
 #include <cudaGL.h>
 
 #include "Device/Wrappers/SoaWorkItems.h"
 #include "Device/Wrappers/WorkItems.h"
 
-#include "Device/DevicePrograms/CudaKernels.h"
 #include "Device/DevicePrograms/randomNumberGenerator.h"
 #include "MDL/CudaLinker.h"
-#include "NeuralNetworks/ReplayBuffer.h"
-#include "Scene/SIM.h"
-#include "Scene/Nodes/Shader/Texture.h"
+#include "NeuralNetworks/Interface/NetworkInterface.h"
 
 namespace vtx::device
 {
@@ -55,14 +51,14 @@ namespace vtx::device
 				slotIds.material = std::get<1>(materialDataMap[materialId]);
 
 				if (vtxID lightId = materialSlot.meshLight->getID(); lightDataMap.contains(lightId)) {
-					instanceData.hasEmission = materialSlot.material->useAsLight;
+					instanceData.hasEmission = std::dynamic_pointer_cast<graph::Material>(materialSlot.material)->useAsLight;
 					slotIds.meshLight = std::get<1>(lightDataMap[lightId]);
 				}
 
 				if(!instanceData.hasOpacity)
 				{
 					auto materialNode = graph::SIM::getNode<graph::Material>(materialId);
-					if (bool hasOpacity = materialNode->useOpacity())
+					if (materialNode->useOpacity())
 					{
 						instanceData.hasOpacity = true;
 					}
@@ -93,86 +89,72 @@ namespace vtx::device
 		return { instanceData, instanceDataBuffer.castedPointer<InstanceData>() };
 	}
 
-	std::tuple<LightData, LightData*> createLightData(std::shared_ptr<graph::Light> lightNode)
+
+	std::tuple<LightData, LightData*> createMeshLightData(const std::shared_ptr<graph::MeshLight>& meshLight)
+	{
+		LightData lightData;
+		MeshLightAttributesData meshLightData;
+
+		CUDABuffer& areaCdfBuffer = GET_BUFFER(Buffers::LightBuffers, meshLight->getID(), areaCdfBuffer);
+		areaCdfBuffer.upload(meshLight->cdfAreas);
+
+		CUDABuffer& actualTriangleIndices = GET_BUFFER(Buffers::LightBuffers, meshLight->getID(), actualTriangleIndices);
+		actualTriangleIndices.upload(meshLight->actualTriangleIndices);
+
+		vtxID meshId = meshLight->mesh->getID();
+		vtxID materialId = meshLight->material->getID();
+		GeometryData* geometryData = std::get<1>(UPLOAD_DATA->geometryDataMap[meshId]);
+		MaterialData* materialData = std::get<1>(UPLOAD_DATA->materialDataMap[materialId]);
+
+		meshLightData.instanceId = meshLight->parentInstanceId;
+		meshLightData.geometryData = geometryData;
+		meshLightData.materialId = materialData;
+		meshLightData.cdfArea = areaCdfBuffer.castedPointer<float>();
+		meshLightData.actualTriangleIndices = actualTriangleIndices.castedPointer<uint32_t>();
+		meshLightData.size = meshLight->cdfAreas.size();
+		meshLightData.totalArea = meshLight->area;
+
+		CUDABuffer& attributeBuffer = GET_BUFFER(Buffers::LightBuffers, meshLight->getID(), attributeBuffer);
+		attributeBuffer.upload(meshLightData);
+
+		lightData.type = L_MESH;
+		lightData.attributes = attributeBuffer.dPointer();
+
+		CUDABuffer& lightDataBuffer = GET_BUFFER(Buffers::LightBuffers, meshLight->getID(), lightDataBuffer);
+		lightDataBuffer.upload(lightData);
+		return { lightData, lightDataBuffer.castedPointer<LightData>() };
+
+	}
+
+	std::tuple<LightData, LightData*> createEnvLightData(std::shared_ptr<graph::EnvironmentLight> envLight)
 	{
 		LightData lightData{};
-		if (lightNode->attributes->lightType == L_MESH)
-		{
-			MeshLightAttributesData meshLightData{};
+		
+		EnvLightAttributesData envLightData{};
 
-			const auto& attributes = std::dynamic_pointer_cast<graph::MeshLightAttributes>(lightNode->attributes);
+		CUDABuffer& aliasBuffer = GET_BUFFER(Buffers::LightBuffers, envLight->getID(), aliasBuffer);
+		aliasBuffer.upload(envLight->aliasMap);
 
-			CUDABuffer& areaCdfBuffer = GET_BUFFER(Buffers::LightBuffers, lightNode->getID(), areaCdfBuffer);
-			areaCdfBuffer.upload(attributes->cdfAreas);
+		TextureData* texture = std::get<1>(UPLOAD_DATA->textureDataMap[envLight->envTexture->getID()]);
+		envLightData.texture = texture;
+		envLightData.transformation = envLight->transform->affineTransform;
+		envLightData.invTransformation = math::affine3f(envLightData.transformation.l.inverse(), envLightData.transformation.p);
+		envLightData.aliasMap = aliasBuffer.castedPointer<AliasData>();
 
-			CUDABuffer& actualTriangleIndices = GET_BUFFER(Buffers::LightBuffers, lightNode->getID(), actualTriangleIndices);
-			actualTriangleIndices.upload(attributes->actualTriangleIndices);
+		CUDABuffer& attributeBuffer = GET_BUFFER(Buffers::LightBuffers, envLight->getID(), attributeBuffer);
+		attributeBuffer.upload(envLightData);
 
-			vtxID meshId = attributes->mesh->getID();
-			vtxID materialId = attributes->material->getID();
-			GeometryData* geometryData = std::get<1>(UPLOAD_DATA->geometryDataMap[meshId]);
-			MaterialData* materialData = std::get<1>(UPLOAD_DATA->materialDataMap[materialId]);
+		lightData.type = L_ENV;
+		lightData.attributes = attributeBuffer.dPointer();
 
-			meshLightData.instanceId            = attributes->parentInstanceId;
-			meshLightData.geometryData			= geometryData;
-			meshLightData.materialId            = materialData;
-			meshLightData.cdfArea               = areaCdfBuffer.castedPointer<float>();
-			meshLightData.actualTriangleIndices = actualTriangleIndices.castedPointer<uint32_t>();
-			meshLightData.size                  = attributes->cdfAreas.size();
-			meshLightData.totalArea             = attributes->area;
-
-			CUDABuffer& attributeBuffer = GET_BUFFER(Buffers::LightBuffers, lightNode->getID(), attributeBuffer);
-			attributeBuffer.upload(meshLightData);
-
-			lightData.type       = L_MESH;
-			lightData.attributes = attributeBuffer.dPointer();
-		}
-		else if(lightNode->attributes->lightType == L_ENV)
-		{
-			EnvLightAttributesData envLightData{};
-
-			const auto& attributes = std::dynamic_pointer_cast<graph::EvnLightAttributes>(lightNode->attributes);
-
-			//CUDABuffer& cdfUBuffer = GET_BUFFER(Buffers::LightBuffers, lightNode->getID(), cdfUBuffer);
-			//cdfUBuffer.upload(attributes->cdfU);
-			//
-			//CUDABuffer& cdfVBuffer = GET_BUFFER(Buffers::LightBuffers, lightNode->getID(), cdfVBuffer);
-			//cdfVBuffer.upload(attributes->cdfV);
-
-			CUDABuffer& aliasBuffer = GET_BUFFER(Buffers::LightBuffers, lightNode->getID(), aliasBuffer);
-			aliasBuffer.upload(attributes->aliasMap);
-
-			TextureData* texture = std::get<1>(UPLOAD_DATA->textureDataMap[attributes->envTexture->getID()]);
-			envLightData.texture = texture;
-			//envLightData.invIntegral = attributes->invIntegral;
-			//envLightData.cdfU = cdfUBuffer.castedPointer<float>();
-			//envLightData.cdfV = cdfVBuffer.castedPointer<float>();
-			envLightData.transformation = attributes->transform->transformationAttribute.affineTransform;
-			envLightData.invTransformation = math::affine3f(envLightData.transformation.l.inverse(), envLightData.transformation.p);
-			envLightData.aliasMap = aliasBuffer.castedPointer<AliasData>();
-
-
-
-			CUDABuffer& attributeBuffer = GET_BUFFER(Buffers::LightBuffers, lightNode->getID(), attributeBuffer);
-			attributeBuffer.upload(envLightData);
-
-			lightData.type = L_ENV;
-			lightData.attributes = attributeBuffer.dPointer();
-		}
-
-		CUDABuffer& lightDataBuffer = GET_BUFFER(Buffers::LightBuffers, lightNode->getID(), lightDataBuffer);
+		CUDABuffer& lightDataBuffer = GET_BUFFER(Buffers::LightBuffers, envLight->getID(), lightDataBuffer);
 		lightDataBuffer.upload(lightData);
 		return { lightData, lightDataBuffer.castedPointer<LightData>() };
 	}
 
-	std::tuple<GeometryData, GeometryData*> createGeometryData(std::shared_ptr<graph::Mesh> meshNode)
+	std::tuple<GeometryData, GeometryData*> createGeometryData(const std::shared_ptr<graph::Mesh>& meshNode)
 	{
 		VTX_INFO("Computing BLAS");
-
-		//CUDA_SYNC_CHECK();
-
-		OptixDeviceContext& optixContext = optix::getState()->optixContext;
-		CUstream&           stream       = optix::getState()->stream;
 
 		/// Uploading Vertex and Index Buffer ///
 
@@ -195,7 +177,7 @@ namespace vtx::device
 			static_cast<uint32_t>(meshNode->indices.size()),
 			sizeof(vtxID) * 3);
 
-		GeometryData data{};
+		GeometryData data;
 
 		data.type                = PT_TRIANGLES;
 		data.traversable         = traversable;
@@ -213,7 +195,7 @@ namespace vtx::device
 		return tuple;
 	}
 
-	DeviceShaderConfiguration* createDeviceShaderConfiguration(std::shared_ptr<graph::Material> material)
+	DeviceShaderConfiguration* createDeviceShaderConfiguration(const std::shared_ptr<graph::Material>& material)
 	{
 		const graph::DevicePrograms& dp = material->getPrograms();
 		const graph::Configuration& config = material->getConfiguration();
@@ -346,9 +328,9 @@ namespace vtx::device
 		return materialConfigBuffer.castedPointer<DeviceShaderConfiguration>();
 	}
 
-	TextureHandler* createTextureHandler(std::shared_ptr<graph::Material> material)
+	TextureHandler* createTextureHandler(const std::shared_ptr<graph::Material>& material)
 	{
-		TextureHandler textureHandler;
+		TextureHandler textureHandler{};
 
 		const CudaMap<vtxID, std::tuple<TextureData, TextureData*>>& textureDataMap = UPLOAD_DATA->textureDataMap;
 		const CudaMap<vtxID, std::tuple<BsdfData, BsdfData*>>& bsdfDataMap = UPLOAD_DATA->bsdfDataMap;
@@ -449,12 +431,10 @@ namespace vtx::device
 		
 	}
 
-	std::tuple<MaterialData, MaterialData*> createMaterialData(std::shared_ptr<graph::Material> material, int matQueueId)
+	std::tuple<MaterialData, MaterialData*> createMaterialData(const std::shared_ptr<graph::Material>& material, int matQueueId)
 	{
 
-		//CUDA_SYNC_CHECK();
-
-		MaterialData materialData   = {}; // Set everything to zero.
+		MaterialData materialData; // Set everything to zero.
 		CUDABuffer&  argBlockBuffer = GET_BUFFER(Buffers::MaterialBuffers, material->getID(), argBlockBuffer);
 		// If the material has an argument block, allocate and upload it.
 		if (const size_t sizeArgumentBlock = material->getArgumentBlockSize(); sizeArgumentBlock > 0)
@@ -475,7 +455,7 @@ namespace vtx::device
 
 	}
 
-	std::tuple<TextureData, TextureData *> createTextureData(std::shared_ptr<vtx::graph::Texture>& textureNode)
+	std::tuple<TextureData, TextureData *> createTextureData(const std::shared_ptr<vtx::graph::Texture>& textureNode)
 	{
 		VTX_INFO("Creating Texture Data for Texture Node ID: {} Name: {}", textureNode->getID(), textureNode->databaseName);
 		CUDA_ARRAY3D_DESCRIPTOR descArray3D = {};
@@ -537,7 +517,7 @@ namespace vtx::device
 		cudaTextureObject_t& texObj = GET_BUFFER(Buffers::TextureBuffers, textureNode->getID(), texObj);
 		cudaTextureObject_t& texObjUnfiltered = GET_BUFFER(Buffers::TextureBuffers, textureNode->getID(), texObjUnfiltered);
 
-		CUDA_RESOURCE_DESC resourceDescription = uploadTexture(textureNode->imageLayersPointers, descArray3D, textureNode->pixelBytesSize, textureArray);
+		const CUDA_RESOURCE_DESC resourceDescription = uploadTexture(textureNode->imageLayersPointers, descArray3D, textureNode->pixelBytesSize, textureArray);
 
 
 		result = cuTexObjectCreate(&texObj, &resourceDescription, &textureDesc, nullptr);
@@ -556,9 +536,9 @@ namespace vtx::device
 		return { textureData, textureDataBuffer.castedPointer<TextureData>() };
 	}
 
-	BsdfSamplingPartData createBsdfPartData(graph::BsdfMeasurement::BsdfPartData& bsdfData, Buffers::BsdfPartBuffer& buffers)
+	BsdfSamplingPartData createBsdfPartData(const graph::BsdfMeasurement::BsdfPartData& bsdfData, Buffers::BsdfPartBuffer& buffers)
 	{
-		BsdfSamplingPartData bsdfSamplingData{};
+		BsdfSamplingPartData bsdfSamplingData;
 		CUDABuffer& sampleData = buffers.sampleData;
 		CUDABuffer& albedoData = buffers.albedoData;
 		CUtexObject& evalData = buffers.evalData;
@@ -579,7 +559,7 @@ namespace vtx::device
 		// - In case of color data, we store each sample in a vector4 to get texture support.
 
 		// Allocate a 3D array on the GPU (phi_delta x theta_out x theta_in)
-		CUDA_ARRAY3D_DESCRIPTOR descArray3D = {};
+		CUDA_ARRAY3D_DESCRIPTOR descArray3D;
 
 		descArray3D.Width = bsdfData.angularResolution.y;
 		descArray3D.Height = bsdfData.angularResolution.x;
@@ -591,7 +571,7 @@ namespace vtx::device
 		std::vector<const void*> pointers;
 		pointers.push_back(bsdfData.lookupData.data());
 
-		CUDA_RESOURCE_DESC resourceDescription = uploadTexture(pointers, descArray3D, sizeof(float), buffers.lookUpArray);
+		const CUDA_RESOURCE_DESC resourceDescription = uploadTexture(pointers, descArray3D, sizeof(float), buffers.lookUpArray);
 
 		bsdfSamplingData.deviceMbsdfData = buffers.lookUpArray;
 
@@ -620,7 +600,7 @@ namespace vtx::device
 		return bsdfSamplingData;
 	}
 
-	std::tuple < BsdfData, BsdfData *> createBsdfData(std::shared_ptr<graph::BsdfMeasurement> bsdfMeasurement)
+	std::tuple < BsdfData, BsdfData *> createBsdfData(const std::shared_ptr<graph::BsdfMeasurement>& bsdfMeasurement)
 	{
 		BsdfData bsdfData;
 		if (bsdfMeasurement->reflectionBsdf.isValid)
@@ -716,80 +696,152 @@ namespace vtx::device
 		return { lightProfileData, bsdfDataBuffer.castedPointer<LightProfileData>() };
 	}
 
-#define PREPARE_BUFFER(cudaBuffer, bufferPoitner, dataType)\
-	CUDABuffer& cudaBuffer = GET_BUFFER(Buffers::FrameBufferBuffers, rendererNode->getID(), cudaBuffer); \
-	cudaBuffer.resize((size_t)rendererNode->width* (size_t)rendererNode->height * sizeof(dataType)); \
-	UPLOAD_DATA->frameBufferData.bufferPoitner = cudaBuffer.castedPointer<dataType>()\
-
-	void setRendererData(std::shared_ptr<graph::Renderer> rendererNode)
+	void uploadNetworkData(
+		network::Network& network,
+		const int& maxBounces,
+		const int& width,
+		const int& height,
+		const ToneMapperSettings& toneMapperSettings,
+		NetworkInterface::WhatChanged& changed)
 	{
-		//auto* tW = new float4[3];
-		//tW[0] = float4{ 1.0f, 0.0f, 0.0f, 0.0f };
-		//tW[1] = float4{ 0.0f, 1.0f, 0.0f, 0.0f };
-		//tW[2] = float4{ 1.0f, 0.0f, 2.0f, 0.0f };
-		//
-		//const float4* tt = tW;
-		//
-		//const math::affine3f objectToWorld(tt);
+		if (network.settings.isDatasetSizeUpdated)
+		{
+			changed.maxDatasetSize = true;
+			network.settings.isDatasetSizeUpdated = false;
+		}
 
-		bool updateQueues = false;
+		if (network.settings.pathGuidingSettings.isUpdated)
+		{
+			changed.distributionType = true;
+			network.settings.pathGuidingSettings.isUpdated = false;
+		}
+
+		const int              totPixels = width * height;
+		UPLOAD_DATA->launchParams.networkInterface = NetworkInterface::upload(
+			totPixels,
+			network.settings.batchSize * network.settings.maxTrainingStepPerFrame,
+			maxBounces,
+			UPLOAD_DATA->frameId,
+			network.settings.pathGuidingSettings.distributionType,
+			network.settings.pathGuidingSettings.mixtureSize,
+			toneMapperSettings,
+			changed);
+
+		if(network.settings.isAnyUpdated())
+		{
+			UPLOAD_DATA->settings.neural = network.settings;
+			UPLOAD_DATA->isSettingsUpdated = true;
+
+			network.settings.resetUpdate();
+		}
+	}
+
+
+	void uploadWavefrontData(WaveFrontIntegrator& wavefrontIntegrator, const int& width, const int& height, bool isResized, bool isMaxBounceChanged)
+	{
+		if(isResized || isMaxBounceChanged)
+		{
+			int totPixels = width * height;
+			UPLOAD_DATA->isSettingsUpdated = true;
+
+			const int maxShadowQueue = totPixels * (wavefrontIntegrator.rendererSettings->maxBounces + 1);
+			const int maxAccumulationQueue = totPixels * (wavefrontIntegrator.rendererSettings->maxBounces + 1); // each bounce can produce an emissive hit
+
+			CUDABufferManager::deallocateAll();
+
+			const WorkQueueSOA<TraceWorkItem> radianceTraceQueue(totPixels, "radianceTraceQueue");
+
+			UPLOAD_DATA->launchParams.radianceTraceQueue = UPLOAD_BUFFERS->workQueueBuffers.radianceTraceQueueBuffer.upload(radianceTraceQueue);
+
+			const WorkQueueSOA<RayWorkItem> shadeQueue(totPixels, "shadeQueue");
+			UPLOAD_DATA->launchParams.shadeQueue = UPLOAD_BUFFERS->workQueueBuffers.shadeQueueBuffer.upload(shadeQueue);
+
+			const WorkQueueSOA<EscapedWorkItem> escapedQueue(totPixels, "escapedQueue");
+			UPLOAD_DATA->launchParams.escapedQueue = UPLOAD_BUFFERS->workQueueBuffers.escapedQueueBuffer.upload(escapedQueue);
+
+			const WorkQueueSOA<AccumulationWorkItem> accumulationQueue(maxShadowQueue, "accumulationQueue");
+			UPLOAD_DATA->launchParams.accumulationQueue = UPLOAD_BUFFERS->workQueueBuffers.accumulationQueueBuffer.upload(accumulationQueue);
+
+			const WorkQueueSOA<ShadowWorkItem> shadowQueue(maxAccumulationQueue, "shadowQueue");
+			UPLOAD_DATA->launchParams.shadowQueue = UPLOAD_BUFFERS->workQueueBuffers.shadowQueueBuffer.upload(shadowQueue);
+
+			Counters counters{};
+			UPLOAD_DATA->launchParams.queueCounters = UPLOAD_BUFFERS->workQueueBuffers.countersBuffer.upload(counters);
+
+			UPLOAD_DATA->isWorkQueueUpdated = true;
+		}
+
+		if(wavefrontIntegrator.settings.isUpdated)
+		{
+			UPLOAD_DATA->settings.wavefront = wavefrontIntegrator.settings;
+			UPLOAD_DATA->isSettingsUpdated = true;
+			wavefrontIntegrator.settings.isUpdated = false;
+		}
+
+		//Neural Network
+		{
+			NetworkInterface::WhatChanged changed;
+			if (isMaxBounceChanged)
+			{
+				changed.maxDepth = true;
+			}
+
+			if (isResized)
+			{
+				changed.numberOfPixels = true;
+			}
+
+			uploadNetworkData(wavefrontIntegrator.network, wavefrontIntegrator.rendererSettings->maxBounces, width, height, wavefrontIntegrator.rendererSettings->toneMapperSettings, changed);
+		}
+	}
+
+	void setRendererData(const std::shared_ptr<graph::Renderer>& rendererNode)
+	{
+		const bool isResized = rendererNode->resized;
 		if (rendererNode->resized) {
 
 			rendererNode->threadData.bufferUpdateReady = false;
 
-			CUDABuffer& cudaOutputBuffer = GET_BUFFER(Buffers::FrameBufferBuffers, rendererNode->getID(), cudaOutputBuffer);
-			cudaOutputBuffer.resize((size_t)rendererNode->width * (size_t)rendererNode->height * sizeof(math::vec4f));
-			UPLOAD_DATA->frameBufferData.outputBuffer = cudaOutputBuffer.dPointer();
+			const uint32_t& width          = rendererNode->width;
+			const uint32_t& height         = rendererNode->height;
+			const vtxID     rendererNodeId = rendererNode->getID();
 
-
-			PREPARE_BUFFER(rawRadiance, radianceAccumulator, math::vec3f);
-			PREPARE_BUFFER(albedo, albedoAccumulator, math::vec3f);
-			PREPARE_BUFFER(normal, normalAccumulator, math::vec3f);
-
-			//PREPARE_BUFFER(directLight, directLight, math::vec3f);
-			//PREPARE_BUFFER(diffuseIndirect, diffuseIndirect, math::vec3f);
-			//PREPARE_BUFFER(glossyIndirect, glossyIndirect, math::vec3f);
-			//PREPARE_BUFFER(transmissionIndirect, transmissionIndirect, math::vec3f);
-			PREPARE_BUFFER(tmRadiance, tmRadiance, math::vec3f);
-			PREPARE_BUFFER(hdriRadiance, hdriRadiance, math::vec3f);
-			PREPARE_BUFFER(normalNormalized, normalNormalized, math::vec3f);
-			PREPARE_BUFFER(albedoNormalized, albedoNormalized, math::vec3f);
-			//PREPARE_BUFFER(tmTransmissionIndirect, tmTransmissionIndirect, math::vec3f);
-			PREPARE_BUFFER(trueNormal, trueNormal, math::vec3f);
-			PREPARE_BUFFER(tangent, tangent, math::vec3f);
-			PREPARE_BUFFER(orientation, orientation, math::vec3f);
-			PREPARE_BUFFER(uv, uv, math::vec3f);
-			PREPARE_BUFFER(debugColor1, debugColor1, math::vec3f);
-			PREPARE_BUFFER(fireflyRemoval, fireflyPass, math::vec3f);
-			PREPARE_BUFFER(samples, samples, int);
+			UPLOAD_DATA->frameBufferData.outputBuffer = (CUdeviceptr)(GET_BUFFER(Buffers::FrameBufferBuffers, rendererNodeId, cudaOutputBuffer).alloc<math::vec4f>(width*height));
+			UPLOAD_DATA->frameBufferData.radianceAccumulator = GET_BUFFER(Buffers::FrameBufferBuffers, rendererNodeId, rawRadiance).alloc<math::vec3f>(width*height);
+			UPLOAD_DATA->frameBufferData.albedoAccumulator = GET_BUFFER(Buffers::FrameBufferBuffers, rendererNodeId, albedo).alloc<math::vec3f>(width*height);
+			UPLOAD_DATA->frameBufferData.normalAccumulator = GET_BUFFER(Buffers::FrameBufferBuffers, rendererNodeId, normal).alloc<math::vec3f>(width*height);
+			UPLOAD_DATA->frameBufferData.tmRadiance = GET_BUFFER(Buffers::FrameBufferBuffers, rendererNodeId, tmRadiance).alloc<math::vec3f>(width*height);
+			UPLOAD_DATA->frameBufferData.hdriRadiance = GET_BUFFER(Buffers::FrameBufferBuffers, rendererNodeId, hdriRadiance).alloc<math::vec3f>(width*height);
+			UPLOAD_DATA->frameBufferData.normalNormalized = GET_BUFFER(Buffers::FrameBufferBuffers, rendererNodeId, normalNormalized).alloc<math::vec3f>(width*height);
+			UPLOAD_DATA->frameBufferData.albedoNormalized = GET_BUFFER(Buffers::FrameBufferBuffers, rendererNodeId, albedoNormalized).alloc<math::vec3f>(width*height);
+			UPLOAD_DATA->frameBufferData.trueNormal = GET_BUFFER(Buffers::FrameBufferBuffers, rendererNodeId, trueNormal).alloc<math::vec3f>(width*height);
+			UPLOAD_DATA->frameBufferData.tangent = GET_BUFFER(Buffers::FrameBufferBuffers, rendererNodeId, tangent).alloc<math::vec3f>(width*height);
+			UPLOAD_DATA->frameBufferData.orientation = GET_BUFFER(Buffers::FrameBufferBuffers, rendererNodeId, orientation).alloc<math::vec3f>(width*height);
+			UPLOAD_DATA->frameBufferData.uv = GET_BUFFER(Buffers::FrameBufferBuffers, rendererNodeId, uv).alloc<math::vec3f>(width*height);
+			UPLOAD_DATA->frameBufferData.debugColor1 = GET_BUFFER(Buffers::FrameBufferBuffers, rendererNodeId, debugColor1).alloc<math::vec3f>(width*height);
+			UPLOAD_DATA->frameBufferData.fireflyPass = GET_BUFFER(Buffers::FrameBufferBuffers, rendererNodeId, fireflyRemoval).alloc<math::vec3f>(width * height);
+			UPLOAD_DATA->frameBufferData.samples = GET_BUFFER(Buffers::FrameBufferBuffers, rendererNodeId, samples).alloc<int>(width*height);
 
 			optix::getState()->denoiser.resize(rendererNode->width, rendererNode->height);
 
 			//TODO Smarter way to set these value, I don't want to waste memory if we are not using adaptive samplig
 			{
-				PREPARE_BUFFER(noiseDataBuffer, noiseBuffer, NoiseData);
+				UPLOAD_DATA->frameBufferData.noiseBuffer = GET_BUFFER(Buffers::FrameBufferBuffers, rendererNodeId, noiseDataBuffer).alloc<NoiseData>(width*height);
 
 				const int size = rendererNode->width * rendererNode->height;
 				constexpr int threadsPerBlock = 256;
 				const int numBlocks = (size + threadsPerBlock - 1) / threadsPerBlock;
 
-				CUDABuffer& radianceRangeBuffer = GET_BUFFER(Buffers::NoiseComputationBuffers, rendererNode->getID(), radianceRangeBuffer);
-				radianceRangeBuffer.resize(numBlocks * sizeof(math::vec2f));
-
-				CUDABuffer& albedoRangeBuffer = GET_BUFFER(Buffers::NoiseComputationBuffers, rendererNode->getID(), albedoRangeBuffer);
-				albedoRangeBuffer.resize(numBlocks * sizeof(math::vec2f));
-
-				CUDABuffer& normalRangeBuffer = GET_BUFFER(Buffers::NoiseComputationBuffers, rendererNode->getID(), normalRangeBuffer);
-				normalRangeBuffer.resize(numBlocks * sizeof(math::vec2f));
+				GET_BUFFER(Buffers::NoiseComputationBuffers, rendererNode->getID(), radianceRangeBuffer).resize(numBlocks * sizeof(math::vec2f));
+				GET_BUFFER(Buffers::NoiseComputationBuffers, rendererNode->getID(), albedoRangeBuffer).resize(numBlocks * sizeof(math::vec2f));
+				GET_BUFFER(Buffers::NoiseComputationBuffers, rendererNode->getID(), normalRangeBuffer).resize(numBlocks * sizeof(math::vec2f));
 
 				CUDABuffer& globalRadianceRangeBuffer = GET_BUFFER(Buffers::NoiseComputationBuffers, rendererNode->getID(), globalRadianceRangeBuffer);
 				if(globalRadianceRangeBuffer.castedPointer<void>() == nullptr)
 				{
 					globalRadianceRangeBuffer.alloc(sizeof(math::vec2f));
-					CUDABuffer& globalAlbedoRangeBuffer = GET_BUFFER(Buffers::NoiseComputationBuffers, rendererNode->getID(), globalAlbedoRangeBuffer);
-					globalAlbedoRangeBuffer.alloc(sizeof(math::vec2f));
-					CUDABuffer& globalNormalRangeBuffer = GET_BUFFER(Buffers::NoiseComputationBuffers, rendererNode->getID(), globalNormalRangeBuffer);
-					globalNormalRangeBuffer.alloc(sizeof(math::vec2f));
+					GET_BUFFER(Buffers::NoiseComputationBuffers, rendererNode->getID(), globalAlbedoRangeBuffer).alloc(sizeof(math::vec2f));
+					GET_BUFFER(Buffers::NoiseComputationBuffers, rendererNode->getID(), globalNormalRangeBuffer).alloc(sizeof(math::vec2f));
 				}
 
 			}
@@ -800,139 +852,32 @@ namespace vtx::device
 			rendererNode->resized             = false;
 			UPLOAD_DATA->isFrameBufferUpdated = true;
 			rendererNode->resizeGlBuffer      = true;
-			UPLOAD_DATA->isSettingsUpdated = true;
-			updateQueues = true;
 		}
 
-		if(rendererNode->settings.isUpdated)
+		const bool isMaxBouncesUpdated = rendererNode->settings.isMaxBounceChanged;
+		if(rendererNode->settings.isAnyUpdated())
 		{
-			UPLOAD_DATA->settings.iteration         = rendererNode->settings.iteration;
-			UPLOAD_DATA->settings.accumulate        = rendererNode->settings.accumulate;
-			UPLOAD_DATA->settings.maxBounces        = rendererNode->settings.maxBounces;
-			UPLOAD_DATA->launchParams.remainingBounces = rendererNode->settings.maxBounces;
-			UPLOAD_DATA->settings.displayBuffer     = rendererNode->settings.displayBuffer;
-			UPLOAD_DATA->settings.samplingTechnique = rendererNode->settings.samplingTechnique;
-			UPLOAD_DATA->settings.minClamp          = rendererNode->settings.minClamp;
-			UPLOAD_DATA->settings.maxClamp          = rendererNode->settings.maxClamp;
-			UPLOAD_DATA->settings.parallelShade = rendererNode->settings.parallelShade;
-
-
-			if (rendererNode->settings.adaptiveSampling != UPLOAD_DATA->settings.adaptiveSampling)
-			{
-				updateQueues = true;
-			}
-
-			UPLOAD_DATA->settings.adaptiveSampling = rendererNode->settings.adaptiveSampling;
-			UPLOAD_DATA->settings.minAdaptiveSamples = rendererNode->settings.minAdaptiveSamples;
-			UPLOAD_DATA->settings.minPixelSamples = rendererNode->settings.minPixelSamples;
-
-			if(rendererNode->settings.maxPixelSamples != UPLOAD_DATA->settings.maxPixelSamples)
-			{
-				updateQueues = true;
-			}
-
-			UPLOAD_DATA->settings.maxPixelSamples = rendererNode->settings.maxPixelSamples;
-			UPLOAD_DATA->settings.noiseCutOff = rendererNode->settings.noiseCutOff;
-			UPLOAD_DATA->settings.removeFirefly = rendererNode->settings.removeFireflies;
-			UPLOAD_DATA->settings.enableDenoiser = rendererNode->settings.enableDenoiser;
-			UPLOAD_DATA->settings.useRussianRoulette = rendererNode->settings.useRussianRoulette;
-
-			UPLOAD_DATA->settings.useLongPathKernel = rendererNode->settings.useLongPathKernel;
-			UPLOAD_DATA->settings.longPathPercentage = rendererNode->settings.longPathPercentage;
-
-			UPLOAD_DATA->settings.useNetwork            = rendererNode->settings.useNetwork;
-			network::NetworkSettings& neuralSettings = rendererNode->waveFrontIntegrator.network.getNeuralNetSettings();
-			UPLOAD_DATA->settings.neuralInferenceStart  = neuralSettings.inferenceIterationStart;
-			UPLOAD_DATA->settings.doInference = neuralSettings.doInference;
-			UPLOAD_DATA->settings.clearOnInferenceStart = neuralSettings.clearOnInferenceStart;
-			if(rendererNode->waveFrontIntegrator.network.type == network::NT_SAC)
-			{
-				network::SacSettings& sacSettings = static_cast<network::SacSettings&>(neuralSettings);
-				UPLOAD_DATA->settings.neuralSampleFraction = sacSettings.neuralSampleFraction;
-			}
-			else if( rendererNode->waveFrontIntegrator.network.type == network::NT_NGP)
-			{
-				
-			}
-
+			UPLOAD_DATA->settings.renderer = rendererNode->settings;
 			UPLOAD_DATA->isSettingsUpdated   = true;
-			rendererNode->settings.isUpdated = false;
+			rendererNode->settings.resetUpdate();
 		}
 
-		if (rendererNode->toneMapperSettings.isUpdated)
+		//Wavefront Architecture
 		{
-			UPLOAD_DATA->toneMapperSettings.invWhitePoint = 1.0f/ rendererNode->toneMapperSettings.whitePoint;
-			UPLOAD_DATA->toneMapperSettings.colorBalance = rendererNode->toneMapperSettings.colorBalance;
-			UPLOAD_DATA->toneMapperSettings.burnHighlights = rendererNode->toneMapperSettings.burnHighlights;
-			UPLOAD_DATA->toneMapperSettings.crushBlacks = rendererNode->toneMapperSettings.crushBlacks;
-			UPLOAD_DATA->toneMapperSettings.saturation = rendererNode->toneMapperSettings.saturation;
-			UPLOAD_DATA->toneMapperSettings.invGamma = 1.0f/ rendererNode->toneMapperSettings.gamma;
-
-			UPLOAD_DATA->isToneMapperSettingsUpdated = true;
-			rendererNode->toneMapperSettings.isUpdated = false;
+			uploadWavefrontData(rendererNode->waveFrontIntegrator, rendererNode->width, rendererNode->height, isResized, isMaxBouncesUpdated);
 		}
 
-		if(updateQueues)
-		{
-			int maxPixelSamples = rendererNode->width * rendererNode->height;
-			/*if(UPLOAD_DATA->settings.adaptiveSampling)
-			{
-				maxPixelSamples *= 2;
-			}*/
-			UPLOAD_DATA->settings.maxTraceQueueSize = maxPixelSamples;
-			UPLOAD_DATA->isSettingsUpdated = true;
-
-			const int maxShadowQueue = maxPixelSamples * (rendererNode->settings.maxBounces + 1);
-			const int maxAccumulationQueue = maxPixelSamples * (rendererNode->settings.maxBounces + 1); // each bounce can produce an emissive hit
-
-			CUDABufferManager::deallocateAll();
-
-			const WorkQueueSOA<TraceWorkItem> radianceTraceQueue(maxPixelSamples, "radianceTraceQueue");
-			CUDABuffer radianceTraceQueueBuffer;
-			radianceTraceQueueBuffer.upload(radianceTraceQueue);
-			UPLOAD_DATA->launchParams.radianceTraceQueue = radianceTraceQueueBuffer.castedPointer<WorkQueueSOA<TraceWorkItem>>();
-
-			const WorkQueueSOA<RayWorkItem> shadeQueue(maxPixelSamples, "shadeQueue");
-			CUDABuffer shadeQueueBuffer;
-			shadeQueueBuffer.upload(shadeQueue);
-			UPLOAD_DATA->launchParams.shadeQueue = shadeQueueBuffer.castedPointer<WorkQueueSOA<RayWorkItem>>();
-
-			const WorkQueueSOA<EscapedWorkItem> escapedQueue(maxPixelSamples, "escapedQueue");
-			CUDABuffer escapedQueueBuffer;
-			escapedQueueBuffer.upload(escapedQueue);
-			UPLOAD_DATA->launchParams.escapedQueue = escapedQueueBuffer.castedPointer<WorkQueueSOA<EscapedWorkItem>>();
-
-			const WorkQueueSOA<AccumulationWorkItem> accumulationQueue(maxShadowQueue, "accumulationQueue");
-			CUDABuffer accumulationQueueBuffer;
-			accumulationQueueBuffer.upload(accumulationQueue);
-			UPLOAD_DATA->launchParams.accumulationQueue = accumulationQueueBuffer.castedPointer<WorkQueueSOA<AccumulationWorkItem>>();
-
-			const WorkQueueSOA<ShadowWorkItem> shadowQueue(maxAccumulationQueue, "shadowQueue");
-			CUDABuffer shadowQueueBuffer;
-			shadowQueueBuffer.upload(shadowQueue);
-			UPLOAD_DATA->launchParams.shadowQueue = shadowQueueBuffer.castedPointer<WorkQueueSOA<ShadowWorkItem>>();
-
-			Counters counters{};
-			CUDABuffer countersBuffer;
-			countersBuffer.upload(counters);
-			UPLOAD_DATA->launchParams.queueCounters = countersBuffer.castedPointer<Counters>();
-
-			network::NetworkSettings nnSettings = rendererNode->waveFrontIntegrator.network.getNeuralNetSettings();
-			NetworkInterface networkInterface(maxPixelSamples, nnSettings.batchSize* nnSettings.maxTrainingStepPerFrame, UPLOAD_DATA->settings.maxBounces, UPLOAD_DATA->frameId);
-			CUDABuffer& networkInterfaceBuffer = UPLOAD_BUFFERS->networkInterfaceBuffer.networkInterfaceBuffer;
-			networkInterfaceBuffer.upload(networkInterface);
-			UPLOAD_DATA->launchParams.networkInterface = networkInterfaceBuffer.castedPointer<NetworkInterface>();
-		}
 	}
 
-	void setCameraData(std::shared_ptr<graph::Camera> cameraNode)
+	void setCameraData(const std::shared_ptr<graph::Camera>& cameraNode)
 	{
-		if (cameraNode->updated) {
+		if (cameraNode->isUpdated) {
 			UPLOAD_DATA->cameraData.position   = cameraNode->position;
 			UPLOAD_DATA->cameraData.direction  = cameraNode->direction;
-			UPLOAD_DATA->cameraData.vertical   = cos(cameraNode->fovY) * cameraNode->vertical;
-			UPLOAD_DATA->cameraData.horizontal = cos(cameraNode->fovY) * cameraNode->aspect * cameraNode->horizontal;
-			cameraNode->updated                = false;
+			const float radianFov              = (cameraNode->fovY * M_PI) / 180.0f;
+			UPLOAD_DATA->cameraData.vertical   = tanf(radianFov*0.5f) * cameraNode->vertical;
+			UPLOAD_DATA->cameraData.horizontal = tanf(radianFov*0.5f) * cameraNode->aspect * cameraNode->horizontal;
+			cameraNode->isUpdated                = false;
 			UPLOAD_DATA->isCameraUpdated       = true;
 		}
 	}

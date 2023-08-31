@@ -39,6 +39,31 @@ namespace vtx::network
         return result;
     }
 
+    bool checkTensorAnomaly(const torch::Tensor& tensor, const std::string& tensorName, const std::string& fileName, const int& line)
+    {
+        bool isAnomaly = false;
+        if (tensor.isnan().any().item<bool>())
+        {
+            VTX_ERROR("Tensor " + tensorName + " has NaN values!" + "File: " + fileName + "Line: " + std::to_string(line));
+            isAnomaly = true;
+        }
+        else if (tensor.isinf().any().item<bool>())
+        {
+            VTX_ERROR("Tensor " + tensorName + " has Inf values!" + "File: " + fileName + "Line: " + std::to_string(line));
+            isAnomaly = true;
+        }
+        return isAnomaly;
+    }
+
+    bool checkTensorHasZero(const torch::Tensor& tensor, const std::string& tensorName, const std::string& fileName, const int& line)
+    {
+        if (tensor.eq(0).any().item<bool>())
+        {
+	        VTX_ERROR("Tensor " + tensorName + " has zero values!" + "File: " + fileName + "Line: " + std::to_string(line));
+			return true;
+		}
+    }
+
     void copyNetworkParameters(const std::shared_ptr<torch::nn::Module>& sourceNetwork, const std::shared_ptr<torch::nn::Module>& targetNetwork) {
         torch::OrderedDict<std::string, torch::Tensor> sourceParams = sourceNetwork->named_parameters();
         torch::OrderedDict<std::string, torch::Tensor> targetParams = targetNetwork->named_parameters();

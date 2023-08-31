@@ -2,7 +2,7 @@
 #include <execution>
 
 #include "ShaderVisitor.h"
-#include "traversal.h"
+#include "mdlTraversal.h"
 #include "Device/OptixWrapper.h"
 #include "Scene/Nodes/Material.h"
 #include "Scene/Nodes/Shader/Texture.h"
@@ -1271,18 +1271,16 @@ namespace vtx::mdl
 		return paramInfos;
 	}
 
-	std::shared_ptr<graph::Texture> createTextureFromFile(const std::string& filePath)
+	void  loadFromFile(std::shared_ptr<graph::Texture> textureNode)
 	{
-
 		MdlState&                       state = *getState();
 		const TransactionInterfaces*    tI    = state.getTransactionInterfaces();
-		std::shared_ptr<graph::Texture> textureNode;
 		{
 			// Load environment texture
 			const Handle image(tI->transaction->create<IImage>("Image"));
-			const Sint32 result = image->reset_file(filePath.c_str());
-			VTX_ASSERT_BREAK(result == 0, "Error with creating new Texture image {}", filePath);
-			const std::string imageDbName = "Image::" + utl::getFileName(filePath);
+			const Sint32 result = image->reset_file(textureNode->filePath.c_str());
+			VTX_ASSERT_BREAK(result == 0, "Error with creating new Texture image {}", textureNode->filePath);
+			const std::string imageDbName = "Image::" + utl::getFileName(textureNode->filePath);
 			tI->transaction->store(image.get(), imageDbName.c_str());
 
 			// Create a new texture instance and set its properties
@@ -1290,21 +1288,16 @@ namespace vtx::mdl
 
 			texture->set_image(imageDbName.c_str());
 
-			const std::string textureDbName = "userTexture::" + utl::getFileName(filePath);
+			const std::string textureDbName = "userTexture::" + utl::getFileName(textureNode->filePath);
 
 			tI->transaction->store(texture.get(), textureDbName.c_str());
 
 			const ITarget_code::Texture_shape shape = ITarget_code::Texture_shape::Texture_shape_2d;
 
-			textureNode = std::make_shared<graph::Texture>();
 			textureNode->databaseName = textureDbName;
-			textureNode->filePath = textureNode->filePath;
 			textureNode->shape = shape;
 		}
 		state.commitTransaction();
-		//tI->transaction->commit();
-		textureNode->init();
-		return textureNode;
 	}
 
 	void fetchTextureData(const std::shared_ptr<graph::Texture>& textureNode)
@@ -1913,11 +1906,12 @@ namespace vtx::mdl
 
 	void createShaderGraphFunctionCalls(std::shared_ptr<graph::shader::ShaderNode> shaderGraph)
 	{
-		MdlState* state = getState();
-		const TransactionInterfaces* tI = state->getTransactionInterfaces();
-		ModuleCreationParameters& mcp = state->moduleCreationParameter;
-		mcp.reset();
-		shaderGraph->traverse({ std::make_shared<ShaderVisitor>() });
+		//MdlState* state = getState();
+		//const TransactionInterfaces* tI = state->getTransactionInterfaces();
+		//ModuleCreationParameters& mcp = state->moduleCreationParameter;
+		//mcp.reset();
+		ShaderVisitor visitor;
+		shaderGraph->traverse(visitor);
 	}
 
 	void ModuleCreationParameters::reset()

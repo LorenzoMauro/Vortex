@@ -1,4 +1,5 @@
 #include "LaunchParams.h"
+#include "Core/Options.h"
 #include "NeuralNetworks/NeuralNetwork.h"
 #include "Scene/Nodes/RendererSettings.h"
 
@@ -14,32 +15,28 @@ namespace vtx
 		Q_SHADOW_TRACE
 	};
 
+	
 	class WaveFrontIntegrator
 	{
 	public:
 
-		WaveFrontIntegrator(graph::RendererSettings* rendererSettings)
+		WaveFrontIntegrator(RendererSettings* _rendererSettings)
 		{
 			queueSizeRetrievalBuffer.alloc(sizeof(int));
 			queueSizeDevicePtr = queueSizeRetrievalBuffer.castedPointer<int>();
-			this->settings = rendererSettings;
+			rendererSettings = _rendererSettings;
+			settings = getOptions()->wavefrontSettings;
 		}
 
 		void render();
 
-		void downloadCounters();
-
 		void generatePixelQueue();
-
-		void launchOptixKernel(math::vec2i launchDimension, std::string pipelineName);
 
 		void traceRadianceRays();
 
-		void resetQueue(Queue queue);
+		void downloadCountersPointers();
 
-		void setCounters();
-
-		void resetCounters();
+		void downloadQueueSize(const int* deviceSize, int& hostSize, int maxSize);
 
 		void shadeRays();
 
@@ -55,8 +52,10 @@ namespace vtx
 		CUDABuffer    queueSizeRetrievalBuffer;
 		int*          queueSizeDevicePtr;
 		int           retrievedQueueSize;
-		graph::RendererSettings* settings;
-		Counters 	counters;
+		RendererSettings* rendererSettings;
+		WavefrontSettings settings;
+		Counters 	deviceCountersPointers;
+		QueueSizes queueSizes;
 
 		CUDABuffer tmpIndicesBuffer;
 		int* tmpIndices;

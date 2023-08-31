@@ -29,12 +29,12 @@ namespace vtx::graph {
 			float totalPower;
 		};
 
-		void init();
-		void traverse(const std::vector<std::shared_ptr<NodeVisitor>>& orderedVisitors) override;
-
-		//void accept(std::shared_ptr<NodeVisitor> visitor) override;
+		void init() override;
 
 		void prepareSampling();
+	protected:
+		void accept(NodeVisitor& visitor) override;
+
 	public:
 		std::string databaseName;
 		LightProfileData lightProfileData;

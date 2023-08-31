@@ -2,10 +2,9 @@
 #include <memory>
 #include <stack>
 
-#include "SIM.h"
 #include "Core/Math.h"
 #include "Core/VortexID.h"
-#include "Nodes/Transform.h"
+#include "Scene/Node.h"
 
 namespace vtx {
 
@@ -22,7 +21,8 @@ namespace vtx {
 		virtual void visit(std::shared_ptr<graph::Texture> texture){}
 		virtual void visit(std::shared_ptr<graph::BsdfMeasurement> bsdfMeasurement) {}
 		virtual void visit(std::shared_ptr<graph::LightProfile> lightProfile) {}
-		virtual void visit(std::shared_ptr<graph::Light> lightProfile) {}
+		virtual void visit(std::shared_ptr<graph::EnvironmentLight> node) {}
+		virtual void visit(std::shared_ptr<graph::MeshLight> node) {}
 
 		//////////////////////////////////////////////////////////////////////////////////
 		//////////////////////// Shaders Nodes ///////////////////////////////////////////
@@ -44,38 +44,21 @@ namespace vtx {
 		virtual void visit(std::shared_ptr<graph::shader::NormalMix> shaderNode) {}
 		virtual void visit(std::shared_ptr<graph::shader::GetChannel> shaderNode) {}
 
-		virtual void popTransform() {
-			transformIndexStack.pop_back();
-			transformUpdateStack.pop_back();
-		}
+		void visitBegin(const std::shared_ptr<graph::Node>& node);
 
-		virtual void pushTransform(const vtxID transformId, const bool transformUpdated) {
-			transformIndexStack.push_back(transformId);
-			transformUpdateStack.push_back(transformUpdated || isTransformStackUpdated());
-		}
+		void visitEnd(std::shared_ptr<graph::Node> node);
 
-		virtual bool isTransformStackUpdated()
-		{
-			if(!transformUpdateStack.empty())
-			{
-				return transformUpdateStack.back();
-			}
-			return false;
-		}
+		bool collectWidthsAndDepths = false;
+		std::map<vtxID, std::tuple<int, int, int>> nodesDepthsAndWidths;
+		std::map<vtxID, std::vector<vtxID>> nodesParents;
+		std::stack<int> depthStack;
+		std::stack<int> widthStack;
+		std::vector<vtxID> parentPath;
 
-		math::affine3f getFinalTransform() const
-		{
-			math::affine3f finalTransform{ math::Identity };
-			for (const auto& index : transformIndexStack) {
-				const auto transformNode = graph::SIM::getNode<graph::Transform>(index);
-				finalTransform     = finalTransform * transformNode->transformationAttribute.affineTransform;
-			}
-			return finalTransform;
-		}
-
-
-		std::vector<vtxID> transformIndexStack;
-		std::vector<bool>  transformUpdateStack;
+		bool collectTransforms = false;
+		std::stack<bool> resetTransforms;
+		math::affine3f currentTransform = math::Identity;
+		std::stack<math::affine3f> tmpTransforms;
 	};
 
 }

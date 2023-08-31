@@ -7,38 +7,15 @@
 
 #include <map>
 #include <typeindex>
-#include <typeinfo>
 #include <utility>
-//#include <vector>
-
 #include <cuda.h>
 #include <cuda_runtime_api.h>
-
+#include "KernelTimings.h"
 #include "Core/Log.h"
 #include "Device/CUDAChecks.h"
 
-//#ifdef NVTX
-//#ifdef UNICODE
-//#undef UNICODE
-//#endif
-//#include <nvtx3/nvToolsExt.h>
-
-//#ifdef RGB
-//#undef RGB
-//#endif  // RGB
-//#endif
-
 
 namespace vtx {
-
-
-    std::pair<cudaEvent_t, cudaEvent_t> GetProfilerEvents(const char* description);
-
-    float GetKernelTimeMS(const char* description);
-
-    int GetKernelLaunches(const char* description);
-
-    void resetKernelStats();
 
     template <typename F>
     inline int GetBlockSize(const char* description, F kernel) {
@@ -52,8 +29,7 @@ namespace vtx {
             return iter->second;
 
         int minGridSize, blockSize;
-        CUDA_CHECK(
-            cudaOccupancyMaxPotentialBlockSize(&minGridSize, &blockSize, kernel, 0, 0));
+        CUDA_CHECK(cudaOccupancyMaxPotentialBlockSize(&minGridSize, &blockSize, kernel, 0, 0));
         kernelBlockSizes[index] = blockSize;
         VTX_INFO("[{}]: block size {}", description, blockSize);
 
@@ -77,41 +53,20 @@ namespace vtx {
     void gpuParallelFor(const char* description, int nItems, F func) {
         auto kernel = &Kernel<F>;
 
-        int blockSize = GetBlockSize(description, kernel);
-        std::pair<cudaEvent_t, cudaEvent_t> events = GetProfilerEvents(description);
+        int                                       blockSize = GetBlockSize(description, kernel);
+		const std::pair<cudaEvent_t, cudaEvent_t> events    = GetProfilerEvents(description);
 
         cudaEventRecord(events.first);
         int gridSize = (nItems + blockSize - 1) / blockSize;
         kernel<<<gridSize, blockSize>>>(func, nItems);
         cudaEventRecord(events.second);
+        CUDA_SYNC_CHECK();
     }
 
     template <typename F>
     void Do(const char* description, F&& func) {
         gpuParallelFor(description, 1, [=] __device__(int) mutable { func(); });
     }
+}
 
-    // GPU Synchronization Function Declarations
-    void GPUWait();
-
-    void ReportKernelStats();
-
-    void GPUInit();
-    void GPUThreadInit();
-
-    void GPUMemset(void* ptr, int byte, size_t bytes);
-
-    void GPURegisterThread(const char* name);
-    void GPUNameStream(cudaStream_t stream, const char* name);
-
-    template <typename T>
-    T gpuDownload(T* devicePtr)
-    {
-    	T hostCopy;
-		CUDA_CHECK(cudaMemcpy(&hostCopy, devicePtr, sizeof(T), cudaMemcpyDeviceToHost));
-		return hostCopy;
-	}
-
-}  // namespace pbrt
-
-#endif  // PBRT_GPU_UTIL_H
+#endif 

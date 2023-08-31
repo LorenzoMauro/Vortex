@@ -43,15 +43,15 @@ namespace vtx::device
 		bool									isFrameBufferUpdated = true;
 		int										frameId = 0;
 		bool									isFrameIdUpdated = true;
-		RendererDeviceSettings					settings;
+		OnDeviceSettings						settings;
 		bool									isSettingsUpdated = true;
-		ToneMapperSettings						toneMapperSettings;
-		bool									isToneMapperSettingsUpdated = true;			
 
 		SbtProgramIdx							programs;
 
 		std::vector<OptixInstance> optixInstances;
 		LaunchParams               launchParams;
+		bool                       isNetworkInterfaceUpdated;
+		bool                       isWorkQueueUpdated;
 
 	private:
 		~UploadData() = default;

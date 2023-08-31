@@ -13,41 +13,19 @@
 #include "Device/DevicePrograms/WavefrontIntegrator.h"
 namespace vtx::graph
 {
-
-	struct ToneMapperSettings
-	{
-		math::vec3f whitePoint;
-		math::vec3f colorBalance;
-		float       burnHighlights;
-		float       crushBlacks;
-		float       saturation;
-		float       gamma;
-		bool         isUpdated;
-	};
-
 	class Renderer : public Node
 	{
 	public:
 
 		Renderer();
 
-		void resize(uint32_t width, uint32_t height);
+		void resize(int width, int height);
 
 		void render();
 
 		GlFrameBuffer getFrame();
 
-		void setCamera(const std::shared_ptr<Camera>& cameraNode);
-
-		void setScene(const std::shared_ptr<Group>& sceneRootNode);
-
-		std::shared_ptr<Camera> getCamera();
-
-		std::shared_ptr<Group> getScene();
-
-		void traverse(const std::vector<std::shared_ptr<NodeVisitor>>& orderedVisitors) override;
-
-		//void accept(std::shared_ptr<NodeVisitor> visitor) override;
+		std::vector<std::shared_ptr<Node>> getChildren() const override;
 
 		bool isReady(bool setBusy = false);
 
@@ -56,6 +34,7 @@ namespace vtx::graph
 		void copyToGl();
 		void  setWindow(GLFWwindow* window);
 
+		void accept(NodeVisitor& visitor) override;
 	public:
 		//GL Interop
 		WaveFrontIntegrator								waveFrontIntegrator;
@@ -69,8 +48,8 @@ namespace vtx::graph
 
 		uint32_t										width;
 		uint32_t										height;
+		bool											isSizeLocked = false;
 		RendererSettings								settings;
-		ToneMapperSettings								toneMapperSettings;
 		bool											resized = true;
 
 		vtx::Timer timer;

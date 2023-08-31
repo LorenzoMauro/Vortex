@@ -28,24 +28,21 @@ namespace vtx
         return math::vec3f(r, g, b);
     }
 
-    __forceinline__ __device__ math::vec3f toneMap(ToneMapperSettings* tm, const math::vec3f& radianceSample)
+    __forceinline__ __device__ math::vec3f toneMap(ToneMapperSettings& tm, const math::vec3f& radianceSample)
     {
-        //printf("ToneMapperSettings pointer %p\n", tm);
-        //printf("ToneMapperSettings: %f %f %f %f\n", tm->invGamma, tm->saturation, tm->burnHighlights, tm->crushBlacks);
-        //return math::vec4f(radianceSample, 1.0f);
-        math::vec3f ldrColor = tm->invWhitePoint * tm->colorBalance * radianceSample;
+        math::vec3f ldrColor = tm.invWhitePoint * tm.colorBalance * radianceSample;
 
-        ldrColor *= (ldrColor * tm->burnHighlights + 1.0f) / (ldrColor + 1.0f);
+        ldrColor *= (ldrColor * tm.burnHighlights + 1.0f) / (ldrColor + 1.0f);
         float luminance = dot(ldrColor, math::vec3f(0.3f, 0.59f, 0.11f));
-        ldrColor        = utl::max<math::vec3f>(utl::lerp(math::vec3f(luminance), ldrColor, tm->saturation), 0.0f);
+        ldrColor        = utl::max<math::vec3f>(utl::lerp(math::vec3f(luminance), ldrColor, tm.saturation), 0.0f);
         luminance       = dot(ldrColor, math::vec3f(0.3f, 0.59f, 0.11f));
 
         if (luminance < 1.0f)
         {
-            ldrColor = utl::max<math::vec3f>(utl::lerp(utl::pow(ldrColor, math::vec3f(tm->crushBlacks)), ldrColor, sqrtf(luminance)), 0.0f);
+            ldrColor = utl::max<math::vec3f>(utl::lerp(utl::pow(ldrColor, math::vec3f(tm.crushBlacks)), ldrColor, sqrtf(luminance)), 0.0f);
         }
 
-        ldrColor = utl::pow(ldrColor, math::vec3f(tm->invGamma));
+        ldrColor = utl::pow(ldrColor, math::vec3f(tm.invGamma));
         return { ldrColor};
     }
     // The code in this file was originally written by Stephen Hill (@self_shadow), who deserves all

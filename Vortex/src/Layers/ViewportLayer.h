@@ -10,7 +10,7 @@ namespace vtx {
     class ViewportLayer : public Layer {
     public:
 
-        ViewportLayer(std::shared_ptr<graph::Renderer> _Renderer);
+        ViewportLayer();
 
         virtual void OnAttach();
 
@@ -24,9 +24,10 @@ namespace vtx {
         std::shared_ptr<graph::Renderer> renderer;
         uint32_t    m_width = getOptions()->width;
         uint32_t    m_height = getOptions()->height;
+        math::vec2i forcedSize = math::vec2i(0, 0);
         bool        m_isResized = false;
-        std::shared_ptr<device::DeviceVisitor> deviceVisitor;
-        std::shared_ptr<HostVisitor> hostVisitor;
+        device::DeviceVisitor deviceVisitor;
+        HostVisitor hostVisitor;
         //gui::MaterialGui materialGui;
     };
 }

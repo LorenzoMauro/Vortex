@@ -9,6 +9,7 @@
 #include "Scene/Nodes/Shader/Texture.h"
 #include "Scene/Nodes/Shader/mdl/ShaderNodes.h"
 
+
 namespace vtx::gui {
     void MaterialGui::refreshMaterialList()
     {
@@ -101,7 +102,7 @@ namespace vtx::gui {
         {
         case graph::shader::ParameterInfo::PK_FLOAT:
 
-				changed |= vtxImGui::HalfSpaceWidget(param.annotation.displayName.c_str(), ImGui::SliderFloat, HiddenIdentifier.c_str(), &param.data<float>(), param.annotation.range[0], param.annotation.range[1], "%.3f", 0);
+				changed |= vtxImGui::halfSpaceWidget(param.annotation.displayName.c_str(), ImGui::SliderFloat, HiddenIdentifier.c_str(), &param.data<float>(), param.annotation.range[0], param.annotation.range[1], "%.3f", 0);
                 //changed |= vtxImGui::SliderFloat(param.annotation.displayName.c_str(), &param.data<float>(), param.annotation.range[0], param.annotation.range[1]);
                 break;
             case graph::shader::ParameterInfo::PK_FLOAT2:
@@ -112,14 +113,14 @@ namespace vtx::gui {
                 break;
 			case graph::shader::ParameterInfo::PK_COLOR:
                 //changed |= vtxImGui::ColorEdit3NoInputs(param.annotation.displayName.c_str(), &param.data<float>());
-                changed |= vtx::vtxImGui::HalfSpaceWidget(param.annotation.displayName.c_str(), vtxImGui::colorPicker, HiddenIdentifier.c_str(), &param.data<float>());
+                changed |= vtx::vtxImGui::halfSpaceWidget(param.annotation.displayName.c_str(), vtxImGui::colorPicker, HiddenIdentifier.c_str(), &param.data<float>());
                 break;
             case graph::shader::ParameterInfo::PK_BOOL:
-                changed |= vtxImGui::HalfSpaceWidget(param.annotation.displayName.c_str(), ImGui::Checkbox, HiddenIdentifier.c_str(), &param.data<bool>());
+                changed |= vtxImGui::halfSpaceWidget(param.annotation.displayName.c_str(), ImGui::Checkbox, HiddenIdentifier.c_str(), &param.data<bool>());
                 //changed |= ImGui::Checkbox(param.annotation.displayName.c_str(), &param.data<bool>());
                 break;
             case graph::shader::ParameterInfo::PK_INT:
-                changed |= vtxImGui::HalfSpaceWidget(param.annotation.displayName.c_str(), ImGui::SliderInt, HiddenIdentifier.c_str(), &param.data<int>(), int(param.annotation.range[0]), int(param.annotation.range[1]), "%d", 0);
+                changed |= vtxImGui::halfSpaceWidget(param.annotation.displayName.c_str(), ImGui::SliderInt, HiddenIdentifier.c_str(), &param.data<int>(), int(param.annotation.range[0]), int(param.annotation.range[1]), "%d", 0);
                 //changed |= ImGui::SliderInt(param.annotation.displayName.c_str(), &param.data<int>(), int(param.annotation.range[0]), int(param.annotation.range[1]));
                 break;
             case graph::shader::ParameterInfo::PK_ARRAY:
@@ -148,7 +149,7 @@ namespace vtx::gui {
                             changed |= ImGui::ColorEdit3(idxStr.c_str(), reinterpret_cast<float*>(ptr));
                             break;
                         case graph::shader::ParameterInfo::PK_BOOL:
-                            changed |= vtxImGui::HalfSpaceWidget(param.annotation.displayName.c_str(), ImGui::Checkbox, HiddenIdentifier.c_str(), reinterpret_cast<bool*>(ptr));
+                            changed |= vtxImGui::halfSpaceWidget(param.annotation.displayName.c_str(), ImGui::Checkbox, HiddenIdentifier.c_str(), reinterpret_cast<bool*>(ptr));
                             //changed |= ImGui::Checkbox(param.annotation.displayName.c_str(), reinterpret_cast<bool*>(ptr));
                             break;
                         case graph::shader::ParameterInfo::PK_INT:
@@ -213,7 +214,7 @@ namespace vtx::gui {
                 if (!inputText.empty())
                 {
 	                
-                    vtxImGui::HalfSpaceWidget("Texture:", vtxImGui::ClippedText, inputText.c_str());
+                    vtxImGui::halfSpaceWidget("Texture:", vtxImGui::clippedText, inputText.c_str());
                 }
             }
             case graph::shader::ParameterInfo::PK_LIGHT_PROFILE:
@@ -314,18 +315,18 @@ namespace vtx::gui {
 
         ImGui::PushItemWidth(info.size.x); // Set the width of the next widget to 200
 
-        vtxImGui::HalfSpaceWidget("Function Signature", vtxImGui::ClippedText, functionSignature.c_str());
-        vtxImGui::HalfSpaceWidget("Node Id:", vtxImGui::ClippedText, std::to_string(shaderNode->getID()).c_str());
+        vtxImGui::halfSpaceWidget("Function Signature", vtxImGui::clippedText, functionSignature.c_str());
+        vtxImGui::halfSpaceWidget("Node Id:", vtxImGui::clippedText, std::to_string(shaderNode->getID()).c_str());
 
         ImNodes::BeginOutputAttribute(shaderNode->outputSocket.Id);
-        vtxImGui::HalfSpaceWidget("Output Type", vtxImGui::ClippedText, shaderNode->outputSocket.parameterInfo.annotation.displayName.c_str());
+        vtxImGui::halfSpaceWidget("Output Type", vtxImGui::clippedText, shaderNode->outputSocket.parameterInfo.annotation.displayName.c_str());
         ImNodes::EndInputAttribute();
 
         //TODO: Some socket appear with no description
         for(auto& [SocketGroup, socketGroupName] : shaderNode->socketsGroupedByGroup)
         {
-            vtxImGui::HalfSpaceWidget(" ", vtxImGui::booleanText, " ");
-            vtxImGui::HalfSpaceWidget("Group:", vtxImGui::ClippedText, SocketGroup.c_str());
+            vtxImGui::halfSpaceWidget(" ", vtxImGui::booleanText, " ");
+            vtxImGui::halfSpaceWidget("Group:", vtxImGui::clippedText, SocketGroup.c_str());
             for (auto& socketName : socketGroupName)
             {
                 std::string name = socketName;
@@ -398,7 +399,7 @@ namespace vtx::gui {
         if(nodeInfo.count(shaderNode->getID()) == 0)
         {
             nodeInfo.insert({ shaderNode->getID(), NodeInfo{} });
-            nodeInfo[shaderNode->getID()].shaderNode = shaderNode;
+            nodeInfo[shaderNode->getID()].node = shaderNode;
             nodeInfo[shaderNode->getID()].depth = currentDepth;
             nodeInfo[shaderNode->getID()].width = width;
         }
@@ -412,52 +413,7 @@ namespace vtx::gui {
             width++;
         }
     }
-    void arrangeNodes(std::map<vtxID, NodeInfo>& nodeInfoMap)
-    {
-        const float padding = 50.0f;  // Some padding to avoid nodes touching each other
-
-        // Find max depth to position nodes from right to left
-        int maxDepth = 0;
-        for (const auto& [id, nodeInfo] : nodeInfoMap)
-        {
-            if (nodeInfo.depth > maxDepth)
-                maxDepth = nodeInfo.depth;
-        }
-
-        // Create a map for each depth, to map old widths to new, continuous widths
-        // Also, keep track of the max node dimensions at each depth level
-        std::map<int, std::map<int, int>> widthRemapping;
-        std::map<int, ImVec2> maxNodeDimensionsAtDepth;
-        for (const auto& [id, nodeInfo] : nodeInfoMap)
-        {
-            widthRemapping[nodeInfo.depth][nodeInfo.width] = 0;
-            ImVec2  nodeDim                                = ImNodes::GetNodeDimensions(id);
-            ImVec2& maxDimAtDepth                          = maxNodeDimensionsAtDepth[nodeInfo.depth];
-            maxDimAtDepth.x                                = std::max(maxDimAtDepth.x, nodeDim.x);
-            maxDimAtDepth.y                                = std::max(maxDimAtDepth.y, nodeDim.y);
-        }
-
-        // Generate new widths
-        for (auto& [depth, widthMap] : widthRemapping)
-        {
-            int newWidth = 0;
-            for (auto& [oldWidth, _] : widthMap)
-            {
-                widthMap[oldWidth] = newWidth++;
-            }
-        }
-
-        // Arrange nodes using new widths, considering node dimensions
-        for (auto& [id, nodeInfo] : nodeInfoMap)
-        {
-            int newWidth = widthRemapping[nodeInfo.depth][nodeInfo.width];
-            ImVec2 maxDimAtDepth = maxNodeDimensionsAtDepth[nodeInfo.depth];
-            float horizontalSpacing = maxDimAtDepth.x + padding;
-            float verticalSpacing = maxDimAtDepth.y + padding;
-            ImVec2 pos((maxDepth - nodeInfo.depth) * horizontalSpacing, newWidth * verticalSpacing);
-            ImNodes::SetNodeGridSpacePos(id, pos);
-        }
-    }
+    
 
     void MaterialGui::materialNodeEditorGui(const vtxID materialId)
     {
@@ -473,7 +429,7 @@ namespace vtx::gui {
 
         for(auto& [id, materialNodesInfo] : materialNodesInfos)
         {
-        	changed |= nodeEditorShaderNodeGui(materialNodesInfo.shaderNode, material);
+        	changed |= nodeEditorShaderNodeGui(materialNodesInfo.node->as<graph::shader::ShaderNode>(), material);
 		}
 
 
@@ -484,7 +440,7 @@ namespace vtx::gui {
 
         for (auto& [id, materialNodesInfo] : materialNodesInfos)
         {
-            nodeEditorShaderNodeGuiLink(materialNodesInfo.shaderNode);
+            nodeEditorShaderNodeGuiLink(materialNodesInfo.node->as<graph::shader::ShaderNode>());
         }
 
         if (changed)

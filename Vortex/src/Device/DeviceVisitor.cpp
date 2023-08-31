@@ -4,6 +4,8 @@
 #include "Device/OptixWrapper.h"
 #include "Scene/Graph.h"
 #include "DevicePrograms/LaunchParams.h"
+#include "Scene/Nodes/EnvironmentLight.h"
+#include "Scene/Nodes/MeshLight.h"
 #include "UploadCode/UploadBuffers.h"
 #include "UploadCode/UploadData.h"
 #include "UploadCode/UploadFunctions.h"
@@ -12,7 +14,7 @@
 
 namespace vtx::device
 {
-	void DeviceVisitor::visit(const std::shared_ptr<graph::Instance> instance)
+	void DeviceVisitor::visit(std::shared_ptr<graph::Instance> instance)
 	{
 		// If the child node is a mesh, then it's leaf therefore we can safely create the instance.
 		// This supposes that child and transform are traversed before the instance visitor is accepted.
@@ -24,34 +26,35 @@ namespace vtx::device
 
 				const OptixTraversableHandle& traversable = std::get<0>(UPLOAD_DATA->geometryDataMap[meshId]).traversable;
 
-				if (isTransformStackUpdated() || !(instance->finalTransformStack==transformIndexStack))
-				{
-					instance->finalTransform = getFinalTransform();
-					instance->finalTransformStack = transformIndexStack;
-				}
+				//if (isTransformStackUpdated() || instance->finalTransformStack!=transformIndexStack)
+				//{
+				//	instance->finalTransform = getFinalTransform();
+				//	instance->finalTransformStack = transformIndexStack;
+				//}
 
-				const OptixInstance                           optixInstance = optix::createInstance(instanceId, instance->finalTransform, traversable);
-				const std::tuple<InstanceData, InstanceData*> instanceData = createInstanceData(instance, instance->finalTransform);
+				const math::affine3f& globalTransform = instance->transform->globalTransform;
+				const OptixInstance                           optixInstance = optix::createInstance(instanceId, globalTransform, traversable);
+				const std::tuple<InstanceData, InstanceData*> instanceData = createInstanceData(instance, globalTransform);
 
 				UPLOAD_DATA->instanceDataMap.insert(instanceId, instanceData);
 				UPLOAD_DATA->optixInstances.push_back(optixInstance);
 
 			}
 		}
-		popTransform();
+		//popTransform();
 	}
 
-	void DeviceVisitor::visit(const std::shared_ptr<graph::Transform> transform)
+	void DeviceVisitor::visit(std::shared_ptr<graph::Transform> transform)
 	{
-		pushTransform(transform->getID(), transform->isUpdated);
+		//pushTransform(transform->getID(), transform->isUpdated);
 	}
 
 	void DeviceVisitor::visit(std::shared_ptr<graph::Group> group)
 	{
-		popTransform();
+		//popTransform();
 	}
 
-	void DeviceVisitor::visit(const std::shared_ptr<graph::Mesh> mesh)
+	void DeviceVisitor::visit(std::shared_ptr<graph::Mesh> mesh)
 	{
 		//TODO : Check if the mesh has been updated
 		if (const vtxID meshId = mesh->getID(); !UPLOAD_DATA->geometryDataMap.contains(meshId)) {
@@ -60,7 +63,7 @@ namespace vtx::device
 		}
 	}
 
-	void DeviceVisitor::visit(const std::shared_ptr<graph::Material> material)
+	void DeviceVisitor::visit(std::shared_ptr<graph::Material> material)
 	{
 		//TODO : Check if the texture has been updated
 		if (const vtxID materialId = material->getID(); (!UPLOAD_DATA->materialDataMap.contains(materialId) || material->isUpdated)) {
@@ -71,12 +74,12 @@ namespace vtx::device
 		}
 	}
 
-	void DeviceVisitor::visit(const std::shared_ptr<graph::Camera> camera)
+	void DeviceVisitor::visit(std::shared_ptr<graph::Camera> camera)
 	{
 		setCameraData(camera);
 	}
 
-	void DeviceVisitor::visit(const std::shared_ptr < graph::Renderer > renderer)
+	void DeviceVisitor::visit(std::shared_ptr < graph::Renderer > renderer)
 	{
 		setRendererData(renderer);
 	}
@@ -108,35 +111,34 @@ namespace vtx::device
 		}
 	}
 
-	void DeviceVisitor::visit(std::shared_ptr<graph::Light> lightNode)
+	void DeviceVisitor::visit(std::shared_ptr<graph::MeshLight> meshLight)
 	{
 		//TODO : Check if the mesh has been updated
-		if (const vtxID lightId = lightNode->getID(); !UPLOAD_DATA->lightDataMap.contains(lightId)) {
-			const std::tuple<LightData, LightData*> lightData = createLightData(lightNode);
+		if (const vtxID lightId = meshLight->getID(); !UPLOAD_DATA->lightDataMap.contains(lightId)) {
+			const std::tuple<LightData, LightData*> lightData = createMeshLightData(meshLight);
 			// We keep a list on the device of all potential mesh lights but only the mesh lights associated with a material
 			// markes as light will be sampled in the mis.
-
-			switch(std::get<0>(lightData).type)
+			if (meshLight->material->useAsLight)
 			{
-			case L_MESH:
-			{
-				if(std::dynamic_pointer_cast<graph::MeshLightAttributes>(lightNode->attributes)->material->useAsLight)
-				{
-					UPLOAD_DATA->lightDataMap.insert(lightId, std::tuple(std::get<0>(lightData), std::get<1>(lightData), true));
-				}
-				else
-				{
-					UPLOAD_DATA->lightDataMap.insert(lightId, std::tuple(std::get<0>(lightData), std::get<1>(lightData), false));
-				}
-
-			}break;
-			case L_ENV:
-			{
-				// TODO : How do we handle the presence of another env Light?
 				UPLOAD_DATA->lightDataMap.insert(lightId, std::tuple(std::get<0>(lightData), std::get<1>(lightData), true));
-				UPLOAD_DATA->launchParams.envLight = std::get<1>(lightData);
 			}
+			else
+			{
+				UPLOAD_DATA->lightDataMap.insert(lightId, std::tuple(std::get<0>(lightData), std::get<1>(lightData), false));
 			}
+		}
+	}
+
+	void DeviceVisitor::visit(std::shared_ptr<graph::EnvironmentLight> envLight)
+	{
+		//TODO : Check if the mesh has been updated
+		if (const vtxID lightId = envLight->getID(); !UPLOAD_DATA->lightDataMap.contains(lightId)) {
+			const std::tuple<LightData, LightData*> lightData = createEnvLightData(envLight);
+			// We keep a list on the device of all potential mesh lights but only the mesh lights associated with a material
+			// markes as light will be sampled in the mis.
+			// TODO : How do we handle the presence of another env Light?
+			UPLOAD_DATA->lightDataMap.insert(lightId, std::tuple(std::get<0>(lightData), std::get<1>(lightData), true));
+			UPLOAD_DATA->launchParams.envLight = std::get<1>(lightData);
 		}
 	}
 
@@ -219,36 +221,33 @@ namespace vtx::device
 		}
 		if(uploadData->isSettingsUpdated)
 		{
-			uploadBuffers->rendererSettingsBuffer.upload(uploadData->settings);
-			if (!uploadData->launchParams.settings || uploadData->launchParams.settings != uploadBuffers->frameIdBuffer.castedPointer<
-				RendererDeviceSettings>())
+			OnDeviceSettings* onDeviceSettings = uploadBuffers->rendererSettingsBuffer.upload(uploadData->settings);
+			if (!uploadData->launchParams.settings || uploadData->launchParams.settings != onDeviceSettings)
 			{
-				uploadData->launchParams.settings = uploadBuffers->rendererSettingsBuffer.castedPointer<RendererDeviceSettings>();
+				uploadData->launchParams.settings = onDeviceSettings;
 				isLaunchParamsUpdated = true;
 			}
 			uploadData->isSettingsUpdated = false;
 		}
 
-		if (uploadData->isToneMapperSettingsUpdated)
-		{
-			uploadBuffers->toneMapperSettingsBuffer.upload(uploadData->toneMapperSettings);
-			if (!uploadData->launchParams.toneMapperSettings || uploadData->launchParams.toneMapperSettings != uploadBuffers->frameIdBuffer.castedPointer<ToneMapperSettings>())
-			{
-				uploadData->launchParams.toneMapperSettings = uploadBuffers->toneMapperSettingsBuffer.castedPointer<ToneMapperSettings>();
-				isLaunchParamsUpdated = true;
-			}
-			uploadData->isToneMapperSettingsUpdated = false;
-		}
-
 		//ATTENTION We do this only once! (hence the no update) However, this might be a way to swap rendering pipeline by changing the set of programSbt
-		if (!uploadData->launchParams.programs)
+		//if (!uploadData->launchParams.programs)
+		//{
+		//	uploadData->programs = setProgramsSbt();
+		//	uploadBuffers->sbtProgramIdxBuffer.upload(uploadData->programs);
+		//	uploadData->launchParams.programs = uploadBuffers->sbtProgramIdxBuffer.castedPointer<SbtProgramIdx>();
+		//	isLaunchParamsUpdated = true;
+		//}
+		if(uploadData->isNetworkInterfaceUpdated)
 		{
-			uploadData->programs = setProgramsSbt();
-			uploadBuffers->sbtProgramIdxBuffer.upload(uploadData->programs);
-			uploadData->launchParams.programs = uploadBuffers->sbtProgramIdxBuffer.castedPointer<SbtProgramIdx>();
 			isLaunchParamsUpdated = true;
+			uploadData->isNetworkInterfaceUpdated = false;
 		}
-
+		if(uploadData->isWorkQueueUpdated)
+		{
+			isLaunchParamsUpdated = true;
+			uploadData->isWorkQueueUpdated = false;
+		}
 		if(isLaunchParamsUpdated)
 		{
 			uploadBuffers->launchParamsBuffer.upload(uploadData->launchParams);

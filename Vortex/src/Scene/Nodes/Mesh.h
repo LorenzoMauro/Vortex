@@ -16,10 +16,12 @@ namespace vtx::graph
 	public:
 		Mesh() : Node(NT_MESH) {}
 
-		void traverse(const std::vector<std::shared_ptr<NodeVisitor>>& orderedVisitors) override;
-
-		//void accept(std::shared_ptr<NodeVisitor> visitor) override;
-
+		std::vector<std::shared_ptr<Node>> getChildren() const override
+		{
+			return {};
+		};
+	protected:
+		void accept(NodeVisitor& visitor) override;
 	public:
 		std::vector<VertexAttributes> vertices;
 		std::vector<vtxID>            indices; // indices for triangles (every 3 indices define a triangle)

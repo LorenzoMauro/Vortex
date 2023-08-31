@@ -18,17 +18,16 @@ namespace vtx::graph
 		mouseDelta(math::vec2f{ 0.0f, 0.0f }),
 		movementSensibility(100.0f),
 		rotationSensibility(3.0f),
-		zoomSensibility(0.01f),
-		updated(true)
+		zoomSensibility(0.1f)
 	{
 		transform = ops::createNode<Transform>();
 	}
 
 	void Camera::updateDirections() {
-		//horizontal = transform->transformationAttribute.AffineTransform.l.vx;
-		//vertical = transform->transformationAttribute.AffineTransform.l.vy;
-		//direction = transform->transformationAttribute.AffineTransform.l.vz;
-		//position = transform->transformationAttribute.AffineTransform.p;
+		//horizontal = inputSockets[nodeNames[NT_TRANSFORM]].getNodeTransformTransfomr>->transformationAttribute.AffineTransform.l.vx;
+		//vertical = inputSockets[nodeNames[NT_TRANSFORM]].getNodeTransformTransfomr>->transformationAttribute.AffineTransform.l.vy;
+		//direction = inputSockets[nodeNames[NT_TRANSFORM]].getNodeTransformTransfomr>->transformationAttribute.AffineTransform.l.vz;
+		//position = inputSockets[nodeNames[NT_TRANSFORM]].getNodeTransformTransfomr>->transformationAttribute.AffineTransform.p;
 
 		horizontal = transform->transformVector(math::vec3f{ 1.0f, 0.0f, 0.0f });
 		vertical = transform->transformVector(math::vec3f{ 0.0f, 1.0f, 0.0f });
@@ -40,10 +39,14 @@ namespace vtx::graph
 		resolution.x = width;
 		resolution.y = height;
 		aspect = static_cast<float>(width) / static_cast<float>(height);
-		updated = true;
+		isUpdated = true;
 	}
 
 	void Camera::onUpdate(const float ts) {
+		if (lockCamera)
+		{
+			return;
+		}
 		math::vec2f lastMousePosition = mousePosition;
 		mousePosition = Input::GetMousePosition();
 		mouseDelta = (mousePosition - lastMousePosition);
@@ -52,80 +55,87 @@ namespace vtx::graph
 	}
 
 	void Camera::orbitNavigation(const float ts) {
-		if (Input::MouseWheel() != 0.0f && navigationActive) {
-			updated = true;
-			fovY += Input::MouseWheel() * zoomSensibility;
-			if (fovY < 1.0f)
-			{
-				fovY = 1.0f;
-			}
-			else if (fovY > 179.0f)
-			{
-				fovY = 179.0f;
-			}
-		}
 
 		math::vec2f delta = math::vec2f(mouseDelta.x / resolution.x, mouseDelta.y / resolution.y);
 
-		if (Input::IsMouseButtonDown(MouseButton::Middle) && navigationActive && !(delta.x == 0.0f && delta.y == 0.0f)) {
-			updated = true;
-			if (Input::IsKeyDown(KeyCode::LeftShift) || Input::IsKeyDown(KeyCode::RightShift)) {
-				navigationMode = NAV_PAN;
+		if (Input::IsMouseButtonDown(MouseButton::Middle) && navigationActive)
+		{
+			if (navigationActive && !(delta.x == 0.0f && delta.y == 0.0f)) {
+				isUpdated = true;
+				if (Input::IsKeyDown(KeyCode::LeftShift) || Input::IsKeyDown(KeyCode::RightShift)) {
+					navigationMode = NAV_PAN;
+				}
+				else if (Input::IsKeyDown(KeyCode::LeftControl) || Input::IsKeyDown(KeyCode::RightControl)) {
+					navigationMode = NAV_DOLLY;
+				}
+				else {
+					navigationMode = NAV_ORBIT;
+				}
 			}
-			else if (Input::IsKeyDown(KeyCode::LeftControl) || Input::IsKeyDown(KeyCode::RightControl)) {
-				navigationMode = NAV_DOLLY;
+		}
+		else if (Input::MouseWheel() != 0.0f && navigationActive)
+		{
+			isUpdated = true;
+			if (Input::IsKeyDown(KeyCode::LeftAlt) || Input::IsKeyDown(KeyCode::RightAlt))
+			{
+				navigationMode = NAV_FOV;
+				delta = math::vec2f(0.0f, Input::MouseWheel() * zoomSensibility);
 			}
 			else {
-				navigationMode = NAV_ORBIT;
+				navigationMode = NAV_DOLLY;
+				delta = math::vec2f(0.0f, -Input::MouseWheel() * zoomSensibility);
 			}
 		}
 		else {
 			navigationActive = false;
 			navigationMode = NAV_NONE;
 			Input::SetCursorMode(CursorMode::Normal);
+			//VTX_INFO("Setting cursor mode to normal");
 			return;
 		}
 
 		Input::SetCursorMode(CursorMode::Locked);
-
+		//VTX_INFO("Setting cursor mode to locked");
 		switch (navigationMode) {
-			case NAV_PAN:
-			{
-				math::vec3f translation = ts * movementSensibility * (-horizontal * delta.x + vertical * delta.y);
-				transform->translate(translation);
-				position = transform->transformPoint(math::vec3f{ 0.0f, 0.0f, 0.0f });
-			}
-			break;
-			case NAV_DOLLY:
-			{
-				math::vec3f translation = -ts * movementSensibility * direction * delta.y;
-				transform->translate(translation);
-				position = transform->transformPoint(math::vec3f{ 0.0f, 0.0f, 0.0f });
-			}
-			break;
-			case NAV_ORBIT:
-			{
-				float pitchDelta = -rotationSensibility * delta.y;
-				float YawDelta = -rotationSensibility * delta.x;
-
-				transform->rotateOrbit(pitchDelta, horizontal, YawDelta, math::zAxis);
-
-				//math::Quaternion3f pitchRotationQuat = math::Quaternion3f(0.0f, pitchDelta, YawDelta);
-				//transform->rotateQuaternion(pitchRotationQuat);
+		case NAV_PAN:
+		{
+			const math::vec3f translation = ts * movementSensibility * (-horizontal * delta.x + vertical * delta.y);
+			transform->translate(translation);
+			position = transform->transformPoint(math::vec3f{ 0.0f, 0.0f, 0.0f });
+		}
+		break;
+		case NAV_DOLLY:
+		{
+			const math::vec3f translation = -ts * movementSensibility * direction * delta.y;
+			transform->translate(translation);
+			position = transform->transformPoint(math::vec3f{ 0.0f, 0.0f, 0.0f });
+		}
+		break;
+		case NAV_ORBIT:
+		{
+			const float pitchDelta = -rotationSensibility * delta.y;
+			const float yawDelta = -rotationSensibility * delta.x;
+			transform->rotateOrbit(pitchDelta, horizontal, yawDelta, math::zAxis);
 				updateDirections();
+			}
+			break;
+			case NAV_FOV:
+				{
+				fovY -= delta.y;
+				fovY = fmaxf(1.0f, fminf(fovY, 179.0f));
 			}
 			break;
 		default: ;
 		}
 	}
 
-	void Camera::traverse(const std::vector<std::shared_ptr<NodeVisitor>>& orderedVisitors)
+	std::vector<std::shared_ptr<Node>> Camera::getChildren() const
 	{
-		ACCEPT(Camera,orderedVisitors)
+		return { transform };
 	}
 
-	/*void Camera::accept(std::shared_ptr<NodeVisitor> visitor)
+	void Camera::accept(NodeVisitor& visitor)
 	{
-		visitor->visit(sharedFromBase<Camera>());
-	}*/
+		visitor.visit(as<Camera>());
+	}
 }

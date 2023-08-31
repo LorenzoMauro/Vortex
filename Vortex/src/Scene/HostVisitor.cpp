@@ -2,6 +2,7 @@
 #include "SIM.h"
 #include "MDL//mdlWrapper.h"
 #include "Nodes/Instance.h"
+#include "Nodes/Mesh.h"
 
 namespace vtx
 {
@@ -50,7 +51,12 @@ namespace vtx
 
 	};
 
-	void HostVisitor::visit(std::shared_ptr<graph::Light> lightNode) {
+	void HostVisitor::visit(std::shared_ptr<graph::EnvironmentLight> lightNode) {
+
+	};
+
+
+	void HostVisitor::visit(std::shared_ptr<graph::MeshLight> lightNode) {
 
 	};
 	

@@ -34,9 +34,15 @@ inline void waitAndClose() {
     std::exit(EXIT_FAILURE);
 }
 
+#define PRINT_MESSAGE(...) do { \
+	std::stringstream ss; \
+	ss << ##__VA_ARGS__ << std::endl; \
+	VTX_ERROR("{}", ss.str()); \
+	} while(0)
+
 #define VTX_ASSERT_CLOSE(successCondition, ...) do { \
     if (!(successCondition)) { \
-		VTX_ERROR(__VA_ARGS__); \
+		VTX_ERROR("Assert {} Failed in File {} at Line {}", #successCondition, __FILE__, __LINE__ ); \
 		__debugbreak(); \
 		waitAndClose(); \
 	}\
@@ -44,13 +50,13 @@ inline void waitAndClose() {
 
 #define VTX_ASSERT_CONTINUE(successCondition, ...) do { \
     if (!(successCondition)) { \
-		VTX_WARN(__VA_ARGS__);\
+		VTX_WARN("Assert {} Failed in File {} at Line {}", #successCondition, __FILE__, __LINE__ );\
 	}\
 } while(0)
 
 #define VTX_ASSERT_RETURN(successCondition, ...) do { \
     if (!(successCondition)) { \
-		VTX_WARN(__VA_ARGS__); \
+		VTX_WARN("Assert {} Failed in File {} at Line {}", #successCondition, __FILE__, __LINE__ ); \
 		return;\
 	}\
 } while(0)
@@ -58,14 +64,14 @@ inline void waitAndClose() {
 
 #define VTX_ASSERT_BREAK(successCondition, ...) do { \
     if (!(successCondition)) { \
-		VTX_WARN(__VA_ARGS__); \
+		VTX_WARN("Assert {} Failed in File {} at Line {}", #successCondition, __FILE__, __LINE__ ); \
 		break;\
 	}\
 } while(0)
 
-#define VTX_ASSERT_RETURNV(successCondition, ...) do { \
+#define VTX_ASSERT_RETURN(successCondition, ...) do { \
     if (!(successCondition)) { \
-		VTX_WARN(__VA_ARGS__); \
+		VTX_WARN("Assert {} Failed in File {} at Line {}", #successCondition, __FILE__, __LINE__ ); \
 		return 0; \
 	}\
 } while(0)

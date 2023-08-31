@@ -1,47 +1,64 @@
 #pragma once
 #include <string>
-
 #include "imgui.h"
+#include <type_traits>
+#include "Core/Math.h"
 
+static const std::string hiddenLabel = "##hidden";
+
+typedef bool (*ComboFuncType)(const char*, int*, const char* const [], int, int);
 
 namespace vtx::vtxImGui
 {
-    const char* empty_format_callback();
+    const char* emptyFormatCallback();
 
-    bool SliderFloat(const char* label, float* value, float min, float max, const char* format="%.3f");
+    bool sliderFloat(const char* label, float* value, const float min, const float max, const char* format="%.3f");
 
-    bool ClippedText(const char* label);
+    bool clippedText(const char* label);
 
     bool colorPicker(const char* label, float* col);
 
-    bool ColorEdit3NoInputs(const char* label, float* col);
+    bool colorEdit3NoInputs(const char* label, float* col);
 
     bool booleanText(const char* fmt, ...);
 
-    template<typename Func, typename ...Args>
-    bool HalfSpaceWidget(const char* label, Func&& widgetFunc, Args&&... args) {
-        bool valueChanged = false;
-        ImGuiStyle& style = ImGui::GetStyle();
+    void affineGui(math::affine3f& affine);
+
+    bool vectorGui(float* data, bool disableEdit = false);
+
+	template<typename Func, typename ...Args>
+    bool halfSpaceWidget(const char* label, Func&& widgetFunc, Args&&... args) {
+        bool              valueChanged = false;
+		const ImGuiStyle& style        = ImGui::GetStyle();
 
         // Start a new ImGui ID Scope
         ImGui::PushID(label);
 
+        constexpr float labelFraction = 0.3f;
+
         // Calculate the size of the text and button
-        float totalItemWidth = ImGui::CalcItemWidth();
-        float halfItemWidth = totalItemWidth * 0.5f; // Subtract the ItemInnerSpacing
+		const float totalItemWidth = ImGui::CalcItemWidth();
 
-        ImGui::PushItemWidth(halfItemWidth - style.ItemSpacing.x); // Set the width of the next widget to 200
+        const float labelWidth = totalItemWidth * labelFraction;
+        const float widgetWidth = totalItemWidth * (1.0f - labelFraction);
 
-        float cursorPosX = ImGui::GetCursorPosX();
+        ImGui::PushItemWidth(labelWidth - style.ItemSpacing.x); // Set the width of the next widget to 200
 
-        ClippedText(label); // Draw the label in the first column
+		const float cursorPosX = ImGui::GetCursorPosX();
+
+        clippedText(label); // Draw the label in the first column
 
         ImGui::PopItemWidth(); // Restore the width
 
         ImGui::SameLine(); // Draw the button on the same line as the label
-        ImGui::SetCursorPosX(cursorPosX + halfItemWidth); // Position in window coordinates
-        ImGui::PushItemWidth(halfItemWidth - style.ItemSpacing.x); // Set the width of the next widget to 200
-        valueChanged = widgetFunc(std::forward<Args>(args)...);
+        ImGui::SetCursorPosX(cursorPosX + labelWidth); // Position in window coordinates
+        ImGui::PushItemWidth(widgetWidth - style.ItemSpacing.x); // Set the width of the next widget to 200
+        if constexpr (std::is_same_v<bool, std::invoke_result_t<Func, Args...>>) {
+            valueChanged = widgetFunc(std::forward<Args>(args)...);
+        }
+        else {
+            widgetFunc(std::forward<Args>(args)...);
+        }
         ImGui::PopItemWidth(); // Restore the width
 
         // End ImGui ID Scope
@@ -49,5 +66,8 @@ namespace vtx::vtxImGui
 
         return valueChanged;
     }
+
+    void openFileDialog(const std::string&  key, const std::string&  name, const std::string&  extension);
+    std::tuple<bool, std::string, std::string> fileDialog(const std::string& label);
 
 }

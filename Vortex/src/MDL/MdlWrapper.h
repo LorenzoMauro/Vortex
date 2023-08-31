@@ -181,7 +181,7 @@ namespace vtx::mdl
 		std::map<std::string, std::shared_ptr<graph::shader::EnumTypeInfo>>& mapEnumTypes,
 		int                                                                  materialAdditionIndex = 0);
 
-	std::shared_ptr<graph::Texture> createTextureFromFile(const std::string& filePath);
+	void  loadFromFile(std::shared_ptr<graph::Texture> textureNode);
 
 	std::string removeMdlPrefix(const std::string& name);
 

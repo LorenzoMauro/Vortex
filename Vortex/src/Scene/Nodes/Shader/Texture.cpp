@@ -6,21 +6,20 @@ namespace vtx::graph
 {
 	void Texture::init()
 	{
-		mdl::fetchTextureData(sharedFromBase<Texture>());
-
-		isInitialized= true;
-	}
-	void Texture::traverse(const std::vector<std::shared_ptr<NodeVisitor>>& orderedVisitors)
-	{
 		if(!isInitialized)
 		{
-			init();
+			if(loadFromFile)
+			{
+				mdl::loadFromFile(as<Texture>());
+				loadFromFile = false;
+			}
+			mdl::fetchTextureData(sharedFromBase<Texture>());
+			isInitialized= true;
 		}
-		ACCEPT(Texture,orderedVisitors);
 	}
 
-	//void Texture::accept(std::shared_ptr<NodeVisitor> visitor)
-	//{
-	//	visitor->visit(sharedFromBase<Texture>());
-	//}
+	void Texture::accept(NodeVisitor& visitor)
+	{
+		visitor.visit(as<Texture>());
+	}
 }

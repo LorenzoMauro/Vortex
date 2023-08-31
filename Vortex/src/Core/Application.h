@@ -5,7 +5,6 @@
 #include "Layers/GuiLayer.h"
 #include "Layers/AppLayer.h"
 #include "Scene/Scene.h"
-#include "MDL/MdlWrapper.h"
 
 namespace vtx {
 
@@ -36,11 +35,10 @@ namespace vtx {
 		}
 		
 	public:
-		GLFWwindow*									window;
-		std::vector<std::shared_ptr<Layer>> 	    layerStack;
-		graph::Scene								scene;
-		float										timeStep = 0.0f;
-		float										frameTime = 0.0f;
-		float										lastFrameTime = 0.0f;
+		GLFWwindow*                         window;
+		std::vector<std::shared_ptr<Layer>> layerStack;
+		float                               timeStep      = 0.0f;
+		float                               frameTime     = 0.0f;
+		float                               lastFrameTime = 0.0f;
 	};
 }

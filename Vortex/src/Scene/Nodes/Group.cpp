@@ -10,26 +10,21 @@ namespace vtx::graph
 		transform = ops::createNode<Transform>();
 	}
 
-	std::vector<std::shared_ptr<Node>>& Group::getChildren() {
-		return children;
+	std::vector<std::shared_ptr<Node>> Group::getChildren() const
+	{
+		std::vector<std::shared_ptr<Node>> rC;
+		rC.push_back(transform);
+		rC.insert(rC.end(), children.begin(), children.end());
+		return rC;
 	}
 
 	void Group::addChild(const std::shared_ptr<Node>& child) {
 		children.push_back(child);
 	}
 
-	void Group::traverse(const std::vector<std::shared_ptr<NodeVisitor>>& orderedVisitors)
+	void Group::accept(NodeVisitor& visitor)
 	{
-		transform->traverse(orderedVisitors);
-		for (const auto& child : children) {
-			child->traverse(orderedVisitors);
-		}
-		ACCEPT(Group,visitors)
+		visitor.visit(as<Group>());
 	}
-
-	/*void Group::accept(std::shared_ptr<NodeVisitor> visitor)
-	{
-		visitor->visit(sharedFromBase<Group>());
-	}*/
 }
 

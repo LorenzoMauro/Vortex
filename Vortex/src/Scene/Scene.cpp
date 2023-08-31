@@ -1,47 +1,18 @@
 #include "Scene.h"
-#include "Utility/Operations.h"
 
 namespace vtx::graph
 {
-	void Scene::start() {
-		graphIndexManager = std::make_shared<SIM>();
-		SIM::sInstance = graphIndexManager;
+	static std::shared_ptr<Scene> gScene;
 
-		//////////////////////////////////////////////////////////////////////////
-		//////////////// Scene Graph /////////////////////////////////////////////
-		//////////////////////////////////////////////////////////////////////////
-
-		//sceneRoot = ops::simpleScene01();
-		sceneRoot = ops::importedScene();
-
-		//////////////////////////////////////////////////////////////////////////
-		//////////////// Graph Root /////////////////////////////////////////////
-		//////////////////////////////////////////////////////////////////////////
-
-		float cameraDistance = 2.0f;
-		std::shared_ptr<Camera> camera = ops::createNode<Camera>();
-		if(false)
+	std::shared_ptr<Scene> Scene::getScene()
+	{
+		if (!gScene)
 		{
-			camera->transform->rotateDegree(math::xAxis, 90.0f);
-			camera->transform->rotateDegree(camera->horizontal, 30.0f);
-			camera->transform->translate(math::yAxis, -cameraDistance);
-			camera->transform->rotateDegree(math::zAxis, 90.0f);
-			camera->transform->translate(math::zAxis, cameraDistance);
+			gScene = std::make_shared<Scene>();
+			gScene->sceneRoot = std::make_shared<Group>();
+			gScene->renderer = std::make_shared<Renderer>();
+			gScene->sceneRoot->addChild(gScene->renderer);
 		}
-		else
-		{
-			camera->transform->rotateDegree(math::xAxis, 90.0f);
-			camera->transform->rotateDegree(camera->horizontal, -15.0f);
-			camera->transform->translate(math::yAxis, -cameraDistance*3);
-			camera->transform->rotateDegree(math::zAxis, -90.0f);
-			camera->transform->translate(math::zAxis, cameraDistance);
-		}
-		camera->updateDirections();
-
-		renderer = ops::createNode<Renderer>();
-		renderer->setCamera(camera);
-		renderer->setScene(sceneRoot);
-		VTX_INFO("Finishing Scene Definition!");
+		return gScene;
 	}
-
 }

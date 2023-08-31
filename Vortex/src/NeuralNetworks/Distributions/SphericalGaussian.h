@@ -1,51 +1,105 @@
 #pragma once
-#ifndef SPHERICALGAUSSIAN_H
-#define SPHERICALGAUSSIAN_H
-#include "NeuralNetworks/tools.h"
+#ifndef SPHERICAL_GAUSSIAN_H
+#define SPHERICAL_GAUSSIAN_H
 
-namespace vtx::network
+#ifndef CUDA_INTERFACE
+#include <torch/torch.h>
+#else
+#include "Core/Math.h"
+#include "Device/DevicePrograms/randomNumberGenerator.h"
+#endif
+#include "cuda_runtime.h"
+
+namespace vtx
+{
+	namespace network
+	{
+		struct GraphsData;
+	}
+}
+
+namespace vtx::distribution
 {
     class SphericalGaussian {
     public:
-        static torch::Tensor sample(const torch::Tensor& loc, const torch::Tensor& scale, torch::Device device) {
+#ifndef CUDA_INTERFACE
+        static torch::Tensor sample(const torch::Tensor& loc, const torch::Tensor& scale);
 
-            int64_t batchSize = loc.size(0);
+        static torch::Tensor prob(const torch::Tensor& x, const torch::Tensor& loc, const torch::Tensor& scale);
 
-            torch::Tensor uniform = torch::rand({ batchSize, 1 }, torch::TensorOptions().device(device));
-            torch::Tensor w = 1.0f + torch::log(uniform + (1.0f - uniform) * torch::exp(-2.0f * scale) + EPS) / (scale + EPS);
+        static torch::Tensor logLikelihood(const torch::Tensor& x, const torch::Tensor& loc, const torch::Tensor& scale);
 
-            torch::Tensor angleUniform = torch::rand({ batchSize, 1 }, torch::TensorOptions().device(device));
-            angleUniform = angleUniform * 2.0f * M_PI_F;
-            torch::Tensor v = torch::cat({ torch::cos(angleUniform), torch::sin(angleUniform) }, -1);
+        static std::tuple<torch::Tensor, torch::Tensor> splitParams(const torch::Tensor& params);
 
-            const torch::Tensor w_ = torch::sqrt(torch::clamp(1 - w.pow(2), EPS, 1));
+    	static torch::Tensor prob(const torch::Tensor& x, const torch::Tensor& params);
 
-            const torch::Tensor x = torch::cat({ w, w_ * v }, -1);
+        static torch::Tensor logLikelihood(const torch::Tensor& x, const torch::Tensor& params);
 
-            // Householder rotation
-            const torch::Tensor e1 = torch::tensor({ 1.0, 0.0, 0.0 }, loc.options()).expand_as(loc);
-            auto       u = e1 - loc;
-            u = u / (u.norm(2, 1, true) + EPS);
-            auto sample = x - 2 * (x * u).sum(-1, true) * u;
+        static torch::Tensor sample(const torch::Tensor& params);
 
-            PRINT_TENSORS("VON MISES SAMPLE", loc, scale, uniform, w, w_, v, x, e1, u, sample);
+        static torch::Tensor finalizeRawParams(const torch::Tensor& params);
+
+        static void setGraphData(const torch::Tensor& params, const torch::Tensor& mixtureWeights, network::GraphsData& graphData, const bool isTraining, const
+								 int depth);
+#else
+    	__forceinline__ __device__ static float prob(const math::vec3f& mean, const float& k, const math::vec3f& action)
+        {
+            const float pdf = k / (2.0f * M_PI * (1 - expf(-2.0f * k))) * expf(k * (dot(mean, action) - 1.0f));
+            if (isnan(pdf))
+            {
+                return 0.0f;
+            }
+            return pdf;
+        }
+
+        __forceinline__ __device__ static math::vec3f sample(const math::vec3f& mean, const float& k, unsigned& seed)
+        {
+            const float uniform = rng(seed);
+            const float w = 1.0f + logf(uniform + (1.0f - uniform) * expf(-2.0f * k) + EPS) / (k + EPS);
+
+            const float angleUniform = rng(seed) * 2.0f * M_PI;
+            const math::vec2f v = math::vec2f(cosf(angleUniform), sinf(angleUniform));
+
+            float      w_ = sqrtf(math::max(0.0f, 1.0f - w * w));
+            const auto x = math::vec3f(w, w_ * v.x, w_ * v.y);
+
+            const auto  e1 = math::vec3f(1.0f, 0.0f, 0.0f);
+            math::vec3f u = e1 - mean;
+            u = math::normalize(u);
+            math::vec3f sample = x - 2.0f * math::dot(x, u) * u;
 
             return sample;
         }
 
-        static torch::Tensor prob(const torch::Tensor& x, const torch::Tensor& loc, const torch::Tensor& scale)
+        __forceinline__ __device__ static void splitPrams(const math::vec3f*& mean, const float*& k, const float* params)
+    	{
+    		mean = reinterpret_cast<const math::vec3f*>(params);
+			k =params+3;
+		}
+        __forceinline__ __device__ static math::vec3f sample(const float* parameters, unsigned& seed)
         {
-            torch::Tensor p = 1.0f / (2.0f * M_PI_F * (1.0f - torch::exp(-2.0f * scale))) * torch::exp(scale * (loc * x).sum(-1).unsqueeze(-1) - 1.0f);
-            PRINT_TENSORS("VON MISES PROB", x, loc, scale, p);
-            return p;
+            const math::vec3f* mean = nullptr;
+    		const float* k = nullptr;
+            splitPrams(mean, k, parameters);
+            const math::vec3f  sample = SphericalGaussian::sample(*mean, *k, seed);
+            return sample;
         }
 
-        static torch::Tensor logLikelihood(const torch::Tensor& x, const torch::Tensor& loc, const torch::Tensor& scale) {
+        __forceinline__ __device__ static float prob(const float* parameters, const math::vec3f& action)
+        {
+            const math::vec3f* mean = nullptr;
+            const float* k = nullptr;
+            splitPrams(mean, k, parameters);
+			const float pdf = SphericalGaussian::prob(*mean, *k, action);
+			return pdf;
+		}
 
-            torch::Tensor logP = torch::log(prob(x, loc, scale) + EPS);
-            PRINT_TENSORS("VON MISES LOG LIKELIHOOD", x, loc, scale, logP);
-            return logP;
+#endif
+        __forceinline__ __device__ __host__ static int getParametersCount()
+        {
+            return 4;
         }
     };
 }
+
 #endif

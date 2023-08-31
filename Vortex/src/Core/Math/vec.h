@@ -30,7 +30,16 @@ namespace gdt {
     template<> struct long_type_of<uint32_t> { typedef uint64_t type; };
 
     template<typename T, int N>
-    struct GDT_INTERFACE vec_t { T t[N]; };
+    struct GDT_INTERFACE vec_t
+    {
+	    T t[N];
+
+        T& operator[](int i)
+        {
+            assert(i >= 0 && i < N);
+	        return t[i];
+        }
+    };
 
 
     template<typename ScalarTypeA, typename ScalarTypeB> struct BinaryOpResultType;

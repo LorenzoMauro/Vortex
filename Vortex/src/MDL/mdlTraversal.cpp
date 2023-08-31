@@ -1,9 +1,7 @@
-﻿#include "traversal.h"
+﻿#include "mdlTraversal.h"
 
 namespace vtx::mdl
 {
-
-
 	bool isValidDf(Handle<IExpression const> expr)
 	{
 		const Handle exprConstant(expr->get_interface<IExpression_constant>());
@@ -14,5 +12,6 @@ namespace vtx::mdl
 		}
 		return true;
 	};
+
 
 }

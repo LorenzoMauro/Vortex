@@ -11,6 +11,7 @@
 #include "NeuralNetworks/NetworkSettings.h"
 #include "Scene/DataStructs/VertexAttribute.h"
 #include "Scene/Nodes/LightTypes.h"
+#include "Scene/Nodes/RendererSettings.h"
 
 namespace vtx {
 	struct NetworkInterface;
@@ -32,17 +33,6 @@ namespace vtx {
 		int envLightSample = -1;
 	};
 
-
-    enum DataType
-    {
-	    DV_INSTANCE,
-        DV_GEOMETRY,
-        DV_MATERIAL,
-        DV_SHADER,
-        DV_TEXTURE,
-        DV_BSDF,
-        DV_LIGHTPROFILE
-    };
     enum PrimitiveType {
         PT_TRIANGLES,
 
@@ -269,119 +259,55 @@ namespace vtx {
         math::vec2ui frameSize;
 	};
 
-    enum SamplingTechnique
-    {
-        S_BSDF,
-        S_DIRECT_LIGHT,
-        S_MIS,
+    
 
-        S_COUNT
-    };
 
-    enum DisplayBuffer
-    {
-        FB_BEAUTY,
-        FB_NOISY,
+    //struct NeuralNetworkDeviceSettings
+    //{
+    //    bool                 useNetwork;
+    //    network::NetworkType type;
+    //    int                  inferenceStart;
+    //    bool                 clearOnInferenceStart;
+    //    bool                 doInference;
+    //    float                samplingFraction = 0.5f;
+    //};
 
-        FB_DIFFUSE,
-        FB_ORIENTATION,
-        FB_TRUE_NORMAL,
-        FB_SHADING_NORMAL,
-        FB_TANGENT,
-        FB_UV,
-        FB_NOISE,
-        FB_SAMPLES,
-        FB_DEBUG_1,
-
-        FB_NETWORK_INFERENCE_STATE_POSITION,
-        FB_NETWORK_INFERENCE_STATE_NORMAL,
-        FB_NETWORK_INFERENCE_OUTGOING_DIRECTION,
-        FB_NETWORK_INFERENCE_MEAN,
-        FB_NETWORK_INFERENCE_CONCENTRATION,
-        FB_NETWORK_INFERENCE_SAMPLE,
-        FB_NETWORK_INFERENCE_PDF,
-        FB_NETWORK_INFERENCE_IS_FRONT_FACE,
-
-        FB_NETWORK_REPLAY_BUFFER_REWARD,
-        FB_NETWORK_REPLAY_BUFFER_SAMPLES,
-
-        FB_COUNT,
-    };
-
-    struct RendererDeviceSettings
-    {
-        inline static const char* samplingTechniqueNames[] = {
-                "Bsdf Sampling",
-                "Light Sampling",
-                "Multiple Importance Sampling",
-        };
-
-        inline static const char* displayBufferNames[] = {
-				"Beauty",
-                "Noisy",
-                "Diffuse",
-                "Orientation",
-                "True Normal",
-                "Shading Normal",
-				"Tangent",
-                "Uv",
-				"Noise",
-				"Samples",
-                "Debug1",
-				"Network Inference State Position",
-				"Network Inference State Normal",
-				"Network Inference Outgoing Direction",
-				"Network Inference Mean",
-				"Network Inference Concentration",
-				"Network Inference Sample",
-				"Network Inference Pdf",
-				"Network Inference Is Front Face",
-				"Network Replay Buffer Reward",
-				"Network Replay Buffer Samples",
-        };
-
-        int                 iteration;
-        int                 maxBounces;
-        bool                accumulate;
-        SamplingTechnique   samplingTechnique;
-		DisplayBuffer       displayBuffer;
-        float               minClamp;
-        float               maxClamp;
-
-        bool                adaptiveSampling;
-        int                 minAdaptiveSamples;
-        int                 minPixelSamples;
-        int                 maxPixelSamples;
-        float               noiseCutOff;
-
-        bool                useLongPathKernel;
-        float               longPathPercentage;
-        int                 maxTraceQueueSize;
-
-        bool enableDenoiser;
-        bool removeFirefly;
-		bool useRussianRoulette;
-		int  parallelShade;
-
-		bool                 useNetwork;
-		network::NetworkType networkType;
-		int                  neuralInferenceStart;
-		bool                 clearOnInferenceStart;
-        bool                 doInference;
-		float                neuralSampleFraction = 0.5f;
-	};
-
-    struct ToneMapperSettings
-    {
-	    math::vec3f invWhitePoint;
-        math::vec3f colorBalance;
-        float 	 burnHighlights;
-        float 	 crushBlacks;
-        float 	 saturation;
-        float 	 invGamma;
-    };
+    //struct RendererDeviceSettings
+    //{
+    //    int                 iteration;
+    //    int                 maxBounces;
+    //    bool                accumulate;
+    //    SamplingTechnique   samplingTechnique;
+	//	DisplayBuffer       displayBuffer;
+    //    float               minClamp;
+    //    float               maxClamp;
+    //
+    //    bool                adaptiveSampling;
+    //    int                 minAdaptiveSamples;
+    //    int                 minPixelSamples;
+    //    int                 maxPixelSamples;
+    //    float               noiseCutOff;
+    //
+    //    bool                useLongPathKernel;
+    //    float               longPathPercentage;
+    //    int                 maxTraceQueueSize;
+    //
+    //    bool                     enableDenoiser;
+    //    bool                     removeFirefly;
+	//	bool                     useRussianRoulette;
+	//	int                      parallelShade;
+    //
+	//};
 
     struct Counters {
+        int* traceQueueCounter = nullptr;
+        int* shadeQueueCounter = nullptr;
+        int* escapedQueueCounter = nullptr;
+        int* accumulationQueueCounter = nullptr;
+        int* shadowQueueCounter = nullptr;
+    };
+
+    struct QueueSizes {
         int traceQueueCounter = 0;
         int shadeQueueCounter = 0;
         int escapedQueueCounter = 0;
@@ -389,16 +315,20 @@ namespace vtx {
         int shadowQueueCounter = 0;
     };
 
+    struct OnDeviceSettings
+    {
+		RendererSettings renderer;
+        WavefrontSettings wavefront;
+        network::NetworkSettings neural;
+    };
+
 	struct LaunchParams
     {
 		int*                    frameID;
 		int                     nextPixel = 0;
-		int                     remainingBounces;
 		FrameBufferData         frameBuffer;
 		CameraData              cameraData;
-		RendererDeviceSettings* settings;
-		ToneMapperSettings*     toneMapperSettings;
-		SbtProgramIdx*          programs;
+		//SbtProgramIdx*          programs;
 		OptixTraversableHandle  topObject;
 		InstanceData**          instances;
 		LightData*              envLight = nullptr;
@@ -413,6 +343,8 @@ namespace vtx {
 		WorkQueueSOA<AccumulationWorkItem>* accumulationQueue;
 
 		NetworkInterface* networkInterface;
+
+        OnDeviceSettings* settings;
 	};
 
     enum TypeRay

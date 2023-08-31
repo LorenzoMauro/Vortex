@@ -8,6 +8,7 @@
 #include "CUDAChecks.h"
 #include "Core/Options.h"
 #include "Core/Utils.h"
+#include "UploadCode/UploadBuffers.h"
 
 namespace vtx::optix
 {
@@ -175,7 +176,7 @@ namespace vtx::optix
 		return fullFunctionName.substr(prefix.size());
 	}
 
-	std::shared_ptr<ProgramOptix> createDcProgram(std::shared_ptr<ModuleOptix> module, std::string functionName, vtxID id, std::vector<std::string> sbtName)
+	std::shared_ptr<ProgramOptix> createDcProgram(const std::shared_ptr<ModuleOptix>& module, const std::string& functionName, vtxID id, const std::vector<std::string>& sbtName)
 	{
 		const auto function = std::make_shared<optix::FunctionOptix>();
 		function->name = functionName;
@@ -345,7 +346,7 @@ namespace vtx::optix
 		return pgd;
 	}
 
-	void SbtPipeline::registerProgram(std::shared_ptr<ProgramOptix> program)
+	void SbtPipeline::registerProgram(const std::shared_ptr<ProgramOptix>& program)
 	{
 		programs[program->type].push_back(program);
 		isDirty = true;
@@ -491,7 +492,7 @@ namespace vtx::optix
 	//	}
 	//}
 
-	void PipelineOptix::registerProgram(std::shared_ptr<ProgramOptix> program, std::vector<std::string> sbtNames)
+	void PipelineOptix::registerProgram(const std::shared_ptr<ProgramOptix>& program, std::vector<std::string> sbtNames)
 	{
 		if (sbtNames.size() == 1 && sbtNames[0] == "")
 		{
@@ -619,7 +620,7 @@ namespace vtx::optix
 		return pipeline;
 	}
 
-	int PipelineOptix::getProgramSbt(std::string programName, std::string sbtName)
+	int PipelineOptix::getProgramSbt(const std::string& programName, std::string sbtName)
 	{
 		if (sbtName.empty())
 		{
@@ -637,6 +638,27 @@ namespace vtx::optix
 		}
 
 		return sbtPipelines[sbtName].getSbt();
+	}
+
+	void PipelineOptix::launchOptixKernel(const math::vec2i& launchDimension, const std::string& pipelineName)
+	{
+		const optix::State& state = *(optix::getState());
+		const OptixPipeline& pipeline = optix::getRenderingPipeline()->getPipeline();
+		const OptixShaderBindingTable& sbt = optix::getRenderingPipeline()->getSbt(pipelineName);
+
+		const auto result = optixLaunch(/*! pipeline we're launching launch: */
+			pipeline, state.stream,
+			/*! parameters and SBT */
+			UPLOAD_BUFFERS->launchParamsBuffer.dPointer(),
+			UPLOAD_BUFFERS->launchParamsBuffer.bytesSize(),
+			&sbt,
+			/*! dimensions of the launch: */
+			launchDimension.x,
+			launchDimension.y,
+			1
+		);
+		OPTIX_CHECK(result);
+		CUDA_SYNC_CHECK();
 	}
 
 	OptixTraversableHandle createGeometryAcceleration(CUdeviceptr vertexData, uint32_t verticesNumber, uint32_t verticesStride, CUdeviceptr indexData, uint32_t indexNumber, uint32_t indicesStride)
@@ -740,7 +762,7 @@ namespace vtx::optix
 		return traversable;
 	}
 
-	OptixInstance createInstance(uint32_t instanceId, math::affine3f transform, OptixTraversableHandle traversable)
+	OptixInstance createInstance(uint32_t instanceId, const math::affine3f& transform, OptixTraversableHandle traversable)
 	{
 		// First check if there is a valid material assigned to this instance.
 
@@ -819,7 +841,7 @@ namespace vtx::optix
 									&TopTraversable,
 									nullptr, 0));
 
-		//CUDA_SYNC_CHECK();
+		CUDA_SYNC_CHECK();
 
 		/// Clean Up ///
 		tempBuffer.free();

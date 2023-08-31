@@ -2,6 +2,7 @@
 #define HIT_PROPERTIES_H
 #pragma once
 #include "LaunchParams.h"
+#include "Utils.h"
 #include "Core/Math.h"
 
 namespace vtx
@@ -75,6 +76,16 @@ namespace vtx
             // Calculate an ortho-normal system respective to the shading normal.
             // Expanding the TBN tbn(tg, ns) constructor because TBN members can't be used as pointers for the Mdl_state with NUM_TEXTURE_SPACES > 1.
             bitangent = math::normalize(cross(shadingNormal, tangent));
+            if(utl::isNan(bitangent))
+            {
+                printf(
+                    "Nan Bitangent\n"
+                    "Shading Normal : %f %f %f\n"
+                    "Tangent : %f %f %f\n\n",
+                    shadingNormal.x, shadingNormal.y, shadingNormal.z,
+                    tangent.x, tangent.y, tangent.z
+                );
+            }
             tangent = cross(bitangent, shadingNormal); // Now the tangent is orthogonal to the shading normal.
 
             // Explicitly include edge-on cases as frontface condition!
@@ -112,6 +123,26 @@ namespace vtx
             // Calculate an ortho-normal system respective to the shading normal.
             // Expanding the TBN tbn(tg, ns) constructor because TBN members can't be used as pointers for the Mdl_state with NUM_TEXTURE_SPACES > 1.
             bitangent = math::normalize(cross(shadingNormal, tangent));
+            if (utl::isNan(bitangent))
+            {
+                printf(
+                    "Nan Bitangent\n"
+                    "Shading Normal : %f %f %f\n"
+                    "Tangent : %f %f %f\n\n"
+                    "tgO: %f %f %f\n"
+                    "Tangent Vertex 0: %f %f %f\n"
+                    "Tanget Vertex 1: %f %f %f\n"
+                    "Tanget Vertex 2: %f %f %f\n"
+                    ,
+                    shadingNormal.x, shadingNormal.y, shadingNormal.z,
+                    tangent.x, tangent.y, tangent.z,
+                    tgO.x, tgO.y, tgO.z,
+                    vertices[0]->tangent.x, vertices[0]->tangent.y, vertices[0]->tangent.z,
+                    vertices[1]->tangent.x, vertices[1]->tangent.y, vertices[1]->tangent.z,
+                    vertices[2]->tangent.x, vertices[2]->tangent.y, vertices[2]->tangent.z
+                );
+            }
+
             tangent = cross(bitangent, shadingNormal); // Now the tangent is orthogonal to the shading normal.
 
             // Explicitly include edge-on cases as frontface condition!

@@ -3,7 +3,12 @@
 
 namespace vtx::graph
 {
-	std::shared_ptr<SIM> SIM::sInstance = nullptr;
+	std::shared_ptr<SIM> sInstance = std::make_shared<SIM>();
+
+	SIM::SIM()
+	{
+		sInstance = std::shared_ptr<SIM>(this);
+	}
 
 	std::shared_ptr<SIM> SIM::Get() {
 		return sInstance;

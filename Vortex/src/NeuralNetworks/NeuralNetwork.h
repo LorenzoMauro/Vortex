@@ -1,5 +1,7 @@
 #pragma once
 #include <memory>
+
+#include "Experiment.h"
 #include "NetworkSettings.h"
 
 namespace vtx::network
@@ -16,13 +18,15 @@ namespace vtx::network
 
 		void initNetworks();
         void train();
-        void inference();
+        void inference(const int& depth);
 		void reset();
 
 		bool doInference();
 		NetworkSettings& getNeuralNetSettings();
 		GraphsData& getGraphs();
 		std::unique_ptr<NetworkImplementation> impl;
-		NetworkType type;
+		NetworkSettings settings;
+		ExperimentsManager experimentManager;
+		bool isInitialized = false;
     };
 }

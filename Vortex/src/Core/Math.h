@@ -95,6 +95,21 @@ namespace vtx::math
 		return min(1.f, max(0.f, f));
 	}
 
+	__inline__ __both__ bool isNan(const vec3f& v)
+	{
+		return isnan(v.x) || isnan(v.y) || isnan(v.z);
+	}
+
+	__inline__ __both__ bool isZero(const vec3f& v)
+	{
+		return v == math::vec3f(0.0f);
+	}
+
+	__inline__ __both__ bool isInf(const vec3f& v)
+	{
+		return isinf(v.x) || isinf(v.y) || isinf(v.z);
+	}
+
 	static inline __both__ vec3f saturate(const vec3f& v) {
 		return vec3f(saturate(v.x), saturate(v.y), saturate(v.z));
 	}

@@ -167,7 +167,7 @@ namespace vtx
 
 		curandState_t state;
 		const float noise = noiseBuffer[y * width + x].noiseAbsolute;
-		curand_init(x, y, (int)noise + params->settings->iteration, &state);
+		curand_init(x, y, (int)noise + params->settings->renderer.iteration, &state);
 		noiseBuffer[y * width + x].normalizedNoise = noise / (*noiseSum);
 		noiseBuffer[y * width + x].adaptiveSamples = 0;
 
@@ -210,7 +210,7 @@ namespace vtx
 
 		curandState_t state;
 		const float noise = noiseBuffer[y * width + x].noiseAbsolute;
-		curand_init(x, y, (int)noise + params->settings->iteration, &state);
+		curand_init(x, y, (int)noise + params->settings->renderer.iteration, &state);
 		noiseBuffer[y * width + x].normalizedNoise = noise / (*noiseSum);
 		noiseBuffer[y * width + x].adaptiveSamples = 0;
 
@@ -305,7 +305,7 @@ namespace vtx
 		atomicMaxFloat(&globalRange[0].y, range.y);
 	}
 
-	void noiseComputation(const LaunchParams* deviceParams, const graph::RendererSettings& settings, const int& rendererNodeId)
+	void noiseComputation(const LaunchParams* deviceParams, const int& rendererNodeId)
 	{
 
 		/*const CUDABuffer& tmRadianceBuffer = GET_BUFFER(device::Buffers::FrameBufferBuffers, rendererNodeId, tmRadiance);
@@ -372,7 +372,7 @@ namespace vtx
 			dim3 numBlocks((width + threadsPerBlock.x - 1) / threadsPerBlock.x,
 						   (height + threadsPerBlock.y - 1) / threadsPerBlock.y);
 
-			computeNoise<<<numBlocks, threadsPerBlock>>> (deviceParams, noiseSum, settings.noiseKernelSize, settings.albedoNormalNoiseInfluence);
+			computeNoise<<<numBlocks, threadsPerBlock>>> (deviceParams, noiseSum, deviceParams->settings->renderer.adaptiveSamplingSettings.noiseKernelSize, deviceParams->settings->renderer.adaptiveSamplingSettings.albedoNormalNoiseInfluence);
 		}
 
 		{

@@ -239,9 +239,10 @@ namespace vtx {
         style.NodeCornerRounding = 5.0f;
         style.NodePadding = ImVec2(10.0f, 4.0f);
         style.NodeBorderThickness = 1.0f;
-        style.LinkThickness = 2.0f;
+        style.LinkThickness = 1.5f;
         style.LinkLineSegmentsPerLength = 0.1f;
         style.LinkHoverDistance = 10.0f;
+        style.PinCircleRadius = 3.0f;
         // ... set other style variables
 
         // Set style flags

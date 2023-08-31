@@ -7,20 +7,14 @@ namespace vtx::graph {
 	{
 		lightProfileData = mdl::fetchLightProfileData(databaseName);
 		prepareSampling();
-	}
-	void LightProfile::traverse(const std::vector<std::shared_ptr<NodeVisitor>>& orderedVisitors)
-	{
-		if (!isInitialized)
-		{
-			init();
-		}
-		ACCEPT(LightProfile, orderedVisitors);
+		isInitialized = true;
 	}
 
-	/*void LightProfile::accept(std::shared_ptr<NodeVisitor> visitor)
+	void LightProfile::accept(NodeVisitor& visitor)
 	{
-		visitor->visit(sharedFromBase<LightProfile>());
-	}*/
+		visitor.visit(as<LightProfile>());
+	}
+
 	void LightProfile::prepareSampling()
 	{
 		const math::vec2ui& res		= lightProfileData.resolution;

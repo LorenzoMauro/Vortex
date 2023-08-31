@@ -18,19 +18,11 @@ namespace vtx::graph {
 		}
 	}
 
-	void BsdfMeasurement::traverse(const std::vector<std::shared_ptr<NodeVisitor>>& orderedVisitors)
+	void BsdfMeasurement::accept(NodeVisitor& visitor)
 	{
-		if(!isInitialized)
-		{
-			init();
-		}
-		ACCEPT(BsdfMeasurement, orderedVisitors)
+		visitor.visit(as<BsdfMeasurement>());
 	}
 
-	/*void BsdfMeasurement::accept(std::shared_ptr<NodeVisitor> visitor)
-	{
-		visitor->visit(sharedFromBase<BsdfMeasurement>());
-	}*/
 	void BsdfMeasurement::prepareSampling(BsdfPartData bsdfData)
 	{
 		// CDF of the probability to select a certain theta_out for a given theta_in.

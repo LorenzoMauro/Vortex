@@ -23,6 +23,7 @@ project "OptixApp"
         IncludeDir["GLFW"],
         IncludeDir["GLAD"],
         IncludeDir["ImGui"],
+        IncludeDir["yaml"],
         IncludeDir["spdlog"],
         IncludeDir["OPTIX"],
         IncludeDir["CUDA"],
@@ -31,7 +32,9 @@ project "OptixApp"
         IncludeDir["ASSIMP"],
         IncludeDir["ImNode"],
         IncludeDir["ImPlot"],
-        IncludeDir["NVTOOLS"]
+        IncludeDir["NVTOOLS"],
+        IncludeDir["stbImage"],
+        IncludeDir["ImGuiFileDialog"]
     }
 
     local relativeIncludeDirsDebug = {table.unpack(relativeIncludeDirsCommon)}
@@ -62,7 +65,8 @@ project "OptixApp"
         "NOMINMAX",
         --"C10_MACROS_CMAKE_MACROS_H_",
         "_UNICODE",
-        "UNICODE"
+        "UNICODE",
+        "YAML_CPP_STATIC_DEFINE"
     }
 
     local preprocessorDefinesDebug = {table.unpack(preprocessorDefinesCommon)}
@@ -83,6 +87,8 @@ project "OptixApp"
         "ImGui",
         "ImNode",
         "ImPlot",
+        "ImGuiFileDialog",
+        "yaml-cpp",
         "mdl_sdk.lib",
         "mdl_core.lib",
         "nv_freeimage.lib",
@@ -125,7 +131,7 @@ project "OptixApp"
 
     local ptxOutput     = "%{cfg.targetdir}/ptx/%{file.basename}.ptx"
     local optixIrOutput = "%{cfg.targetdir}/ptx/%{file.basename}.optixir"
-    local objOutput     = "%{cfg.targetdir}/obj/%{file.basename}.obj"
+    local objOutput     = "%{cfg.objdir}/%{file.basename}.obj"
     local bcOutput      = "%{cfg.targetdir}/bc/%{file.basename}.bc"
     local dOutput       = "%{cfg.targetdir}/bc/%{file.basename}.d"
 
@@ -139,6 +145,43 @@ project "OptixApp"
     local optixirCompileCommandRelease = nvccCompileToIntermediate("%{file.relpath}", optixIrOutput, "optix-ir", CUDA_TOOLKIT_PATH_11, absoluteIncludeDirsRelease,preprocessorDefinesRelease, false)
     local clangCompileCommandRelease = clangCompileCu("%{file.relpath}", bcOutput, dOutput, clang12, CUDA_TOOLKIT_PATH_8,clangInclude ,preprocessorDefinesRelease, false)
     
+    local torchBuildInputs = {
+        "src/NeuralNetworks/Interface/InferenceQueries.h",
+        "src/NeuralNetworks/Interface/NetworkInputs.h",
+        "src/NeuralNetworks/Interface/NetworkInterface.h",
+        "src/NeuralNetworks/Interface/NpgTrainingData.h",
+        "src/NeuralNetworks/Interface/Paths.h",
+        "src/NeuralNetworks/Interface/ReplayBuffer.h",
+
+        "src/NeuralNetworks/NetworkImplementation.h",
+        "src/NeuralNetworks/NetworkSettings.h",
+        "src/NeuralNetworks/NeuralNetworkGraphs.h",
+        "src/NeuralNetworks/tools.h",
+        "src/NeuralNetworks/Networks/Sac.h",
+        "src/NeuralNetworks/Networks/Npg.h",
+        "src/NeuralNetworks/Networks/PathGuidingNetwork.h",
+        "src/NeuralNetworks/Networks/InputComposer.h",
+        "src/NeuralNetworks/Distributions/GaussianToSphere.h",
+        "src/NeuralNetworks/Distributions/SphericalGaussian.h",
+        "src/NeuralNetworks/Distributions/Nasg.h",
+        "src/NeuralNetworks/Distributions/Mixture.h",
+        "src/Device/DevicePrograms/LaunchParams.h"
+    }
+
+    local cudaBuildInputs = {
+        "src/NeuralNetworks/Interface/InferenceQueries.h",
+        "src/NeuralNetworks/Interface/NetworkInputs.h",
+        "src/NeuralNetworks/Interface/NetworkInterface.h",
+        "src/NeuralNetworks/Interface/NpgTrainingData.h",
+        "src/NeuralNetworks/Interface/Paths.h",
+        "src/NeuralNetworks/Interface/ReplayBuffer.h",
+        "src/NeuralNetworks/Distributions/Mixture.h",
+        "src/NeuralNetworks/Distributions/SphericalGaussian.h",
+        "src/NeuralNetworks/Distributions/Nasg.h",
+        "src/Device/DevicePrograms/LaunchParams.h",
+        "src/Device/DevicePrograms/rendererFunctions.h"
+    }
+
     filter "configurations:Debug"
         includedirs{
             relativeIncludeDirsDebug
@@ -175,10 +218,7 @@ project "OptixApp"
             ptxOutput,
         }
         buildinputs{
-            "src/NeuralNetworks/ReplayBuffer.h",
-            "src/Device/DevicePrograms/LaunchParams.h",
-            "src/Device/DevicePrograms/rendererFunctions.h"
-            
+            cudaBuildInputs
         }
         flags { "MultiProcessorCompile" }
 
@@ -191,12 +231,24 @@ project "OptixApp"
             objOutput,
         }
         buildinputs{
-            "src/NeuralNetworks/ReplayBuffer.h",
-            "src/Device/DevicePrograms/LaunchParams.h",
-            "src/Device/DevicePrograms/rendererFunctions.h"
-            
+            cudaBuildInputs
         }
         flags { "MultiProcessorCompile" }
+
+        
+    filter {"configurations:Release", "files:src/Device/CudaFunctions/*.cu"}
+        buildcommands {
+            'echo "Running NVCC:"' .. CudaCompileCommandRelease .. '"',
+            CudaCompileCommandRelease,
+        }
+        buildoutputs {
+            objOutput,
+        }
+        buildinputs{
+            cudaBuildInputs
+        }
+        flags { "MultiProcessorCompile" }
+
     filter {"configurations:Release","files:src/NeuralNetworks/*.cu"}
         buildcommands {
             'echo "Running NVCC:"' .. CudaCompileCommandRelease .. '"',
@@ -206,18 +258,7 @@ project "OptixApp"
             objOutput,
         }
         buildinputs{
-            "src/NeuralNetworks/ReplayBuffer.h",
-            "src/NeuralNetworks/Encodings.h",
-            "src/NeuralNetworks/NetworkImplementation.h",
-            "src/NeuralNetworks/NetworkSettings.h",
-            "src/NeuralNetworks/NeuralNetworkGraphs.h",
-            "src/NeuralNetworks/tools.h",
-            "src/NeuralNetworks/tools.cpp",
-            "src/NeuralNetworks/Networks/Sac.h",
-            "src/NeuralNetworks/Distributions/GaussianToSphere.h",
-            "src/NeuralNetworks/Distributions/SphericalGaussian.h",
-            "src/Device/DevicePrograms/LaunchParams.h"
-            
+            torchBuildInputs
         }
         flags { "MultiProcessorCompile" }
 
@@ -231,10 +272,7 @@ project "OptixApp"
             optixIrOutput,
         }
         buildinputs{
-            "src/NeuralNetworks/ReplayBuffer.h",
-            "src/Device/DevicePrograms/LaunchParams.h",
-            "src/Device/DevicePrograms/rendererFunctions.h"
-            
+            cudaBuildInputs
         }
         flags { "MultiProcessorCompile" }
 
@@ -248,10 +286,7 @@ project "OptixApp"
             dOutput
         }
         buildinputs{
-            "src/NeuralNetworks/ReplayBuffer.h",
-            "src/Device/DevicePrograms/LaunchParams.h",
-            "src/Device/DevicePrograms/rendererFunctions.h"
-            
+            cudaBuildInputs         
         }
         flags { "MultiProcessorCompile" }
     
@@ -267,10 +302,21 @@ project "OptixApp"
             objOutput,
         }
         buildinputs{
-            "src/NeuralNetworks/ReplayBuffer.h",
-            "src/Device/DevicePrograms/LaunchParams.h",
-            "src/Device/DevicePrograms/rendererFunctions.h"
-            
+            cudaBuildInputs
+        }
+        flags { "MultiProcessorCompile" }
+
+    filter {"configurations:Debug", "files:src/Device/CudaFunctions/*.cu"}
+
+        buildcommands {
+            'echo "Running NVCC:"' .. CudaCompileCommandDebug .. '"',
+            CudaCompileCommandDebug,
+        }
+        buildoutputs {
+            objOutput,
+        }
+        buildinputs{
+            cudaBuildInputs
         }
         flags { "MultiProcessorCompile" }
     filter {"configurations:Debug", "files:src/NeuralNetworks/*.cu"}
@@ -283,17 +329,7 @@ project "OptixApp"
             objOutput,
         }
         buildinputs{
-            "src/NeuralNetworks/ReplayBuffer.h",
-            "src/NeuralNetworks/Encodings.h",
-            "src/NeuralNetworks/NetworkImplementation.h",
-            "src/NeuralNetworks/NetworkSettings.h",
-            "src/NeuralNetworks/NeuralNetworkGraphs.h",
-            "src/NeuralNetworks/tools.h",
-            "src/NeuralNetworks/tools.cpp",
-            "src/NeuralNetworks/Networks/Sac.h",
-            "src/NeuralNetworks/Distributions/GaussianToSphere.h",
-            "src/NeuralNetworks/Distributions/SphericalGaussian.h",
-            "src/Device/DevicePrograms/LaunchParams.h"
+           torchBuildInputs
         }
         flags { "MultiProcessorCompile" }
     
@@ -306,10 +342,7 @@ project "OptixApp"
             ptxOutput,
         }
         buildinputs{
-            "src/NeuralNetworks/ReplayBuffer.h",
-            "src/Device/DevicePrograms/LaunchParams.h",
-            "src/Device/DevicePrograms/rendererFunctions.h"
-            
+            cudaBuildInputs
         }
         flags { "MultiProcessorCompile" }
 
@@ -322,10 +355,7 @@ project "OptixApp"
             optixIrOutput,
         }
         buildinputs{
-            "src/NeuralNetworks/ReplayBuffer.h",
-            "src/Device/DevicePrograms/LaunchParams.h",
-            "src/Device/DevicePrograms/rendererFunctions.h"
-            
+            cudaBuildInputs
         }
         flags { "MultiProcessorCompile" }
 
@@ -339,10 +369,7 @@ project "OptixApp"
             dOutput
         }
         buildinputs{
-            "src/NeuralNetworks/ReplayBuffer.h",
-            "src/Device/DevicePrograms/LaunchParams.h",
-            "src/Device/DevicePrograms/rendererFunctions.h"
-            
+            cudaBuildInputs
         }
         flags { "MultiProcessorCompile" }
 

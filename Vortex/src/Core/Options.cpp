@@ -1,5 +1,6 @@
 #include "Options.h"
 #include "Device/DevicePrograms/LaunchParams.h"
+#include "NeuralNetworks/NetworkSettings.h"
 
 namespace vtx {
 
@@ -24,70 +25,101 @@ namespace vtx {
 		/////////////////// Rendering Settings /////////////////////////////////////////////
 		////////////////////////////////////////////////////////////////////////////////////
 
-		options.runOnSeparateThread = false;
-		options.maxBounces = 10;
-		options.maxSamples = 100000;
-		options.accumulate = true;
-		options.useRussianRoulette = true;
-		options.samplingTechnique = SamplingTechnique::S_BSDF
-		;
-		options.displayBuffer = DisplayBuffer::FB_BEAUTY;
-		options.maxClamp = 0.01f;
-		options.minClamp = 1000.0f;
-		options.noiseKernelSize = 3;
+		options.rendererSettings.iteration = -1;
+		options.rendererSettings.maxBounces = 10;
+		options.rendererSettings.maxSamples = 100000;
+		options.rendererSettings.accumulate = true;
+		options.rendererSettings.samplingTechnique = S_MIS;
+		options.rendererSettings.displayBuffer = FB_DEBUG_1;
+		options.rendererSettings.minClamp = 0.0001f;
+		options.rendererSettings.maxClamp = 1000.0f;
+		options.rendererSettings.useRussianRoulette = true;
+		options.rendererSettings.runOnSeparateThread = false;
+		options.rendererSettings.isUpdated = false;
 
-		options.adaptiveSampling = false;
-		options.minAdaptiveSamples = 100;
-		options.minPixelSamples = 1;
-		options.maxPixelSamples = 1;
-		options.albedoNormalNoiseInfluence = 1.0f;
-		options.noiseCutOff = 0.1f;
-		options.fireflyKernelSize = 3;
-		options.fireflyThreshold = 2.0f;
-		options.removeFireflies = false;
+		options.rendererSettings.adaptiveSamplingSettings.active = false;
+		options.rendererSettings.adaptiveSamplingSettings.noiseKernelSize = 3;
+		options.rendererSettings.adaptiveSamplingSettings.minAdaptiveSamples = 100;
+		options.rendererSettings.adaptiveSamplingSettings.minPixelSamples = 1;
+		options.rendererSettings.adaptiveSamplingSettings.maxPixelSamples = 1;
+		options.rendererSettings.adaptiveSamplingSettings.albedoNormalNoiseInfluence = 1.0f;
+		options.rendererSettings.adaptiveSamplingSettings.noiseCutOff = 0.1f;
+		options.rendererSettings.adaptiveSamplingSettings.isUpdated = false;
 
-		options.useWavefront = true;
-		options.optixShade = false;
-		options.parallelShade = false;
-		options.fitWavefront = false;
-		options.longPathPercentage = 0.25f;
-		options.useLongPathKernel = false;
+		options.rendererSettings.fireflySettings.kernelSize = 3;
+		options.rendererSettings.fireflySettings.threshold = 2.0f;
+		options.rendererSettings.fireflySettings.active = false;
+		options.rendererSettings.fireflySettings.isUpdated = false;
 
-		options.useNetwork = true;
+		options.rendererSettings.denoiserSettings.active = false;
+		options.rendererSettings.denoiserSettings.denoiserStart = 10;
+		options.rendererSettings.denoiserSettings.denoiserBlend = 0.1f;
+		options.rendererSettings.denoiserSettings.isUpdated = false;
 
-		options.enableDenoiser = false;
-		options.denoiserStart = 10;
-		options.denoiserBlend = 0.1f;
+		options.rendererSettings.toneMapperSettings.whitePoint = { 1.0f, 1.0f, 1.0f };
+		options.rendererSettings.toneMapperSettings.invWhitePoint = { 1.0f, 1.0f, 1.0f };
+		options.rendererSettings.toneMapperSettings.colorBalance = { 1.0f, 1.0f, 1.0f };
+		options.rendererSettings.toneMapperSettings.burnHighlights = 0.0f;
+		options.rendererSettings.toneMapperSettings.crushBlacks = 1.0f;
+		options.rendererSettings.toneMapperSettings.saturation = 1.0f;
+		options.rendererSettings.toneMapperSettings.gamma = 2.2f;
+		options.rendererSettings.toneMapperSettings.invGamma = 1.0f / 2.2f;
+		options.rendererSettings.toneMapperSettings.isUpdated = false;
 
-		options.whitePoint = { 1.0f, 1.0f, 1.0f };
-		options.colorBalance = { 1.0f, 1.0f, 1.0f };
-		options.burnHighlights = 0.0f;
-		options.crushBlacks = 1.0f;
-		options.saturation = 1.0f;
-		options.gamma = 2.2f; // Typical gamma value for sRGB color space
+		options.wavefrontSettings.active = true;
+		options.wavefrontSettings.fitWavefront = false;
+		options.wavefrontSettings.optixShade = false;
+		options.wavefrontSettings.parallelShade = false;
+		options.wavefrontSettings.longPathPercentage = 0.25f;
+		options.wavefrontSettings.useLongPathKernel = false;
+		options.wavefrontSettings.isUpdated  = false;
 
 		////////////////////////////////////////////////////////////////////////////////////
 		/////////////////// Neural Network Options /////////////////////////////////////////
 		////////////////////////////////////////////////////////////////////////////////////
-		options.networkType = network::NetworkType::NT_SAC;
-		options.batchSize   = 100000;
+		options.networkSettings.active = false; // 10;//
+		options.networkSettings.batchSize = 100000; // 10;//
+		options.networkSettings.maxTrainingStepPerFrame = 1;
+		options.networkSettings.doInference = true;
+		options.networkSettings.doTraining = true;
+		options.networkSettings.maxTrainingSteps = 1000;
+		options.networkSettings.inferenceIterationStart = 1;
+		options.networkSettings.clearOnInferenceStart = true;
+		options.networkSettings.type = network::NetworkType::NT_NGP;
 
-		options.polyakFactor = 0.00001f;
-		options.maxTrainingStepPerFrame = 1;
-		options.inferenceIterationStart = 0;
-		options.clearOnInferenceStart = true;
-		options.logAlphaStart = 0.0f;
-		options.neuralGamma = 0.99f;
-		options.doInference = false;
-		options.neuralSampleFraction = 0.9f;
+		options.networkSettings.trainingBatchGenerationSettings.lightSamplingProb = 0.0f;
+		options.networkSettings.trainingBatchGenerationSettings.weightByMis= true;
+		options.networkSettings.trainingBatchGenerationSettings.strategy = network::SS_PATHS_WITH_CONTRIBUTION;
 
-		float errorPopLr = 1.0f;
-		float goodLr = 0.00001f;
-		options.policyLr = goodLr;
-		options.qLr = options.policyLr;
-		options.alphaLr = options.policyLr;
+		options.networkSettings.inputSettings.positionEncoding.type= network::E_NONE;
+		options.networkSettings.inputSettings.positionEncoding.features = 3;
+		options.networkSettings.inputSettings.woEncoding.type = network::E_NONE;
+		options.networkSettings.inputSettings.woEncoding.features = 3;
+		options.networkSettings.inputSettings.normalEncoding.type = network::E_NONE;
+		options.networkSettings.inputSettings.normalEncoding.features   = 3;
 
-		options.autoencoderLr = 0.0001f;
+		options.networkSettings.pathGuidingSettings.hiddenDim               = 64;
+		options.networkSettings.pathGuidingSettings.numHiddenLayers         = 4;
+		options.networkSettings.pathGuidingSettings.distributionType        = network::D_NASG_AXIS_ANGLE;
+		options.networkSettings.pathGuidingSettings.produceSamplingFraction = false;
+		options.networkSettings.pathGuidingSettings.mixtureSize				= 3;
+
+		options.networkSettings.sac.polyakFactor = 0.0001f;
+		options.networkSettings.sac.logAlphaStart = 0.0f;
+		options.networkSettings.sac.gamma = 0.0f;
+		options.networkSettings.sac.neuralSampleFraction = 0.9f;
+		options.networkSettings.sac.policyLr = 0.00001f;
+		options.networkSettings.sac.qLr = 0.00001f;
+		options.networkSettings.sac.alphaLr = 0.00001f;
+
+		options.networkSettings.npg.learningRate = 0.020f;
+		options.networkSettings.npg.e = 0.8f;
+		options.networkSettings.npg.constantBlendFactor = false;
+		options.networkSettings.npg.samplingFractionBlend = false;
+		options.networkSettings.npg.lossType = network::L_KL_DIV_MC_ESTIMATION;
+		options.networkSettings.npg.meanLoss = false;
+		options.networkSettings.npg.absoluteLoss = false;
+
 
 		////////////////////////////////////////////////////////////////////////////////////
 		/////////////////// Optix Options //////////////////////////////////////////////////

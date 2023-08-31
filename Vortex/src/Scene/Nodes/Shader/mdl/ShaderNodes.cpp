@@ -5,6 +5,50 @@
 
 namespace vtx::graph::shader
 {
+	ShaderNode::~ShaderNode()
+	{
+		for (auto& [name, socket] : sockets)
+		{
+			SIM::releaseIndex(socket.Id);
+		}
+	}
+
+	ShaderNode::ShaderNode(const NodeType cNodeType, mdl::MdlFunctionInfo cFunctionInfo) :
+		Node(cNodeType),
+		functionInfo(std::move(cFunctionInfo))
+	{
+		mdl::getFunctionSignature(&functionInfo);
+		generateOutputSocket();
+		defineName();
+		initializeSockets();
+		isUpdated = true;
+	}
+
+	ShaderNode::ShaderNode(const NodeType cNodeType, std::string modulePath, std::string functionName, bool isMdlPath) :
+		Node(cNodeType)
+	{
+		isUpdated = true;
+		functionInfo = mdl::MdlFunctionInfo{};
+		if (!isMdlPath)
+		{
+			mdl::addSearchPath(utl::getFolder(modulePath));
+			modulePath = "/" + utl::getFile(modulePath);
+		}
+		functionInfo.module = "mdl" + mdl::pathToModuleName(modulePath);
+		functionInfo.name = functionInfo.module + "::" + functionName;
+		mdl::getFunctionSignature(&functionInfo);
+		generateOutputSocket();
+		defineName();
+		initializeSockets();
+	}
+
+	void ShaderNode::generateOutputSocket()
+	{
+		outputSocket.Id = SIM::getFreeIndex();
+		outputSocket.parameterInfo.expressionKind = functionInfo.returnType->skip_all_type_aliases()->get_kind();
+		outputSocket.parameterInfo.annotation.displayName = mdl::ITypeToString[outputSocket.parameterInfo.
+			expressionKind];
+	}
 
 	void ShaderNode::initializeSockets()
 	{
@@ -62,53 +106,110 @@ namespace vtx::graph::shader
 		}
 	}
 
-//	void TextureFile::traverse(const std::vector<std::shared_ptr<NodeVisitor>>& orderedVisitors)
-//	{
-//		for (auto& [name, socket] : sockets)
-//		{
-//			if (socket.node)
-//			{
-//				socket.node->traverse(orderedVisitors);
-//			}
-//		}
-//		ACCEPT(TextureFile, visitors)
-//	}
-//
-//	void TextureReturn::traverse(const std::vector<std::shared_ptr<NodeVisitor>>& orderedVisitors)
-//	{
-//		for (auto& [name, socket] : sockets)
-//		{
-//			if (socket.node)
-//			{
-//				socket.node->traverse(orderedVisitors);
-//			}
-//		}
-//		ACCEPT(TextureReturn, visitors)
-//	}
-
-#define DEFINE_SHADER_NODE_TRAVERSE(NODE_NAME) \
-	void NODE_NAME::traverse(const std::vector<std::shared_ptr<NodeVisitor>>& orderedVisitors) \
-	{\
-		for (auto& [name, socket] : sockets)\
-		{\
-			if (socket.node)\
-			{\
-				socket.node->traverse(orderedVisitors);\
-			}\
-		}\
-		ACCEPT(NODE_NAME, visitors)\
+	void ShaderNode::defineName()
+	{
+		const std::size_t lastColon = functionInfo.name.rfind("::");
+		std::string       extractedName;
+		if (lastColon != std::string::npos)
+		{
+			extractedName = functionInfo.name.substr(lastColon + 2);
+		}
+		name = (extractedName + "_" + std::to_string(getID()));
 	}
 
-	DEFINE_SHADER_NODE_TRAVERSE(DiffuseReflection)
-	DEFINE_SHADER_NODE_TRAVERSE(MaterialSurface)
-	DEFINE_SHADER_NODE_TRAVERSE(Material)
-	DEFINE_SHADER_NODE_TRAVERSE(ImportedNode)
-	DEFINE_SHADER_NODE_TRAVERSE(PrincipledMaterial)
-	DEFINE_SHADER_NODE_TRAVERSE(ColorTexture)
-	DEFINE_SHADER_NODE_TRAVERSE(MonoTexture)
-	DEFINE_SHADER_NODE_TRAVERSE(NormalTexture)
-	DEFINE_SHADER_NODE_TRAVERSE(BumpTexture)
-	DEFINE_SHADER_NODE_TRAVERSE(TextureTransform)
-	DEFINE_SHADER_NODE_TRAVERSE(NormalMix)
-	DEFINE_SHADER_NODE_TRAVERSE(GetChannel)
+	void ShaderNode::printSocketInfos()
+	{
+		auto ss = std::stringstream();
+		ss << "ShaderNode: " << name << std::endl;
+		for (auto& [name, socket] : sockets)
+		{
+			auto& [node, parameterInfo, id, expression, linkID] = socket;
+			std::string socketNameType = mdl::ITypeToString[parameterInfo.expressionKind];
+			ss << "\nSocket: " << name << " Type: " << socketNameType << std::endl;
+		}
+		VTX_INFO(ss.str());
+	}
+
+	void ShaderNode::init()
+	{
+		if (isUpdated)
+		{
+			bool Success = mdl::generateFunctionExpression(functionInfo.signature, sockets, name); 
+			if (Success) {
+				
+					isUpdated = false; 
+			}
+		}
+	}
+
+//#define DEFINE_SHADER_NODE_TRAVERSE_CHILDREN(NODE_NAME) \
+//	void NODE_NAME::traverseChildren(NodeVisitor& visitor) \
+//	{\
+//		for (auto& [name, socket] : sockets)\
+//		{\
+//			if (socket.node)\
+//			{\
+//				socket.node->traverse(visitor);\
+//			}\
+//		}\
+//	}
+
+#define DEFINE_SHADER_NODE_ACCEPT(NODE_NAME) \
+	void NODE_NAME::accept(NodeVisitor& visitor) \
+	{\
+		ACCEPT(NODE_NAME, visitor)\
+	}
+
+//#define DEFINE_SHADER_NODE_GET_CHILDREN(NODE_NAME) \
+//	std::vector<std::shared_ptr<Node>> NODE_NAME::getChildren() const\
+//	{\
+//		std::vector<std::shared_ptr<Node>> children;\
+//		for (auto& [name, socket] : sockets)\
+//		{\
+//			if (socket.node)\
+//			{\
+//				children.push_back(socket.node);\
+//			}\
+//		}\
+//		return children;\
+//	}
+
+	//DEFINE_SHADER_NODE_TRAVERSE_CHILDREN(DiffuseReflection)
+	//DEFINE_SHADER_NODE_TRAVERSE_CHILDREN(MaterialSurface)
+	//DEFINE_SHADER_NODE_TRAVERSE_CHILDREN(Material)
+	//DEFINE_SHADER_NODE_TRAVERSE_CHILDREN(ImportedNode)
+	//DEFINE_SHADER_NODE_TRAVERSE_CHILDREN(PrincipledMaterial)
+	//DEFINE_SHADER_NODE_TRAVERSE_CHILDREN(ColorTexture)
+	//DEFINE_SHADER_NODE_TRAVERSE_CHILDREN(MonoTexture)
+	//DEFINE_SHADER_NODE_TRAVERSE_CHILDREN(NormalTexture)
+	//DEFINE_SHADER_NODE_TRAVERSE_CHILDREN(BumpTexture)
+	//DEFINE_SHADER_NODE_TRAVERSE_CHILDREN(TextureTransform)
+	//DEFINE_SHADER_NODE_TRAVERSE_CHILDREN(NormalMix)
+	//DEFINE_SHADER_NODE_TRAVERSE_CHILDREN(GetChannel)
+
+	//DEFINE_SHADER_NODE_GET_CHILDREN(DiffuseReflection)
+	//DEFINE_SHADER_NODE_GET_CHILDREN(MaterialSurface)
+	//DEFINE_SHADER_NODE_GET_CHILDREN(Material)
+	//DEFINE_SHADER_NODE_GET_CHILDREN(ImportedNode)
+	//DEFINE_SHADER_NODE_GET_CHILDREN(PrincipledMaterial)
+	//DEFINE_SHADER_NODE_GET_CHILDREN(ColorTexture)
+	//DEFINE_SHADER_NODE_GET_CHILDREN(MonoTexture)
+	//DEFINE_SHADER_NODE_GET_CHILDREN(NormalTexture)
+	//DEFINE_SHADER_NODE_GET_CHILDREN(BumpTexture)
+	//DEFINE_SHADER_NODE_GET_CHILDREN(TextureTransform)
+	//DEFINE_SHADER_NODE_GET_CHILDREN(NormalMix)
+	//DEFINE_SHADER_NODE_GET_CHILDREN(GetChannel)
+
+	DEFINE_SHADER_NODE_ACCEPT(DiffuseReflection)
+	DEFINE_SHADER_NODE_ACCEPT(MaterialSurface)
+	DEFINE_SHADER_NODE_ACCEPT(Material)
+	DEFINE_SHADER_NODE_ACCEPT(ImportedNode)
+	DEFINE_SHADER_NODE_ACCEPT(PrincipledMaterial)
+	DEFINE_SHADER_NODE_ACCEPT(ColorTexture)
+	DEFINE_SHADER_NODE_ACCEPT(MonoTexture)
+	DEFINE_SHADER_NODE_ACCEPT(NormalTexture)
+	DEFINE_SHADER_NODE_ACCEPT(BumpTexture)
+	DEFINE_SHADER_NODE_ACCEPT(TextureTransform)
+	DEFINE_SHADER_NODE_ACCEPT(NormalMix)
+	DEFINE_SHADER_NODE_ACCEPT(GetChannel)
 }

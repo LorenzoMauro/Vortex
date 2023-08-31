@@ -2,99 +2,19 @@
 #ifndef SAC_H
 #define SAC_H
 #include <torch/torch.h>
-#include "Core/Options.h"
+
+#include "InputComposer.h"
+#include "PathGuidingNetwork.h"
 #include "Device/DevicePrograms/LaunchParams.h"
 #include "Device/UploadCode/UploadBuffers.h"
-#include "NeuralNetworks/Encodings.h"
+#include "Device/Wrappers/KernelTimings.h"
 #include "NeuralNetworks/NetworkImplementation.h"
 #include "NeuralNetworks/NetworkSettings.h"
 #include "NeuralNetworks/NeuralNetworkGraphs.h"
-#include "NeuralNetworks/ReplayBuffer.h"
-#include "NeuralNetworks/Distributions/SphericalGaussian.h"
-
-//#define DEBUG_TENSORS
-//#define CHECK_ANOMALY
 #include "NeuralNetworks/tools.h"
 
 namespace vtx::network
 {
-    struct PolicyNetworkImpl : torch::nn::Module {
-        PolicyNetworkImpl(int64_t inputDim, int64_t outputDim)
-            :
-            fc1(torch::nn::Linear(inputDim, 64)),
-            fc2(torch::nn::Linear(64, 64)),
-            fc3(torch::nn::Linear(64, 64)),
-            fc4(torch::nn::Linear(64, 64)),
-            fc5(torch::nn::Linear(64, 64)),
-            fc6(torch::nn::Linear(64, outputDim + 1))
-            //fcMean(torch::nn::Linear(256, outputDim)),
-            //fcK(torch::nn::Linear(256 + outputDim, 1))
-        {  // 2x outputDim for mean and log covariance
-
-            register_module("fc1", fc1);
-            register_module("fc2", fc2);
-            register_module("fc3", fc3);
-            register_module("fc4", fc4);
-            register_module("fc5", fc5);
-            register_module("fc6", fc6);
-            //register_module("fcMean", fcMean);
-            //register_module("fcK", fcK);
-        }
-
-        std::tuple<torch::Tensor, torch::Tensor> forward(torch::Tensor x) {
-            x = relu(fc1->forward(x));
-            x = relu(fc2->forward(x));
-            x = relu(fc3->forward(x));
-            x = relu(fc4->forward(x));
-            x = relu(fc5->forward(x));
-            x = fc6->forward(x);
-
-            torch::Tensor mean = x.narrow(1, 0, x.size(1) - 1);
-            mean               = mean / mean.norm(2, 1, true);
-            torch::Tensor k    = relu(x.narrow(1, x.size(1) - 1, 1));
-            k                  = clamp(k, -1.0f, MAX_CONCENTRATION) + EPS;
-
-            //auto mean = fcMean->forward(x);
-            //mean = mean / mean.norm(2, 1, true);
-            //
-            //x = torch::cat({ x, mean }, /*dim=*/-1);
-            //auto k = torch::relu(fcK->forward(x));
-            //k = torch::clamp(k, -1.0f, MAX_CONCENTRATION) + EPS;
-
-            return { mean, k };
-        }
-
-        std::tuple<torch::Tensor, torch::Tensor> sample(const torch::Tensor& state, const torch::Device& device)
-        {
-            //mean and logCov represent a 2d gaussian distribution for spherical angles in the range 0-1, sample a direction from it
-            auto [mean, k] = forward(state);
-
-            const torch::Tensor action = SphericalGaussian::sample(mean, k, device);
-            const torch::Tensor logLikelihood = SphericalGaussian::logLikelihood(action, mean, k);
-
-            return { action, logLikelihood };
-        }
-
-        std::tuple<torch::Tensor> evaluate(const torch::Tensor& state, const torch::Tensor& action)
-        {
-            //mean and logCov represent a 2d gaussian distribution for spherical angles in the range 0-1, sample a direction from it
-            auto [mean, k] = forward(state);
-            const torch::Tensor logLikelihood = SphericalGaussian::logLikelihood(action, mean, k);
-            return { logLikelihood };
-        }
-
-        torch::nn::Linear fc1;
-        torch::nn::Linear fc2;
-        torch::nn::Linear fc3;
-        torch::nn::Linear fc4;
-        torch::nn::Linear fc5;
-        torch::nn::Linear fc6;
-        //torch::nn::Linear fcMean;
-        //torch::nn::Linear fcK;
-
-    };
-    TORCH_MODULE(PolicyNetwork);
-
     struct QNetworkImpl : torch::nn::Module {
         QNetworkImpl(int64_t inputDim, int64_t outputDim)
             :
@@ -135,103 +55,86 @@ namespace vtx::network
     class Sac : public NetworkImplementation
     {
     public:
-		Sac() : device(torch::kCUDA, 0)
-		{
-			settings                         = SacSettings{};
-			settings.batchSize               = getOptions()->batchSize;
-			settings.maxTrainingStepPerFrame = getOptions()->maxTrainingStepPerFrame;
-			settings.polyakFactor            = getOptions()->polyakFactor;
-			settings.logAlphaStart           = getOptions()->logAlphaStart;
-			settings.gamma                   = getOptions()->neuralGamma;
-			settings.inferenceIterationStart = getOptions()->inferenceIterationStart;
-			settings.clearOnInferenceStart   = getOptions()->clearOnInferenceStart;
-			settings.doInference             = getOptions()->doInference;
-			settings.neuralSampleFraction    = getOptions()->neuralSampleFraction;
-			positionEncodingDim              = 12;
-			stateDim                         = positionEncodingDim * 3 + 3 + 3;
-			actionDim                        = 3;
-			targetEntropy                    = torch::tensor(-actionDim).to(device);
-
-			settings.policyLr      = getOptions()->policyLr;
-			settings.qLr           = getOptions()->qLr;
-			settings.alphaLr       = getOptions()->alphaLr;
-			settings.autoencoderLr = getOptions()->autoencoderLr;
-
-			init();
-		}
-
-        void init() override
+		Sac(NetworkSettings* _settings) : device(torch::kCUDA, 0)
         {
-            gamma = torch::scalar_tensor(settings.gamma).to(device);
-            logAlpha = torch::full({ 1 }, settings.logAlphaStart, torch::TensorOptions().device(device).requires_grad(true));
+            settings = _settings;
+            actionDim = 3;
+            targetEntropy = torch::tensor(-actionDim).to(device);
 
-            policyNetwork = PolicyNetwork(stateDim, actionDim);
-            q1Network = QNetwork(stateDim + actionDim, 1);
-            q2Network = QNetwork(stateDim + actionDim, 1);
-            q1TargetNetwork = QNetwork(stateDim + actionDim, 1);
-            q2TargetNetwork = QNetwork(stateDim + actionDim, 1);
+            init();
+        }
 
-            policyNetwork->to(device);
+        void init() override {
+            gamma = torch::scalar_tensor(settings->sac.gamma).to(device);
+            logAlpha = torch::full({ 1 }, settings->sac.logAlphaStart, torch::TensorOptions().device(device).requires_grad(true));
+
+            ic                       = InputComposer(device, &settings->inputSettings);
+			const int inputDimension = ic.dimension();
+            policyNetwork            = PathGuidingNetwork(inputDimension, device, &settings->pathGuidingSettings);
+            q1Network                = QNetwork(inputDimension + actionDim, 1);
+            q2Network                = QNetwork(inputDimension + actionDim, 1);
+            q1TargetNetwork          = QNetwork(inputDimension + actionDim, 1);
+            q2TargetNetwork          = QNetwork(inputDimension + actionDim, 1);
+
             q1Network->to(device);
             q2Network->to(device);
             q1TargetNetwork->to(device);
             q2TargetNetwork->to(device);
             logAlpha = logAlpha.to(device);
 
-            policyOptimizer = std::make_shared<torch::optim::Adam>(torch::optim::Adam(policyNetwork->parameters(), torch::optim::AdamOptions(settings.policyLr)));
-            q1Optimizer = std::make_shared<torch::optim::Adam>(torch::optim::Adam(q1Network->parameters(), torch::optim::AdamOptions(settings.qLr)));
-            q2Optimizer = std::make_shared<torch::optim::Adam>(torch::optim::Adam(q2Network->parameters(), torch::optim::AdamOptions(settings.qLr)));
-            alphaOptimizer = std::make_shared<torch::optim::Adam>(torch::optim::Adam({ logAlpha }, torch::optim::AdamOptions(settings.alphaLr)));
+            policyOptimizer = std::make_shared<torch::optim::Adam>(torch::optim::Adam(policyNetwork.parameters(), torch::optim::AdamOptions(settings->sac.policyLr)));
+            q1Optimizer = std::make_shared<torch::optim::Adam>(torch::optim::Adam(q1Network->parameters(), torch::optim::AdamOptions(settings->sac.qLr)));
+            q2Optimizer = std::make_shared<torch::optim::Adam>(torch::optim::Adam(q2Network->parameters(), torch::optim::AdamOptions(settings->sac.qLr)));
+            alphaOptimizer = std::make_shared<torch::optim::Adam>(torch::optim::Adam({ logAlpha }, torch::optim::AdamOptions(settings->sac.alphaLr)));
 
             //torch::NoGradGuard noGrad;
-			copyNetworkParameters(q1Network.ptr(), q1TargetNetwork.ptr());
+            copyNetworkParameters(q1Network.ptr(), q1TargetNetwork.ptr());
             copyNetworkParameters(q2Network.ptr(), q2TargetNetwork.ptr());
-        }
+        };
 
         void reset() override
         {
-            graphs.reset({ G_POLICY_LOSS, G_Q1_LOSS, G_Q2_LOSS, G_ALPHA_LOSS, G_DATASET_REWARDS, G_Q1_VALUES, G_Q2_VALUES, G_ALPHA_VALUES });
+            graphs.reset();
             init();
-        }
+        };
 
-        void train() override
-        {
+        void train() override {
             const std::pair<cudaEvent_t, cudaEvent_t> events = GetProfilerEvents(eventNames[N_TRAIN]);
             cudaEventRecord(events.first);
             const auto deviceParams = UPLOAD_BUFFERS->launchParamsBuffer.castedPointer<LaunchParams>();
+            shuffleDataset(deviceParams);
 
-            const int replayBufferSize = settings.batchSize * settings.maxTrainingStepPerFrame;
-            shuffleReplayBuffer(deviceParams, replayBufferSize);
+			const device::Buffers::ReplayBufferBuffers& buffers = UPLOAD_BUFFERS->networkInterfaceBuffer.replayBufferBuffers;
 
+            const auto actionPtr = buffers.actionBuffer.castedPointer<float>();
+            const auto rewardPtr = buffers.rewardBuffer.castedPointer<float>();
+            const auto donePtr = buffers.doneBuffer.castedPointer<int>();
 
-            device::Buffers::ReplayBufferBuffers& replayBufferBuffers = UPLOAD_BUFFERS->networkInterfaceBuffer.replayBufferBuffers;
-
-            const auto actionPtr = replayBufferBuffers.actionBuffer.castedPointer<float>();
-            const auto rewardPtr = replayBufferBuffers.rewardBuffer.castedPointer<float>();
-            const auto donePtr = replayBufferBuffers.doneBuffer.castedPointer<int>();
-
-            for (int i = 0; i < settings.maxTrainingStepPerFrame; i++)
+            for (int i = 0; i < settings->maxTrainingStepPerFrame; i++)
             {
-                float* actionBatch = actionPtr + i * settings.batchSize;
-                float* rewardBatch = rewardPtr + i * settings.batchSize;
-                int* doneBatch = donePtr + i * settings.batchSize;
+                float* actionBatch = actionPtr + i * settings->batchSize;
+                float* rewardBatch = rewardPtr + i * settings->batchSize;
+                int* doneBatch = donePtr + i * settings->batchSize;
+                
+                ic.setFromBuffer(buffers.stateBuffer, settings->batchSize, i);
+                torch::Tensor states = ic.getInput();
 
-                torch::Tensor states = createStateInput(replayBufferBuffers.stateBuffer, settings.batchSize, i);
-                torch::Tensor nextStates = createStateInput(replayBufferBuffers.nextStatesBuffer, settings.batchSize, i);
-                torch::Tensor actions = torch::from_blob(actionBatch, { settings.batchSize, actionDim }, torch::TensorOptions().device(device).dtype(torch::kFloat));
-                torch::Tensor rewards = torch::from_blob(rewardBatch, { settings.batchSize, 1 }, torch::TensorOptions().device(device).dtype(torch::kFloat));
-                torch::Tensor done = torch::from_blob(doneBatch, { settings.batchSize, 1 }, torch::TensorOptions().device(device).dtype(torch::kI32));
+                ic.setFromBuffer(buffers.nextStatesBuffer, settings->batchSize, i);
+                torch::Tensor nextStates = ic.getInput();
+
+                torch::Tensor actions = torch::from_blob(actionBatch, { settings->batchSize, actionDim }, torch::TensorOptions().device(device).dtype(torch::kFloat));
+                torch::Tensor rewards = torch::from_blob(rewardBatch, { settings->batchSize, 1 }, torch::TensorOptions().device(device).dtype(torch::kFloat));
+                torch::Tensor done = torch::from_blob(doneBatch, { settings->batchSize, 1 }, torch::TensorOptions().device(device).dtype(torch::kI32));
                 trainStep(states, nextStates, actions, rewards, done);
             }
             cudaEventRecord(events.second);
-            //settings.batchSize += 1;
-        }
+            //settings->batchSize += 1;
+        };
 
-        void inference() override
-        {
+        void inference(const int& depth) override {
 
-            device::Buffers::InferenceBuffers& inferenceBuffers = UPLOAD_BUFFERS->networkInterfaceBuffer.inferenceBuffers;
-            CUDABuffer inferenceSizeBuffers = inferenceBuffers.inferenceSize;
+            device::Buffers::InferenceBuffers& buffers = UPLOAD_BUFFERS->networkInterfaceBuffer.inferenceBuffers;
+            CUDABuffer inferenceSizeBuffers = buffers.inferenceSize;
             int inferenceSize;
             inferenceSizeBuffers.download(&inferenceSize);
 
@@ -243,70 +146,45 @@ namespace vtx::network
             const std::pair<cudaEvent_t, cudaEvent_t> events = GetProfilerEvents(eventNames[N_INFER]);
             cudaEventRecord(events.first);
 
-            const auto meanPtr = inferenceBuffers.meanBuffer.castedPointer<float>();
-            const auto concentrationPtr = inferenceBuffers.concentrationBuffer.castedPointer<float>();
+            const auto distributionParametersPtr = buffers.distributionParameters.castedPointer<float>();
+            const auto samplesPtr = buffers.samplesBuffer.castedPointer<float>();
+            const auto probPtr = buffers.probabilitiesBuffer.castedPointer<float>();
+            const auto mixtureWeightPtr = buffers.mixtureWeightBuffer.castedPointer<float>();
 
-            const torch::Tensor inferenceStates = createStateInput(inferenceBuffers.stateBuffer, inferenceSize);
-            const torch::Tensor inferenceMean = torch::from_blob(meanPtr, { inferenceSize, actionDim }, at::device(device).dtype(torch::kFloat32));
-            const torch::Tensor inferenceLogCov = torch::from_blob(concentrationPtr, { inferenceSize, 1 }, at::device(device).dtype(torch::kFloat32));
+            ic.setFromBuffer(buffers.stateBuffer, inferenceSize, 0);
+            const torch::Tensor inferenceInput = ic.getInput();
 
-            const std::vector<torch::Tensor> hostTensors = downloadTensors(
-                {
-                    inferenceLogCov.mean().unsqueeze(-1),
-                }
-            );
+            const torch::Tensor distributionParameterCuda = torch::from_blob(distributionParametersPtr, { inferenceSize, policyNetwork.getMixtureParameterCount() }, at::device(device).dtype(torch::kFloat32));
+            const torch::Tensor samplesCuda = torch::from_blob(samplesPtr, { inferenceSize, 3 }, at::device(device).dtype(torch::kFloat32));
+            const torch::Tensor probCuda = torch::from_blob(probPtr, { inferenceSize, 1 }, at::device(device).dtype(torch::kFloat32));
+            const torch::Tensor mixtureWeightCuda = torch::from_blob(mixtureWeightPtr, { inferenceSize, settings->pathGuidingSettings.mixtureSize }, at::device(device).dtype(torch::kFloat32));
 
-            graphs.graphs[G_INFERENCE_CONCENTRATION].push_back(hostTensors[0].item<float>());
+            const auto [mixtureParameters, mixtureWeight, sample, prob, c] = policyNetwork.inferenceWithSample(inferenceInput);
 
-            auto [mean, k] = policyNetwork->forward(inferenceStates);
+            CHECK_TENSOR_ANOMALY(inferenceInput);
+            CHECK_TENSOR_ANOMALY(mixtureParameters);
+            CHECK_TENSOR_ANOMALY(mixtureWeight);
+            CHECK_TENSOR_ANOMALY(sample);
+            CHECK_TENSOR_ANOMALY(prob);
 
-            inferenceMean.copy_(mean);
-            inferenceLogCov.copy_(k);
+
+            distributionParameterCuda.copy_(mixtureParameters);
+            samplesCuda.copy_(sample);
+            probCuda.copy_(prob);
+            mixtureWeightCuda.copy_(mixtureWeight);
 
             cudaEventRecord(events.second);
-        }
+        };
 
-        NetworkSettings& getSettings() override
-		{
-            return settings;
-		}
+        GraphsData& getGraphs() override {
+            return graphs;
+        };
 
-        GraphsData& getGraphs() override
-		{
-			return graphs;
-		}
-
-        void shuffleReplayBuffer(LaunchParams* params, const int replayBufferSize)
-        {
-            LaunchParams* paramsCopy = params;
-            gpuParallelFor(eventNames[N_SHUFFLE_DATASET],
-                replayBufferSize,
-                [paramsCopy] __device__(int id)
-            {
-                paramsCopy->networkInterface->randomFillReplayBuffer(id);
-            });
-        }
     private:
-    	torch::Tensor createStateInput(device::Buffers::NetworkStateBuffers& buffers, const int batchSize, const int batchId = 0)
-        {
-            const auto positionPtr = buffers.positionBuffer.castedPointer<float>() + batchId * batchSize * 3;
-            const auto woPtr = buffers.woBuffer.castedPointer<float>() + batchId * batchSize * 3;
-            const auto normalPtr = buffers.normalBuffer.castedPointer<float>() + batchId * batchSize * 3;
-
-            float* encodedPositionPtr = encoding::TriangleWaveEncoding::encode(buffers.encodedPositionBuffer, positionPtr, batchSize, 3, positionEncodingDim);
-            torch::Tensor encodedPosition = torch::from_blob(encodedPositionPtr, { batchSize, positionEncodingDim * 3 }, torch::TensorOptions().device(device).dtype(torch::kFloat));
-            torch::Tensor position = torch::from_blob(positionPtr, { batchSize, 3 }, torch::TensorOptions().device(device).dtype(torch::kFloat));
-            torch::Tensor wo = torch::from_blob(woPtr, { batchSize, 3 }, torch::TensorOptions().device(device).dtype(torch::kFloat));
-            torch::Tensor normal = torch::from_blob(normalPtr, { batchSize, 3 }, torch::TensorOptions().device(device).dtype(torch::kFloat));
-            torch::Tensor states = torch::cat({ encodedPosition, wo, normal }, -1);
-
-            PRINT_TENSORS("CREATE STATE INPUT", position, encodedPosition, wo, normal, states);
-            return states;
-        }
-
-        std::tuple<torch::Tensor, torch::Tensor> policyTargetValue(torch::Tensor& states, bool useTargetQ)
-        {
-            auto [action, logL] = policyNetwork->sample(states, device);
+    	
+        std::tuple<torch::Tensor, torch::Tensor> policyTargetValue(torch::Tensor& states, bool useTargetQ) {
+            auto [action, p] = policyNetwork.sample(states);
+            torch::Tensor logL = torch::log(p + EPS);
             torch::Tensor q1Value;
             torch::Tensor q2Value;
 
@@ -329,15 +207,14 @@ namespace vtx::network
             PRINT_TENSORS("POLICY TARGET VALUE COMPUTATION", action, logL, minQ, policyTarget);
 
             return { policyTarget, logL };
-        }
+        };
 
         void trainStep(
             torch::Tensor& states,
             torch::Tensor& nextStates,
             torch::Tensor& actions,
             const torch::Tensor& rewards,
-            const torch::Tensor& done)
-        {
+            const torch::Tensor& done) {
             ANOMALY_SWITCH;
             PRINT_TENSORS("TRAIN STEP", states, nextStates, actions, rewards, done);
 
@@ -387,8 +264,8 @@ namespace vtx::network
             alphaLoss.backward();
             alphaOptimizer->step();
 
-            polyakUpdate(q1Network.ptr(), q1TargetNetwork.ptr(), settings.polyakFactor);
-            polyakUpdate(q2Network.ptr(), q2TargetNetwork.ptr(), settings.polyakFactor);
+            polyakUpdate(q1Network.ptr(), q1TargetNetwork.ptr(), settings->sac.polyakFactor);
+            polyakUpdate(q2Network.ptr(), q2TargetNetwork.ptr(), settings->sac.polyakFactor);
 
             const std::vector<torch::Tensor> hostTensors = downloadTensors(
                 {
@@ -403,20 +280,17 @@ namespace vtx::network
                 }
             );
 
-            graphs.graphs[G_POLICY_LOSS].push_back(hostTensors[0].item<float>());
-            graphs.graphs[G_Q1_LOSS].push_back(hostTensors[1].item<float>());
-            graphs.graphs[G_Q2_LOSS].push_back(hostTensors[2].item<float>());
-            graphs.graphs[G_ALPHA_LOSS].push_back(hostTensors[3].item<float>());
-            graphs.graphs[G_DATASET_REWARDS].push_back(hostTensors[4].item<float>());
-            graphs.graphs[G_Q1_VALUES].push_back(hostTensors[5].item<float>());
-            graphs.graphs[G_Q2_VALUES].push_back(hostTensors[6].item<float>());
-            graphs.graphs[G_ALPHA_VALUES].push_back(hostTensors[7].item<float>());
-        }
-
-        
+            graphs.addData(G_POLICY_LOSS, hostTensors[0].item<float>());
+            graphs.addData(G_Q1_LOSS, hostTensors[1].item<float>());
+            graphs.addData(G_Q2_LOSS, hostTensors[2].item<float>());
+            graphs.addData(G_ALPHA_LOSS, hostTensors[3].item<float>());
+            graphs.addData(G_DATASET_REWARDS, hostTensors[4].item<float>());
+            graphs.addData(G_Q1_VALUES, hostTensors[5].item<float>());
+            graphs.addData(G_Q2_VALUES, hostTensors[6].item<float>());
+            graphs.addData(G_ALPHA_VALUES, hostTensors[7].item<float>());
+        };
 
     public:
-        int64_t stateDim;  // Dimensionality of state (3D vector for position)
         int64_t positionEncodingDim;
         int64_t actionDim;
         torch::Tensor logAlpha;
@@ -424,7 +298,9 @@ namespace vtx::network
         torch::Tensor targetEntropy;
         torch::Device device; // This selects the second GPU
 
-        PolicyNetwork policyNetwork = nullptr;
+
+        InputComposer ic;
+        PathGuidingNetwork policyNetwork;
         QNetwork q1Network = nullptr;
         QNetwork q2Network = nullptr;
         QNetwork q1TargetNetwork = nullptr;
@@ -436,7 +312,6 @@ namespace vtx::network
         std::shared_ptr<torch::optim::Adam> q1Optimizer;
         std::shared_ptr<torch::optim::Adam> q2Optimizer;
 
-        SacSettings settings;
         GraphsData graphs;
     };
 }

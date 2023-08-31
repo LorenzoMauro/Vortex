@@ -16,7 +16,9 @@ namespace vtx::graph
 	class Group;
 	class Node;
 	class Mesh;
-	class TransformAttribute;
+	struct TransformAttribute;
+
+    class Scene;
 }
 
 namespace vtx::ops {
@@ -32,7 +34,7 @@ namespace vtx::ops {
     // A simple unit cube built from 12 triangles.
     std::shared_ptr<graph::Mesh> createBox(float sideLength=2.0f);
 
-    void applyTransformation(graph::TransformAttribute& transformation, const math::affine3f& affine);
+    std::shared_ptr<graph::Camera> standardCamera();
 
     std::shared_ptr<graph::Mesh> createPlane(float width=2.0f, float height=2.0f);
 
@@ -59,5 +61,7 @@ namespace vtx::ops {
 
     std::shared_ptr<graph::Group> simpleScene01();
 
-    std::shared_ptr<graph::Group> importedScene();
+    std::tuple<std::shared_ptr<graph::Group>, std::shared_ptr<graph::Camera>> importedScene();
+
+    void startUpOperations();
 }

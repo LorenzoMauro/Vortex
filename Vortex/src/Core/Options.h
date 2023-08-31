@@ -2,6 +2,8 @@
 #include <string>
 #include <vector>
 #include "Core/Math.h"
+#include "NeuralNetworks/NetworkSettings.h"
+#include "Scene/Nodes/RendererSettings.h"
 
 namespace vtx
 {
@@ -14,11 +16,6 @@ namespace vtx
 
 	enum SamplingTechnique;
 	enum DisplayBuffer;
-
-	namespace network
-	{
-		enum NetworkType;
-	}
 
 	struct Options
 	{
@@ -35,66 +32,14 @@ namespace vtx
 		/////////////////// Rendering Settings /////////////////////////////////////////////
 		////////////////////////////////////////////////////////////////////////////////////
 
-		bool         runOnSeparateThread;
-		uint32_t                                  maxBounces;
-		uint32_t                                  maxSamples;
-		bool                                      accumulate;
-		bool									  useRussianRoulette;
-		SamplingTechnique samplingTechnique;
-		DisplayBuffer     displayBuffer;
-		float                                     maxClamp;
-		float                                     minClamp;
-
-		int										  useWavefront;
-		bool									  fitWavefront;
-		bool										optixShade;
-		bool         parallelShade;
-		float         longPathPercentage;
-		bool			useLongPathKernel;
-
-		bool         useNetwork;
-
-		int   noiseKernelSize;
-		int   adaptiveSampling;
-		int   minAdaptiveSamples;
-		int   minPixelSamples;
-		int   maxPixelSamples;
-		float albedoNormalNoiseInfluence;
-		float noiseCutOff;
-
-		int fireflyKernelSize;
-		float fireflyThreshold;
-		bool removeFireflies;
-
-		bool enableDenoiser;
-		int denoiserStart;
-		float denoiserBlend;
-
-		math::vec3f whitePoint;
-		math::vec3f colorBalance;
-		float       burnHighlights;
-		float       crushBlacks;
-		float       saturation;
-		float       gamma;
+		RendererSettings rendererSettings;
+		
+		WavefrontSettings wavefrontSettings;
 
 		////////////////////////////////////////////////////////////////////////////////////
 		/////////////////// Neural Network Options /////////////////////////////////////////
 		////////////////////////////////////////////////////////////////////////////////////
-		int batchSize;
-		int maxTrainingStepPerFrame;
-		float polyakFactor;
-		float logAlphaStart;
-		bool doInference;
-		int inferenceIterationStart;
-		bool clearOnInferenceStart;
-		float neuralGamma;
-		float         neuralSampleFraction;
-
-		float policyLr;
-		float qLr ;
-		float alphaLr ;
-		float autoencoderLr ;
-
+		network::NetworkSettings networkSettings;
 		////////////////////////////////////////////////////////////////////////////////////
 		/////////////////// Optix Options //////////////////////////////////////////////////
 		////////////////////////////////////////////////////////////////////////////////////
@@ -118,9 +63,8 @@ namespace vtx
 		////////////////////////////////////////////////////////////////////////////////////
 		/////////////////// Gui Options ////////////////////////////////////////////////////
 		////////////////////////////////////////////////////////////////////////////////////
-		float                nodeWidth;
-		std::string          fontPath;
-		network::NetworkType networkType;
+		float       nodeWidth;
+		std::string fontPath;
 	};
 
 	Options* getOptions();

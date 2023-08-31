@@ -30,16 +30,19 @@ IncludeDir = {}
 IncludeDir["GLFW"] = my_project_dir .. "/ext/glfw/include"
 IncludeDir["GLAD"] = my_project_dir .. "/ext/glad/include"
 IncludeDir["ImGui"] = my_project_dir .. "/ext/imgui"
+IncludeDir["yaml"] = my_project_dir .. "ext/yaml/include"
 IncludeDir["spdlog"] = my_project_dir .. "/ext/spdlog/include"
 IncludeDir["gdt"] = my_project_dir .. "/ext/gdt"
 IncludeDir["MDL"] = my_project_dir .. "/ext/MDL/include"
 IncludeDir["ImNode"] = my_project_dir .. "/ext/imnodes"
 IncludeDir["ImPlot"] = my_project_dir .. "/ext/implot"
+IncludeDir["stbImage"] = my_project_dir .. "/ext/stbImage"
+IncludeDir["ImGuiFileDialog"] = my_project_dir .. "/ext/ImGuiFileDialog"
+
 IncludeDir["OPTIX"] = path.join(OPTIX_SDK_PATH, "include")
 IncludeDir["CUDA"] = path.join(CUDA_TOOLKIT_PATH_11, "include")
 IncludeDir["ASSIMP"] = path.join(ASSIMP_SDK_PATH, "include")
 IncludeDir["NVTOOLS"] = path.join(NVTOOLS, "include")
-
 IncludeDir["LibTorch_Release"] = path.join(LIBTORCH_RELEASE_PATH, "include")
 IncludeDir["LibTorch_Release_API"] = path.join(LIBTORCH_RELEASE_PATH, "include/torch/csrc/api/include")
 

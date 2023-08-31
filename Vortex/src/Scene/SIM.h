@@ -10,6 +10,7 @@ namespace vtx::graph
 	class SIM {
 	public:
 
+		SIM();
 		static std::shared_ptr<SIM> Get();
 
 		static vtxID getFreeIndex();
@@ -92,8 +93,6 @@ namespace vtx::graph
 		std::vector<std::map<vtxID, std::shared_ptr<Node>>>			map;
 		std::map<NodeType, std::vector<std::shared_ptr<Node>>>		vectorsOfNodes;
 		std::map<vtxID, NodeType>									idToType;
-
-		static std::shared_ptr<SIM>									sInstance;
 	};
 
 }

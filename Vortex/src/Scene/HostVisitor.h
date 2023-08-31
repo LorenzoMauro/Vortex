@@ -16,6 +16,7 @@ namespace vtx
 		void visit(std::shared_ptr<graph::Texture> texture) override;
 		void visit(std::shared_ptr<graph::BsdfMeasurement> bsdfMeasurement) override;
 		void visit(std::shared_ptr<graph::LightProfile> lightProfile) override;
-		void visit(std::shared_ptr<graph::Light> lightNode) override;
+		void visit(std::shared_ptr<graph::EnvironmentLight> lightNode) override;
+		void visit(std::shared_ptr<graph::MeshLight> lightNode) override;
 	};
 }

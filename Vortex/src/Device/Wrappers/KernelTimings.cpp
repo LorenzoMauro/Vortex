@@ -1,4 +1,6 @@
-#include "dWrapper.h"
+﻿#include "KernelTimings.h"
+
+#include <map>
 
 #include "Device/CUDAChecks.h"
 
@@ -29,13 +31,13 @@ namespace vtx
             CUDA_CHECK(cudaEventSynchronize(start));
             CUDA_CHECK(cudaEventSynchronize(stop));
 
-            float       ms  = 0;
-			cudaError_t err = cudaEventElapsedTime(&ms, start, stop);
-            if(err!=cudaSuccess)
+            float       ms = 0;
+            cudaError_t err = cudaEventElapsedTime(&ms, start, stop);
+            if (err != cudaSuccess)
             {
                 VTX_INFO("Profiler Event Sync Fail on Kernle: {} Launches: {}", stats->description, stats->numLaunches);
                 CUDA_CHECK_CONTINUE(err);
-			}
+            }
             else
             {
                 ++stats->numLaunches;
@@ -46,7 +48,7 @@ namespace vtx
                     stats->minMS = std::min(stats->minMS, ms);
                     stats->maxMS = std::max(stats->maxMS, ms);
                 }
-	            
+
             }
 
             active = false;
@@ -64,42 +66,71 @@ namespace vtx
     static int maxPoolSize = 100;
     bool hasLooped = false;
 
-    std::pair<cudaEvent_t, cudaEvent_t> vtx::GetProfilerEvents(const char* description) {
+    CudaEventTimes getCudaEventTimes()
+    {
+        CudaEventTimes times;
+        times.setQueueCounters = GetKernelTimeMS(eventNames[K_SET_QUEUE_COUNTERS]);
+        times.genCameraRay = GetKernelTimeMS(eventNames[K_GEN_CAMERA_RAY]);
+        times.traceRadianceRay = GetKernelTimeMS(eventNames[K_TRACE_RADIANCE_RAY]);
+        times.reset = GetKernelTimeMS(eventNames[K_RESET]);
+        times.shadeRay = GetKernelTimeMS(eventNames[K_SHADE_RAY]);
+        times.handleEscapedRay = GetKernelTimeMS(eventNames[K_HANDLE_ESCAPED_RAY]);
+        times.accumulateRay = GetKernelTimeMS(eventNames[K_ACCUMULATE_RAY]);
+        times.fetchQueueSize = GetKernelTimeMS(eventNames[K_RETRIEVE_QUEUE_SIZE]);
+
+        times.noiseComputation = GetKernelTimeMS(eventNames[R_NOISE_COMPUTATION]);
+        times.trace = GetKernelTimeMS(eventNames[R_TRACE]);
+        times.postProcessing = GetKernelTimeMS(eventNames[R_POSTPROCESSING]);
+        times.display = GetKernelTimeMS(eventNames[R_DISPLAY]);
+        times.toneMapRadiance = GetKernelTimeMS(eventNames[R_TONE_MAP_RADIANCE]);
+
+        times.nnShuffleDataset = GetKernelTimeMS(eventNames[N_SHUFFLE_DATASET]);
+        times.nnTrain = GetKernelTimeMS(eventNames[N_TRAIN]);
+        times.nnInfer = GetKernelTimeMS(eventNames[N_INFER]);
+        return times;
+    }
+
+    int getLaunches()
+    {
+        return GetKernelLaunches(eventNames[R_TRACE]);
+    }
+
+    std::pair<cudaEvent_t, cudaEvent_t> GetProfilerEvents(const char* description) {
         if (eventPool.empty())
             eventPool.resize(maxPoolSize);  // how many? This is probably more than we need...
 
         if (eventPoolOffset == eventPool.size())
         {
-	        hasLooped = true;
+            hasLooped = true;
             eventPoolOffset = 0;
         }
-		
+
 
         ProfilerEvent& pe = eventPool[eventPoolOffset++];
         if (pe.active)
         {
-        	pe.Sync();
+            pe.Sync();
         }
 
         pe.active = true;
         pe.stats = nullptr;
 
-        if(kernelStats.find(description) != kernelStats.end())
+        if (kernelStats.find(description) != kernelStats.end())
         {
-	        pe.stats = kernelStats[description];
+            pe.stats = kernelStats[description];
         }
         else
         {
             kernelStats.insert({ description, new KernelStats(description) });
-	        pe.stats = kernelStats[description];
-		}
+            pe.stats = kernelStats[description];
+        }
 
         return { pe.start, pe.stop };
     }
 
-    float vtx::GetKernelTimeMS(const char* description)
+    float GetKernelTimeMS(const char* description)
     {
-        if(!hasLooped)
+        if (!hasLooped)
         {
             return 0.0f;
         }
@@ -110,26 +141,26 @@ namespace vtx
         return 0.0f;
     }
 
-    int vtx::GetKernelLaunches(const char* description)
+    int GetKernelLaunches(const char* description)
     {
         if (!hasLooped)
         {
             return 0;
         }
-	    if(kernelStats.find(description) != kernelStats.end())
-	    {
-	    		        return kernelStats[description]->numLaunches;
-	    }
+        if (kernelStats.find(description) != kernelStats.end())
+        {
+            return kernelStats[description]->numLaunches;
+        }
     }
 
-    void vtx::resetKernelStats()
+    void resetKernelStats()
     {
         /*for(auto& [description, kS] : kernelStats)
         {
-        	kS->numLaunches = 0;
-	    	kS->sumMS = 0;
-	    	kS->minMS = 0;
-	    	kS->maxMS = 0;
+            kS->numLaunches = 0;
+            kS->sumMS = 0;
+            kS->minMS = 0;
+            kS->maxMS = 0;
         }*/
 
         kernelStats.clear();

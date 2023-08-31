@@ -7,7 +7,7 @@
 
 namespace vtx
 {
-	void noiseComputation(const LaunchParams* deviceParams, const graph::RendererSettings& settings, const int& rendererNodeId);
+	void noiseComputation(const LaunchParams* deviceParams, const int& rendererNodeId);
 
 	void switchOutput(LaunchParams* launchParams, int width, int height, math::vec3f* beauty = nullptr);
 

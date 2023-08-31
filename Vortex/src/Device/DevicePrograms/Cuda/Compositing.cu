@@ -3,8 +3,9 @@
 #include "Device/CUDAChecks.h"
 #include "Device/DevicePrograms/ToneMapper.h"
 #include "Device/DevicePrograms/LaunchParams.h"
-#include "Device/Wrappers/dWrapper.h"
-#include "NeuralNetworks/ReplayBuffer.h"
+#include "Device/Wrappers/KernelLaunch.h"
+#include "NeuralNetworks/Interface/NetworkInterface.h"
+#include "NeuralNetworks/Interface/Paths.h"
 
 namespace vtx
 {
@@ -84,7 +85,7 @@ namespace vtx
 		}
 		if(dotoneMap)
 		{
-			output3f = toneMap(params->toneMapperSettings, output3f);
+			output3f = toneMap(params->settings->renderer.toneMapperSettings, output3f);
 		}
 		reinterpret_cast<math::vec4f*>(params->frameBuffer.outputBuffer)[pixelId] = math::vec4f(output3f, 1.0f);
 	}
@@ -94,7 +95,8 @@ namespace vtx
 		params->frameBuffer.hdriRadiance[id] = params->frameBuffer.radianceAccumulator[id] / params->frameBuffer.samples[id];
 		params->frameBuffer.normalNormalized[id] = params->frameBuffer.normalAccumulator[id] / params->frameBuffer.samples[id];
 		params->frameBuffer.albedoNormalized[id] = params->frameBuffer.albedoAccumulator[id] / params->frameBuffer.samples[id];
-		params->frameBuffer.tmRadiance[id]= toneMap(params->toneMapperSettings, params->frameBuffer.hdriRadiance[id]);
+		params->frameBuffer.tmRadiance[id]= toneMap(params->settings->renderer.toneMapperSettings, params->frameBuffer.hdriRadiance[id]);
+
 	}
 
 	__global__ void outputSelector(LaunchParams* launchParams, math::vec3f* beauty) {
@@ -106,13 +108,16 @@ namespace vtx
 		if (x >= frameSize.x || y >= frameSize.y) return;
 
 		const uint32_t fbIndex = x + y * frameSize.x;
-		const RendererDeviceSettings* settings     = launchParams->settings;
+		const OnDeviceSettings* settings = launchParams->settings;
 		const auto                    outputBuffer = reinterpret_cast<math::vec4f*>(frameBuffer->outputBuffer);
 
 		math::vec3f* input = nullptr;
 		bool normalizeBySamples = true;
 		bool dotoneMap = true;
-		switch (settings->displayBuffer)
+
+		launchParams->networkInterface->paths->accumulatePath(fbIndex);
+
+		switch (settings->renderer.displayBuffer)
 		{
 
 		case(FB_BEAUTY):
@@ -184,9 +189,9 @@ namespace vtx
 		break;
 		case(FB_SAMPLES):
 		{
-			float sampleMetric = (float)(frameBuffer->samples[fbIndex] - launchParams->settings->minAdaptiveSamples) / (float)(launchParams->settings->iteration - launchParams->settings->minAdaptiveSamples);
+			float sampleMetric = (float)(frameBuffer->samples[fbIndex] - launchParams->settings->renderer.adaptiveSamplingSettings.minAdaptiveSamples) / (float)(launchParams->settings->renderer.iteration - launchParams->settings->renderer.adaptiveSamplingSettings.minAdaptiveSamples);
 			sampleMetric *= 0.01f;
-			sampleMetric = toneMap(launchParams->toneMapperSettings, math::vec3f(sampleMetric)).x;
+			sampleMetric = toneMap(launchParams->settings->renderer.toneMapperSettings, math::vec3f(sampleMetric)).x;
 
 			math::vec3f value = floatToScientificRGB(sampleMetric);
 			outputBuffer[fbIndex] = math::vec4f(value, 1.0f);
@@ -202,10 +207,13 @@ namespace vtx
 		case(FB_NETWORK_INFERENCE_STATE_NORMAL):
 		case(FB_NETWORK_INFERENCE_OUTGOING_DIRECTION):
 		case(FB_NETWORK_INFERENCE_MEAN):
-		case(FB_NETWORK_INFERENCE_CONCENTRATION):
 		case(FB_NETWORK_INFERENCE_SAMPLE):
+		case(FB_NETWORK_INFERENCE_SAMPLE_DEBUG):
+		case(FB_NETWORK_INFERENCE_CONCENTRATION):
+		case(FB_NETWORK_INFERENCE_ANISOTROPY):
 		case(FB_NETWORK_INFERENCE_PDF):
 		case(FB_NETWORK_INFERENCE_IS_FRONT_FACE):
+		case(FB_NETWORK_INFERENCE_SAMPLING_FRACTION):
 		{
 			outputBuffer[fbIndex] = math::vec4f{ launchParams->networkInterface->debugBuffer2[fbIndex], 1.0f };
 		}
@@ -218,9 +226,57 @@ namespace vtx
 		break;
 		case(FB_NETWORK_REPLAY_BUFFER_SAMPLES):
 		{
-			outputBuffer[fbIndex] = math::vec4f(launchParams->networkInterface->debugBuffer3[fbIndex], 1.0f);
+			math::vec3f* debugBuffer = launchParams->networkInterface->debugBuffer3;
+
+			/*if (launchParams->networkInterface->paths->paths[fbIndex].isDepthAtTerminalZero)
+			{
+				debugBuffer[fbIndex].y += 1.0f;
+			}
+			float value = debugBuffer[fbIndex].y / ((float)launchParams->settings->renderer.iteration+1.0f);
+			
+			math::vec3f color = floatToScientificRGB(value);
+			outputBuffer[fbIndex] = math::vec4f(color, 1.0f);*/
+
+			int& batchSize = launchParams->settings->neural.batchSize;
+			int totPixel = frameSize.x * frameSize.y;
+			int iteration = launchParams->frameBuffer.samples[fbIndex] + 1;
+			int& numberOfTrainingStep = launchParams->settings->neural.maxTrainingStepPerFrame;
+			int totSamples = batchSize * iteration * numberOfTrainingStep;
+			float maxSamplesPerPixel = (float)totSamples / (float)(totPixel);
+			
+			float& totSampleAtPixel = debugBuffer[fbIndex].x;
+			float value = fmaxf(0.0f,fminf(totSampleAtPixel / maxSamplesPerPixel, 1.0f));
+			if (value < 0.0f || value > 1.0f || isnan(value))
+			{
+				printf(
+					"ToT sample at pixel %d is %f\n"
+					"Max sample per pixel is %f\n",
+					fbIndex,
+					totSampleAtPixel,
+					maxSamplesPerPixel
+				);
+			}
+
+			math::vec3f color = floatToScientificRGB(value);
+			outputBuffer[fbIndex] = math::vec4f(color, 1.0f);
+
 		}
+		break;
+		case(FB_NETWORK_DEBUG_PATHS):
+		{
+				math::vec3f reconstructedRadiance = launchParams->networkInterface->paths->pathsAccumulator[fbIndex] / launchParams->frameBuffer.samples[fbIndex];
+				reconstructedRadiance = toneMap(launchParams->settings->renderer.toneMapperSettings, reconstructedRadiance);
+				const math::vec3f& integratedRadiance = frameBuffer->tmRadiance[fbIndex];
+				const math::vec3f difference = integratedRadiance - reconstructedRadiance;
+				const float value = math::length(difference)*0.5f;
+				const math::vec3f fts = floatToScientificRGB(value);
+				//outputBuffer[fbIndex] = math::vec4f(reconstructedRadiance, 1.0f);
+				outputBuffer[fbIndex] = math::vec4f(fts, 1.0f);
+
 		}
+		break;
+		}
+		
 
 		if(input!=nullptr)
 		{
@@ -235,7 +291,7 @@ namespace vtx
 		dim3 numBlocks((width + threadsPerBlock.x - 1) / threadsPerBlock.x, (height + threadsPerBlock.y - 1) / threadsPerBlock.y);
 
 		fireFlyPass << <numBlocks, threadsPerBlock >> > (launchParams, kernelSize, LUMINANCE, threshold);
-		//CUDA_CHECK(cudaDeviceSynchronize());
+		CUDA_SYNC_CHECK();
 	}
 
 	void switchOutput(LaunchParams* launchParams, int width, int height, math::vec3f* beauty)
@@ -246,6 +302,7 @@ namespace vtx
 
 		outputSelector <<<numBlocks, threadsPerBlock>>>(launchParams, beauty);
 		//CUDA_CHECK(cudaDeviceSynchronize());
+		CUDA_SYNC_CHECK();
 	}
 
 	void toneMapRadianceKernel(const LaunchParams* launchParams, const int width, const int height, const char* name)

@@ -11,8 +11,7 @@ int main() {
 		}
 		app.shutDown();
 	}
-	catch (const std::exception& e) {
-		VTX_ERROR("Error in main: {}", e.what());
+	catch (const std::exception& e) {VTX_ERROR("Error in main: {}", e.what());
 		return EXIT_FAILURE;
 	}
 }
