@@ -1,21 +1,9 @@
-[submodule "ext/glfw"]
-	path = ext/glfw
-	url = https://github.com/LorenzoMauro/glfw.git
-[submodule "ext/imgui"]
-	path = ext/imgui
-	url = https://github.com/ocornut/imgui.git
-[submodule "ext/spdlog"]
-	path = ext/spdlog
-	url = https://github.com/gabime/spdlog.git
 [submodule "ext/imnodes"]
 	path = ext/imnodes
 	url = https://github.com/LorenzoMauro/imnodes.git
-[submodule "ext/implot"]
-	path = ext/implot
-	url = https://github.com/epezent/implot
-[submodule "ext/yaml"]
-	path = ext/yaml
-	url = https://github.com/thecherno/yaml-cpp
 [submodule "ext/ImGuiFileDialog"]
 	path = ext/ImGuiFileDialog
 	url = https://github.com/aiekick/ImGuiFileDialog.git
+[submodule "ext/MDL-SDK"]
+	path = ext/MDL-SDK
+	url = https://github.com/NVIDIA/MDL-SDK.git

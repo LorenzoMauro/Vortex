@@ -122,7 +122,7 @@ namespace vtx::utl
 		constexpr float floatScale = 1.0f / 65536.0f;
 		constexpr float intScale = 256.0f;
 
-		const math::vec3ui ofI(
+		const math::vec3i ofI(
 			static_cast<int>(intScale * normal.x),
 			static_cast<int>(intScale * normal.y),
 			static_cast<int>(intScale * normal.z));

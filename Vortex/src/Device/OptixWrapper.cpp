@@ -1,4 +1,3 @@
-#define NOMINMAX
 #include <algorithm>
 #include "OptixWrapper.h"
 
@@ -79,7 +78,8 @@ namespace vtx::optix
 		CUDA_CHECK(cudaSetDevice(deviceId));
 		CUDA_CHECK(cudaStreamCreate(&state.stream));
 
-		cudaGetDeviceProperties(&state.deviceProps, deviceId);
+		VTX_INFO("DeviceProps pointer : {}", (void*)& state.deviceProps);
+		CUDA_CHECK(cudaGetDeviceProperties(&state.deviceProps, deviceId));
 		VTX_INFO("Optix Wrapper : running on device: {}", state.deviceProps.name);
 
 		CUresult  cuRes = cuCtxGetCurrent(&state.cudaContext);
@@ -138,12 +138,10 @@ namespace vtx::optix
 		state.pipelineCompileOptions.numPayloadValues = 2;  // I need two to encode a 64-bit pointer to the per ray payload structure.
 		state.pipelineCompileOptions.numAttributeValues = 2;  // The minimum is two for the triangle barycentrics.
 		if (getOptions()->isDebug) {
-			state.pipelineCompileOptions.exceptionFlags = OPTIX_EXCEPTION_FLAG_DEBUG;
 			state.pipelineCompileOptions.exceptionFlags =
 				OPTIX_EXCEPTION_FLAG_STACK_OVERFLOW |
 				OPTIX_EXCEPTION_FLAG_TRACE_DEPTH |
-				OPTIX_EXCEPTION_FLAG_USER |
-				OPTIX_EXCEPTION_FLAG_DEBUG;
+				OPTIX_EXCEPTION_FLAG_USER;
 		}
 		else
 			state.pipelineCompileOptions.exceptionFlags = OPTIX_EXCEPTION_FLAG_NONE;

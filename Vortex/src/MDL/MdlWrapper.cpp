@@ -132,15 +132,15 @@ namespace vtx::mdl
 		}
 		// Load plugins.
 
-		std::string freeimagePath = utl::absolutePath(getOptions()->dllPath + "freeimage.dll");
-		const HMODULE handle = LoadLibraryA(freeimagePath.c_str());
-		VTX_ASSERT_CLOSE(handle, "Error Loading {} with error code {}", freeimagePath, GetLastError());
+		//std::string freeimagePath = utl::absolutePath(getOptions()->dllPath + "freeimage.dll");
+		//const HMODULE handle = LoadLibraryA(freeimagePath.c_str());
+		//VTX_ASSERT_CLOSE(handle, "Error Loading {} with error code {}", freeimagePath, GetLastError());
 
 		const std::string ddsPath = getOptions()->dllPath + "dds.dll";
-		const std::string nv_freeimagePath = utl::absolutePath(getOptions()->dllPath + "nv_freeimage.dll");
+		const std::string nv_openimageioPath = utl::absolutePath(getOptions()->dllPath + "nv_openimageio.dll");
 
 
-		loadPlugin(nv_freeimagePath);
+		loadPlugin(nv_openimageioPath);
 		loadPlugin(ddsPath);
 
 	}
@@ -1792,10 +1792,8 @@ namespace vtx::mdl
 		}
 		else
 		{
-			std::string{};
+			return std::string{};
 		}
-
-
 	}
 
 	bool generateFunctionExpression(const std::string& functionSignature, std::map<std::string, graph::shader::ShaderNodeSocket>& sockets, std::string callerNodeName)

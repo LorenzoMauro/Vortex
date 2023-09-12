@@ -151,6 +151,7 @@ namespace vtx
         {
             return kernelStats[description]->numLaunches;
         }
+        return 0;
     }
 
     void resetKernelStats()

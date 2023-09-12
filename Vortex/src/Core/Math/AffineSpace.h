@@ -58,7 +58,7 @@ namespace gdt {
 
     inline AffineSpaceT           ( ) = default;
     inline __both__ AffineSpaceT           ( const AffineSpaceT& other ) { l = other.l; p = other.p; }
-    inline AffineSpaceT           ( const L           & other ) { l = other  ; p = VectorT(zero); }
+    inline __both__ AffineSpaceT           ( const L           & other ) { l = other  ; p = VectorT(ZeroTy()); }
     inline __both__ AffineSpaceT& operator=( const AffineSpaceT& other ) { l = other.l; p = other.p; return *this; }
 
     inline __both__  AffineSpaceT( const VectorT& vx, const VectorT& vy, const VectorT& vz, const VectorT& p ) : l(vx,vy,vz), p(p) {}

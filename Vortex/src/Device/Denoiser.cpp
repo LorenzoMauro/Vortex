@@ -101,7 +101,6 @@ namespace vtx::optix
 		VTX_ASSERT_CLOSE(isReady, "Trying To call Denoiser but not all data has been set up!");
 
 		OptixDenoiserParams denoiserParams;
-		denoiserParams.denoiseAlpha = OPTIX_DENOISER_ALPHA_MODE_ALPHA_AS_AOV;
 		denoiserParams.hdrIntensity = intensity.dPointer();
 		denoiserParams.blendFactor = blend;
 

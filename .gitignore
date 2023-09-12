@@ -9,6 +9,7 @@ nsightProfile/
 data/*.*
 data/*
 Vortex/x64/*
+ext/vcpkg
 
 # Ignore object files and libraries
 *.o

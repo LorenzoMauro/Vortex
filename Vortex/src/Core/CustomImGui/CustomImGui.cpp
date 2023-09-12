@@ -62,7 +62,7 @@ namespace vtx::vtxImGui
         float       spaceWidth = ImGui::CalcTextSize(" ").x;
         const float ellipsisWidth = ImGui::CalcTextSize("...").x;
 
-        std::vector<float> positionalWidth;
+        std::vector<float> positionalWidth = {};
         float width = 0;
         for (const auto character : labelStr)
         {
@@ -71,7 +71,7 @@ namespace vtx::vtxImGui
         }
 
         std::string newLabel;
-        if (positionalWidth.back() > totalItemWidth)
+        if (!positionalWidth.empty() && positionalWidth.back() > totalItemWidth)
         {
             size_t currentPosition = positionalWidth.size() - 1;
             while (currentPosition > 0 && positionalWidth[currentPosition] + ellipsisWidth > totalItemWidth)

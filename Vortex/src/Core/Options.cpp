@@ -14,7 +14,7 @@ namespace vtx {
 		options.windowName = "Vortex";
 		options.dataFolder = "E:/Dev/VortexOptix/data/";
 		options.imGuiIniFile = options.dataFolder + "ImGui.ini";
-		options.dllPath = "./lib/";
+		options.dllPath = "./";
 		options.clearColor[4] = (0.45f, 0.55f, 0.60f, 1.00f);
 #ifdef NDEBUG
 		options.isDebug = false;

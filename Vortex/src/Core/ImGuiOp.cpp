@@ -4,8 +4,8 @@
 #include "imgui.h"
 #include "imnodes.h"
 #include "implot.h"
-#include "Core/ImguiBackEnds/imgui_impl_glfw.h"
-#include "Core/ImguiBackEnds/imgui_impl_opengl3.h"
+#include "imgui_impl_glfw.h"
+#include "imgui_impl_opengl3.h"
 #include "Core/Options.h"
 #include "glad/glad.h"
 

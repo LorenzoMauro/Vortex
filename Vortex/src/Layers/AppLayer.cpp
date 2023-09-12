@@ -1,8 +1,9 @@
 #include "AppLayer.h"
 #include "GuiLayer.h"
 #include "Core/Options.h"
-#include "Core/ImguiBackEnds/imgui_impl_glfw.h"
-#include "Core/ImguiBackEnds/imgui_impl_opengl3.h"
+#define IMGUI_ENABLE_DOCKING
+#include <imgui_impl_glfw.h>
+#include <imgui_impl_opengl3.h>
 #include "AppLayer.h"
 #include "GLFW/glfw3.h"
 

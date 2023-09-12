@@ -85,11 +85,11 @@ namespace vtx {
             ImGui::Begin("Viewport");
         }
 
-        const int width = ImGui::GetContentRegionAvail().x;
-        const int height = ImGui::GetContentRegionAvail().y;
+        const int width = (int)ImGui::GetContentRegionAvail().x;
+        const int height = (int)ImGui::GetContentRegionAvail().y;
         renderer->resize(width, height);
-        GlFrameBuffer& bf = renderer->getFrame();
-        ImGui::Image(reinterpret_cast<void*>(bf.colorAttachment), ImVec2{ static_cast<float>(bf.width), static_cast<float>(bf.height) }, ImVec2{ 0, 1 }, ImVec2{ 1, 0 });
+		const GlFrameBuffer& bf = renderer->getFrame();
+        ImGui::Image((ImTextureID)bf.colorAttachment, ImVec2{ static_cast<float>(bf.width), static_cast<float>(bf.height) }, ImVec2{ 0, 1 }, ImVec2{ 1, 0 });
         if (!renderer->camera->navigationActive) {
             renderer->camera->navigationActive = ImGui::IsItemHovered();
         }

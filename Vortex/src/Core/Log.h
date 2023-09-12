@@ -68,10 +68,3 @@ inline void waitAndClose() {
 		break;\
 	}\
 } while(0)
-
-#define VTX_ASSERT_RETURN(successCondition, ...) do { \
-    if (!(successCondition)) { \
-		VTX_WARN("Assert {} Failed in File {} at Line {}", #successCondition, __FILE__, __LINE__ ); \
-		return 0; \
-	}\
-} while(0)
