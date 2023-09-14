@@ -155,18 +155,20 @@ class Setup():
             os.chdir(vcpkg_dir)
 
             # Note: Modify this line to execute the corresponding script for your platform
-            subprocess.run(['./bootstrap-vcpkg.bat'])  # On Linux: ['./bootstrap-vcpkg.sh']
+            print("running bootstrap")
+            subprocess.run(['bootstrap-vcpkg.bat'])  # On Linux: ['bootstrap-vcpkg.sh']
+            print("ending bootstrap")
 
             # Install dependencies
             commands = [
-                ['./vcpkg', 'install', 'boost-any', 'boost-uuid', '--triplet=x64-windows-static'],
-                ['./vcpkg', 'install', 'openimageio', '--triplet=x64-windows-static'],
-                ['./vcpkg', 'install', 'imgui[docking-experimental,opengl3-binding,glfw-binding,win32-binding]', '--triplet=x64-windows-static-md', '--recurse'],
-                ['./vcpkg', 'install', 'spdlog', '--triplet=x64-windows-static-md'],
-                ['./vcpkg', 'install', 'yaml-cpp', '--triplet=x64-windows-static-md'],
-                ['./vcpkg', 'install', 'assimp', '--triplet=x64-windows-static-md'],
-                ['./vcpkg', 'install', 'glfw3', '--triplet=x64-windows-static-md'],
-                ['./vcpkg', 'install', 'implot', '--triplet=x64-windows-static-md']
+                ['vcpkg', 'install', 'boost-any', 'boost-uuid', '--triplet=x64-windows-static'],
+                ['vcpkg', 'install', 'openimageio', '--triplet=x64-windows-static'],
+                ['vcpkg', 'install', 'imgui[docking-experimental,opengl3-binding,glfw-binding,win32-binding]', '--triplet=x64-windows-static-md', '--recurse'],
+                ['vcpkg', 'install', 'spdlog', '--triplet=x64-windows-static-md'],
+                ['vcpkg', 'install', 'yaml-cpp', '--triplet=x64-windows-static-md'],
+                ['vcpkg', 'install', 'assimp', '--triplet=x64-windows-static-md'],
+                ['vcpkg', 'install', 'glfw3', '--triplet=x64-windows-static-md'],
+                ['vcpkg', 'install', 'implot', '--triplet=x64-windows-static-md']
             ]
 
             for command in commands:

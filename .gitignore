@@ -11,6 +11,7 @@ data/*
 Vortex/x64/*
 ext/vcpkg
 scripts/__pycache__
+dist/
 
 # Ignore object files and libraries
 *.o
@@ -40,3 +41,4 @@ Vortex/x64/Debug/NoiseKernel.cu.obj
 Vortex/x64/Release/NoiseKernel.cu.obj
 installationLog.txt
 scripts/vortex_38018.ico
+install.spec
