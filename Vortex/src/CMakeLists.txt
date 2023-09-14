@@ -15,7 +15,7 @@ file(GLOB OPTIXIR_COMPILE_FILES "${CMAKE_CURRENT_SOURCE_DIR}/Device/DeviceProgra
 file(GLOB CLANG_COMPILE_FILES "${CMAKE_CURRENT_SOURCE_DIR}/Device/DevicePrograms/Clang/*.cu")
 
 #Dependencies for the custom cuda compilation step with nvcc
-list(APPEND CU_DEPENDENCIES ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES} ${OPTIX77_INCLUDE_DIR} ${MDL_SDK_INCLUDE_DIRS} ${SPDLOG_INCLUDE_DIRS})
+list(APPEND CU_DEPENDENCIES ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES} ${OPTIX_INCLUDE_DIR} ${MDL_SDK_INCLUDE_DIRS} ${SPDLOG_INCLUDE_DIRS})
 
 #Intermediate CUDA Compilation Flags
 list(APPEND CU_COMPILE_FLAGS "-gencode=arch=compute_70,code=\\\"sm_70,compute_70\\\"")
@@ -55,7 +55,7 @@ NVCUDA_COMPILE_MODULE(
 )
 
 # Clang Compilation of Cu files for MDL Inlining of functions
-list(APPEND CLANG_DEPENDENCIES ${CMAKE_CURRENT_SOURCE_DIR} "${CUDA_8_PATH}/include" ${OPTIX77_INCLUDE_DIR} ${MDL_SDK_INCLUDE_DIRS} ${SPDLOG_INCLUDE_DIRS})
+list(APPEND CLANG_DEPENDENCIES ${CMAKE_CURRENT_SOURCE_DIR} "${CUDA_8_PATH}/include" ${OPTIX_INCLUDE_DIR} ${MDL_SDK_INCLUDE_DIRS} ${SPDLOG_INCLUDE_DIRS})
 list(APPEND CLANG_COMPILE_COMMAND "${CLANG_12_PATH}")
 list(APPEND CLANG_COMPILE_COMMAND "--cuda-path=${CUDA_8_PATH}")
 list(APPEND CLANG_COMPILE_COMMAND "-D_ALLOW_COMPILER_AND_STL_VERSION_MISMATCH")
@@ -109,6 +109,7 @@ target_sources(Vortex PRIVATE
   ${PTX_MODULES}
   ${CLANG_MODULES}
 )
+set_property(TARGET Vortex PROPERTY CUDA_ARCHITECTURES OFF)
 set_property(TARGET Vortex PROPERTY CUDA_SEPARABLE_COMPILATION ON)
 set_target_properties(Vortex PROPERTIES
     VS_DEBUGGER_WORKING_DIRECTORY "$<TARGET_FILE_DIR:Vortex>"
@@ -128,9 +129,9 @@ target_compile_options(Vortex PRIVATE
     -cudart static
     -std=c++17
     --extended-lambda
+    $<$<AND:$<COMPILE_LANGUAGE:CUDA>,$<CONFIG:Debug>>:-G>
+    $<$<OR:$<CONFIG:Release>,$<CONFIG:RelWithDebInfo>,$<CONFIG:MinSizeRel>>:-O3>
   >
-  $<$<AND:$<COMPILE_LANGUAGE:CUDA>,$<CONFIG:Debug>>:-G>
-  $<$<OR:$<CONFIG:Release>,$<CONFIG:RelWithDebInfo>,$<CONFIG:MinSizeRel>>:-O3>
 )
 
 target_link_directories(Vortex PRIVATE
@@ -182,13 +183,13 @@ target_link_libraries(Vortex PRIVATE
 )
 #Options from Torch, not sure what is the need of this
 if(MSVC)
-  target_link_options(yourTargetName PRIVATE "/INCLUDE:?warp_size@cuda@at@@YAHXZ")
+  target_link_options(Vortex PRIVATE "/INCLUDE:?warp_size@cuda@at@@YAHXZ")
 endif()
 
 target_include_directories(Vortex PRIVATE
   ${CMAKE_SOURCE_DIR}/Vortex/src
   ${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES}
-  ${OPTIX77_INCLUDE_DIR}
+  ${OPTIX_INCLUDE_DIR}
   ${MDL_SDK_INCLUDE_DIRS}
   ${EXTERNAL}/imnodes
   ${EXTERNAL}/ImGuiFileDialog
@@ -226,7 +227,7 @@ foreach(idx RANGE ${len})
   list(GET TORCH_RELEASE_DLLS ${idx} release_dll)
 
   add_custom_command(TARGET Vortex POST_BUILD
-                     COMMAND ${CMAKE_COMMAND} -E echo "Copying ${debug_dll} or ${release_dll}"
+                     #COMMAND ${CMAKE_COMMAND} -E echo "Copying ${debug_dll} or ${release_dll}"
                      COMMAND ${CMAKE_COMMAND} -E copy_if_different
                      $<$<CONFIG:Debug>:${debug_dll}>$<$<OR:$<CONFIG:Release>,$<CONFIG:RelWithDebInfo>,$<CONFIG:MinSizeRel>>:${release_dll}>
                      $<TARGET_FILE_DIR:Vortex>)
@@ -243,3 +244,32 @@ add_custom_command(TARGET Vortex POST_BUILD
                    COMMAND ${CMAKE_COMMAND} -E copy_if_different
                    ${MDL_DLLS}
                    $<TARGET_FILE_DIR:Vortex>)
+
+
+#install Target                   
+#set(CMAKE_INSTALL_PREFIX "${CMAKE_BINARY_DIR}/install" CACHE PATH "Default install path" FORCE)
+
+# Copying the ptx folder
+install(DIRECTORY "$<TARGET_FILE_DIR:Vortex>/ptx"
+        DESTINATION .)
+
+# Copying the bc folder
+install(DIRECTORY "$<TARGET_FILE_DIR:Vortex>/bc"
+        DESTINATION .)
+
+# Installing Torch DLLs based on configuration
+foreach(debug_dll IN LISTS TORCH_DEBUG_DLLS)
+    install(FILES $<$<CONFIG:Debug>:${debug_dll}>
+            DESTINATION .)
+endforeach()
+
+foreach(release_dll IN LISTS TORCH_RELEASE_DLLS)
+    install(FILES $<$<OR:$<CONFIG:Release>,$<CONFIG:RelWithDebInfo>,$<CONFIG:MinSizeRel>>:${release_dll}>
+            DESTINATION .)
+endforeach()
+
+install(FILES ${MDL_DLLS}
+        DESTINATION .)  # again, in the root of the install directory
+
+install(TARGETS Vortex 
+        RUNTIME DESTINATION .)

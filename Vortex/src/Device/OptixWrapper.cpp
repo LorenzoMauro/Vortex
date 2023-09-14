@@ -83,7 +83,7 @@ namespace vtx::optix
 		VTX_INFO("Optix Wrapper : running on device: {}", state.deviceProps.name);
 
 		CUresult  cuRes = cuCtxGetCurrent(&state.cudaContext);
-		VTX_ASSERT_CLOSE(cuRes == CUDA_SUCCESS, "Optix Wrapper : Error querying current context: error code {}", cuRes);
+		VTX_ASSERT_CLOSE(cuRes == CUDA_SUCCESS, "Optix Wrapper : Error querying current context: error code {}", (int)cuRes);
 
 		OptixDeviceContextOptions options = {};
 		options.validationMode = OPTIX_DEVICE_CONTEXT_VALIDATION_MODE_ALL;

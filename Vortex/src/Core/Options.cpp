@@ -30,7 +30,7 @@ namespace vtx {
 		options.rendererSettings.maxSamples = 100000;
 		options.rendererSettings.accumulate = true;
 		options.rendererSettings.samplingTechnique = S_MIS;
-		options.rendererSettings.displayBuffer = FB_DEBUG_1;
+		options.rendererSettings.displayBuffer = FB_BEAUTY;
 		options.rendererSettings.minClamp = 0.0001f;
 		options.rendererSettings.maxClamp = 1000.0f;
 		options.rendererSettings.useRussianRoulette = true;
@@ -66,7 +66,7 @@ namespace vtx {
 		options.rendererSettings.toneMapperSettings.invGamma = 1.0f / 2.2f;
 		options.rendererSettings.toneMapperSettings.isUpdated = false;
 
-		options.wavefrontSettings.active = true;
+		options.wavefrontSettings.active = false;
 		options.wavefrontSettings.fitWavefront = false;
 		options.wavefrontSettings.optixShade = false;
 		options.wavefrontSettings.parallelShade = false;

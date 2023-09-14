@@ -1,7 +1,10 @@
 # Vortex/CMakeLists.txt
 cmake_policy(SET CMP0074 NEW)
 cmake_policy(SET CMP0076 NEW)
-cmake_minimum_required(VERSION 3.10)
+if(POLICY CMP0104)
+    cmake_policy(SET CMP0104 NEW)
+endif()
+cmake_minimum_required(VERSION 3.17)
 
 #UTILS
 function(assign_source_group)
@@ -55,7 +58,7 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
 
 find_package(CUDAToolkit 11.7 EXACT REQUIRED)
-find_package(OptiX77 REQUIRED)
+find_package(OptiX REQUIRED)
 find_package(imgui CONFIG REQUIRED)
 find_package(MDL_SDK REQUIRED) 
 find_package(spdlog CONFIG REQUIRED)
@@ -76,3 +79,5 @@ set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 set_property(TARGET Glad PROPERTY FOLDER "Dependencies")
 set_property(TARGET ImGuiFileDialog PROPERTY FOLDER "Dependencies")
 set_property(TARGET imnodes PROPERTY FOLDER "Dependencies")
+
+configure_file(${CMAKE_SOURCE_DIR}/scripts/VortexInstaller.nsi.in ${CMAKE_BINARY_DIR}/VortexInstaller.nsi @ONLY)

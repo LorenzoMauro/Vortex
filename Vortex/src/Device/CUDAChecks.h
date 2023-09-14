@@ -36,9 +36,11 @@ static void checkCuResultError(CUresult rc, std::string file, int line, bool clo
 
 static void checkOptixError(OptixResult res, const std::string& call_str, std::string file, int line, bool close = true) {
     if (close)
-        VTX_ASSERT_CLOSE(res == OPTIX_SUCCESS, "Optix Error Check: file: {} line: {}\n\tCall ({}) failed with code {}", file, line, call_str, res);
+    {
+        VTX_ASSERT_CLOSE(res == OPTIX_SUCCESS, "Optix Error Check: file: {} line: {}\n\tCall ({}) failed with code {}", file, line, call_str, (int)res);
+    }
     else
-        VTX_ASSERT_CONTINUE(res == OPTIX_SUCCESS, "Optix Error Check: file: {} line: {}\n\tCall ({}) failed with code {}", file, line, call_str, res);
+        VTX_ASSERT_CONTINUE(res == OPTIX_SUCCESS, "Optix Error Check: file: {} line: {}\n\tCall ({}) failed with code {}", file, line, call_str, (int)res);
 }
 
 static void cudaSynchronize(std::string file, int line, bool close = true) {

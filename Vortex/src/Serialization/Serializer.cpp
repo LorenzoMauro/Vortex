@@ -33,6 +33,7 @@ namespace vtx::serializer
 
     bool deserialize(const std::string& filePath, const std::shared_ptr<graph::Scene>& scene)
     {
+        VTX_INFO("Deserializing scene from {0}", filePath);
         std::ifstream file(filePath);
 
         YAML::Node data = YAML::Load(file);

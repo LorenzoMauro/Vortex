@@ -7,7 +7,7 @@ extFolder=$repoRoot/ext
 logFile="$repoRoot/installationLog.txt"
 touch $logFile
 
-source ./utilities.sh
+source ./scripts/utilities.sh
 
 #manual dependencies
 echo "Before proceeding make sure to have installed the following dependencies:"
@@ -120,24 +120,26 @@ cd $repoRoot
 mkdir -p $repoRoot/build
 cd $repoRoot/build
 #rm -rf ./CMakeCache.txt ./CMakeFiles
-cmake -DCMAKE_TOOLCHAIN_FILE="$vcpkg_dir/scripts/buildsystems/vcpkg.cmake" \
+cmake -T cuda="$cudaToolkitRoot" \
+    -DCMAKE_TOOLCHAIN_FILE="$vcpkg_dir/scripts/buildsystems/vcpkg.cmake" \
     -DTORCH_INSTALL_PREFIX_DEBUG="$torchPathDebug" \
     -DTORCH_INSTALL_PREFIX_RELEASE="$torchPathRelease" \
     -DCUDAToolkit_ROOT="$cudaToolkitRoot" \
     -DCLANG_12_PATH="$clang12Path" \
     -DCUDA_8_PATH="$cuda8Path" \
-    -DOPTIX77_PATH="$optixPath" \
+    -DOPTIX_PATH="$optixPath" \
     ..
 echoGreen "Cmake Configuration Completed!"
 
 
-answer=$(askYesOrNo "Do you want to build Vortex or open Visual Studio? (Yes for building, No for opening Solution)")
+answer=$(askYesOrNo "Do you want to build Vortex or open Visual Studio? (Yes for building, No for opening Solution, Cancel to exit)")
 
 if [[ $answer -eq 6 ]]; then
     echoGreen "Building Vortex..."
     cmake --build . --config Release
     echoGreen "Build complete, Launching Vortex."
-    ./Vortex/src/Release/Vortex.exe
+    cd ./Vortex/src/Release/
+    ./Vortex.exe 
 elif [[ $answer -eq 7 ]]; then
     echoGreen "Opening Visual Studio solution."
     start .build/Vortex.sln

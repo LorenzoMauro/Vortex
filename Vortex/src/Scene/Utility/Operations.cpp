@@ -661,6 +661,7 @@ namespace vtx::ops
 			VTX_ASSERT_CLOSE(!math::isNan(n));
 			VTX_ASSERT_CLOSE(!math::isNan(t));
 			VTX_ASSERT_CLOSE(!math::isNan(b));
+
 			i++;
 		}
 		mesh->status.hasTangents = true;
