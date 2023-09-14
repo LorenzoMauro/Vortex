@@ -1,25 +1,10 @@
 #include "LaunchParams.h"
+#include "Core/Options.h"
+#include "NeuralNetworks/NeuralNetwork.h"
 #include "Scene/Nodes/RendererSettings.h"
 
 namespace vtx
 {
-	struct KernelTimes
-	{
-		float genCameraRay     = 0.0f;
-		float traceRadianceRay = 0.0f;
-		float reset            = 0.0f;
-		float shadeRay         = 0.0f;
-		float handleEscapedRay = 0.0f;
-		float accumulateRay    = 0.0f;
-		float fetchQueueSize   = 0.0f;
-		float setQueueCounters = 0.0f;
-
-		float totMs()
-		{
-			return setQueueCounters + genCameraRay + traceRadianceRay + reset + shadeRay + handleEscapedRay + accumulateRay + fetchQueueSize;
-		}
-	};
-
 	enum Queue
 	{
 		Q_RADIANCE_TRACE,
@@ -30,29 +15,28 @@ namespace vtx
 		Q_SHADOW_TRACE
 	};
 
+	
 	class WaveFrontIntegrator
 	{
 	public:
 
-		WaveFrontIntegrator(graph::RendererSettings* settings);
-
-		KernelTimes& getKernelTime();
+		WaveFrontIntegrator(RendererSettings* _rendererSettings)
+		{
+			queueSizeRetrievalBuffer.alloc(sizeof(int));
+			queueSizeDevicePtr = queueSizeRetrievalBuffer.castedPointer<int>();
+			rendererSettings = _rendererSettings;
+			settings = getOptions()->wavefrontSettings;
+		}
 
 		void render();
 
-		void downloadCounters();
-
 		void generatePixelQueue();
-
-		void launchOptixKernel(math::vec2i launchDimension, std::string pipelineName);
 
 		void traceRadianceRays();
 
-		void resetQueue(Queue queue);
+		void downloadCountersPointers();
 
-		void setCounters();
-
-		void resetCounters();
+		void downloadQueueSize(const int* deviceSize, int& hostSize, int maxSize);
 
 		void shadeRays();
 
@@ -65,11 +49,16 @@ namespace vtx
 		LaunchParams* hostParams;
 		LaunchParams* deviceParams;
 		int           maxTraceQueueSize;
-		KernelTimes   kernelTimes;
 		CUDABuffer    queueSizeRetrievalBuffer;
 		int*          queueSizeDevicePtr;
 		int           retrievedQueueSize;
-		graph::RendererSettings* settings;
-		Counters 	counters;
+		RendererSettings* rendererSettings;
+		WavefrontSettings settings;
+		Counters 	deviceCountersPointers;
+		QueueSizes queueSizes;
+
+		CUDABuffer tmpIndicesBuffer;
+		int* tmpIndices;
+		network::Network network;
 	};
 }

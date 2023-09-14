@@ -14,7 +14,8 @@ namespace vtx::graph
 		NAV_PAN,
 		NAV_ORBIT,
 		NAV_ZOOM,
-		NAV_DOLLY
+		NAV_DOLLY,
+		NAV_FOV
 	};
 
 	class Camera : public Node
@@ -30,11 +31,10 @@ namespace vtx::graph
 
 		void orbitNavigation(const float ts);
 
-		void traverse(const std::vector<std::shared_ptr<NodeVisitor>>& orderedVisitors) override;
+		std::vector<std::shared_ptr<Node>> getChildren() const override;
 
-		//void accept(std::shared_ptr<NodeVisitor> visitor) override;
-
-
+	protected:
+		void accept(NodeVisitor& visitor) override;
 	public:
 		std::shared_ptr<Transform>			transform;
 		math::vec3f							position;
@@ -51,7 +51,7 @@ namespace vtx::graph
 		float								movementSensibility;
 		float								rotationSensibility;
 		float								zoomSensibility;
-		bool								updated;
+		bool								lockCamera = false;
 	};
 
 }

@@ -1,256 +1,331 @@
 ﻿#include "RendererNodeGui.h"
 
 #include "imgui.h"
+#include "NeuralNetworkGui.h"
+#include "SceneGraph.h"
+#include "Core/Application.h"
 #include "Core/CustomImGui/CustomImGui.h"
+#include "Device/Wrappers/KernelTimings.h"
 #include "Scene/Nodes/Renderer.h"
-#include "Device/DevicePrograms/LaunchParams.h"
 
 namespace vtx::gui
 {
-	typedef bool (*ComboFuncType)(const char*, int*, const char* const [], int, int);
+	static const std::string hiddenLabel = "##hidden";
 
-    void rendererNodeGui(std::shared_ptr<graph::Renderer> renderNode)
+	bool fireflySettingsEditorGui(FireflySettings& settings)
+	{
+		if (ImGui::CollapsingHeader("Firefly Filtering"))
+		{
+			if (vtxImGui::halfSpaceWidget("Enable", ImGui::Checkbox, (hiddenLabel + "Enable Fireflies Filtering").c_str(), &settings.active))
+			{
+				settings.isUpdated = true;
+			}
+			if (vtxImGui::halfSpaceWidget("FireFly Kernel Size", ImGui::DragInt, (hiddenLabel + "FireFly Kernel Size").c_str(), &settings.kernelSize, 1.0f, 1, 30, "%d", 0))
+			{
+				settings.isUpdated = true;
+			}
+			if (vtxImGui::halfSpaceWidget("FireFly Threshold", ImGui::DragFloat, (hiddenLabel + "FireFly Threshold").c_str(), &settings.threshold, 0.01f, 1.0f, 5.0f, "%.3f", 0))
+			{
+				settings.isUpdated = true;
+			}
+		}
+
+		return settings.isUpdated;
+	}
+
+	bool denoiserSettingsEditorGui(DenoiserSettings& settings)
+	{
+		if (ImGui::CollapsingHeader("Denoiser Settings"))
+		{
+			if (vtxImGui::halfSpaceWidget("Enable", ImGui::Checkbox, (hiddenLabel + "Enable Denoiser").c_str(), &settings.active))
+			{
+				settings.isUpdated = true;
+			}
+			if (vtxImGui::halfSpaceWidget("Denoiser Iteration Start", ImGui::DragInt, (hiddenLabel + "Denoiser Iteration Start").c_str(), &settings.denoiserStart, 1, 1, 1000, "%d", 0))
+			{
+				settings.isUpdated = true;
+			}
+			if (vtxImGui::halfSpaceWidget("Denoiser Blend", ImGui::DragFloat, (hiddenLabel + "Denoiser Blend").c_str(), &settings.denoiserBlend, 0.01f, 0.0f, 1.0f, "%.3f", 0))
+			{
+				settings.isUpdated = true;
+			}
+		}
+
+		return settings.isUpdated;
+	}
+
+	bool toneMapperSettingsEditorGui(ToneMapperSettings& settings)
+	{
+		if (ImGui::CollapsingHeader("Tone Mapper Settings"))
+		{
+			if (vtxImGui::halfSpaceWidget("White Point", vtxImGui::colorPicker, (hiddenLabel + "_White Point").c_str(), &settings.whitePoint.x))
+			{
+				settings.invWhitePoint = 1.0f / settings.whitePoint;
+				settings.isUpdated = true;
+			}
+			if (vtxImGui::halfSpaceWidget("Color balance", vtxImGui::colorPicker, (hiddenLabel + "_Color balance").c_str(), &settings.colorBalance.x))
+			{
+				settings.isUpdated = true;
+			}
+			if (vtxImGui::halfSpaceWidget("Burn Highlights", ImGui::DragFloat, (hiddenLabel + "_Burn Highlights").c_str(), &settings.burnHighlights, 0.01f, 0.0f, 1.0f, "%.3f", 0))
+			{
+				settings.isUpdated = true;
+			}
+			if (vtxImGui::halfSpaceWidget("Crush Blacks", ImGui::DragFloat, (hiddenLabel + "_Crush Blacks").c_str(), &settings.crushBlacks, 0.01f, 0.0f, 1.0f, "%.3f", 0))
+			{
+				settings.isUpdated = true;
+			}
+			if (vtxImGui::halfSpaceWidget("Saturation", ImGui::DragFloat, (hiddenLabel + "_Saturation").c_str(), &settings.saturation, 0.01f, 0.0f, 2.0f, "%.3f", 0))
+			{
+				settings.isUpdated = true;
+			}
+			if (vtxImGui::halfSpaceWidget("Gamma", ImGui::DragFloat, (hiddenLabel + "_Gamma").c_str(), &settings.gamma, 0.01f, 0.1f, 5.0f, "%.3f", 0))
+			{
+				settings.invGamma = 1.0f / settings.gamma;
+				settings.isUpdated = true;
+			}
+		}
+
+		return settings.isUpdated;
+	}
+
+	bool postProcessingSettingsEditorGui(RendererSettings& settings)
+	{
+		bool isUpdated = false;
+		if (ImGui::CollapsingHeader("Post Processing"))
+		{
+			isUpdated |= fireflySettingsEditorGui(settings.fireflySettings);
+			ImGui::Separator();
+			isUpdated |= denoiserSettingsEditorGui(settings.denoiserSettings);
+			ImGui::Separator();
+			isUpdated |= toneMapperSettingsEditorGui(settings.toneMapperSettings);
+		}
+
+		return isUpdated;
+	}
+
+	bool adaptiveSettingsEditorGui(AdaptiveSamplingSettings& settings)
+	{
+		if (ImGui::CollapsingHeader("Adaptive Sampling"))
+		{
+			if (vtxImGui::halfSpaceWidget("Enable", ImGui::Checkbox, (hiddenLabel + "_Adaptive Sampling").c_str(), &settings.active))
+			{
+				settings.isUpdated = true;
+			}
+			if (vtxImGui::halfSpaceWidget("Noise Kernel Size", ImGui::DragInt, (hiddenLabel + "_Noise Kernel Size").c_str(), &settings.noiseKernelSize, 1, 0, 40, "%d", 0))
+			{
+				settings.isUpdated = true;
+			}
+			if (vtxImGui::halfSpaceWidget("Start Adaptive Sample Sample", ImGui::DragInt, (hiddenLabel + "_Start Adaptive Sample Sample").c_str(), &settings.minAdaptiveSamples, 1, 0, 500, "%d", 0))
+			{
+				settings.isUpdated = true;
+			}
+			if (vtxImGui::halfSpaceWidget("Albedo-Normal Noise Influence", ImGui::DragFloat, (hiddenLabel + "_Albedo-Normal Noise Influence").c_str(), &settings.albedoNormalNoiseInfluence, 0.01f, 0.0f, 1.0f, "%.3f", 0))
+			{
+				settings.isUpdated = true;
+			}
+		}
+
+		return settings.isUpdated;
+	}
+
+	bool wavefrontSettingsEditorGui(WavefrontSettings& settings)
+	{
+		if (ImGui::CollapsingHeader("WaveFront Settings"))
+		{
+			if (vtxImGui::halfSpaceWidget("Use WaveFront", ImGui::Checkbox, (hiddenLabel + "_Use Wavefront").c_str(), &settings.active))
+			{
+				settings.isUpdated = true;
+			}
+
+			if (vtxImGui::halfSpaceWidget("Long Path Mega Kernel", ImGui::Checkbox, (hiddenLabel + "_Long Path Mega Kernel").c_str(), &settings.useLongPathKernel))
+			{
+				settings.isUpdated = true;
+			}
+
+			if (vtxImGui::halfSpaceWidget("Wavefront Long Path Kernel Start", ImGui::DragFloat, (hiddenLabel + "_Wavefront Long Path Kernel Start").c_str(), &settings.longPathPercentage, 0.01, 0, 1, "%.3f", 0))
+			{
+				settings.isUpdated = true;
+			}
+
+			if (vtxImGui::halfSpaceWidget("Fit Kernel Launch", ImGui::Checkbox, (hiddenLabel + "_Fit Kernel Launch").c_str(), &settings.fitWavefront))
+			{
+				settings.isUpdated = true;
+			}
+
+			if (vtxImGui::halfSpaceWidget("Use Optix Shader Kernel", ImGui::Checkbox, (hiddenLabel + "_Use Optix Shader Kernel").c_str(), &settings.optixShade))
+			{
+				settings.isUpdated = true;
+			}
+
+		}
+
+		return settings.isUpdated;
+	}
+
+	void statisticsDisplayGui(const std::shared_ptr<graph::Renderer>& renderNode)
+	{
+		if (ImGui::CollapsingHeader("Statistics"))
+		{
+			const CudaEventTimes cuTimes = getCudaEventTimes();
+			const int actualLaunches = getLaunches();
+			float totTimeSeconds = (cuTimes.trace + cuTimes.noiseComputation + cuTimes.postProcessing + cuTimes.display) / 1000.0f;
+			float sppS = renderNode->width * renderNode->height * actualLaunches / totTimeSeconds;
+			float averageFrameTime = totTimeSeconds / actualLaunches;
+			float fps = 1.0f / averageFrameTime;
+
+			vtxImGui::halfSpaceWidget("Total Time:", vtxImGui::booleanText, "%.3f s", totTimeSeconds);
+			vtxImGui::halfSpaceWidget("Samples Per Pixels:", vtxImGui::booleanText, "%d", renderNode->settings.iteration);
+			vtxImGui::halfSpaceWidget("SPP per Seconds:", vtxImGui::booleanText, "%.3f", sppS);
+			vtxImGui::halfSpaceWidget("Frame Time:", vtxImGui::booleanText, "%.3f ms", averageFrameTime);
+			vtxImGui::halfSpaceWidget("Fps:", vtxImGui::booleanText, "%.3f", fps);
+			ImGui::Separator();
+
+			float internalFps = 1000.0f * (float)renderNode->internalIteration / renderNode->overallTime;
+			float totTimeInternal = renderNode->overallTime / 1000.0f;
+			vtxImGui::halfSpaceWidget("CPU Fps:", vtxImGui::booleanText, "%.3f", internalFps);
+			vtxImGui::halfSpaceWidget("CPU Tot Time:", vtxImGui::booleanText, "%.3f", totTimeInternal);
+			ImGui::Separator();
+
+			const float factor = 1.0f / (float)actualLaunches;
+
+			vtxImGui::halfSpaceWidget("Renderer Noise				", vtxImGui::booleanText, "%.2f ms", factor * cuTimes.noiseComputation);
+			vtxImGui::halfSpaceWidget("Renderer Trace				", vtxImGui::booleanText, "%.2f ms", factor * cuTimes.trace);
+			vtxImGui::halfSpaceWidget("Renderer Post				", vtxImGui::booleanText, "%.2f ms", factor * cuTimes.postProcessing);
+			vtxImGui::halfSpaceWidget("Renderer Display				", vtxImGui::booleanText, "%.2f ms", factor * cuTimes.display);
+			ImGui::Separator();
+			vtxImGui::halfSpaceWidget("WaveFront Generate Ray		", vtxImGui::booleanText, "%.2f ms", factor * cuTimes.genCameraRay);
+			vtxImGui::halfSpaceWidget("WaveFront Trace				", vtxImGui::booleanText, "%.2f ms", factor * cuTimes.traceRadianceRay);
+			vtxImGui::halfSpaceWidget("WaveFront Shade				", vtxImGui::booleanText, "%.2f ms", factor * cuTimes.shadeRay);
+			vtxImGui::halfSpaceWidget("WaveFront Escaped			", vtxImGui::booleanText, "%.2f ms", factor * cuTimes.handleEscapedRay);
+			vtxImGui::halfSpaceWidget("WaveFront Accumulate			", vtxImGui::booleanText, "%.2f ms", factor * cuTimes.accumulateRay);
+			vtxImGui::halfSpaceWidget("WaveFront Reset				", vtxImGui::booleanText, "%.2f ms", factor * cuTimes.reset);
+			vtxImGui::halfSpaceWidget("WaveFront Fetch Queue Size	", vtxImGui::booleanText, "%.2f ms", factor * cuTimes.fetchQueueSize);
+			ImGui::Separator();
+			vtxImGui::halfSpaceWidget("Neural Shuffle Dataset		", vtxImGui::booleanText, "%.2f ms", factor * cuTimes.nnShuffleDataset);
+			vtxImGui::halfSpaceWidget("Neural Network Train			", vtxImGui::booleanText, "%.2f ms", factor * cuTimes.nnTrain);
+			vtxImGui::halfSpaceWidget("Neural Network Infer			", vtxImGui::booleanText, "%.2f ms", factor * cuTimes.nnInfer);
+
+		}
+	}
+
+	bool rendererSettingsEditorGui(RendererSettings& settings)
+	{
+		bool restartRendering = false;
+		ImGui::SetNextItemOpen(true, ImGuiCond_Once);
+		if (ImGui::CollapsingHeader("General Settings"))
+		{
+			vtxImGui::halfSpaceWidget("Samples Per Pixels:", vtxImGui::booleanText, "%d", settings.iteration);
+
+			if (vtxImGui::halfSpaceWidget("Max Bounces", ImGui::DragInt, (hiddenLabel + "_Max Bounces").c_str(), &(settings.maxBounces), 1.0f, 1, 1000000, "%d", 0))
+			{
+				settings.isUpdated = true;
+				settings.isMaxBounceChanged = true;
+			}
+			if (vtxImGui::halfSpaceWidget("Max Samples", ImGui::DragInt, (hiddenLabel + "_Max Samples").c_str(), &settings.maxSamples, 1.0f, 1, 1000000, "%d", 0))
+			{
+				settings.isUpdated = true;
+			}
+			if (vtxImGui::halfSpaceWidget("Accumulate", ImGui::Checkbox, (hiddenLabel + "_Accumulate").c_str(), &settings.accumulate))
+			{
+				settings.isUpdated = true;
+				restartRendering = true;
+			}
+			if (vtxImGui::halfSpaceWidget("Sampling Technique", (ComboFuncType)ImGui::Combo, (hiddenLabel + "_Sampling Technique").c_str(), reinterpret_cast<int*>(&settings.samplingTechnique), samplingTechniqueNames, S_COUNT, -1))
+			{
+				settings.isUpdated = true;
+				restartRendering = true;
+			}
+			if (vtxImGui::halfSpaceWidget("Display Buffer Type", (ComboFuncType)ImGui::Combo, (hiddenLabel + "_Display Buffer Type").c_str(), reinterpret_cast<int*>(&settings.displayBuffer), displayBufferNames, FB_COUNT, -1))
+			{
+				settings.isUpdated = true;
+			}
+			if (vtxImGui::halfSpaceWidget("Min Clip", ImGui::DragFloat, (hiddenLabel + "_Min Clip").c_str(), &settings.minClamp, 0.01, 0, 1000, "%.3f", 0))
+			{
+				settings.isUpdated = true;
+				restartRendering = true;
+			}
+			if (vtxImGui::halfSpaceWidget("Max Clip", ImGui::DragFloat, (hiddenLabel + "_Max Clip").c_str(), &settings.maxClamp, 1, 0, 10000, "%.3f", 0))
+			{
+				settings.isUpdated = true;
+				restartRendering = true;
+			}
+			if (vtxImGui::halfSpaceWidget("Russian Roulette", ImGui::Checkbox, (hiddenLabel + "_Russian Roulette").c_str(), &settings.useRussianRoulette))
+			{
+				settings.isUpdated = true;
+				restartRendering = true;
+			}
+			if (vtxImGui::halfSpaceWidget("Separate Thread", ImGui::Checkbox, (hiddenLabel + "_Separate Thread").c_str(), &settings.runOnSeparateThread))
+			{
+				settings.isUpdated = true;
+				restartRendering = true;
+			}
+		}
+		return restartRendering;
+	}
+
+	void rendererNodeGui(const std::shared_ptr<graph::Renderer>& renderNode)
     {
-        ImGui::Begin("Renderer Settings");
+		bool restartRendering = false;
 
-		float availableWidth = ImGui::GetContentRegionAvail().x;
+		const float availableWidth = ImGui::GetContentRegionAvail().x;
 
 		ImGui::PushItemWidth(availableWidth); // Set the width of the next widget to 200
 
-		std::string hiddenLabel = "##hidden";
-        int displayBufferItem = renderNode->settings.displayBuffer;
-
-		if (vtxImGui::HalfSpaceWidget("Separate Thread", ImGui::Checkbox, (hiddenLabel + "_Separate Thread").c_str(), &(renderNode->settings.runOnSeparateThread)))
-		{
-			renderNode->settings.iteration = -1;
-			renderNode->settings.isUpdated = true;
-		}
-
-        if (vtxImGui::HalfSpaceWidget("Display Buffer Type", (ComboFuncType)ImGui::Combo, (hiddenLabel + "_Display Buffer Type").c_str(), &displayBufferItem, RendererDeviceSettings::displayBufferNames, RendererDeviceSettings::DisplayBuffer::FB_COUNT, -1))
-        {
-            renderNode->settings.displayBuffer = static_cast<RendererDeviceSettings::DisplayBuffer>(displayBufferItem);
-            renderNode->settings.isUpdated = true;
-        }
-
-        int samplingTechniqueItem = renderNode->settings.samplingTechnique;
-
-		if (vtxImGui::HalfSpaceWidget("Sampling Technique", (ComboFuncType)ImGui::Combo, (hiddenLabel + "_Sampling Technique").c_str(), &samplingTechniqueItem, RendererDeviceSettings::samplingTechniqueNames, RendererDeviceSettings::SamplingTechnique::S_COUNT, -1))
-        {
-            renderNode->settings.samplingTechnique = static_cast<RendererDeviceSettings::SamplingTechnique>(samplingTechniqueItem);
-            renderNode->settings.iteration = -1;
-            renderNode->settings.isUpdated = true;
-        }
-
-		if (vtxImGui::HalfSpaceWidget("Max Samples", ImGui::SliderInt, (hiddenLabel + "_Max Samples").c_str(), &(renderNode->settings.maxSamples), 0, 100000, "%d", 0))
-		{
-			//renderNode->settings.iteration = -1;
-			renderNode->settings.isUpdated = true;
-		};
-		if (vtxImGui::HalfSpaceWidget("Max Bounces", ImGui::SliderInt, (hiddenLabel + "_Max Bounces").c_str(), &(renderNode->settings.maxBounces), 1, 35, "%d", 0))
-		{
-			renderNode->settings.iteration = -1;
-			renderNode->settings.isUpdated = true;
-		};
-		if (vtxImGui::HalfSpaceWidget("Accumulate", ImGui::Checkbox, (hiddenLabel + "_Accumulate").c_str(), &(renderNode->settings.accumulate)))
-		{
-			renderNode->settings.iteration = -1;
-			renderNode->settings.isUpdated = true;
-		};
-		if (vtxImGui::HalfSpaceWidget("Min Clip", ImGui::DragFloat, (hiddenLabel + "_Min Clip").c_str(), &(renderNode->settings.minClamp), 0.01, 0, 1000, "%.3f", 0))
-		{
-			renderNode->settings.iteration = -1;
-			renderNode->settings.isUpdated = true;
-		};
-		if (vtxImGui::HalfSpaceWidget("Max Clip", ImGui::DragFloat, (hiddenLabel + "_Max Clip").c_str(), &(renderNode->settings.maxClamp), 1, 0, 10000, "%.3f", 0))
-		{
-			renderNode->settings.iteration = -1;
-			renderNode->settings.isUpdated = true;
-		};
+		restartRendering |= rendererSettingsEditorGui(renderNode->settings);
 
 		ImGui::Separator();
 
-		ImGui::SetNextItemOpen(true, ImGuiCond_Once);
-		if (ImGui::CollapsingHeader("WaveFront Settings"))
-		{
-			if (vtxImGui::HalfSpaceWidget("Use WaveFront", ImGui::Checkbox, (hiddenLabel + "_Use Wavefront").c_str(), &(renderNode->settings.useWavefront)))
-			{
-				renderNode->settings.iteration = -1;
-				renderNode->settings.isUpdated = true;
-			}
-
-			if (vtxImGui::HalfSpaceWidget("Long Path Mega Kernel", ImGui::Checkbox, (hiddenLabel + "_Long Path Mega Kernel").c_str(), &(renderNode->settings.useLongPathKernel)))
-			{
-				renderNode->settings.iteration = -1;
-				renderNode->settings.isUpdated = true;
-			}
-
-			if (vtxImGui::HalfSpaceWidget("Wavefront Long Path Kernel Start", ImGui::DragFloat, (hiddenLabel + "_Wavefront Long Path Kernel Start").c_str(), &(renderNode->settings.longPathPercentage), 0.01, 0, 1, "%.3f", 0))
-			{
-				renderNode->settings.iteration = -1;
-				renderNode->settings.isUpdated = true;
-			}
-
-			if (vtxImGui::HalfSpaceWidget("Fit Kernel Launch", ImGui::Checkbox, (hiddenLabel + "_Fit Kernel Launch").c_str(), &(renderNode->settings.fitWavefront)))
-			{
-				renderNode->settings.iteration = -1;
-				renderNode->settings.isUpdated = true;
-			}
-
-			if (vtxImGui::HalfSpaceWidget("Use Optix Shader Kernel", ImGui::Checkbox, (hiddenLabel + "_Use Optix Shader Kernel").c_str(), &(renderNode->settings.optixShade)))
-			{
-				renderNode->settings.iteration = -1;
-				renderNode->settings.isUpdated = true;
-			}
-
-			if (vtxImGui::HalfSpaceWidget("Russian Roulette", ImGui::Checkbox, (hiddenLabel + "_Use Russian Roulette").c_str(), &(renderNode->settings.useRussianRoulette)))
-			{
-				renderNode->settings.iteration = -1;
-				renderNode->settings.isUpdated = true;
-			}
-		}
+		restartRendering |= wavefrontSettingsEditorGui(renderNode->waveFrontIntegrator.settings);
 
 		ImGui::Separator();
-		ImGui::SetNextItemOpen(true, ImGuiCond_Once);
-		if (ImGui::CollapsingHeader("Adaptive Sampling Settings"))
-		{
-			if (vtxImGui::HalfSpaceWidget("Adaptive Sampling", ImGui::Checkbox, (hiddenLabel + "_Adaptive Sampling").c_str(), &(renderNode->settings.adaptiveSampling)))
-			{
-				renderNode->settings.iteration = -1;
-					renderNode->settings.isUpdated = true;
-			}
-			if (vtxImGui::HalfSpaceWidget("Noise Kernel Size", ImGui::DragInt, (hiddenLabel + "_Noise Kernel Size").c_str(), &(renderNode->settings.noiseKernelSize), 1, 0, 40, "%d", 0))
-			{
-				renderNode->settings.iteration = -1;
-			}
-			if (vtxImGui::HalfSpaceWidget("Start Adaptive Sample Sample", ImGui::DragInt, (hiddenLabel + "_Start Adaptive Sample Sample").c_str(), &(renderNode->settings.minAdaptiveSamples), 1, 0, 500, "%d", 0))
-			{
-				renderNode->settings.iteration = -1;
-				renderNode->settings.isUpdated = true;
-			}
-			/*if (vtxImGui::HalfSpaceWidget("Adaptive Min Pixel Sample", ImGui::DragInt, (hiddenLabel + "_Adaptive Min Pixel Sample").c_str(), &(renderNode->settings.minPixelSamples), 1, 0, 20, "%d", 0))
-			{
-				renderNode->settings.iteration = -1;
-				renderNode->settings.isUpdated = true;
-			}
-			if (vtxImGui::HalfSpaceWidget("Adaptive Max Pixel Sample", ImGui::DragInt, (hiddenLabel + "_Adaptive Max Pixel Sample").c_str(), &(renderNode->settings.maxPixelSamples), 1, 1, 1000, "%d", 0))
-			{
-				renderNode->settings.iteration = -1;
-				renderNode->settings.isUpdated = true;
-			}*/
-			if (vtxImGui::HalfSpaceWidget("Albedo-Normal Noise Influence", ImGui::DragFloat, (hiddenLabel + "_Albedo-Normal Noise Influence").c_str(), &(renderNode->settings.albedoNormalNoiseInfluence), 0.01f, 0.0f, 1.0f, "%.3f", 0))
-			{
-				renderNode->settings.iteration = -1;
-			}
-			/*if (vtxImGui::HalfSpaceWidget("Noise Threshold", ImGui::DragFloat, (hiddenLabel + "_Noise Threshold").c_str(), &(renderNode->settings.noiseCutOff), 0.00001f, 0.0f, 1.0f, "%.3f", 0))
-			{
-				renderNode->settings.iteration = -1;
-			}*/
-		}
+
+		restartRendering |= adaptiveSettingsEditorGui(renderNode->settings.adaptiveSamplingSettings);
 
 		ImGui::Separator();
-		ImGui::SetNextItemOpen(true, ImGuiCond_Once);
-		if(ImGui::CollapsingHeader("Post Processing"))
+
+		networkSettingsEditorGui(renderNode->waveFrontIntegrator.network.settings);
+
+		ImGui::Separator();
+
+		postProcessingSettingsEditorGui(renderNode->settings);
+
+		ImGui::Separator();
+
+		statisticsDisplayGui(renderNode);
+        
+		ImGui::PopItemWidth();
+
+
+
+		if(renderNode->waveFrontIntegrator.settings.active)
 		{
-			ImGui::SetNextItemOpen(true, ImGuiCond_Once);
-			if (ImGui::CollapsingHeader("Firefly Filtering"))
+			if (renderNode->waveFrontIntegrator.network.settings.active)
 			{
-				if (vtxImGui::HalfSpaceWidget("FireFly Kernel Size", ImGui::DragInt, (hiddenLabel + "FireFly Kernel Size").c_str(), &(renderNode->settings.fireflyKernelSize), 1, 1, 30, "%d", 0))
+				neuralNetworkPlotWindow(renderNode->waveFrontIntegrator.network);
+				if (renderNode->waveFrontIntegrator.network.settings.isUpdated)
 				{
-				}
-				if (vtxImGui::HalfSpaceWidget("FireFly Threshold", ImGui::DragFloat, (hiddenLabel + "FireFly Threshold").c_str(), &(renderNode->settings.fireflyThreshold), 0.01f, 1.0f, 5.0f, "%.3f", 0))
-				{
-				}
-				if(vtxImGui::HalfSpaceWidget("Enable Fireflies Filtering", ImGui::Checkbox, (hiddenLabel + "Enable Fireflies Filtering").c_str(), &(renderNode->settings.removeFireflies)))
-				{
-					renderNode->settings.isUpdated = true;
+					renderNode->waveFrontIntegrator.network.reset();
+					restartRendering = true;
 				}
 			}
-
-			ImGui::SetNextItemOpen(true, ImGuiCond_Once);
-			if (ImGui::CollapsingHeader("Denoiser Settings"))
-			{
-				if (vtxImGui::HalfSpaceWidget("Enable Denoiser", ImGui::Checkbox, (hiddenLabel + "Enable Denoiser").c_str(), &(renderNode->settings.enableDenoiser)))
-				{
-					renderNode->settings.isUpdated = true;
-				}
-				if (vtxImGui::HalfSpaceWidget("Denoiser Iteration Start", ImGui::DragInt, (hiddenLabel + "Denoiser Iteration Start").c_str(), &(renderNode->settings.denoiserStart), 1, 1, 1000, "%d", 0))
-				{
-				}
-				if (vtxImGui::HalfSpaceWidget("Denoiser Blend", ImGui::DragFloat, (hiddenLabel + "Denoiser Blend").c_str(), &(renderNode->settings.denoiserBlend), 0.01f, 0.0f, 1.0f, "%.3f", 0))
-				{
-				}
-			}
-
-			ImGui::SetNextItemOpen(true, ImGuiCond_Once);
-			if (ImGui::CollapsingHeader("Tone Mapper Settings"))
-			{
-				if (vtxImGui::HalfSpaceWidget("White Point", vtxImGui::colorPicker, (hiddenLabel + "_White Point").c_str(), &(renderNode->toneMapperSettings.whitePoint.x)))
-				{
-					renderNode->toneMapperSettings.isUpdated = true;
-				}
-				if (vtxImGui::HalfSpaceWidget("Color balance", vtxImGui::colorPicker, (hiddenLabel + "_Color balance").c_str(), &(renderNode->toneMapperSettings.colorBalance.x)))
-				{
-					renderNode->toneMapperSettings.isUpdated = true;
-				}
-				if (vtxImGui::HalfSpaceWidget("Burn Highlights", ImGui::DragFloat, (hiddenLabel + "_Burn Highlights").c_str(), &(renderNode->toneMapperSettings.burnHighlights), 0.01f, 0.0f, 1.0f, "%.3f", 0))
-				{
-					renderNode->toneMapperSettings.isUpdated = true;
-				}
-				if (vtxImGui::HalfSpaceWidget("Crush Blacks", ImGui::DragFloat, (hiddenLabel + "_Crush Blacks").c_str(), &(renderNode->toneMapperSettings.crushBlacks), 0.01f, 0.0f, 1.0f, "%.3f", 0))
-				{
-					renderNode->toneMapperSettings.isUpdated = true;
-				}
-				if (vtxImGui::HalfSpaceWidget("Saturation", ImGui::DragFloat, (hiddenLabel + "_Saturation").c_str(), &(renderNode->toneMapperSettings.saturation), 0.01f, 0.0f, 2.0f, "%.3f", 0))
-				{
-					renderNode->toneMapperSettings.isUpdated = true;
-				}
-				if (vtxImGui::HalfSpaceWidget("Gamma", ImGui::DragFloat, (hiddenLabel + "_Gamma").c_str(), &(renderNode->toneMapperSettings.gamma), 0.01f, 0.1f, 5.0f, "%.3f", 0))
-				{
-					renderNode->toneMapperSettings.isUpdated = true;
-				}
-			}
+		}
+		else
+		{
+			renderNode->waveFrontIntegrator.network.settings.active = false;
 		}
 		
 
-        ///////// INFO /////////////
-        ////////////////////////////
-		ImGui::Separator();
-		ImGui::SetNextItemOpen(true, ImGuiCond_Once);
-		if (ImGui::CollapsingHeader("Statistics"))
+		if(renderNode->waveFrontIntegrator.network.settings.isAnyUpdated())
 		{
-			vtxImGui::HalfSpaceWidget("Total Time:", vtxImGui::booleanText, "%.3f s", renderNode->totalTimeSeconds);
-			vtxImGui::HalfSpaceWidget("Samples Per Pixels:", vtxImGui::booleanText, "%d", renderNode->settings.iteration);
-			vtxImGui::HalfSpaceWidget("SPP per Seconds:", vtxImGui::booleanText, "%.3f", renderNode->sppS);
-			vtxImGui::HalfSpaceWidget("Frame Time:", vtxImGui::booleanText, "%.3f ms", renderNode->averageFrameTime);
-			vtxImGui::HalfSpaceWidget("Fps:", vtxImGui::booleanText, "%.3f", renderNode->fps);
-			ImGui::Separator();
-
-			float internalFps = ((1000.0f) * (float)(renderNode->internalIteration)) / renderNode->overallTime;
-			float totTimeInternal = renderNode->overallTime / 1000.0f;
-			vtxImGui::HalfSpaceWidget("CPU Fps:", vtxImGui::booleanText, "%.3f", internalFps);
-			vtxImGui::HalfSpaceWidget("CPU Tot Time:", vtxImGui::booleanText, "%.3f", totTimeInternal);
-			ImGui::Separator();
-
-			KernelTimes& kernelTimes = renderNode->getWaveFrontTimes();
-			int actualLaunches = renderNode->getWavefrontLaunches();
-			float factor = 1.0f / (float)actualLaunches;
-
-			vtxImGui::HalfSpaceWidget("Renderer Noise				", vtxImGui::booleanText, "%.2f ms", factor* renderNode->noiseComputationTime);
-			vtxImGui::HalfSpaceWidget("Renderer Trace				", vtxImGui::booleanText, "%.2f ms", factor* renderNode->traceComputationTime);
-			vtxImGui::HalfSpaceWidget("Renderer Post				", vtxImGui::booleanText, "%.2f ms", factor* renderNode->postProcessingComputationTime);
-			vtxImGui::HalfSpaceWidget("Renderer Display				", vtxImGui::booleanText, "%.2f ms", factor* renderNode->displayComputationTime);
-			ImGui::Separator();
-			vtxImGui::HalfSpaceWidget("WaveFront Generate Ray		", vtxImGui::booleanText, "%.2f ms", factor* kernelTimes.genCameraRay);
-			vtxImGui::HalfSpaceWidget("WaveFront Trace				", vtxImGui::booleanText, "%.2f ms", factor* kernelTimes.traceRadianceRay);
-			vtxImGui::HalfSpaceWidget("WaveFront Shade				", vtxImGui::booleanText, "%.2f ms", factor* kernelTimes.shadeRay);
-			vtxImGui::HalfSpaceWidget("WaveFront Escaped			", vtxImGui::booleanText, "%.2f ms", factor* kernelTimes.handleEscapedRay);
-			vtxImGui::HalfSpaceWidget("WaveFront Accumulate			", vtxImGui::booleanText, "%.2f ms", factor* kernelTimes.accumulateRay);
-			vtxImGui::HalfSpaceWidget("WaveFront Reset				", vtxImGui::booleanText, "%.2f ms", factor* kernelTimes.reset);
-			vtxImGui::HalfSpaceWidget("WaveFront Fetch Queue Size	", vtxImGui::booleanText, "%.2f ms", factor * kernelTimes.fetchQueueSize);
+			restartRendering = true;
 		}
-        
-		ImGui::PopItemWidth();
-        ImGui::End();
+
+		if(restartRendering)
+		{
+			renderNode->settings.iteration = -1;
+		}
+
     }
 }
 

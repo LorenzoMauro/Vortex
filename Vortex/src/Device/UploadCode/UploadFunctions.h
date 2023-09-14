@@ -2,37 +2,24 @@
 #include "UploadBuffers.h"
 #include "Device/DevicePrograms/LaunchParams.h"
 #include "Scene/Nodes/Shader/BsdfMeasurement.h"
-
-namespace vtx
-{
-	namespace graph
-	{
-		class Camera;
-		class Renderer;
-		class LightProfile;
-		class Texture;
-		class Shader;
-		class Material;
-		class Mesh;
-		class Light;
-		class Instance;
-	}
-}
+#include "Scene/Node.h"
 
 namespace vtx::device
 {
 	std::tuple<InstanceData, InstanceData*> createInstanceData(std::shared_ptr<graph::Instance> instanceNode, const math::affine3f& transform);
 
-	std::tuple<LightData, LightData*> createLightData(std::shared_ptr<graph::Light> lightNode);
+	std::tuple<LightData, LightData*> createMeshLightData(const std::shared_ptr<graph::MeshLight>& meshLight);
+
+	std::tuple<LightData, LightData*> createEnvLightData(std::shared_ptr<graph::EnvironmentLight> envLight);
 
 	/*Create BLAS and GeometryDataStruct given vertices attributes and indices*/
-	std::tuple<GeometryData, GeometryData*> createGeometryData(std::shared_ptr<graph::Mesh> meshNode);
+	std::tuple<GeometryData, GeometryData*> createGeometryData(const std::shared_ptr<graph::Mesh>& meshNode);
 
 	void uploadMaps();
 
-	std::tuple<MaterialData, MaterialData*>createMaterialData(std::shared_ptr<graph::Material> material, int matQueueId);
+	std::tuple<MaterialData, MaterialData*> createMaterialData(const std::shared_ptr<graph::Material>& material, int matQueueId);
 
-	DeviceShaderConfiguration createDeviceShaderConfiguration(std::shared_ptr<graph::Shader> shader);
+	DeviceShaderConfiguration* createDeviceShaderConfiguration(const std::shared_ptr<graph::Material>& material);
 
 	CUDA_RESOURCE_DESC uploadTexture(
 		const std::vector<const void*>& imageLayers,
@@ -40,17 +27,17 @@ namespace vtx::device
 		const size_t& sizeBytesPerElement,
 		CUarray& array);
 
-	std::tuple< TextureData, TextureData*> createTextureData(std::shared_ptr<vtx::graph::Texture>& textureNode);
+	std::tuple< TextureData, TextureData*> createTextureData(const std::shared_ptr<vtx::graph::Texture>& textureNode);
 
-	BsdfSamplingPartData createBsdfPartData(graph::BsdfMeasurement::BsdfPartData& bsdfData, Buffers::BsdfPartBuffer& buffers);
+	BsdfSamplingPartData createBsdfPartData(const graph::BsdfMeasurement::BsdfPartData& bsdfData, Buffers::BsdfPartBuffer& buffers);
 
-	std::tuple < BsdfData, BsdfData*> createBsdfData(std::shared_ptr<graph::BsdfMeasurement> bsdfMeasurement);
+	std::tuple < BsdfData, BsdfData*> createBsdfData(const std::shared_ptr<graph::BsdfMeasurement>& bsdfMeasurement);
 
 	std::tuple < LightProfileData, LightProfileData*> createLightProfileData(std::shared_ptr<graph::LightProfile> lightProfile);
 
-	void setRendererData(std::shared_ptr<graph::Renderer> rendererNode);
+	void setRendererData(const std::shared_ptr<graph::Renderer>& rendererNode);
 
-	void setCameraData(std::shared_ptr<graph::Camera> cameraNode);
+	void setCameraData(const std::shared_ptr<graph::Camera>& cameraNode);
 
 	SbtProgramIdx setProgramsSbt();
 }

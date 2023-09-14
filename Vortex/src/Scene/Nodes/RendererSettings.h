@@ -1,41 +1,191 @@
 ﻿#pragma once
-#include "Device/DevicePrograms/LaunchParams.h"
-#include "Device/UploadCode/UploadData.h"
 
-
-namespace vtx::graph
+namespace vtx
 {
+	struct AdaptiveSamplingSettings
+	{
+		bool  active;
+		int   noiseKernelSize;
+		int   minAdaptiveSamples;
+		int   minPixelSamples;
+		int   maxPixelSamples;
+		float albedoNormalNoiseInfluence;
+		float noiseCutOff;
+		bool  isUpdated = true;
+	};
+
+	struct FireflySettings
+	{
+		bool  active;
+		int   kernelSize;
+		float threshold;
+		bool  isUpdated = true;
+	};
+
+	struct DenoiserSettings
+	{
+		bool  active;
+		int   denoiserStart;
+		float denoiserBlend;
+		bool  isUpdated = true;
+	};
+
+	struct WavefrontSettings
+	{
+		bool  active;
+		bool  fitWavefront;
+		bool  optixShade;
+		bool  parallelShade;
+		float longPathPercentage;
+		bool  useLongPathKernel;
+		bool  isUpdated = true;
+	};
+
+	struct ToneMapperSettings
+	{
+		math::vec3f whitePoint;
+		math::vec3f invWhitePoint;
+		math::vec3f colorBalance;
+		float       burnHighlights;
+		float       crushBlacks;
+		float       saturation;
+		float       gamma;
+		float       invGamma;
+		bool        isUpdated = true;
+
+		__both__ __forceinline__ void print()
+		{
+			printf(
+				"whitePoint: %f %f %f\n"
+				"invWhitePoint: %f %f %f\n"
+				"colorBalance: %f %f %f\n"
+				"burnHighlights: %f\n"
+				"crushBlacks: %f\n"
+				"saturation: %f\n"
+				"gamma: %f\n"
+				"invGamma: %f\n"
+				,
+				whitePoint.x, whitePoint.y, whitePoint.z,
+				invWhitePoint.x, invWhitePoint.y, invWhitePoint.z,
+				colorBalance.x, colorBalance.y, colorBalance.z,
+				burnHighlights,
+				crushBlacks,
+				saturation,
+				gamma,
+				invGamma
+			);
+		}
+	};
+
+	enum DisplayBuffer
+	{
+		FB_BEAUTY,
+		FB_NOISY,
+
+		FB_DIFFUSE,
+		FB_ORIENTATION,
+		FB_TRUE_NORMAL,
+		FB_SHADING_NORMAL,
+		FB_TANGENT,
+		FB_UV,
+		FB_NOISE,
+		FB_SAMPLES,
+		FB_DEBUG_1,
+
+		FB_NETWORK_INFERENCE_STATE_POSITION,
+		FB_NETWORK_INFERENCE_STATE_NORMAL,
+		FB_NETWORK_INFERENCE_OUTGOING_DIRECTION,
+		FB_NETWORK_INFERENCE_CONCENTRATION,
+		FB_NETWORK_INFERENCE_ANISOTROPY,
+		FB_NETWORK_INFERENCE_MEAN,
+		FB_NETWORK_INFERENCE_SAMPLE,
+		FB_NETWORK_INFERENCE_SAMPLE_DEBUG,
+		FB_NETWORK_INFERENCE_PDF,
+		FB_NETWORK_INFERENCE_IS_FRONT_FACE,
+		FB_NETWORK_INFERENCE_SAMPLING_FRACTION,
+
+		FB_NETWORK_REPLAY_BUFFER_REWARD,
+		FB_NETWORK_REPLAY_BUFFER_SAMPLES,
+		FB_NETWORK_DEBUG_PATHS,
+
+		FB_COUNT,
+	};
+
+	inline static const char* displayBufferNames[] = {
+			"Beauty",
+			"Noisy",
+			"Diffuse",
+			"Orientation",
+			"True Normal",
+			"Shading Normal",
+			"Tangent",
+			"Uv",
+			"Noise",
+			"Samples",
+			"Debug1",
+			"Network Inference State Position",
+			"Network Inference State Normal",
+			"Network Inference Outgoing Direction",
+			"Network Inference Concentration",
+		    "Network Inference Anisotropy",
+			"Network Inference Mean",
+			"Network Inference Sample",
+		    "Network Inference Sample Debug",
+			"Network Inference Pdf",
+			"Network Inference Is Front Face",
+			"Network Inference Sampling Fraction",
+			"Network Replay Buffer Reward",
+			"Network Replay Buffer Samples",
+			"Network Debug Paths",
+	};
+
+	enum SamplingTechnique
+	{
+		S_BSDF,
+		S_DIRECT_LIGHT,
+		S_MIS,
+
+		S_COUNT
+	};
+
+	inline static const char* samplingTechniqueNames[] = {
+				"Bsdf Sampling",
+				"Light Sampling",
+				"Multiple Importance Sampling",
+	};
+
 	struct RendererSettings
 	{
-		int                                       iteration;
-		int                                       maxBounces;
-		int                                       maxSamples;
-		bool                                      accumulate;
-		RendererDeviceSettings::SamplingTechnique samplingTechnique;
-		RendererDeviceSettings::DisplayBuffer     displayBuffer;
-		bool                                      isUpdated;
-		float                                     minClamp;
-		float                                     maxClamp;
-		int                                       noiseKernelSize;
-		bool                                      adaptiveSampling;
-		int                                       minAdaptiveSamples;
-		int                                       minPixelSamples;
-		int                                       maxPixelSamples;
-		float                                     albedoNormalNoiseInfluence;
-		float                                     noiseCutOff;
-		int                                       fireflyKernelSize;
-		float                                     fireflyThreshold;
-		bool                                      removeFireflies;
-		bool                                      enableDenoiser;
-		int                                       denoiserStart;
-		float                                     denoiserBlend;
-		bool                                      useWavefront;
-		bool                                      useRussianRoulette;
-		bool                                      fitWavefront;
-		bool                                      optixShade;
-		bool                                      parallelShade;
-		bool                                      runOnSeparateThread;
-		float                                     longPathPercentage;
-		bool                                      useLongPathKernel;
+		int               iteration;
+		int               maxBounces;
+		int               maxSamples;
+		bool              accumulate;
+		SamplingTechnique samplingTechnique;
+		DisplayBuffer     displayBuffer;
+		float             minClamp;
+		float             maxClamp;
+		bool              useRussianRoulette;
+		bool              runOnSeparateThread;
+		bool              isUpdated = true;
+		bool              isMaxBounceChanged = true;
+		AdaptiveSamplingSettings adaptiveSamplingSettings;
+		FireflySettings           fireflySettings;
+		DenoiserSettings          denoiserSettings;
+		ToneMapperSettings        toneMapperSettings;
+
+		void resetUpdate()
+		{
+			isUpdated = false;
+			isMaxBounceChanged = false;
+			adaptiveSamplingSettings.isUpdated = false;
+			fireflySettings.isUpdated = false;
+			denoiserSettings.isUpdated = false;
+			toneMapperSettings.isUpdated = false;
+		}
+
+		bool isAnyUpdated()
+		{
+			return isUpdated || adaptiveSamplingSettings.isUpdated || fireflySettings.isUpdated || denoiserSettings.isUpdated || toneMapperSettings.isUpdated;
+		}
 	};
 }

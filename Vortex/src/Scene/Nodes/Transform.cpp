@@ -6,21 +6,21 @@ namespace vtx::graph
 	Transform::Transform() : Node(NT_TRANSFORM) {}
 
 	math::vec3f Transform::transformVector(const math::vec3f& vector) {
-		return transformVector3F(transformationAttribute.affineTransform, vector);
+		return transformVector3F(affineTransform, vector);
 	}
 
 	math::vec3f Transform::transformNormal(const math::vec3f& vector) {
-		return transformNormal3F(transformationAttribute.affineTransform, vector);
+		return transformNormal3F(affineTransform, vector);
 	}
 
 	math::vec3f Transform::transformPoint(const math::vec3f& vector) {
-		return transformPoint3F(transformationAttribute.affineTransform, vector);
+		return transformPoint3F(affineTransform, vector);
 	}
 
 	void Transform::setAffine(const math::affine3f& affine)
 	{
-		transformationAttribute.affineTransform = affine;
-		transformationAttribute.updateFromAffine();
+		affineTransform = affine;
+		updateFromAffine();
 	}
 
 	/* Translation utility given vector */
@@ -28,14 +28,14 @@ namespace vtx::graph
 	void Transform::scale(float scale)
 	{
 		const math::affine3f scaleMatrix = math::affine3f::scale(scale);
-		transformationAttribute.affineTransform = scaleMatrix * transformationAttribute.affineTransform;
-		transformationAttribute.updateFromAffine();
+		affineTransform = scaleMatrix * affineTransform;
+		updateFromAffine();
 	}
 
 	void Transform::translate(const math::vec3f& translation) {
 		const math::affine3f translationMatrix = math::affine3f::translate(translation);
-		transformationAttribute.affineTransform = translationMatrix * transformationAttribute.affineTransform;
-		transformationAttribute.updateFromAffine();
+		affineTransform = translationMatrix * affineTransform;
+		updateFromAffine();
 	}
 
 	/* Translation utility given axis and ammount */
@@ -48,8 +48,8 @@ namespace vtx::graph
 
 	void Transform::rotate(const math::vec3f& axis, const float radian) {
 		const math::affine3f rotationMatrix = math::affine3f::rotate(axis, radian);
-		transformationAttribute.affineTransform = rotationMatrix * transformationAttribute.affineTransform;
-		transformationAttribute.updateFromAffine();
+		affineTransform = rotationMatrix * affineTransform;
+		updateFromAffine();
 	}
 
 	/* Rotation utility for axis angle in degree */
@@ -62,8 +62,8 @@ namespace vtx::graph
 
 	void Transform::rotateAroundPoint(const math::vec3f& point, const math::vec3f& axis, const float radian) {
 		const math::affine3f transformation = math::affine3f::rotate(point, axis, radian);
-		transformationAttribute.affineTransform = transformation * transformationAttribute.affineTransform;
-		transformationAttribute.updateFromAffine();
+		affineTransform = transformation * affineTransform;
+		updateFromAffine();
 	}
 
 	/* Rotation utility for axis angle around point in degree */
@@ -75,24 +75,32 @@ namespace vtx::graph
 	void Transform::rotateQuaternion(const math::Quaternion3f& quaternion) {
 		auto rotationMatrix = math::LinearSpace3f(quaternion);
 		auto transformation = math::affine3f(rotationMatrix);
-		transformationAttribute.affineTransform = transformation * transformationAttribute.affineTransform;
-		transformationAttribute.updateFromAffine();
+		affineTransform = transformation * affineTransform;
+		updateFromAffine();
 	}
 
 	void Transform::rotateOrbit(float pitch, math::vec3f xAxis, float yaw, math::vec3f zAxis) {
 		math::affine3f rotationPitchMatrix = math::affine3f::rotate(xAxis, pitch);
 		math::affine3f rotationYawMatrix = math::affine3f::rotate(zAxis, yaw);
-		transformationAttribute.affineTransform = rotationPitchMatrix * rotationYawMatrix * transformationAttribute.affineTransform;
+		affineTransform = rotationPitchMatrix * rotationYawMatrix * affineTransform;
 
-		transformationAttribute.updateFromAffine();
+		updateFromAffine();
 	}
-	void Transform::traverse(const std::vector<std::shared_ptr<NodeVisitor>>& orderedVisitors)
-	{
-		ACCEPT(Transform,visitors)
+
+	/* Update the transformation given the vector representation*/
+
+	void Transform::updateFromVectors() {
+		affineTransform = math::affine3f::translate(translation) * math::AffineFromEuler<math::LinearSpace3f>(eulerAngles) * math::affine3f::scale(scaleVector);
 	}
-	/*void Transform::accept(const std::shared_ptr<NodeVisitor> visitor)
+
+	/* Update the vector representation given the affine matrix*/
+
+	void Transform::updateFromAffine() {
+		math::VectorFromAffine<math::LinearSpace3f>(affineTransform, translation, scaleVector, eulerAngles);
+	}
+	void Transform::accept(NodeVisitor& visitor)
 	{
-		visitor->visit(sharedFromBase<Transform>());
-	}*/
+		visitor.visit(as<Transform>());
+	}
 }
 

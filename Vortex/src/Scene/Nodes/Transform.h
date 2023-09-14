@@ -4,24 +4,6 @@
 
 namespace vtx::graph
 {
-
-	struct TransformAttribute {
-		math::vec3f scale{ 1.0f };
-		math::vec3f translation{ 0.0f };
-		math::vec3f eulerAngles{ 0.0f };
-		math::affine3f affineTransform = math::affine3f(math::Identity);
-
-		/* Update the transformation given the vector representation*/
-		void updateFromVectors() {
-			affineTransform = math::affine3f::translate(translation) * math::AffineFromEuler<math::LinearSpace3f>(eulerAngles) * math::affine3f::scale(scale);
-		}
-
-		/* Update the vector representation given the affine matrix*/
-		void updateFromAffine() {
-			math::VectorFromAffine<math::LinearSpace3f>(affineTransform, translation, scale, eulerAngles);
-		}
-	};
-
 	class Transform : public Node {
 	public:
 		Transform();
@@ -61,11 +43,20 @@ namespace vtx::graph
 		/* Rotation utility for rotations expressed as orbit*/
 		void rotateOrbit(float pitch, math::vec3f xAxis, float yaw, math::vec3f zAxis);
 
-		void traverse(const std::vector<std::shared_ptr<NodeVisitor>>& orderedVisitors) override;
+		/* Update the transformation given the vector representation*/
+		void updateFromVectors();
 
-		//void accept(std::shared_ptr<NodeVisitor> visitor) override;
+		/* Update the vector representation given the affine matrix*/
+		void updateFromAffine();
+
+		void accept(NodeVisitor& visitor) override;
 
 	public:
-		TransformAttribute transformationAttribute;
+		math::vec3f scaleVector{ 1.0f };
+		math::vec3f translation{ 0.0f };
+		math::vec3f eulerAngles{ 0.0f };
+		math::affine3f affineTransform = math::affine3f(math::Identity);
+		math::affine3f globalTransform = math::affine3f(math::Identity);
+
 	};
 }

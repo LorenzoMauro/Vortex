@@ -12,6 +12,7 @@ namespace vtx
 {
 	namespace graph
 	{
+		class Camera;
 		class Group;
 		class Instance;
 		class Mesh;
@@ -62,5 +63,5 @@ namespace vtx::importer
 
 	std::shared_ptr<graph::Group> processAssimpNode(const aiNode* node, const aiScene* scene, std::map<unsigned, vtxID>& meshMap, const std::vector<std::shared_ptr<graph::Material>>& importedMaterials);
 
-    std::shared_ptr<graph::Group> importSceneFile(std::string filePath);
+	std::tuple<std::shared_ptr<graph::Group>, std::vector<std::shared_ptr<graph::Camera>>> importSceneFile(std::string filePath);
 }

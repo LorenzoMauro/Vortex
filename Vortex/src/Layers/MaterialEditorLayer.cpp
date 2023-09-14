@@ -4,6 +4,7 @@
 #include "GuiElements/MaterialNodeGui.h"
 #include "Scene/Nodes/Material.h"
 #include "imnodes.h"
+static auto materialNodeEditorContext = ImNodes::EditorContextCreate();
 
 namespace vtx {
     MaterialEditorLayer::MaterialEditorLayer()
@@ -61,7 +62,7 @@ namespace vtx {
 
         //ImNodesStyleEditor();
         materialGui.materialSelector();
-
+        ImNodes::EditorContextSet(materialNodeEditorContext);
         ImNodes::BeginNodeEditor();
         materialGui.materialNodeEditorGui(materialGui.selectedMaterialId);
         ImNodes::EndNodeEditor();

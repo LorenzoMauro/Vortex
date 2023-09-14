@@ -1,21 +1,26 @@
-#pragma once
-
 #ifndef LAUNCH_PARAMS_H
 #define LAUNCH_PARAMS_H
+#pragma once
 
 #include "Core/Math.h"
 #include "Core/VortexID.h"
 #include "cuda.h"
 #include <mi/neuraylib/target_code_types.h>
 #include "NoiseData.h"
+#include "Device/Wrappers/WorkQueue.h"
+#include "NeuralNetworks/NetworkSettings.h"
 #include "Scene/DataStructs/VertexAttribute.h"
 #include "Scene/Nodes/LightTypes.h"
-#include "Device/Wrappers/SOA.h"
+#include "Scene/Nodes/RendererSettings.h"
 
 namespace vtx {
+	struct NetworkInterface;
+	struct AccumulationWorkItem;
+	struct EscapedWorkItem;
+	struct ShadowWorkItem;
+	struct RayWorkItem;
+	struct TraceWorkItem;
 	struct RayData;
-
-	class WorkQueue;
 
     struct SbtProgramIdx
     {
@@ -28,17 +33,6 @@ namespace vtx {
 		int envLightSample = -1;
 	};
 
-
-    enum DataType
-    {
-	    DV_INSTANCE,
-        DV_GEOMETRY,
-        DV_MATERIAL,
-        DV_SHADER,
-        DV_TEXTURE,
-        DV_BSDF,
-        DV_LIGHTPROFILE
-    };
     enum PrimitiveType {
         PT_TRIANGLES,
 
@@ -265,90 +259,55 @@ namespace vtx {
         math::vec2ui frameSize;
 	};
 
-    struct RendererDeviceSettings
-    {
-        enum SamplingTechnique
-        {
-	        S_BSDF,
-            S_DIRECT_LIGHT,
-            S_MIS,
+    
 
-            S_COUNT
-        };
 
-        inline static const char* samplingTechniqueNames[] = {
-                "Bsdf Sampling",
-                "Light Sampling",
-                "Multiple Importance Sampling",
-        };
+    //struct NeuralNetworkDeviceSettings
+    //{
+    //    bool                 useNetwork;
+    //    network::NetworkType type;
+    //    int                  inferenceStart;
+    //    bool                 clearOnInferenceStart;
+    //    bool                 doInference;
+    //    float                samplingFraction = 0.5f;
+    //};
 
-        enum DisplayBuffer
-        {
-            FB_BEAUTY,
-            FB_NOISY,
-
-            FB_DIFFUSE,
-            FB_ORIENTATION,
-            FB_TRUE_NORMAL,
-            FB_SHADING_NORMAL,
-            FB_TANGENT,
-            FB_UV,
-            FB_NOISE,
-            FB_SAMPLES,
-            FB_DEBUG_1,
-
-            FB_COUNT,
-        };
-
-        inline static const char* displayBufferNames[] = {
-				"Beauty",
-                "Noisy",
-                "Diffuse",
-                "Orientation",
-                "True Normal",
-                "Shading Normal",
-				"Tangent",
-                "Uv",
-				"Noise",
-				"Samples",
-                "Debug1"
-        };
-
-        int                 iteration;
-        int                 maxBounces;
-        bool                accumulate;
-        SamplingTechnique   samplingTechnique;
-		DisplayBuffer       displayBuffer;
-        float               minClamp;
-        float               maxClamp;
-
-        bool                adaptiveSampling;
-        int                 minAdaptiveSamples;
-        int                 minPixelSamples;
-        int                 maxPixelSamples;
-        float               noiseCutOff;
-
-        bool                useLongPathKernel;
-        float               longPathPercentage;
-        int                 maxTraceQueueSize;
-
-        bool enableDenoiser;
-        bool removeFirefly;
-		bool useRussianRoulette;
-		int  parallelShade;
-	};
-
-    struct ToneMapperSettings
-    {
-	    math::vec3f invWhitePoint;
-        math::vec3f colorBalance;
-        float 	 burnHighlights;
-        float 	 crushBlacks;
-        float 	 saturation;
-        float 	 invGamma;
-    };
+    //struct RendererDeviceSettings
+    //{
+    //    int                 iteration;
+    //    int                 maxBounces;
+    //    bool                accumulate;
+    //    SamplingTechnique   samplingTechnique;
+	//	DisplayBuffer       displayBuffer;
+    //    float               minClamp;
+    //    float               maxClamp;
+    //
+    //    bool                adaptiveSampling;
+    //    int                 minAdaptiveSamples;
+    //    int                 minPixelSamples;
+    //    int                 maxPixelSamples;
+    //    float               noiseCutOff;
+    //
+    //    bool                useLongPathKernel;
+    //    float               longPathPercentage;
+    //    int                 maxTraceQueueSize;
+    //
+    //    bool                     enableDenoiser;
+    //    bool                     removeFirefly;
+	//	bool                     useRussianRoulette;
+	//	int                      parallelShade;
+    //
+	//};
 
     struct Counters {
+        int* traceQueueCounter = nullptr;
+        int* shadeQueueCounter = nullptr;
+        int* escapedQueueCounter = nullptr;
+        int* accumulationQueueCounter = nullptr;
+        int* shadowQueueCounter = nullptr;
+    };
+
+    struct QueueSizes {
         int traceQueueCounter = 0;
         int shadeQueueCounter = 0;
         int escapedQueueCounter = 0;
@@ -356,29 +315,37 @@ namespace vtx {
         int shadowQueueCounter = 0;
     };
 
+    struct OnDeviceSettings
+    {
+		RendererSettings renderer;
+        WavefrontSettings wavefront;
+        network::NetworkSettings neural;
+    };
+
 	struct LaunchParams
     {
 		int*                    frameID;
-        int 				    nextPixel = 0;
-        int                     remainingBounces;
+		int                     nextPixel = 0;
 		FrameBufferData         frameBuffer;
 		CameraData              cameraData;
-		RendererDeviceSettings* settings;
-        ToneMapperSettings*     toneMapperSettings;
-		SbtProgramIdx*          programs;
+		//SbtProgramIdx*          programs;
 		OptixTraversableHandle  topObject;
 		InstanceData**          instances;
 		LightData*              envLight = nullptr;
-        LightData**             lights;
-        int                     numberOfLights;
-        Counters*                queueCounters;
+		LightData**             lights;
+		int                     numberOfLights;
+		Counters*               queueCounters;
 
 		WorkQueueSOA<TraceWorkItem>*        radianceTraceQueue;
 		WorkQueueSOA<RayWorkItem>*          shadeQueue;
 		WorkQueueSOA<ShadowWorkItem>*       shadowQueue;
 		WorkQueueSOA<EscapedWorkItem>*      escapedQueue;
 		WorkQueueSOA<AccumulationWorkItem>* accumulationQueue;
-    };
+
+		NetworkInterface* networkInterface;
+
+        OnDeviceSettings* settings;
+	};
 
     enum TypeRay
     {

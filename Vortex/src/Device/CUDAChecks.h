@@ -36,12 +36,14 @@ static void checkCuResultError(CUresult rc, std::string file, int line, bool clo
 
 static void checkOptixError(OptixResult res, const std::string& call_str, std::string file, int line, bool close = true) {
     if (close)
-        VTX_ASSERT_CLOSE(res == OPTIX_SUCCESS, "Optix Error Check: file: {} line: {}\n\tCall ({}) failed with code {}", file, line, call_str, res);
+    {
+        VTX_ASSERT_CLOSE(res == OPTIX_SUCCESS, "Optix Error Check: file: {} line: {}\n\tCall ({}) failed with code {}", file, line, call_str, (int)res);
+    }
     else
-        VTX_ASSERT_CONTINUE(res == OPTIX_SUCCESS, "Optix Error Check: file: {} line: {}\n\tCall ({}) failed with code {}", file, line, call_str, res);
+        VTX_ASSERT_CONTINUE(res == OPTIX_SUCCESS, "Optix Error Check: file: {} line: {}\n\tCall ({}) failed with code {}", file, line, call_str, (int)res);
 }
 
-static void cudaSynchonize(std::string file, int line, bool close = true) {
+static void cudaSynchronize(std::string file, int line, bool close = true) {
     cudaDeviceSynchronize();
     cudaError_t error = cudaGetLastError();
     if (close)
@@ -82,18 +84,27 @@ static void context_log_cb(unsigned int level,
 
 #define CU_CHECK(call) checkCuResultError(call,__FILE__, __LINE__)
 
-#ifdef NDEBUG
-#define CUDA_SYNC_CHECK() cudaSynchonize(__FILE__, __LINE__, false)
-#else
-#define CUDA_SYNC_CHECK()
-#endif
-
-
 #define OPTIX_CHECK_CONTINUE(call) checkOptixError(call, #call, __FILE__, __LINE__, false)
 
 #define CUDA_CHECK_CONTINUE(call) checkCudaError(call,__FILE__, __LINE__, false)
 
 #define CU_CHECK_CONTINUE(call) checkCuResultError(call,__FILE__, __LINE__, false)
 
-#define CUDA_SYNC_CHECK_CONTINUE() cudaSynchonize(__FILE__, __LINE__, false)
-  
+#ifdef CUDA_CHECK_ALSO_ON_RELEASE
+#define CUDA_SYNC_CHECK() cudaSynchronize(__FILE__, __LINE__, true)
+
+#define CUDA_SYNC_CHECK_CONTINUE() cudaSynchronize(__FILE__, __LINE__, false)
+#else
+#ifdef DEBUG
+
+#define CUDA_SYNC_CHECK() cudaSynchronize(__FILE__, __LINE__, true)
+
+#define CUDA_SYNC_CHECK_CONTINUE() cudaSynchronize(__FILE__, __LINE__, false)
+#else
+
+#define CUDA_SYNC_CHECK()
+
+#define CUDA_SYNC_CHECK_CONTINUE()
+
+#endif
+#endif

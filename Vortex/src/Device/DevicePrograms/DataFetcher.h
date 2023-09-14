@@ -62,7 +62,7 @@ namespace vtx
     }
 
     template<>
-    __forceinline__ __device__ const RendererDeviceSettings* getData() {
+    __forceinline__ __device__ const OnDeviceSettings* getData() {
         if (optixLaunchParams.settings == nullptr)
         {
             CUDA_ERROR_PRINT("renderer Settings is not set!\n");

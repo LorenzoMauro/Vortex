@@ -52,8 +52,8 @@ namespace gdt {
     
     /*! default matrix constructor */
     inline LinearSpace2           ( ) = default;
-    inline LinearSpace2           ( const LinearSpace2& other ) { vx = other.vx; vy = other.vy; }
-    inline LinearSpace2& operator=( const LinearSpace2& other ) { vx = other.vx; vy = other.vy; return *this; }
+    inline __both__ LinearSpace2           ( const LinearSpace2& other ) { vx = other.vx; vy = other.vy; }
+    inline __both__ LinearSpace2& operator=( const LinearSpace2& other ) { vx = other.vx; vy = other.vy; return *this; }
 
     template<typename L1> inline LinearSpace2( const LinearSpace2<L1>& s ) : vx(s.vx), vy(s.vy) {}
 

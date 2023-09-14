@@ -1,8 +1,9 @@
 #pragma once
-#include "optix.h"
 #include <string>
 #include <vector>
-#include "Device/DevicePrograms/LaunchParams.h"
+#include "Core/Math.h"
+#include "NeuralNetworks/NetworkSettings.h"
+#include "Scene/Nodes/RendererSettings.h"
 
 namespace vtx
 {
@@ -12,6 +13,10 @@ namespace vtx
 		MDL_INLINE,
 		MDL_CUDA
 	};
+
+	enum SamplingTechnique;
+	enum DisplayBuffer;
+
 	struct Options
 	{
 		bool        initialized = false;
@@ -27,46 +32,14 @@ namespace vtx
 		/////////////////// Rendering Settings /////////////////////////////////////////////
 		////////////////////////////////////////////////////////////////////////////////////
 
-		bool         runOnSeparateThread;
-		uint32_t                                  maxBounces;
-		uint32_t                                  maxSamples;
-		bool                                      accumulate;
-		bool									  useRussianRoulette;
-		RendererDeviceSettings::SamplingTechnique samplingTechnique;
-		RendererDeviceSettings::DisplayBuffer     displayBuffer;
-		float                                     maxClamp;
-		float                                     minClamp;
+		RendererSettings rendererSettings;
+		
+		WavefrontSettings wavefrontSettings;
 
-		int										  useWavefront;
-		bool									  fitWavefront;
-		bool										optixShade;
-		bool         parallelShade;
-		float         longPathPercentage;
-		bool			useLongPathKernel;
-
-		int   noiseKernelSize;
-		int   adaptiveSampling;
-		int   minAdaptiveSamples;
-		int   minPixelSamples;
-		int   maxPixelSamples;
-		float albedoNormalNoiseInfluence;
-		float noiseCutOff;
-
-		int fireflyKernelSize;
-		float fireflyThreshold;
-		bool removeFireflies;
-
-		bool enableDenoiser;
-		int denoiserStart;
-		float denoiserBlend;
-
-		math::vec3f whitePoint;
-		math::vec3f colorBalance;
-		float       burnHighlights;
-		float       crushBlacks;
-		float       saturation;
-		float       gamma;
-
+		////////////////////////////////////////////////////////////////////////////////////
+		/////////////////// Neural Network Options /////////////////////////////////////////
+		////////////////////////////////////////////////////////////////////////////////////
+		network::NetworkSettings networkSettings;
 		////////////////////////////////////////////////////////////////////////////////////
 		/////////////////// Optix Options //////////////////////////////////////////////////
 		////////////////////////////////////////////////////////////////////////////////////

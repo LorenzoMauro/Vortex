@@ -25,7 +25,7 @@ namespace vtx
 		float normalizedNoise;
 		float prevNoise = 0.0f;
         float noiseAbsolute;
-        int	  adaptiveSamples = 1.0f;
+        int	  adaptiveSamples = 1;
     };
 }
 

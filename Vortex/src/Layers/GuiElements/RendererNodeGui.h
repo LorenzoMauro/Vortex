@@ -8,5 +8,5 @@ namespace vtx::graph
 
 namespace vtx::gui
 {
-	void rendererNodeGui(std::shared_ptr<graph::Renderer> renderNode);
+	void rendererNodeGui(const std::shared_ptr<graph::Renderer>& renderNode);
 }

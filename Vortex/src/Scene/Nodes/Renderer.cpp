@@ -11,30 +11,11 @@
 #include "device_launch_parameters.h"
 #include "cuda_runtime.h"
 #include "Device/DevicePrograms/CudaKernels.h"
-#include "Device/Wrappers/dWrapper.h"
+#include "Device/Wrappers/KernelTimings.h"
+#include "Scene/Utility/Operations.h"
 
 namespace vtx::graph
 {
-
-	enum RenderingStages
-	{
-		R_NOISE_COMPUTATION,
-		R_TRACE,
-		R_POSTPROCESSING,
-		R_DISPLAY,
-		R_TONE_MAP_RADIANCE,
-
-		R_COUNT
-	};
-
-	inline static const char* renderingStagesNames[] = {
-		"Rendering Noise Computation",
-		"Rendering Trace",
-		"Rendering Post Processing",
-		"Rendering Display",
-		"Rendering Tone Mapping Radiance"
-	};
-
 	Renderer::Renderer() :
 		Node(NT_RENDERER),
 		width(getOptions()->width),
@@ -43,52 +24,10 @@ namespace vtx::graph
 		settings(),
 		waveFrontIntegrator(&settings)
 	{
-		settings.runOnSeparateThread = getOptions()->runOnSeparateThread;
-		settings.iteration = 0;
-		settings.maxBounces = getOptions()->maxBounces;
-		settings.accumulate = getOptions()->accumulate;
-		settings.maxSamples = getOptions()->maxSamples;
-		settings.samplingTechnique = getOptions()->samplingTechnique;
-		settings.displayBuffer = getOptions()->displayBuffer;
-		settings.useRussianRoulette = getOptions()->useRussianRoulette;
-		settings.minClamp = getOptions()->maxClamp;
-		settings.maxClamp = getOptions()->minClamp;
-		settings.isUpdated = true;
 
-		settings.useWavefront = getOptions()->useWavefront;
-		settings.optixShade = getOptions()->optixShade;
-		settings.fitWavefront = getOptions()->fitWavefront;
-		settings.parallelShade = getOptions()->parallelShade;
-
-		settings.useLongPathKernel = getOptions()->useLongPathKernel;
-		settings.longPathPercentage = getOptions()->longPathPercentage;
-
-		settings.noiseKernelSize = getOptions()->noiseKernelSize;
-		settings.adaptiveSampling = getOptions()->adaptiveSampling;
-		settings.minAdaptiveSamples = getOptions()->minAdaptiveSamples;
-		settings.minPixelSamples = getOptions()->minPixelSamples;
-		settings.maxPixelSamples = getOptions()->maxPixelSamples;
-		settings.albedoNormalNoiseInfluence = getOptions()->albedoNormalNoiseInfluence;
-		settings.noiseCutOff = getOptions()->noiseCutOff;
-
-		 
-		settings.fireflyKernelSize = getOptions()->fireflyKernelSize;
-		settings.fireflyThreshold = getOptions()->fireflyThreshold;
-		settings.removeFireflies = getOptions()->removeFireflies;
-
-		settings.enableDenoiser = getOptions()->enableDenoiser;
-
-		settings.denoiserStart = getOptions()->denoiserStart;
-		settings.denoiserBlend = getOptions()->denoiserBlend;
-
-		toneMapperSettings.whitePoint = getOptions()->whitePoint;
-		toneMapperSettings.colorBalance = getOptions()->colorBalance;
-		toneMapperSettings.burnHighlights = getOptions()->burnHighlights;
-		toneMapperSettings.crushBlacks = getOptions()->crushBlacks;
-		toneMapperSettings.saturation = getOptions()->saturation;
-		toneMapperSettings.gamma = getOptions()->gamma;
-		toneMapperSettings.isUpdated = true;
-
+		camera = ops::createNode<Camera>();
+		sceneRoot = ops::createNode<Group>();
+		settings = getOptions()->rendererSettings;
 		drawFrameBuffer.setSize(width, height);
 		drawFrameBuffer.bind();
 		glClearColor(0.2f, 0.2f, 0.2f, 1.0f);
@@ -103,33 +42,15 @@ namespace vtx::graph
 
 	}
 
-	void Renderer::setCamera(const std::shared_ptr<Camera>& cameraNode) {
-		camera = cameraNode;
-	}
-
-	void Renderer::setScene(const std::shared_ptr<Group>& sceneRootNode) {
-		sceneRoot = sceneRootNode;
-	}
-
-	std::shared_ptr<Camera> Renderer::getCamera() {
-		return camera;
-	}
-
-	std::shared_ptr<Group> Renderer::getScene() {
-		return sceneRoot;
-	}
-
-	void Renderer::traverse(const std::vector<std::shared_ptr<NodeVisitor>>& orderedVisitors)
+	std::vector<std::shared_ptr<Node>> Renderer::getChildren() const
 	{
-		camera->traverse(orderedVisitors);
-		sceneRoot->traverse(orderedVisitors);
-		ACCEPT(Renderer,orderedVisitors)
+		return { camera, sceneRoot };
 	}
 
-	/*void Renderer::accept(std::shared_ptr<NodeVisitor> visitor)
+	void Renderer::accept(NodeVisitor& visitor)
 	{
-		visitor->visit(sharedFromBase<Renderer>());
-	}*/
+		visitor.visit(as<Renderer>());
+	}
 
 	bool Renderer::isReady(const bool setBusy) {
 		if (threadData.renderMutex.try_lock()) {
@@ -167,7 +88,6 @@ namespace vtx::graph
 		{
 			return;
 		}
-
 		if(!settings.accumulate)
 		{
 			settings.iteration = 0;
@@ -175,36 +95,35 @@ namespace vtx::graph
 		if (settings.iteration == 0)
 		{
 			resetKernelStats();
-			totalTimeSeconds = 0;
-			noiseComputationTime = 0;
-			traceComputationTime = 0;
-			postProcessingComputationTime = 0;
-			displayComputationTime = 0;
 			timer.reset();
 			internalIteration = 0;
 		}
 
 		{
 			//timer.reset();
-			const std::pair<cudaEvent_t, cudaEvent_t> events = GetProfilerEvents(renderingStagesNames[R_NOISE_COMPUTATION]);
+			const std::pair<cudaEvent_t, cudaEvent_t> events = GetProfilerEvents(eventNames[R_NOISE_COMPUTATION]);
 			cudaEventRecord(events.first);
 
-			if (settings.adaptiveSampling && settings.minAdaptiveSamples <= settings.iteration)
+			if (
+				settings.adaptiveSamplingSettings.active && 
+				settings.adaptiveSamplingSettings.minAdaptiveSamples <= settings.iteration
+				)
 			{
-				if (settings.adaptiveSampling && settings.iteration >= settings.minAdaptiveSamples)
-				{
-					noiseComputation(launchParamsBuffer.castedPointer<LaunchParams>(),settings,getID());
-				}
+				noiseComputation(launchParamsBuffer.castedPointer<LaunchParams>(), getID());
 			}
 			cudaEventRecord(events.second);
 
 		}
 
 		{
-			const std::pair<cudaEvent_t, cudaEvent_t> events = GetProfilerEvents(renderingStagesNames[R_TRACE]);
+			const std::pair<cudaEvent_t, cudaEvent_t> events = GetProfilerEvents(eventNames[R_TRACE]);
 			cudaEventRecord(events.first);
 
-			if(!settings.useWavefront)
+			if(waveFrontIntegrator.settings.active)
+			{
+				waveFrontIntegrator.render();
+			}
+			else
 			{
 				const optix::State& state = *(optix::getState());
 				const OptixPipeline& pipeline = optix::getRenderingPipeline()->getPipeline();
@@ -223,34 +142,29 @@ namespace vtx::graph
 				);
 				OPTIX_CHECK(result);
 			}
-			else
-			{
-				waveFrontIntegrator.render();
-			}
 			cudaEventRecord(events.second);
 		}
 
 		{
 
-			const std::pair<cudaEvent_t, cudaEvent_t> events = GetProfilerEvents(renderingStagesNames[R_POSTPROCESSING]);
+			const std::pair<cudaEvent_t, cudaEvent_t> events = GetProfilerEvents(eventNames[R_POSTPROCESSING]);
 			cudaEventRecord(events.first);
 
-			toneMapRadianceKernel(launchParamsBuffer.castedPointer<LaunchParams>(), width, height, renderingStagesNames[R_TONE_MAP_RADIANCE]);
+			toneMapRadianceKernel(launchParamsBuffer.castedPointer<LaunchParams>(), width, height, eventNames[R_TONE_MAP_RADIANCE]);
 			math::vec3f* beauty = nullptr;
-			if (settings.removeFireflies)
+			if (settings.fireflySettings.active)
 			{
-				removeFireflies(launchParamsBuffer.castedPointer<LaunchParams>(), settings.fireflyKernelSize, settings.fireflyThreshold, width, height);
+				removeFireflies(launchParamsBuffer.castedPointer<LaunchParams>(), settings.fireflySettings.kernelSize, settings.fireflySettings.threshold, width, height);
 				beauty = GET_BUFFER(device::Buffers::FrameBufferBuffers, getID(), fireflyRemoval).castedPointer<math::vec3f>();
-				//CUDA_SYNC_CHECK();
 			}
 
-			if(settings.enableDenoiser && settings.iteration>settings.denoiserStart)
+			if(settings.denoiserSettings.active && settings.iteration>settings.denoiserSettings.denoiserStart)
 			{
-				CUDABuffer& denoiserRadianceInput = settings.removeFireflies ? GET_BUFFER(device::Buffers::FrameBufferBuffers, getID(), fireflyRemoval) : GET_BUFFER(device::Buffers::FrameBufferBuffers, getID(), hdriRadiance);
+				CUDABuffer& denoiserRadianceInput = settings.fireflySettings.active ? GET_BUFFER(device::Buffers::FrameBufferBuffers, getID(), fireflyRemoval) : GET_BUFFER(device::Buffers::FrameBufferBuffers, getID(), hdriRadiance);
 				CUDABuffer& albedoBuffer = GET_BUFFER(device::Buffers::FrameBufferBuffers, getID(), albedoNormalized);
 				CUDABuffer& normalBuffer = GET_BUFFER(device::Buffers::FrameBufferBuffers, getID(), normalNormalized);
 				optix::getState()->denoiser.setInputs(denoiserRadianceInput, albedoBuffer, normalBuffer);
-				beauty = optix::getState()->denoiser.denoise(settings.denoiserBlend);
+				beauty = optix::getState()->denoiser.denoise(settings.denoiserSettings.denoiserBlend);
 			}
 
 			switchOutput(launchParamsBuffer.castedPointer<LaunchParams>(), width, height, beauty);
@@ -258,28 +172,25 @@ namespace vtx::graph
 		}
 
 		{
-			const std::pair<cudaEvent_t, cudaEvent_t> events = GetProfilerEvents(renderingStagesNames[R_DISPLAY]);
+			const std::pair<cudaEvent_t, cudaEvent_t> events = GetProfilerEvents(eventNames[R_DISPLAY]);
 			cudaEventRecord(events.first);
 			copyToGl();
 			cudaEventRecord(events.second);
 		}
 
-		noiseComputationTime = GetKernelTimeMS(renderingStagesNames[R_NOISE_COMPUTATION]);
-		traceComputationTime = GetKernelTimeMS(renderingStagesNames[R_TRACE]);
-		postProcessingComputationTime = GetKernelTimeMS(renderingStagesNames[R_POSTPROCESSING]);
-		displayComputationTime = GetKernelTimeMS(renderingStagesNames[R_DISPLAY]);
-		
-		totalTimeSeconds = (noiseComputationTime + traceComputationTime + postProcessingComputationTime + displayComputationTime) / 1000.0f;
-
-		int actualLaunches = GetKernelLaunches(renderingStagesNames[R_TRACE]);
-
-		fps = (float)(actualLaunches) / totalTimeSeconds;
-		sppS = ((float)width * (float)height * ((float)actualLaunches)) / totalTimeSeconds;
-		averageFrameTime = (totalTimeSeconds * 1000.0f)/ (float)(actualLaunches);
+		CudaEventTimes cuTimes = getCudaEventTimes();
 	}
 
-	void Renderer::resize(uint32_t _width, uint32_t _height) {
+	void Renderer::resize(int _width, int _height) {
+		if(isSizeLocked)
+		{
+			return;
+		}
 		if (width == _width && height == _height) {
+			return;
+		}
+		if( _width <= 0 || _height <= 0)
+		{
 			return;
 		}
 		width = _width;
@@ -342,6 +253,7 @@ namespace vtx::graph
 		//currentFrameBuffer = tempBuffer;
 		overallTime = timer.elapsedMillis();
 		internalIteration++;
+		CUDA_SYNC_CHECK();
 	}
 
 	void Renderer::setWindow(GLFWwindow* window)
@@ -349,16 +261,6 @@ namespace vtx::graph
 		// Create a shared OpenGL context for the separate thread
 		glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE);
 		sharedContext = glfwCreateWindow(1, 1, "Shared Context", nullptr, window);
-	}
-
-	int Renderer::getWavefrontLaunches()
-	{
-		return GetKernelLaunches(renderingStagesNames[R_TRACE]);
-	}
-
-	KernelTimes& Renderer::getWaveFrontTimes()
-	{
-		return waveFrontIntegrator.getKernelTime();
 	}
 
 	GlFrameBuffer Renderer::getFrame() {

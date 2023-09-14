@@ -10,13 +10,7 @@ namespace vtx::mdl
 	#define STANDARD_SHADER_NODE_VISIT(SHADER_NODE_NAME) \
 	void ShaderVisitor::visit(std::shared_ptr<SHADER_NODE_NAME> shaderNode)\
 	{\
-		if(shaderNode->isUpdated)\
-		{\
-			bool Success = mdl::generateFunctionExpression(shaderNode->functionInfo.signature, shaderNode->sockets, shaderNode->name); \
-			if(Success){\
-				shaderNode->isUpdated = false;\
-			}\
-		}\
+		shaderNode->init();\
 	}
 
 	STANDARD_SHADER_NODE_VISIT(DiffuseReflection)

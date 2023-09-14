@@ -31,13 +31,11 @@ namespace vtx::graph
 			bool isValid = false;
 		};
 
-		void traverse(const std::vector<std::shared_ptr<NodeVisitor>>& orderedVisitors) override;
-
-		//void accept(std::shared_ptr<NodeVisitor> visitor) override;
-
 		void prepareSampling(BsdfPartData bsdfData);
 
-		void init();
+		void init() override;
+	protected:
+		void accept(NodeVisitor& visitor) override;
 	public:
 		std::string databaseName;
 		BsdfPartData reflectionBsdf;

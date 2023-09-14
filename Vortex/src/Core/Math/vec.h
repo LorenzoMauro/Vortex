@@ -30,7 +30,16 @@ namespace gdt {
     template<> struct long_type_of<uint32_t> { typedef uint64_t type; };
 
     template<typename T, int N>
-    struct GDT_INTERFACE vec_t { T t[N]; };
+    struct GDT_INTERFACE vec_t
+    {
+	    T t[N];
+
+        T& operator[](int i)
+        {
+            assert(i >= 0 && i < N);
+	        return t[i];
+        }
+    };
 
 
     template<typename ScalarTypeA, typename ScalarTypeB> struct BinaryOpResultType;
@@ -88,10 +97,9 @@ namespace gdt {
         enum { dims = 2 };
         typedef T scalar_t;
 
-        inline __both__ vec_t() {}
+        inline __both__ vec_t(): x(0), y(0) {}
         inline __both__ vec_t(const T& t) : x(t), y(t) {}
         inline __both__ vec_t(const T& x, const T& y) : x(x), y(y) {}
-#ifdef __CUDACC__
         inline __both__ vec_t(const float2 v) : x(v.x), y(v.y) {}
         inline __both__ vec_t(const int2 v) : x(v.x), y(v.y) {}
         inline __both__ vec_t(const uint2 v) : x(v.x), y(v.y) {}
@@ -101,7 +109,6 @@ namespace gdt {
         inline __both__ operator uint2() const { return make_uint2(x, y); }
         // inline __both__ vec_t(const size_t2 v) : x(v.x), y(v.y), z(v.z) {}
         // inline __both__ operator size_t2() { return make_size_t2(x,y); }
-#endif
 
     /*! assignment operator */
         inline __both__ vec_t<T, 2>& operator=(const vec_t<T, 2>& other) {
@@ -344,6 +351,28 @@ namespace gdt {
     {
         return gdt::overloaded::sqrt(dot(v, v));
     }
+
+    /*! vector cross product */
+    template<typename T>
+    inline __both__ T dot(const vec_t<T, 2>& a, const vec_t<T, 2>& b)
+    {
+        return a.x * b.x + a.y * b.y;
+    }
+
+    /*! vector cross product */
+    template<typename T>
+    inline __both__ vec_t<T, 2> normalize(const vec_t<T, 2>& v)
+    {
+        return v * 1.f / gdt::overloaded::sqrt(dot(v, v));
+    }
+
+    /*! vector cross product */
+    template<typename T>
+    inline __both__ T length(const vec_t<T, 2>& v)
+    {
+        return gdt::overloaded::sqrt(dot(v, v));
+    }
+
 
     template<typename T>
     inline __gdt_host std::ostream& operator<<(std::ostream& o, const vec_t<T, 1>& v)

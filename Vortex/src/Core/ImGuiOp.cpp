@@ -3,8 +3,9 @@
 #include "Core/Log.h"
 #include "imgui.h"
 #include "imnodes.h"
-#include "Core/ImguiBackEnds/imgui_impl_glfw.h"
-#include "Core/ImguiBackEnds/imgui_impl_opengl3.h"
+#include "implot.h"
+#include "imgui_impl_glfw.h"
+#include "imgui_impl_opengl3.h"
 #include "Core/Options.h"
 #include "glad/glad.h"
 
@@ -82,6 +83,7 @@ namespace vtx {
         IMGUI_CHECKVERSION();
         ImGui::CreateContext();
         ImNodes::CreateContext();
+        ImPlot::CreateContext();
 
         ImGuiIO& io = ImGui::GetIO();
         io.DeltaTime = 1.0f / 1000000.0f;
@@ -237,9 +239,10 @@ namespace vtx {
         style.NodeCornerRounding = 5.0f;
         style.NodePadding = ImVec2(10.0f, 4.0f);
         style.NodeBorderThickness = 1.0f;
-        style.LinkThickness = 2.0f;
+        style.LinkThickness = 1.5f;
         style.LinkLineSegmentsPerLength = 0.1f;
         style.LinkHoverDistance = 10.0f;
+        style.PinCircleRadius = 3.0f;
         // ... set other style variables
 
         // Set style flags
@@ -308,6 +311,7 @@ namespace vtx {
         ImGui_ImplGlfw_Shutdown();
         ImNodes::DestroyContext();
         ImGui::DestroyContext();
+        ImPlot::DestroyContext();
 
         IMGUI_API
     }

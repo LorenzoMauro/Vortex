@@ -1,24 +1,23 @@
 #pragma once
-#include <set>
-
 #include "Scene/Node.h"
 #include "Light.h"
 #include "Material.h"
 #include "Transform.h"
-#include <unordered_map>
 
 namespace vtx::graph
 {
 	struct MaterialSlot
 	{
-		int slotIndex;
-		std::shared_ptr<Material> material;
-		std::shared_ptr <Light> meshLight;
-		bool isMeshLightEvaluated;
+		std::shared_ptr<Material> material = nullptr;
+		int                       slotIndex;
+		std::shared_ptr<MeshLight>    meshLight;
 	};
-	struct PairHash {
+
+	struct PairHash
+	{
 		template <class T1, class T2>
-		std::size_t operator () (const std::pair<T1, T2>& pair) const {
+		std::size_t operator ()(const std::pair<T1, T2>& pair) const
+		{
 			auto h1 = std::hash<T1>{}(pair.first);
 			auto h2 = std::hash<T2>{}(pair.second);
 
@@ -27,52 +26,41 @@ namespace vtx::graph
 		}
 	};
 
-	class Instance : public Node {
+	class Instance : public Node
+	{
 	public:
-
 		Instance();
+
 
 		std::shared_ptr<Node> getChild();
 
 		void setChild(const std::shared_ptr<Node>& _child);
 
-		std::shared_ptr<Transform> getTransform();
-
-		void setTransform(std::shared_ptr<Transform>& _transform);
-
-		std::vector<std::shared_ptr<Material>>& getMaterials();
+		std::vector<std::shared_ptr<Material>> getMaterials();
 
 		//TODO Slot addition and removal, currently we can add or remove materials
 		//Removing Material won't delete the slot
-		void Instance::addMaterial(const std::shared_ptr<Material>& _material, int slot=-1);
+		void addMaterial(const std::shared_ptr<Material>& _material, int slot = -1);
 
 		void removeMaterial(vtxID matID);
 
-		void clearMeshLights();
+		void clearMeshLights() const;
 
-		void traverse(const std::vector<std::shared_ptr<NodeVisitor>>& orderedVisitors) override;
+		void clearMeshLight(vtxID matID) const;
 
-		//void accept(std::shared_ptr<NodeVisitor> visitor) override;
+		std::shared_ptr<graph::MeshLight> getMeshLight(vtxID materialId) const;
 
-		void createMeshLight();
+		std::vector<MaterialSlot>& getMaterialSlots();
 
-		void createMeshLight(const std::shared_ptr<graph::Material>& materialNode, unsigned int relativeSlot);
-
-		void clearMeshLight(vtxID matID);
-
-		std::shared_ptr<graph::Light> getMeshLight(vtxID materialID);
-
-		std::vector<MaterialSlot>&     getMaterialSlots();
-
+		std::vector<std::shared_ptr<Node>> getChildren() const override;
+	protected:
+		void accept(NodeVisitor& visitor) override;
 	public:
 		std::shared_ptr<Transform>		transform;
-		std::vector<vtxID>				finalTransformStack;
-		math::affine3f                  finalTransform;
 
 	private:
-		std::shared_ptr<Node>							child;
-		std::vector<MaterialSlot>                       materialSlots;
-		bool											childIsMesh = false;
+		std::vector<MaterialSlot>		materialSlots;
+		std::shared_ptr<Node>			child;
+		bool                      childIsMesh = false;
 	};
-
 }

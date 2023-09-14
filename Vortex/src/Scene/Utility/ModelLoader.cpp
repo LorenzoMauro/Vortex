@@ -1,7 +1,7 @@
 ﻿#include "ModelLoader.h"
-#include "Scene/Nodes/Group.h"
-#include "Scene/Nodes/Instance.h"
+
 #include "Scene/Nodes/Shader/mdl/ShaderNodes.h"
+#include "Scene/Graph.h"
 
 namespace vtx::importer
 {
@@ -605,7 +605,59 @@ namespace vtx::importer
         }
     }
 
-    std::shared_ptr<graph::Group> importSceneFile(std::string filePath)
+    std::vector<std::shared_ptr<graph::Camera>> processCameras(const aiScene* scene)
+    {
+        std::vector<std::shared_ptr<graph::Camera>> cameras;
+        for (unsigned int i = 0; i < scene->mNumCameras; ++i)
+        {
+            const aiCamera* cam = scene->mCameras[i];
+
+            // Extract camera properties
+            float fov = cam->mHorizontalFOV;
+            float aspect = cam->mAspect;
+            float clipNear = cam->mClipPlaneNear;
+            float clipFar = cam->mClipPlaneFar;
+
+            // Position and direction are expressed in the local space of the node
+            // the camera is attached to. These will need to be transformed by the
+            // node's transform to get them into world space.
+            // Get the node that this camera is attached to
+            aiNode* node = scene->mRootNode->FindNode(cam->mName);
+
+            // Get the transformation of the node
+            math::affine3f transform = convertAssimpMatrix(node->mTransformation);
+            math::affine3f rootM = convertAssimpMatrix(scene->mRootNode->mTransformation);
+            math::affine3f finalTransform = rootM * transform;
+            // Transform the camera's local vectors into world space
+            aiVector3D posAssimp = cam->mPosition;
+            aiVector3D upAssimp = cam->mUp;
+            aiVector3D lookAssimp = cam->mLookAt;
+
+            math::vec3f pos (posAssimp.x, posAssimp.y, posAssimp.z);
+            math::vec3f up = math::normalize({ upAssimp.x, upAssimp.y, upAssimp.z });
+            math::vec3f lookAt = math::normalize({lookAssimp.x, lookAssimp.y, lookAssimp.z});
+            math::vec3f horizzontal = math::normalize(cross(lookAt, up));
+
+            math::vec3f wUp = math::transformVector3F(finalTransform, up);
+            math::vec3f wLookAt = math::transformVector3F(finalTransform, lookAt);
+            math::vec3f wHorizzontal = math::transformVector3F(finalTransform, horizzontal);
+        	math::vec3f wPos = math::transformPoint3F(rootM, pos);
+
+
+			std::shared_ptr<graph::Camera> camera = ops::createNode<graph::Camera>();
+
+			math::affine3f cameraTransform(wHorizzontal, wUp, -wLookAt, wPos);
+
+            camera->transform->setAffine(cameraTransform);
+            camera->fovY = fov*180.0f/M_PI;
+            camera->updateDirections();
+
+            cameras.push_back(camera);
+        }
+        return cameras;
+    }
+
+    std::tuple<std::shared_ptr<graph::Group>, std::vector<std::shared_ptr<graph::Camera>>> importSceneFile(std::string filePath)
     {
         filePath                     = utl::absolutePath(filePath);
 		const std::string fileFormat = utl::getFileExtension(filePath);
@@ -638,7 +690,9 @@ namespace vtx::importer
         std::map<unsigned, vtxID> meshMap;
         VTX_INFO("Creating Scene Graph");
 		const std::vector<std::shared_ptr<graph::Material>> importedMaterials = processMaterials(scene, utl::getFolder(filePath));
-        return processAssimpNode(scene->mRootNode, scene, meshMap, importedMaterials);
+		std::shared_ptr<graph::Group> sceneGraph = processAssimpNode(scene->mRootNode, scene, meshMap,importedMaterials);
+		std::vector<std::shared_ptr<graph::Camera>> cameras = processCameras(scene);
+        return { sceneGraph, cameras };
 
     }
 

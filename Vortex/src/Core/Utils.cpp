@@ -145,6 +145,23 @@ namespace utl{
 		return true;
 	}
 
+	bool binaryDump(void* data, const size_t& size, const std::string& filePath)
+	{
+		std::ofstream outFile(filePath, std::ios::binary);
+
+		if (!outFile) {
+			VTX_ERROR("ERROR: binaryDump() Failed to open file {}", filePath);
+			return false;
+		}
+
+		outFile.write((char*)data, size);
+
+		outFile.close();
+
+		return true;
+	}
+
+
 	std::string getDateTime()
 	{
 		SYSTEMTIME time;

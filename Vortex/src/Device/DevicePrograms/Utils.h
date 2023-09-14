@@ -2,7 +2,7 @@
 #ifndef UTILS_H
 #define UTILS_H
 #include "Core/Math.h"
-
+#include "Device/DevicePrograms/randomNumberGenerator.h"
 #undef min
 #undef max
 
@@ -11,7 +11,7 @@ namespace vtx::utl
 
 	__forceinline__ __device__ bool isNan(const math::vec3f& vec)
 	{
-		return (isnan(vec.x) && isnan(vec.y) && isnan(vec.z));
+		return (isnan(vec.x) || isnan(vec.y) || isnan(vec.z));
 	}
 
 
@@ -122,7 +122,7 @@ namespace vtx::utl
 		constexpr float floatScale = 1.0f / 65536.0f;
 		constexpr float intScale = 256.0f;
 
-		const math::vec3ui ofI(
+		const math::vec3i ofI(
 			static_cast<int>(intScale * normal.x),
 			static_cast<int>(intScale * normal.y),
 			static_cast<int>(intScale * normal.z));
@@ -175,7 +175,7 @@ namespace vtx::utl
 	__forceinline__ __host__ __device__ float heuristic(const float a, const float b)
 	{
 		//return __fdiv_rn(a,__fadd_rn(a,b));
-		return powerHeuristic(a, b);
+		return balanceHeuristic(a, b);
 	}
 
 	// Binary-search and return the highest cell index with CDF value <= sample.
@@ -200,6 +200,22 @@ namespace vtx::utl
 		}
 
 		return lowerBound;
+	}
+
+	__forceinline__ __device__ unsigned int selectFromWeights(const float* weights, const unsigned int numberOfWeights, unsigned& seed)
+	{
+		const float sample = rng(seed);
+
+		float runningSum = 0.0f;
+
+		for (unsigned int i = 0; i < numberOfWeights; ++i)
+		{
+			runningSum += weights[i];
+			if (sample < runningSum)
+				return i;
+		}
+
+		return numberOfWeights - 1; // This should ideally not happen if weights are normalized and the sample is in [0.0f, 1.0f), but acts as a safeguard.
 	}
 }
 

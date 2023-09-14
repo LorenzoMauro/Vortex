@@ -9,6 +9,8 @@ nsightProfile/
 data/*.*
 data/*
 Vortex/x64/*
+ext/vcpkg
+scripts/__pycache__
 
 # Ignore object files and libraries
 *.o
@@ -36,3 +38,5 @@ VortexOptix/Vortex.lua
 *.DotSettings
 Vortex/x64/Debug/NoiseKernel.cu.obj
 Vortex/x64/Release/NoiseKernel.cu.obj
+installationLog.txt
+scripts/vortex_38018.ico

@@ -1,4 +1,7 @@
 #include "CudaLinker.h"
+#include <cuda.h>
+
+#include "Device/CUDAChecks.h"
 
 
 namespace vtx::mdl
@@ -213,6 +216,7 @@ namespace vtx::mdl
             }
             if (linkResult != CUDA_SUCCESS) break;
 
+
             // Add the "mdl_expr_functions" array PTX module
             linkResult = cuLinkAddData(
                 cudaLinkState, CU_JIT_INPUT_PTX,
@@ -270,14 +274,14 @@ namespace vtx::mdl
 		return *mdlCudaLinker;
     }
 
-	void MdlCudaLinker::submitTargetCode(mi::base::Handle<const mi::neuraylib::ITarget_code> targetCode, std::string materialName)
+	void MdlCudaLinker::submitTargetCode(const mi::base::Handle<const mi::neuraylib::ITarget_code>& targetCode, const std::string& materialName)
     {
         m_targetCodes.push_back(targetCode);
         matNametoTargetCode[materialName] = m_targetCodes.size() - 1;
         isDirty = true;
     }
 
-	int MdlCudaLinker::getMdlFunctionIndices(std::string material)
+	int MdlCudaLinker::getMdlFunctionIndices(const std::string& material)
     {
         if (isDirty)
         {
@@ -290,7 +294,6 @@ namespace vtx::mdl
     void MdlCudaLinker::link()
     {
         VTX_INFO("Linking CUDA MDL code.");
-        //ptxFile = generateFuncArrayPtx(m_targetCodes);
         outModule = buildLinkedKernel(m_targetCodes, ptxFile.c_str(), kernelFunctionName.c_str(), &outKernelFunction);
         isDirty = false;
     }

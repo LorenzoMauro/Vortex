@@ -36,7 +36,7 @@
  // Tiny Encryption Algorithm (TEA) to calculate a the seed per launch index and iteration.
  // This results in a ton of integer instructions! Use the smallest N necessary.
 template<unsigned int N>
-__forceinline__ __device__ unsigned int tea(const unsigned int val0, const unsigned int val1)
+__forceinline__ __both__ unsigned int tea(const unsigned int val0, const unsigned int val1)
 {
     unsigned int v0 = val0;
     unsigned int v1 = val1;
@@ -52,7 +52,7 @@ __forceinline__ __device__ unsigned int tea(const unsigned int val0, const unsig
 }
 
 // Just do one LCG step. The new random unsigned int number is in the referenced argument.
-__forceinline__ __device__ void lcg(unsigned int& previous)
+__forceinline__ __both__ void lcg(unsigned int& previous)
 {
     previous = previous * 1664525u + 1013904223u;
 }
@@ -128,6 +128,25 @@ __forceinline__ __device__ float4 rng4(unsigned int& previous)
     return s;
 }
 
+__forceinline__ __device__ float nRng(unsigned int& previous)
+{
+    const float epsilon = 1e-6f;
+    float u1 = rng(previous);
+    u1 = (u1 < epsilon) ? epsilon : (u1 > 1.0f - epsilon) ? 1.0f - epsilon : u1;
+    const float u2 = rng(previous);
+    const float r = sqrtf(-2.0f * logf(u1));
+    const float phi = 2.0f * 3.1415926535897932384626433832795f * u2;
+    const float x = r * cosf(phi);
 
+    return x;
+}
+
+__forceinline__ __device__ float2 nRng2(unsigned int& previous)
+{
+    float2 z;
+    z.x = nRng(previous);
+    z.y = nRng(previous);
+    return z;
+}
 
 #endif // RANDOM_NUMBER_GENERATORS_H

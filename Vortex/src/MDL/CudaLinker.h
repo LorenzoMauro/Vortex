@@ -1,4 +1,5 @@
 ﻿#pragma once
+#include <cuda.h>
 #include "MdlWrapper.h"
 #include <map>
 namespace vtx::mdl
@@ -38,10 +39,10 @@ namespace vtx::mdl
     class MdlCudaLinker
     {
     public:
-        void submitTargetCode(mi::base::Handle<const mi::neuraylib::ITarget_code> targetCode, std::string materialName);
+        void submitTargetCode(const mi::base::Handle<const mi::neuraylib::ITarget_code>& targetCode, const std::string& materialName);
 
-        int getMdlFunctionIndices(std::string material);
-		void                 link();
+        int  getMdlFunctionIndices(const std::string& material);
+		void link();
 
 		std::map<std::string, int> matNametoTargetCode;
         std::vector<mi::base::Handle<const mi::neuraylib::ITarget_code> > m_targetCodes;

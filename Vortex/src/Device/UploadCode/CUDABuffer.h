@@ -35,27 +35,31 @@ namespace vtx {
             }
         }
 
+
         /*upload a generic T type, the function takes care of eventual resizing and allocation*/
         template<typename T>
-        __host__ void upload(const T& uploadData)
+        __host__ T* upload(const T& uploadData)
         {
 	        const size_t newSize = sizeof(T);
             uploadImplementation(&uploadData, newSize);
+            return castedPointer<T>();
         }
 
         /*upload a std::vector type, the function takes care of eventual resizing and allocation*/
         template<typename T>
-        __host__ void upload(const std::vector<T>& uploadVector)
+        __host__ T* upload(const std::vector<T>& uploadVector)
         {
             const size_t newSize = sizeof(T)*uploadVector.size();
             uploadImplementation(uploadVector.data(), newSize);
+            return castedPointer<T>();
         }
 
         template<typename T>
-        __host__ void upload(T* uploadArray, size_t count)
+        __host__ T* upload(T* uploadArray, size_t count)
         {
             const size_t newSize = sizeof(T) * count;
             uploadImplementation(uploadArray, newSize);
+            return castedPointer<T>();
         }
         /*Download Data, no checks are made about the requested type if not that the stored size is a multiple of the size of the requested type
          * It returns the count of the data
@@ -71,11 +75,23 @@ namespace vtx {
             return 0;
         }
 
+
+        template<typename T>
+        __host__ T* alloc(const int count)
+        {
+            const size_t newSize = sizeof(T) * count;
+            resize(newSize);
+            return castedPointer<T>();
+        }
+
         //! re-size buffer to given number of bytes
         __host__ void resize(const size_t size)
         {
-            free();
-            alloc(size);
+            if(size != sizeInBytes)
+            {
+                free();
+                alloc(size);
+            }
         }
 
         //! allocate to given number of bytes
@@ -94,15 +110,11 @@ namespace vtx {
         /*Internal Function to manage allocation, resize and upload on upload request*/
         __host__ void uploadImplementation(const void* uploadData, const size_t newSize)
         {
-            do
-			{
-				if (!(newSize != 0))
-				{
-					VTX_ERROR("CudaBuffer: trying to upload a zero size Data?");
-					waitAndClose();
-				}
-			}
-			while (0);
+            if (newSize == 0)
+            {
+                VTX_ERROR("CudaBuffer: trying to upload a zero size Data?");
+                waitAndClose();
+            }
             if (d_ptr == nullptr)
             {
                 alloc(newSize);

@@ -22,123 +22,12 @@ namespace vtx {
 #define GREENCOLOR  math::vec3f(0.0f, 1.0f, 0.0f)
 #define BLUECOLOR  math::vec3f(0.0f, 0.0f, 1.0f)
 
-	enum TraceType
-	{
-		TR_MISS,
-		TR_HIT,
-		TR_SHADOW,
-
-		TR_UNKNOWN
-	};
-
-	struct HitProperties
-	{
-		vtxID				instanceId;
-		vtxID				geometryId;
-
-		const InstanceData* instance = nullptr;
-		const GeometryData* geometry = nullptr;
-
-		graph::VertexAttributes*   vertices[3]{nullptr, nullptr, nullptr};
-
-		// Material Properties
-		const MaterialData* material = nullptr;
-		const DeviceShaderConfiguration* materialConfiguration = nullptr;
-		const LightData* meshLight = nullptr;
-		const MeshLightAttributesData* meshLightAttributes = nullptr;
-
-		// Hit Point Properties
-		math::vec3f				baricenter;
-		math::vec3f             position;
-		math::vec3f             direction;
-		float                   distance;
-		math::vec3f    mediumIor;
-
-		//Transformations
-		math::affine3f        objectToWorld;
-		math::affine3f        worldToObject;
-
-		// World normals and Tangents
-		math::vec3f           ngW;
-		math::vec3f           nsW;
-		math::vec3f           tgW;
-		math::vec3f           btW;
-
-		// Object normals and Tangents
-		math::vec3f           ngO;
-		math::vec3f           nsO;
-		math::vec3f           tgO;
-		math::vec3f           btO;
-
-		float3 textureCoordinates[2];
-		float3 textureBitangents[2];
-		float3 textureTangents[2];
-
-		bool isFrontFace;
-		unsigned  seed;
-
-		float4 oTwF4[3];
-		float4 wToF4[3];
-	};
-
-	struct MaterialStack
-	{
-		float3 ior;
-		float3 absorption;
-		float3 scattering;
-		float bias;
-	};
-
-	struct ShadingColors
-	{
-		math::vec3f finalDiffuse;
-		math::vec3f bounceDiffuse;
-		math::vec3f shadingNormal;
-		math::vec3f trueNormal;
-		math::vec3f orientation;
-		math::vec3f tangent;
-		math::vec3f uv;
-		math::vec3f debugColor1;
-	};
-
-
-	struct PerRayData {
-		math::vec3f						position;					//Current Hit Position
-		float							distance;					//Distance of hit Position to Ray origin
-		int								depth;
-		TraceType						traceResult;				// Bitfield with flags. See FLAG_* defines above for its contents.
-		TraceType						traceOperation = TR_HIT;	// Bitfield with flags. See FLAG_* defines above for its contents.
-
-		math::vec3f						wo;							//Outgoing direction, to observer in world space
-		math::vec3f						wi;							//Incoming direction, to light, in world space
-
-		math::vec3f						radiance;					//Radiance along the current path segment
-
-		float							pdf;						//last Bdsf smaple, tracked for multiple importance sampling
-		math::vec3f						throughput;					//Throughput of the current path segment, starts white and gets modulated with bsdf_over_pdf with each sample.
-		mi::neuraylib::Bsdf_event_type	eventType;					// The type of events created by BSDF importance sampling.
-
-
-		math::vec3f sigmaT;											// Extinction coefficient in a homogeneous medium.
-		int         walk;											// Number of random walk steps done through scattering volume.
-		math::vec3f pdfVolume;										// Volume extinction sample pdf. Used to adjust the throughput along the random walk.
-
-		unsigned int seed;											// Random number generator input.
-
-		// Small material stack tracking IOR, absorption and scattering coefficients of the entered materials. Entry 0 is vacuum.
-		int           idxStack;
-		MaterialStack stack[MATERIAL_STACK_SIZE];
-		math::vec3f           mediumIor;
-
-		ShadingColors colors;
-	};
-
 	// Alias the PerRayData pointer and an math::vec2f for the payload split and merge operations. This generates only move instructions.
-	typedef union
-	{
+	union Payload {
+		__host__ __device__ Payload(): dat(math::vec2ui(0)) {};
 		void* ptr;
-		math::vec2ui dat{0,0};
-	} Payload;
+		math::vec2ui dat; // Initialization removed here
+	};
 
 	__forceinline__ __device__ math::vec2ui splitPointer(void* ptr)
 	{

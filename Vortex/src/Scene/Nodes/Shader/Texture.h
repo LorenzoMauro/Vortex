@@ -29,7 +29,8 @@ namespace vtx::graph
 		Texture(std::string filePath) :
 			Node(NT_MDL_TEXTURE)
 		{
-			
+			this->filePath = filePath;
+			loadFromFile = true;
 		}
 
 		~Texture() override
@@ -40,12 +41,10 @@ namespace vtx::graph
 			}
 		}
 
-		void init();
+		void init() override;
 
-		void traverse(const std::vector<std::shared_ptr<NodeVisitor>>& orderedVisitors) override;
-
-		//void accept(std::shared_ptr<NodeVisitor> visitor) override;
-
+	protected:
+		void accept(NodeVisitor& visitor) override;
 	public:
 		std::string										filePath; // In case the image is loaded from a file
 		std::string										databaseName; // In case the image is loaded from the database
@@ -58,6 +57,7 @@ namespace vtx::graph
 		float											effectiveGamma;
 
 		bool											isInitialized = false;
+		bool											loadFromFile = false;
 		Size mdlIndex;
 	};
 }

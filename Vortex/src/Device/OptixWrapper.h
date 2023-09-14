@@ -116,19 +116,19 @@ namespace vtx::optix
 		SbtMap																	sbtPrograms;
 		CUDABuffer																sbtRecordHeadersBuffer;
 
-		void initSbtMap();
-		std::vector<OptixProgramGroup> getProgramGroups();
-		void createSbt();
-		void registerProgram(std::shared_ptr<ProgramOptix> program);
-		const OptixShaderBindingTable& getSbt();
+		void                                  initSbtMap();
+		std::vector<OptixProgramGroup>        getProgramGroups();
+		void                                  createSbt();
+		void                                  registerProgram(const std::shared_ptr<ProgramOptix>& program);
+		const OptixShaderBindingTable&        getSbt();
 		const CudaMap<uint32_t, sbtPosition>& getSbtMap();
-		int getProgramSbt(std::string programName);
+		int                                   getProgramSbt(std::string programName);
 		//static int getProgramSbt(const CudaMap<uint32_t, sbtPosition>& map, std::string programName);
 	};
 
 	struct PipelineOptix
 	{
-		void registerProgram(std::shared_ptr<ProgramOptix> program, std::vector<std::string> sbtNames = {""});
+		void registerProgram(const std::shared_ptr<ProgramOptix>& program, std::vector<std::string> sbtNames = {""});
 
 		std::vector<OptixProgramGroup> getAllProgramGroups();
 
@@ -138,10 +138,11 @@ namespace vtx::optix
 
 		const OptixPipeline& getPipeline();
 
-		int getProgramSbt(std::string programName, std::string sbtName = "");
+		int getProgramSbt(const std::string& programName, std::string sbtName = "");
 
 		const OptixShaderBindingTable& getSbt(std::string sbtName = "");
 
+		static void launchOptixKernel(const math::vec2i& launchDimension, const std::string& pipelineName);
 
 	private:
 		OptixPipeline															pipeline = nullptr;
@@ -179,13 +180,13 @@ namespace vtx::optix
 	std::vector<cudaStream_t>& createMaterialStreamVector(const int size);
 
 	/*Utility to directly create a direct callable program from a function name and module*/
-	std::shared_ptr<ProgramOptix> createDcProgram(std::shared_ptr<ModuleOptix> module, std::string functionName, vtxID id = 0, std::vector<std::string> sbtName = {""});
+	std::shared_ptr<ProgramOptix> createDcProgram(const std::shared_ptr<ModuleOptix>& module, const std::string& functionName, vtxID id = 0, const std::vector<std::string>& sbtName = {""});
 
 	/*Utility to create BLAS*/
 	OptixTraversableHandle createGeometryAcceleration(CUdeviceptr vertexData, uint32_t verticesNumber, uint32_t verticesStride, 
 													  CUdeviceptr indexData, uint32_t indexNumber, uint32_t indicesStride);
 
-	OptixInstance createInstance(uint32_t instanceId, math::affine3f transform, OptixTraversableHandle traversable);
+	OptixInstance createInstance(uint32_t instanceId, const math::affine3f& transform, OptixTraversableHandle traversable);
 
 	OptixTraversableHandle createInstanceAcceleration(const std::vector<OptixInstance>& optixInstances);
 

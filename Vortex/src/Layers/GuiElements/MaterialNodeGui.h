@@ -3,6 +3,8 @@
 #include <memory>
 #include <set>
 #include <vector>
+
+#include "NodeEditorWrapper.h"
 #include "Scene/Node.h"
 #include "Core/VortexID.h"
 #include "Core/Math.h"
@@ -15,20 +17,13 @@ namespace vtx::graph
 
 namespace vtx::gui
 {
-    struct NodeInfo
-    {
-        std::shared_ptr<graph::shader::ShaderNode> shaderNode;
-        math::vec2f size{0,0};
-        math::vec2i pos{ 0,0 };
-        int width = 0;
-        int depth = 0;
-	};
+    
 
     class MaterialGui
     {
     public:
         vtxID                                           selectedMaterialId = 0;
-        std::vector<std::shared_ptr< graph::Material >> materials;
+        std::vector<std::shared_ptr< graph::Material >> materials = {};
         std::map<vtxID, std::map<vtxID, NodeInfo>>      nodeInfo;
         vtxID                                           materialOpened;
 

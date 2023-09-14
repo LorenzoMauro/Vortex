@@ -3,6 +3,7 @@
 #include "MDL/CudaLinker.h"
 #include "Scene/Traversal.h"
 #include "MDL/MdlWrapper.h"
+#include "MDL/ShaderVisitor.h"
 #include "Scene/Nodes/Shader/mdl/ShaderNodes.h"
 #include "Shader/BsdfMeasurement.h"
 #include "Shader/LightProfile.h"
@@ -12,7 +13,6 @@ namespace vtx::graph
 {
 	void Material::init()
 	{
-
 		mdl::compileMaterial(materialGraph->name, getMaterialDbName());
 
 		config = mdl::determineShaderConfiguration(getMaterialDbName());
@@ -27,36 +27,7 @@ namespace vtx::graph
 
 		dispatchParameters(mdl::getArgumentBlockData(getMaterialDbName(), materialGraph->functionInfo.signature, targetCode, argBlock, mapEnumTypes));
 
-		/*std::string enable_emission = "enable_emission";
-		std::string enable_opacity = "enable_opacity";
-		bool* enableEmission = nullptr;
-		bool* enableOpacity = nullptr;
-		for(std::pair<const std::string, std::vector<shader::ParameterInfo>> param : params)
-		{
-			for(auto paramInfo : param.second)
-			{
-				std::string name = paramInfo.displayName();
-
-				if (name.find(enable_emission) != std::string::npos)
-				{
-					enableEmission = &paramInfo.data<bool>();
-				}
-				else if (name.find(enable_opacity) != std::string::npos)
-				{
-					enableOpacity = &paramInfo.data<bool>();
-				}
-			}
-
-		}
-		if(enableEmission != nullptr)
-		{
-			config.emissivityToggle = enableEmission;
-
-		}
-		if(enableOpacity != nullptr)
-		{
-			config.opacityToggle = enableOpacity;
-		}*/
+		isUpdated = true;
 		isInitialized = true;
 	}
 
@@ -90,26 +61,13 @@ namespace vtx::graph
 			}
 			if(foundSocket)
 			{
-				/*VTX_INFO("Traversed path: {} Found Socket of Shader Node {} Named {}\n"
-							"With Target Code Annotation: {}\n"
-							"and Function Definition Annotation: {}\n", argumentName, shaderNode->name, parameterInfo->argumentName, param.annotation.print(), parameterInfo->annotation.print());*/
-
-
-				//parameterInfo->index = param.index;
-				//parameterInfo->argumentName = param.argumentName;
 				parameterInfo->kind = param.kind;
 				parameterInfo->arrayElemKind = param.arrayElemKind;
 				parameterInfo->arraySize = param.arraySize;
 				parameterInfo->arrayPitch = param.arrayPitch;
 				parameterInfo->dataPtr = param.dataPtr;
 				parameterInfo->enumInfo = param.enumInfo;
-				//parameterInfo->expressionKind = param.expressionKind;
 			}
-			/*else
-			{
-				VTX_WARN("Could not find socket path {} in shader node {}", argumentName, shaderNode->name);
-			}*/
-
 		}
 	}
 
@@ -132,6 +90,28 @@ namespace vtx::graph
 		return fNames;
 	}
 
+	std::vector<std::shared_ptr<Node>> Material::getChildren() const
+	{
+		std::vector<std::shared_ptr<Node>> children;
+		if (materialGraph)
+		{
+			children.push_back(materialGraph);
+		}
+		for (const auto& texture : textures)
+		{
+			children.push_back(texture);
+		}
+		for (const auto& lightProfile : lightProfiles)
+		{
+			children.push_back(lightProfile);
+		}
+		for (const auto& bsdfMeasurement : bsdfMeasurements)
+		{
+			children.push_back(bsdfMeasurement);
+		}
+		return children;
+	}
+
 	size_t Material::getArgumentBlockSize()
 	{
 		if (!argBlock)
@@ -150,52 +130,47 @@ namespace vtx::graph
 		return argBlock->get_data();
 	}
 
-	void Material::traverse(const std::vector<std::shared_ptr<NodeVisitor>>& orderedVisitors)
-	{
-		if(materialGraph)
-		{
-			if(materialGraph->isUpdated)
-			{
-				auto materialCasted = std::dynamic_pointer_cast<graph::shader::Material>(materialGraph);
-				mdl::createShaderGraphFunctionCalls(materialGraph);
-				//shader->materialDbName = materialGraph->functionInfo.signature;
-				//shader->materialCallName = materialGraph->name;
-				//shader->name = materialGraph->name;
-				//auto [moduleName, functionName] =mdl::createNewFunctionInModule(materialGraph);
-				//shader->name = functionName;
-				//shader->path = moduleName;
-			}
-		}
+	//void Material::traverseChildren(NodeVisitor& visitor)
+	//{
+	//	//if(materialGraph)
+	//	//{
+	//	//	if(materialGraph->isUpdated)
+	//	//	{
+	//	//		auto materialCasted = std::dynamic_pointer_cast<graph::shader::Material>(materialGraph);
+	//	//		//mdl::createShaderGraphFunctionCalls(materialGraph);
+	//	//	}
+	//	//}
+	//	if (materialGraph)
+	//	{
+	//		materialGraph->traverse(visitor);
+	//	}
+	//
+	//	if(!isInitialized)
+	//	{
+	//		init();
+	//	}
+	//	for (const auto& texture : textures)
+	//	{
+	//		texture->traverse(visitor);
+	//	}
+	//	for (const auto& lightProfile : lightProfiles)
+	//	{
+	//		lightProfile->traverse(visitor);
+	//	}
+	//	for (const auto& bsdfMeasurement : bsdfMeasurements)
+	//	{
+	//		bsdfMeasurement->traverse(visitor);
+	//	}
+	//}
 
-		//shader->traverse(orderedVisitors);
-		if(!isInitialized)
-		{
-			init();
-		}
-		for (auto& texture : textures)
-		{
-			texture->traverse(orderedVisitors);
-		}
-		for (auto& lightProfile : lightProfiles)
-		{
-			lightProfile->traverse(orderedVisitors);
-		}
-		for (auto& bsdfMeasurement : bsdfMeasurements)
-		{
-			bsdfMeasurement->traverse(orderedVisitors);
-		}
-		ACCEPT(Material,visitors);
+	void Material:: accept(NodeVisitor& visitor)
+	{
+		visitor.visit(as<Material>());
 	}
-
-	/*void Material::accept(std::shared_ptr<NodeVisitor> visitor)
-	{
-		visitor->visit(sharedFromBase<Material>());
-	}*/
-	
 
 	void Material::createPrograms()
 	{
-		auto module = std::make_shared<optix::ModuleOptix>();
+		const auto module = std::make_shared<optix::ModuleOptix>();
 		module->name = name;
 		module->code = utl::replaceFunctionNameInPTX(targetCode->get_code(), "__replace__EvaluateMaterial", "unused_" + std::to_string(getID())); ;
 		if (getOptions()->mdlCallType == MDL_DIRECT_CALL)
@@ -387,7 +362,7 @@ namespace vtx::graph
 		{
 			init();
 		}
-		bool thinWalled = isThinWalled();
+		const bool thinWalled = isThinWalled();
 
 		bool isSurfaceEmissive = false;
 		if (config.isSurfaceEdfValid) {
@@ -409,8 +384,8 @@ namespace vtx::graph
 				isBackfaceEmissive = true;
 			}
 		}
-		isBackfaceEmissive = (thinWalled && isBackfaceEmissive);
-		bool isEmissive = isSurfaceEmissive || isBackfaceEmissive;// To be emissive on the backface it needs to be isThinWalled
+		isBackfaceEmissive    = (thinWalled && isBackfaceEmissive);
+		const bool isEmissive = isSurfaceEmissive || isBackfaceEmissive; // To be emissive on the backface it needs to be isThinWalled
 
 		if (config.emissivityToggle) //The material has a enable emission option
 		{
@@ -444,10 +419,12 @@ namespace vtx::graph
 	{
 		if (!material->isInitialized)
 		{
-			Handle<ILink_unit> linkUnit;
-			mdl::createShaderGraphFunctionCalls(material->materialGraph);
+			mdl::ShaderVisitor visitor;
+			material->materialGraph->traverse(visitor);
 			mdl::compileMaterial(material->materialGraph->name, material->getMaterialDbName());
 			material->config = mdl::determineShaderConfiguration(material->getMaterialDbName());
+
+			Handle<ILink_unit> linkUnit;
 			mdl::addMaterialToLinkUnit(material->getMaterialDbName(), material->config, material->getID(), linkUnit);
 			VTX_INFO("Creating target code for shader {}", material->getMaterialDbName());
 			Handle<ITarget_code const> targetCode = mdl::generateTargetCode(linkUnit);
@@ -459,6 +436,8 @@ namespace vtx::graph
 			material->createPrograms();
 			material->dispatchParameters(mdl::getArgumentBlockData(material->getMaterialDbName(), material->materialGraph->functionInfo.signature, material->targetCode, material->argBlock, material->mapEnumTypes, 0));
 			material->isInitialized = true;
+			material->isUpdated = true;
+
 		}
 	}
 
@@ -480,58 +459,6 @@ namespace vtx::graph
 				thread.join();
 			}
 		}
-	}
-
-	void computeMaterialCode()
-	{
-		auto materials = SIM::getAllNodeOfType<graph::Material>(NT_MATERIAL);
-
-		Handle<ILink_unit> linkUnit;
-
-		std::map<vtxID , int> materialToTargetCodeIndex;
-		int targetCodeIndex = 0;
-
-		for (auto& material : materials)
-		{
-			if(!material->isInitialized)
-			{
-				mdl::createShaderGraphFunctionCalls(material->materialGraph);
-				mdl::compileMaterial(material->materialGraph->name, material->getMaterialDbName());
-				material->config = mdl::determineShaderConfiguration(material->getMaterialDbName());
-				mdl::addMaterialToLinkUnit(material->getMaterialDbName(), material->config, material->getID(), linkUnit);
-				materialToTargetCodeIndex.insert({ material->getID(), targetCodeIndex });
-				targetCodeIndex++;
-			}
-
-		}
-
-		if(targetCodeIndex>0)
-		{
-			Handle<ITarget_code const> targetCode = mdl::generateTargetCode(linkUnit);
-			auto textures = mdl::createTextureResources(targetCode);
-			auto bsdfMeasurements = mdl::createBsdfMeasurementResources(targetCode);
-			auto lightProfiles = mdl::createLightProfileResources(targetCode);
-
-			for (auto& material : materials) {
-				if (!material->isInitialized && materialToTargetCodeIndex.count(material->getID()) > 0)
-				{
-					material->targetCode = targetCode;
-
-					material->createPrograms();
-
-					material->textures = textures;
-					material->bsdfMeasurements = bsdfMeasurements;
-					material->lightProfiles = lightProfiles;
-
-					material->dispatchParameters(mdl::getArgumentBlockData(material->getMaterialDbName(), material->materialGraph->functionInfo.signature, material->targetCode, material->argBlock, material->mapEnumTypes, materialToTargetCodeIndex[material->getID()]));
-
-					material->isInitialized = true;
-
-				}
-
-			}
-		}
-		
 	}
 }
 

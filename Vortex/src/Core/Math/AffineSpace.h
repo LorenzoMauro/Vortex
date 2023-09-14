@@ -58,13 +58,52 @@ namespace gdt {
 
     inline AffineSpaceT           ( ) = default;
     inline __both__ AffineSpaceT           ( const AffineSpaceT& other ) { l = other.l; p = other.p; }
-    inline AffineSpaceT           ( const L           & other ) { l = other  ; p = VectorT(zero); }
+    inline __both__ AffineSpaceT           ( const L           & other ) { l = other  ; p = VectorT(ZeroTy()); }
     inline __both__ AffineSpaceT& operator=( const AffineSpaceT& other ) { l = other.l; p = other.p; return *this; }
 
     inline __both__  AffineSpaceT( const VectorT& vx, const VectorT& vy, const VectorT& vz, const VectorT& p ) : l(vx,vy,vz), p(p) {}
     inline __both__  AffineSpaceT( const L& l, const VectorT& p ) : l(l), p(p) {}
 
     template<typename L1> inline AffineSpaceT( const AffineSpaceT<L1>& s ) : l(s.l), p(s.p) {}
+
+    class Proxy {
+    private:
+        ScalarT* data[4];
+
+    public:
+        Proxy(ScalarT* e0, ScalarT* e1, ScalarT* e2, ScalarT* e3)
+    	{
+            data[0] = e0;
+            data[1] = e1;
+            data[2] = e2;
+            data[3] = e3;
+        }
+
+        ScalarT& operator[](int index) {
+            assert(index >= 0 && index < 4);
+            return *data[index];
+        }
+    };
+
+    inline __both__  Proxy operator[](const int i)
+    {
+        assert(i >= 0 && i < 3);
+		switch (i)
+		{
+		case 0:
+			{
+				return Proxy(&l.vx.x, &l.vy.x, &l.vz.x, &p.x);
+			}
+		case 1:
+			{
+				return Proxy(&l.vx.y, &l.vy.y, &l.vz.y, &p.y);
+			}
+		case 2:
+			{
+				return Proxy(&l.vx.z, &l.vy.z, &l.vz.z, &p.z);
+			}
+		}
+    }
 
     ////////////////////////////////////////////////////////////////////////////////
     // Constants
@@ -161,6 +200,7 @@ namespace gdt {
   ////////////////////////////////////////////////////////////////////////////////
 
   template<typename L> inline std::ostream& operator<<(std::ostream& cout, const AffineSpaceT<L>& m) {
+    return cout << "vx:" << m.l.vx << "\nvy: " << m.l.vy << "\nvz: " << m.l.vz << "\np: " << m.p;
     return cout << "{ l = " << m.l << ", p = " << m.p << " }";
   }
 

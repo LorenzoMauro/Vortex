@@ -1,4 +1,3 @@
-#define NOMINMAX
 #include <algorithm>
 #include "OptixWrapper.h"
 
@@ -8,6 +7,7 @@
 #include "CUDAChecks.h"
 #include "Core/Options.h"
 #include "Core/Utils.h"
+#include "UploadCode/UploadBuffers.h"
 
 namespace vtx::optix
 {
@@ -78,13 +78,18 @@ namespace vtx::optix
 		CUDA_CHECK(cudaSetDevice(deviceId));
 		CUDA_CHECK(cudaStreamCreate(&state.stream));
 
-		cudaGetDeviceProperties(&state.deviceProps, deviceId);
+		VTX_INFO("DeviceProps pointer : {}", (void*)& state.deviceProps);
+		CUDA_CHECK(cudaGetDeviceProperties(&state.deviceProps, deviceId));
 		VTX_INFO("Optix Wrapper : running on device: {}", state.deviceProps.name);
 
 		CUresult  cuRes = cuCtxGetCurrent(&state.cudaContext);
-		VTX_ASSERT_CLOSE(cuRes == CUDA_SUCCESS, "Optix Wrapper : Error querying current context: error code {}", cuRes);
+		VTX_ASSERT_CLOSE(cuRes == CUDA_SUCCESS, "Optix Wrapper : Error querying current context: error code {}", (int)cuRes);
 
-		OPTIX_CHECK(optixDeviceContextCreate(state.cudaContext, nullptr, &state.optixContext));
+		OptixDeviceContextOptions options = {};
+		options.validationMode = OPTIX_DEVICE_CONTEXT_VALIDATION_MODE_ALL;
+		options.logCallbackFunction = &context_log_cb;
+		options.logCallbackLevel = 4;
+		OPTIX_CHECK(optixDeviceContextCreate(state.cudaContext, &options, &state.optixContext));
 		OPTIX_CHECK(optixDeviceContextSetLogCallback(state.optixContext, context_log_cb, nullptr, 4));
 		if((getOptions()->isDebug && !(getOptions()->enableCache)) || !getOptions()->enableCache)
 		{
@@ -133,12 +138,10 @@ namespace vtx::optix
 		state.pipelineCompileOptions.numPayloadValues = 2;  // I need two to encode a 64-bit pointer to the per ray payload structure.
 		state.pipelineCompileOptions.numAttributeValues = 2;  // The minimum is two for the triangle barycentrics.
 		if (getOptions()->isDebug) {
-			state.pipelineCompileOptions.exceptionFlags = OPTIX_EXCEPTION_FLAG_DEBUG;
 			state.pipelineCompileOptions.exceptionFlags =
 				OPTIX_EXCEPTION_FLAG_STACK_OVERFLOW |
 				OPTIX_EXCEPTION_FLAG_TRACE_DEPTH |
-				OPTIX_EXCEPTION_FLAG_USER |
-				OPTIX_EXCEPTION_FLAG_DEBUG;
+				OPTIX_EXCEPTION_FLAG_USER;
 		}
 		else
 			state.pipelineCompileOptions.exceptionFlags = OPTIX_EXCEPTION_FLAG_NONE;
@@ -171,7 +174,7 @@ namespace vtx::optix
 		return fullFunctionName.substr(prefix.size());
 	}
 
-	std::shared_ptr<ProgramOptix> createDcProgram(std::shared_ptr<ModuleOptix> module, std::string functionName, vtxID id, std::vector<std::string> sbtName)
+	std::shared_ptr<ProgramOptix> createDcProgram(const std::shared_ptr<ModuleOptix>& module, const std::string& functionName, vtxID id, const std::vector<std::string>& sbtName)
 	{
 		const auto function = std::make_shared<optix::FunctionOptix>();
 		function->name = functionName;
@@ -341,7 +344,7 @@ namespace vtx::optix
 		return pgd;
 	}
 
-	void SbtPipeline::registerProgram(std::shared_ptr<ProgramOptix> program)
+	void SbtPipeline::registerProgram(const std::shared_ptr<ProgramOptix>& program)
 	{
 		programs[program->type].push_back(program);
 		isDirty = true;
@@ -487,7 +490,7 @@ namespace vtx::optix
 	//	}
 	//}
 
-	void PipelineOptix::registerProgram(std::shared_ptr<ProgramOptix> program, std::vector<std::string> sbtNames)
+	void PipelineOptix::registerProgram(const std::shared_ptr<ProgramOptix>& program, std::vector<std::string> sbtNames)
 	{
 		if (sbtNames.size() == 1 && sbtNames[0] == "")
 		{
@@ -615,7 +618,7 @@ namespace vtx::optix
 		return pipeline;
 	}
 
-	int PipelineOptix::getProgramSbt(std::string programName, std::string sbtName)
+	int PipelineOptix::getProgramSbt(const std::string& programName, std::string sbtName)
 	{
 		if (sbtName.empty())
 		{
@@ -635,11 +638,32 @@ namespace vtx::optix
 		return sbtPipelines[sbtName].getSbt();
 	}
 
+	void PipelineOptix::launchOptixKernel(const math::vec2i& launchDimension, const std::string& pipelineName)
+	{
+		const optix::State& state = *(optix::getState());
+		const OptixPipeline& pipeline = optix::getRenderingPipeline()->getPipeline();
+		const OptixShaderBindingTable& sbt = optix::getRenderingPipeline()->getSbt(pipelineName);
+
+		const auto result = optixLaunch(/*! pipeline we're launching launch: */
+			pipeline, state.stream,
+			/*! parameters and SBT */
+			UPLOAD_BUFFERS->launchParamsBuffer.dPointer(),
+			UPLOAD_BUFFERS->launchParamsBuffer.bytesSize(),
+			&sbt,
+			/*! dimensions of the launch: */
+			launchDimension.x,
+			launchDimension.y,
+			1
+		);
+		OPTIX_CHECK(result);
+		CUDA_SYNC_CHECK();
+	}
+
 	OptixTraversableHandle createGeometryAcceleration(CUdeviceptr vertexData, uint32_t verticesNumber, uint32_t verticesStride, CUdeviceptr indexData, uint32_t indexNumber, uint32_t indicesStride)
 	{
 		VTX_INFO("Optix Wrapper: Computing BLAS");
 
-		CUDA_SYNC_CHECK();
+		//CUDA_SYNC_CHECK();
 
 		OptixDeviceContext& optixContext = getState()->optixContext;
 		CUstream& stream = getState()->stream;
@@ -705,7 +729,7 @@ namespace vtx::optix
 									outputBuffer.bytesSize(),
 									&traversable,
 									&emitDesc, 1));
-		CUDA_SYNC_CHECK();
+		//CUDA_SYNC_CHECK();
 
 		/// Compaction ///
 		uint64_t compactedSize;
@@ -725,7 +749,7 @@ namespace vtx::optix
 
 			auto savedBytes = outputBuffer.bytesSize() - compactedSize;
 			VTX_INFO("Optix Wrapper: Compacted GAS, saved {} bytes", savedBytes);
-			CUDA_SYNC_CHECK();
+			//CUDA_SYNC_CHECK();
 			outputBuffer.free(); // << the UNcompacted, temporary output buffer
 		}
 
@@ -736,7 +760,7 @@ namespace vtx::optix
 		return traversable;
 	}
 
-	OptixInstance createInstance(uint32_t instanceId, math::affine3f transform, OptixTraversableHandle traversable)
+	OptixInstance createInstance(uint32_t instanceId, const math::affine3f& transform, OptixTraversableHandle traversable)
 	{
 		// First check if there is a valid material assigned to this instance.
 
@@ -761,7 +785,7 @@ namespace vtx::optix
 
 	OptixTraversableHandle createInstanceAcceleration(const std::vector<OptixInstance>& optixInstances)
 	{
-		CUDA_SYNC_CHECK();
+		//CUDA_SYNC_CHECK();
 		VTX_INFO("Optix Wrapper: Computing TLAS");
 
 		auto& optixContext = optix::getState()->optixContext;

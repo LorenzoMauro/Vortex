@@ -12,10 +12,7 @@ namespace vtx::math
 #define PI 3.1415926535897932384626433832795
 #define PI_180 0.01745329251994329576923690768489
 #define _180_PI 57.295779513082320876798154814105
-
-
-	template<typename T>
-	constexpr auto length = gdt::length<T>;
+#define EPS 1e-6f
 
 	template<typename T>
 	__both__ T max(T a , T b)
@@ -69,14 +66,48 @@ namespace vtx::math
 	DEFINE_VEC_TYPES(float, f);
 	DEFINE_VEC_TYPES(double, d);
 
-	template<typename T>
-	static inline __both__ vec_t<T, 3> normalize(const vec_t<T, 3>& v) {
+	__inline__ __both__ vec3f normalize(const vec3f& v) {
 		return gdt::normalize(v);
+	}
+
+	__inline__ __both__ vec2f normalize(const vec2f& v) {
+		return gdt::normalize(v);
+	}
+
+	__inline__ __both__ float dot(const vec3f& a, const vec3f& b) {
+		return gdt::dot(a,b);
+	}
+
+	__inline__ __both__ float dot(const vec2f& a, const vec2f& b) {
+		return gdt::dot(a,b);
+	}
+
+	__inline__ __both__ float length(const vec3f& a) {
+		return gdt::length(a);
+	}
+
+	__inline__ __both__ float length(const vec2f& a) {
+		return gdt::length(a);
 	}
 
 	__inline__ __both__ float saturate(float f)
 	{
 		return min(1.f, max(0.f, f));
+	}
+
+	__inline__ __both__ bool isNan(const vec3f& v)
+	{
+		return isnan(v.x) || isnan(v.y) || isnan(v.z);
+	}
+
+	__inline__ __both__ bool isZero(const vec3f& v)
+	{
+		return v == math::vec3f(0.0f);
+	}
+
+	__inline__ __both__ bool isInf(const vec3f& v)
+	{
+		return isinf(v.x) || isinf(v.y) || isinf(v.z);
 	}
 
 	static inline __both__ vec3f saturate(const vec3f& v) {
@@ -86,6 +117,48 @@ namespace vtx::math
 	inline __both__ vec3f randomColor(int i)
 	{
 		return gdt::randomColor(i);
+	}
+
+	inline __both__ vec3f exp(const vec3f& v)
+	{
+		math::vec3f result;
+		result.x = expf(v.x);
+		result.y = expf(v.y);
+		result.z = expf(v.z);
+		return result;
+	}
+
+	inline __both__ vec3f pow(const vec3f& v, const float p)
+	{
+		math::vec3f result;
+		result.x = powf(v.x, p);
+		result.y = powf(v.y, p);
+		result.z = powf(v.z, p);
+		return result;
+	}
+
+	inline __both__ vec2f exp(const vec2f& v)
+	{
+		math::vec2f result;
+		result.x = expf(v.x);
+		result.y = expf(v.y);
+		return result;
+	}
+
+	inline __both__ vec2f pow(const vec2f& v, const float p)
+	{
+		math::vec2f result;
+		result.x = powf(v.x, p);
+		result.y = powf(v.y, p);
+		return result;
+	}
+
+	inline __both__ vec2f abs(const vec2f& v)
+	{
+		math::vec2f result;
+		result.x = fabs(v.x);
+		result.y = fabs(v.y);
+		return result;
 	}
 		
 	///////////////////////////////////////////////////////////////////////////
@@ -212,9 +285,9 @@ namespace vtx::math
 	void VectorFromAffine(AffineSpaceT<T> affine, vec_t<Scalar_t, 3>& translation, vec_t<Scalar_t, 3> scale, vec_t<Scalar_t, 3>& euler) {
 		translation = affine.p;
 
-		scale.x = length<Scalar_t>(affine.l.vx);
-		scale.y = length<Scalar_t>(affine.l.vy);
-		scale.z = length<Scalar_t>(affine.l.vz);
+		scale.x = length(affine.l.vx);
+		scale.y = length(affine.l.vy);
+		scale.z = length(affine.l.vz);
 
 		vec_t<Scalar_t, 3> reverseScale = 1.0f / scale;
 		vec_t<Scalar_t, 3> rVx = affine.l.vx * reverseScale.x;

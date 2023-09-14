@@ -26,7 +26,7 @@ namespace vtx {
 		////////////////// Exception /////////////////////////////////////////
 		//////////////////////////////////////////////////////////////////////
 		
-		auto exceptionFunction = std::make_shared<optix::FunctionOptix>();
+		/*auto exceptionFunction = std::make_shared<optix::FunctionOptix>();
 		exceptionFunction->name = "__exception__all";
 		exceptionFunction->module = deviceProgramModule;
 		exceptionFunction->type = optix::OptixFunctionType::F_Exception;
@@ -34,7 +34,7 @@ namespace vtx {
 		auto exceptionProgram = std::make_shared<optix::ProgramOptix>();
 		exceptionProgram->name = "exception";
 		exceptionProgram->type = optix::OptixProgramType::P_Exception;
-		exceptionProgram->exceptionFunction = exceptionFunction;
+		exceptionProgram->exceptionFunction = exceptionFunction;*/
 
 
 		///////////////////////////////////////////////////////////////////
@@ -116,7 +116,7 @@ namespace vtx {
 		rayGenProgram->raygenFunction = renderFrameFunction;
 
 		pipeline->registerProgram(rayGenProgram);
-		pipeline->registerProgram(exceptionProgram);
+		//pipeline->registerProgram(exceptionProgram);
 		pipeline->registerProgram(radianceMissP);
 		pipeline->registerProgram(radianceHitP);
 		pipeline->registerProgram(shadowMissP);

@@ -5,9 +5,6 @@
 #include "../RayData.h"
 #include "../Utils.h"
 #include "../ToneMapper.h"
-#include "Device/WorkQueues.h"
-#include "Device/DevicePrograms/HitPropertiesComputation.h"
-//#include "Device/DevicePrograms/Mdl/directMdlWrapper.h"
 #define ARCHITECTURE_OPTIX
 #include "Device/DevicePrograms/rendererFunctions.h"
 
@@ -15,25 +12,25 @@ namespace vtx
 {
 	extern "C" __constant__ LaunchParams optixLaunchParams;
 
-	extern "C" __global__ void __exception__all()
-	{
-		//const uint3 theLaunchDim     = optixGetLaunchDimensions(); 
-		const uint3 theLaunchIndex = optixGetLaunchIndex();
-		const int   theExceptionCode = optixGetExceptionCode();
-		const char* exceptionLineInfo = optixGetExceptionLineInfo();
+	//extern "C" __global__ void __exception__all()
+	//{
+	//	//const uint3 theLaunchDim     = optixGetLaunchDimensions(); 
+	//	const uint3 theLaunchIndex = optixGetLaunchIndex();
+	//	const int   theExceptionCode = optixGetExceptionCode();
+	//	const char* exceptionLineInfo = optixGetExceptionLineInfo();
 
-		printf("Optix Exception: \n"
-			"    Code: %d\n"
-			"    LineInfo: %s\n"
-			"    at launch Index (pixel): x = %u y = %u\n",
-			theExceptionCode, exceptionLineInfo, theLaunchIndex.x, theLaunchIndex.y);
+	//	printf("Optix Exception: \n"
+	//		"    Code: %d\n"
+	//		"    LineInfo: %s\n"
+	//		"    at launch Index (pixel): x = %u y = %u\n",
+	//		theExceptionCode, exceptionLineInfo, theLaunchIndex.x, theLaunchIndex.y);
 
-		// FIXME This only works for render strategies where the launch dimension matches the outputBuffer resolution.
-		//float4* buffer = reinterpret_cast<float4*>(sysData.outputBuffer);
-		//const unsigned int index = theLaunchIndex.y * theLaunchDim.x + theLaunchIndex.x;
+	//	// FIXME This only works for render strategies where the launch dimension matches the outputBuffer resolution.
+	//	//float4* buffer = reinterpret_cast<float4*>(sysData.outputBuffer);
+	//	//const unsigned int index = theLaunchIndex.y * theLaunchDim.x + theLaunchIndex.x;
 
-		//buffer[index] = make_float4(1000000.0f, 0.0f, 1000000.0f, 1.0f); // super magenta
-	}
+	//	//buffer[index] = make_float4(1000000.0f, 0.0f, 1000000.0f, 1.0f); // super magenta
+	//}
 
 	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	//////////////////////////////////////////// SHADOW TRACE //////////////////////////////////////////////////////////////
@@ -84,9 +81,9 @@ namespace vtx
 
 		for (int i = 0; i < samplesPerLaunch; i++)
 		{
-			twi.seed = tea<4>(fbIndex + i, optixLaunchParams.settings->iteration + *optixLaunchParams.frameID);
+			twi.seed = tea<4>(fbIndex + i, optixLaunchParams.settings->renderer.iteration + *optixLaunchParams.frameID);
 			generateCameraRay(fbIndex, &optixLaunchParams, twi);
-			for (int i = 0; i < optixLaunchParams.settings->maxBounces; i++)
+			for (int i = 0; i < optixLaunchParams.settings->renderer.maxBounces; i++)
 			{
 				elaborateRadianceTrace(twi, optixLaunchParams, A_FULL_OPTIX);
 				if(!twi.extendRay)

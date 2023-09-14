@@ -6,6 +6,8 @@
 #include "Scene/Nodes/RendererSettings.h"
 #include <curand_kernel.h>
 
+#include "Device/UploadCode/UploadData.h"
+
 namespace vtx
 {
 
@@ -97,8 +99,8 @@ namespace vtx
 					}
 					else
 					{
-						value = math::length<float>(buffer[ny * width + nx] - 0.0f);
-						diff = math::length<float>(buffer[ny * width + nx] - buffer[y * width + x]);
+						value = math::length(buffer[ny * width + nx] - 0.0f);
+						diff = math::length(buffer[ny * width + nx] - buffer[y * width + x]);
 						count++;
 					}
 					maxDiff = fmaxf(maxDiff, diff);  // Update maxDiff if this difference is larger
@@ -165,7 +167,7 @@ namespace vtx
 
 		curandState_t state;
 		const float noise = noiseBuffer[y * width + x].noiseAbsolute;
-		curand_init(x, y, (int)noise + params->settings->iteration, &state);
+		curand_init(x, y, (int)noise + params->settings->renderer.iteration, &state);
 		noiseBuffer[y * width + x].normalizedNoise = noise / (*noiseSum);
 		noiseBuffer[y * width + x].adaptiveSamples = 0;
 
@@ -208,7 +210,7 @@ namespace vtx
 
 		curandState_t state;
 		const float noise = noiseBuffer[y * width + x].noiseAbsolute;
-		curand_init(x, y, (int)noise + params->settings->iteration, &state);
+		curand_init(x, y, (int)noise + params->settings->renderer.iteration, &state);
 		noiseBuffer[y * width + x].normalizedNoise = noise / (*noiseSum);
 		noiseBuffer[y * width + x].adaptiveSamples = 0;
 
@@ -241,7 +243,7 @@ namespace vtx
 					value = luminance(inputBuffer[i]);
 					break;
 			case COLOR:
-					value = math::length<float>(inputBuffer[i] - math::vec3f(0.0f));
+					value = math::length(inputBuffer[i] - math::vec3f(0.0f));
 					break;
 			}
 
@@ -303,7 +305,7 @@ namespace vtx
 		atomicMaxFloat(&globalRange[0].y, range.y);
 	}
 
-	void noiseComputation(const LaunchParams* deviceParams, const graph::RendererSettings& settings, const int& rendererNodeId)
+	void noiseComputation(const LaunchParams* deviceParams, const int& rendererNodeId)
 	{
 
 		/*const CUDABuffer& tmRadianceBuffer = GET_BUFFER(device::Buffers::FrameBufferBuffers, rendererNodeId, tmRadiance);
@@ -370,7 +372,7 @@ namespace vtx
 			dim3 numBlocks((width + threadsPerBlock.x - 1) / threadsPerBlock.x,
 						   (height + threadsPerBlock.y - 1) / threadsPerBlock.y);
 
-			computeNoise<<<numBlocks, threadsPerBlock>>> (deviceParams, noiseSum, settings.noiseKernelSize, settings.albedoNormalNoiseInfluence);
+			computeNoise<<<numBlocks, threadsPerBlock>>> (deviceParams, noiseSum, deviceParams->settings->renderer.adaptiveSamplingSettings.noiseKernelSize, deviceParams->settings->renderer.adaptiveSamplingSettings.albedoNormalNoiseInfluence);
 		}
 
 		{

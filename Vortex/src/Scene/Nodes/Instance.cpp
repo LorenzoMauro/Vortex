@@ -1,6 +1,7 @@
 #include "Instance.h"
 #include "Scene/Traversal.h"
 #include "Mesh.h"
+#include "MeshLight.h"
 #include "Scene/SIM.h"
 
 namespace vtx::graph
@@ -8,33 +9,13 @@ namespace vtx::graph
 	Instance::Instance() : Node(NT_INSTANCE)
 	{
 		transform = ops::createNode<Transform>();
+		child = nullptr;
 	}
 
-	void Instance::traverse(const std::vector<std::shared_ptr<NodeVisitor>>& orderedVisitors)
+	void Instance::accept(NodeVisitor& visitor)
 	{
-
-		transform->traverse(orderedVisitors);
-		child->traverse(orderedVisitors);
-		for (auto& materialSlot : materialSlots) {
-			materialSlot.material->traverse(orderedVisitors);
-
-			if(!materialSlot.isMeshLightEvaluated)
-			{
-				materialSlot.meshLight->attributes->init();
-				materialSlot.isMeshLightEvaluated = true;
-			}
-			if(materialSlot.meshLight->attributes->isValid )
-			{
-				materialSlot.meshLight->traverse(orderedVisitors);
-			}
-		}
-		ACCEPT(Instance,orderedVisitors);
+		visitor.visit(as<Instance>());
 	}
-
-	/*void Instance::accept(std::shared_ptr<NodeVisitor> visitor)
-	{
-		visitor->visit(sharedFromBase<Instance>());
-	}*/
 
 	std::shared_ptr<Node> Instance::getChild() {
 		return child;
@@ -46,15 +27,14 @@ namespace vtx::graph
 				clearMeshLights();
 			}
 		}
-		child = _child;
+		child = _child ;
 		if (child->getType() == NT_MESH)
 		{
 			childIsMesh = true;
-			for (auto& [slotIndex, material, meshLight, isMeshLightEvaluated] : materialSlots)
+			for (auto& [material, slotIndex, meshLight] : materialSlots)
 			{
-				const auto& attributes = std::dynamic_pointer_cast<MeshLightAttributes>(meshLight->attributes);
-				attributes->mesh = std::dynamic_pointer_cast<Mesh>(child);
-				isMeshLightEvaluated = false;
+				meshLight->mesh = child->as<Mesh>();
+				meshLight->isInitialized = false;
 			}
 		}
 		else
@@ -63,104 +43,102 @@ namespace vtx::graph
 		}
 	}
 
-	std::shared_ptr<Transform> Instance::getTransform() {
-		return transform;
-	}
-
-	void Instance::setTransform(std::shared_ptr<Transform>& _transform) {
-		transform = _transform;
-	}
-
 	void Instance::addMaterial(const std::shared_ptr<Material>& _material, const int slot) {
 
-		MaterialSlot* matSlot;
-		if(slot <= materialSlots.size()-1 && slot!= -1)
+		MaterialSlot* materialSlot;
+		if(slot <= materialSlots.size() - 1 && slot != -1)
 		{
 			const vtxID matId = materialSlots[slot].material->getID();
 			removeMaterial(matId);
-			matSlot = &materialSlots[slot];
+			materialSlot = &materialSlots[slot];
 		}
 		else
 		{
 			materialSlots.emplace_back();
-			matSlot = &materialSlots.back();
+			materialSlot = &materialSlots.back();
 		}
-
-		matSlot->material = _material;
-		matSlot->meshLight = ops::createNode<graph::Light>();
-		matSlot->isMeshLightEvaluated = false;
-		const auto attributes = std::make_shared<graph::MeshLightAttributes>();
-		attributes->material = matSlot->material;
-		attributes->materialRelativeIndex = materialSlots.size() - 1;
-		attributes->parentInstanceId = getID();
-
-		SIM::record(matSlot->meshLight);
+		materialSlot->material = _material;
+		materialSlot->meshLight = ops::createNode<graph::MeshLight>();
+		materialSlot->meshLight->material = materialSlot->material;
+		materialSlot->meshLight->materialRelativeIndex = materialSlots.size() - 1;
+		materialSlot->meshLight->parentInstanceId = getID();
 
 		if (childIsMesh)
 		{
-			attributes->mesh = std::dynamic_pointer_cast<graph::Mesh>(getChild());
+			materialSlot->meshLight->mesh = std::dynamic_pointer_cast<graph::Mesh>(getChild());
 		}
-		matSlot->meshLight->attributes = attributes;
 	} 
 
 	void Instance::removeMaterial(const vtxID matID) {
 
-		//clearMeshLight(matID);
-
-		for (auto& [slotIndex, material, meshLight, isMeshLightEvaluated] : materialSlots)
+		// Remove Related Material Slot
+		for(int i = 0; i < materialSlots.size(); i++)
 		{
-			if (material->getID() == matID)
+			if (materialSlots[i].material->getID() == matID)
 			{
-				material = nullptr;
-				SIM::releaseIndex(meshLight->getID());
-				meshLight            = nullptr;
-				isMeshLightEvaluated = true;
+				materialSlots[i].material = nullptr;
+				SIM::releaseIndex(materialSlots[i].meshLight->getID());
+				materialSlots[i].meshLight = nullptr;
+
+				materialSlots.erase(materialSlots.begin() + i);
 				break;
 			}
 		}
 	}
 
-	std::vector<std::shared_ptr<Material>>& Instance::getMaterials() {
+	std::vector<std::shared_ptr<Material>> Instance::getMaterials() {
 		std::vector<std::shared_ptr<Material>> materials;
-		for(auto it: materialSlots)
+		for(const auto& it: materialSlots)
 		{
 			materials.push_back(it.material);
 		}
 		return materials;
 	}
 
-	void Instance::clearMeshLights()
+	void Instance::clearMeshLights() const
 	{
 		for (auto it : materialSlots)
 		{
 			SIM::releaseIndex(it.meshLight->getID());
 			it.meshLight = nullptr;
-			it.isMeshLightEvaluated = true;
 		}
 	}
 
-	void Instance::clearMeshLight(const vtxID matID)
+	void Instance::clearMeshLight(const vtxID matID) const
 	{
 		for (auto it : materialSlots)
 		{
-			if(it.material->getID()==matID)
+			if(it.material->getID() == matID)
 			{
 				SIM::releaseIndex(it.meshLight->getID());
 				it.meshLight = nullptr;
-				it.isMeshLightEvaluated = true;
 			}
 		}
 	}
 
-	std::shared_ptr<graph::Light> Instance::getMeshLight(vtxID materialID)
+	std::shared_ptr<graph::MeshLight> Instance::getMeshLight(const vtxID materialId) const
 	{
-		for (auto it : materialSlots)
+		for (auto& it : materialSlots)
 		{
-			if (it.material->getID() == materialID)
+			if (it.material->getID() == materialId)
 			{
 				return it.meshLight;
 			}
 		}
+		return nullptr;
+	}
+
+	std::vector<std::shared_ptr<Node>> Instance::getChildren() const
+	{
+		std::vector<std::shared_ptr<Node>> children;
+		children.push_back(transform);
+		children.push_back(child);
+		for (auto& materialSlot : materialSlots)
+		{
+			children.push_back(materialSlot.material);
+			children.push_back(materialSlot.meshLight);
+		}
+		return children;
 	}
 
 	std::vector<MaterialSlot>& Instance::getMaterialSlots()
