@@ -1,6 +1,6 @@
 ﻿#pragma once
 #include <memory>
-#include "Layers/GuiLayer.h"
+#include "Gui/GuiWindow.h"
 #include "NeuralNetworks/Experiment.h"
 
 namespace vtx {
@@ -9,18 +9,15 @@ namespace vtx {
 		class Renderer;
 	}
 
-	class ExperimentsLayer : public Layer {
+	class ExperimentsWindow : public Window {
     public:
 
-        ExperimentsLayer();
-
-        virtual void OnAttach();
-
-        virtual void OnDetach();
+        ExperimentsWindow();
 
         virtual void OnUpdate(float ts);
 
-        virtual void OnUIRender();
+        virtual void renderMainContent() override;
+        virtual void renderToolBar() override;
 
         void startNewRender(SamplingTechnique technique);
 
@@ -44,5 +41,6 @@ namespace vtx {
 
         bool toggleMisExperiment = true;
         bool toggleBsdfExperiment = true;
+        float lossesContentPercentage = 0.75f;
     };
 };

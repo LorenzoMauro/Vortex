@@ -78,33 +78,34 @@ namespace vtx::gui
 	{
 		colorMap.requestedCount = 0;
 		const int numberOfPlots = plots.size();
-		int xNumberPlots = std::ceil(std::sqrt((float)numberOfPlots));
-		int yNumberPlots = std::ceil((float)numberOfPlots / xNumberPlots);
+		const int xNumberPlots  = std::ceil(std::sqrt((float)numberOfPlots));
+		const int yNumberPlots  = std::ceil((float)numberOfPlots / xNumberPlots);
 
 
-		ImGuiStyle& style = ImGui::GetStyle();
+		const ImGuiStyle& style = ImGui::GetStyle();
 		math::vec2f windowSize = math::vec2f(ImGui::GetContentRegionAvail().x, ImGui::GetContentRegionAvail().y);
 		math::vec2f itemSpacing = math::vec2f(style.ItemSpacing.x, style.ItemSpacing.y);
 		math::vec2f windowPadding = math::vec2f(style.WindowPadding.x, style.WindowPadding.y);
 
-		math::vec2f quadrantSize = math::vec2f(windowSize) / math::vec2f(xNumberPlots, yNumberPlots) - itemSpacing * math::vec2f(xNumberPlots - 1, yNumberPlots - 1); //- windowPadding 
+		const math::vec2f availableSpace = windowSize - windowPadding * 2.0f - itemSpacing * math::vec2f((float)xNumberPlots - 1.0f, (float)yNumberPlots - 1.0f);
+		const math::vec2f quadrantSize = availableSpace / math::vec2f(xNumberPlots, yNumberPlots);
 
 		//VTX_INFO("Window Size: {}-{}\n Item Spacing: {}-{}\n Window Padding: {}-{}\n Quadrant Size: {}-{}\n", windowSize.x, windowSize.y, itemSpacing.x, itemSpacing.y, windowPadding.x, windowPadding.y, quadrantSize.x, quadrantSize.y);
 
 		for (int y = 0; y < yNumberPlots; y++) {
 			for (int x = 0; x < xNumberPlots; x++) {
-				int index = x + y * xNumberPlots;
+				const int index = x + y * xNumberPlots;
 
 				if (index < numberOfPlots) // make sure index is within the bounds
 				{
 					math::vec2f actualSize = quadrantSize;
 					if (index == numberOfPlots - 1) // if last plot
 					{
-						int remainingXSpaces = xNumberPlots - (x + 1);
-						int remainingYSpaces = yNumberPlots - (y + 1);
+						const int remainingXSpaces = xNumberPlots - (x + 1);
+						const int remainingYSpaces = yNumberPlots - (y + 1);
 
-						actualSize.x += (float)remainingXSpaces * (quadrantSize.x + itemSpacing.x);
-						actualSize.y += (float)remainingYSpaces * (quadrantSize.y + itemSpacing.y);
+						actualSize.x += (float)remainingXSpaces * (quadrantSize.x);// + itemSpacing.x);
+						actualSize.y += (float)remainingYSpaces * (quadrantSize.y);// + itemSpacing.y);
 
 						//VTX_INFO("Remaining X Spaces: {}\n Remaining Y Spaces: {}\n Quadrant Size = {}-{}", remainingXSpaces, remainingYSpaces, quadrantSize.x, quadrantSize.y);
 					}

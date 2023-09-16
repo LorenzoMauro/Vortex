@@ -11,7 +11,6 @@ namespace vtx::gui {
 
 		bool updated = false;
 		ImGui::PushID(cameraNode->getID());
-		ImGui::SetNextItemOpen(true, ImGuiCond_Once);
 		if (ImGui::CollapsingHeader("Camera"))
 		{
 			ImGui::Indent();

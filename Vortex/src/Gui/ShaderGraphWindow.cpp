@@ -1,4 +1,4 @@
-﻿#include "MaterialEditorLayer.h"
+﻿#include "ShaderGraphWindow.h"
 
 #include "imgui.h"
 #include "GuiElements/MaterialNodeGui.h"
@@ -7,22 +7,12 @@
 static auto materialNodeEditorContext = ImNodes::EditorContextCreate();
 
 namespace vtx {
-    MaterialEditorLayer::MaterialEditorLayer()
+    ShaderGraphWindow::ShaderGraphWindow()
     {
         materialGui = gui::MaterialGui();
-    }
-
-    void MaterialEditorLayer::OnAttach()
-    {
-    }
-
-    void MaterialEditorLayer::OnDetach()
-    {
-    }
-
-    void MaterialEditorLayer::OnUpdate(float ts)
-    {
-        //graph::computeMaterialsMultiThreadCode();
+        name = "Shader Graph";
+        useToolbar = false;
+        isBorderLess = true;
     }
 
     void ImNodesStyleEditor()
@@ -56,9 +46,7 @@ namespace vtx {
         ImGui::CheckboxFlags("GridSnapping", reinterpret_cast<unsigned int*>(&style.Flags), ImNodesStyleFlags_GridSnapping);
     }
 
-    void MaterialEditorLayer::OnUIRender() {
-
-        ImGui::Begin("node editor");
+    void ShaderGraphWindow::renderMainContent() {
 
         //ImNodesStyleEditor();
         materialGui.materialSelector();
@@ -66,7 +54,5 @@ namespace vtx {
         ImNodes::BeginNodeEditor();
         materialGui.materialNodeEditorGui(materialGui.selectedMaterialId);
         ImNodes::EndNodeEditor();
-
-        ImGui::End();
     }
 }

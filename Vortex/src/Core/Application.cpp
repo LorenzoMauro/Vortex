@@ -4,9 +4,13 @@
 #include "ImGuiOp.h"
 #include "Device/OptixWrapper.h"
 #include "Device/PipelineConfiguration.h"
-#include "Layers/MaterialEditorLayer.h"
-#include "Layers/ViewportLayer.h"
-#include "Layers/ExperimentsLayer.h"
+#include "Gui/AppWindow.h"
+#include "Gui/ShaderGraphWindow.h"
+#include "Gui/ViewportWindow.h"
+#include "Gui/ExperimentsWindow.h"
+#include "Gui/SceneHierarchyWindow.h"
+#include "Gui/GraphWindow.h"
+#include "Gui/PropertiesWindow.h"
 
 namespace vtx
 {
@@ -18,26 +22,29 @@ namespace vtx
 
 	void Application::init() {
 		initWindow();
-		Input::SetWindowHandle(window);
-		Init_ImGui(window);
+		Input::SetWindowHandle(glfwWindow);
+		Init_ImGui(glfwWindow);
 
 		optix::init();
 		pipelineConfiguration();
 		mdl::init();
-
-		createLayer<AppLayer>();
+		windowManager = std::make_shared<WindowManager>();
+		windowManager->createWindow<AppWindow>();
 
 		ops::startUpOperations();
-		graph::Scene::getScene()->renderer->setWindow(window);
-		createLayer<MaterialEditorLayer>();
-		createLayer<ViewportLayer>();
-		createLayer<ExperimentsLayer>();
+		graph::Scene::getScene()->renderer->setWindow(glfwWindow);
+		windowManager->createWindow<SceneHierarchyWindow>();
+		windowManager->createWindow<ViewportWindow>();
+		windowManager->createWindow<PropertiesWindow>();
+		windowManager->createWindow<GraphWindow>();
+		windowManager->createWindow<ShaderGraphWindow>();
+		windowManager->createWindow<ExperimentsWindow>();
 	}
 
 	void Application::shutDown() {
 		//Last run!
 		shutDownOperations();
-		glfwDestroyWindow(window);
+		glfwDestroyWindow(glfwWindow);
 		glfwTerminate();
 		VTX_INFO("GLFW DESTROYED");
 	}
@@ -73,16 +80,16 @@ namespace vtx
 		getOptions()->width = mode->width;
 		getOptions()->height = mode->height;
 
-		window = glfwCreateWindow(getOptions()->width, getOptions()->height, getOptions()->windowName.c_str(), nullptr, nullptr);
-		glfwMakeContextCurrent(window);
+		glfwWindow = glfwCreateWindow(getOptions()->width, getOptions()->height, getOptions()->windowName.c_str(), nullptr, nullptr);
+		glfwMakeContextCurrent(glfwWindow);
 		if (!gladLoadGLLoader(reinterpret_cast<GLADloadproc>(glfwGetProcAddress)))
 		{
 			VTX_ERROR("Failed to create GLFW window");
 		}
 		glfwSwapInterval(0); // Enable vsync
 		// Initialize the window
-		glfwSetWindowUserPointer(window, this);
-		glfwSetScrollCallback(window, 
+		glfwSetWindowUserPointer(glfwWindow, this);
+		glfwSetScrollCallback(glfwWindow, 
 			[](GLFWwindow* window, double xOffset, double yOffset)
 			{
 				ImGuiIO& io = ImGui::GetIO();
@@ -95,29 +102,20 @@ namespace vtx
 
 	void Application::run() {
 		glfwPollEvents();
-		//////////////////////////
-		for (auto& layer : layerStack)
-			layer->OnUpdate(timeStep);
+		windowManager->updateWindows(timeStep);
 
-		int layerCount = layerStack.size();
-		if(!isWindowMinimized(window))
+		if(!isWindowMinimized(glfwWindow))
 		{
 			ImGuiRenderStart();
-			for (int i = 0; i < layerCount; i++) {
-				auto& layer = layerStack[i];
-				layer->OnUIRender();
-				layerCount = layerStack.size();
-			}
-			ImGuiDraw(window);
-			glfwSwapBuffers(window);
+			windowManager->renderWindows();
+			ImGuiDraw(glfwWindow);
+			glfwSwapBuffers(glfwWindow);
 		}
-		
-
-		auto time = static_cast<float>(glfwGetTime());
+		windowManager->removeClosedWindows();
+		const auto time = static_cast<float>(glfwGetTime());
 		frameTime = time - lastFrameTime;
 		timeStep = std::min(frameTime, 0.0333f);
 		lastFrameTime = time;
-
 	}
 }
 

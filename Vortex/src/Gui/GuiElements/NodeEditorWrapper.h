@@ -184,11 +184,9 @@ namespace vtx::gui
 			}
 		}
 
-
-
 		void draw()
 		{
-			ImGui::Begin("Scene Graph");
+			//ImGui::Begin("Scene Graph");
 			ImNodes::EditorContextSet(sceneGraphContext);
 			ImNodes::BeginNodeEditor();
 			ImNodes::PushAttributeFlag(ImNodesStyleFlags_VerticalLayout);
@@ -210,29 +208,16 @@ namespace vtx::gui
 			
 			ImNodes::EndNodeEditor();
 			ImNodes::PopAttributeFlag();
-			ImGui::End();
 
-			ImGui::Begin("Settings");
-
-			int numberOfSelectedNodes = ImNodes::NumSelectedNodes();
-			std::vector<int> selectedNodes;
+			const int numberOfSelectedNodes = ImNodes::NumSelectedNodes();
 			if (numberOfSelectedNodes!=0)
 			{
 				selectedNodes.resize(numberOfSelectedNodes);
 				ImNodes::GetSelectedNodes(selectedNodes.data());
-
-				for (int idx : selectedNodes)
-				{
-					vtxID nodeId = idx;
-
-					std::shared_ptr<graph::Node> node = nodes[nodeId].node;
-
-					ImGui::TextUnformatted(node->name.c_str());
-					ImGui::Separator();
-					ImGui::TextUnformatted(graph::nodeNames[node->getType()].c_str());
-
-					node->accept(guiVisitor);
-				}
+			}
+			else
+			{
+				selectedNodes.clear();
 			}
 
 			//if(ImNodes::IsEditorHovered())
@@ -253,7 +238,7 @@ namespace vtx::gui
 			//	}
 			//}
 
-			ImGui::End();
+			//ImGui::End();
 
 		}
         std::map<vtxID, NodeInfo>    nodes;
@@ -261,8 +246,7 @@ namespace vtx::gui
 		int spacing = 40;
 		std::vector<vtxID> depthFirstTraversal;
 		bool isFirstTime = true;
-
-		GuiVisitor guiVisitor;
+		std::vector<int> selectedNodes;
     };
 
     void arrangeNodes(std::map<vtxID, NodeInfo>& nodeInfoMap, bool remapPosition = true);

@@ -162,11 +162,10 @@ namespace vtx::gui
 
 	static SceneGraphVisitor visitor = SceneGraphVisitor();
 
-	void SceneGraphGui::draw()
+	std::vector<int> SceneGraphGui::draw(const std::shared_ptr<graph::Renderer>& renderer)
 	{
-		std::shared_ptr<graph::Scene>      scene    = graph::Scene::getScene();
-		std::shared_ptr<graph::Renderer>   renderer = scene->renderer;
 		renderer->traverse(visitor);
 		visitor.nodeGraphUi.draw();
+		return visitor.nodeGraphUi.selectedNodes;
 	}
 }

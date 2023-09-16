@@ -2,7 +2,7 @@
 
 #include "CameraNodeGui.h"
 #include "TransformNodeGui.h"
-#include "Layers/GuiElements/RendererNodeGui.h"
+#include "Gui/GuiElements/RendererNodeGui.h"
 #include "Scene/Graph.h"
 
 namespace vtx::gui
@@ -13,6 +13,7 @@ namespace vtx::gui
 		const std::vector<std::shared_ptr<graph::Node>> children = node->getChildren();
 		if (!children.empty())
 		{
+			ImGui::PushID(node->getID());
 			if (ImGui::CollapsingHeader("Node Children"))
 			{
 				ImGui::Indent();
@@ -22,6 +23,7 @@ namespace vtx::gui
 				}
 				ImGui::Unindent();
 			}
+			ImGui::PopID();
 		}
 		
 		

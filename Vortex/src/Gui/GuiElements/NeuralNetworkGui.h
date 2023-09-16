@@ -1,5 +1,7 @@
 ﻿#pragma once
 #include <string>
+
+#include "PlottingWrapper.h"
 #include "NeuralNetworks/NetworkSettings.h"
 
 namespace vtx
@@ -65,16 +67,14 @@ namespace vtx::gui
 	///////////////////// Plots /////////////////////////////////////////
 	/////////////////////////////////////////////////////////////////////
 
-	void ngpPlots(network::GraphsData& graphsData, const network::DistributionType& dt);
+	std::vector<PlotInfo> ngpPlots(network::GraphsData& graphsData, const network::DistributionType& dt);
 
-	void sacPlots(network::GraphsData& graphsData);
+	std::vector<PlotInfo> sacPlots(network::GraphsData& graphsData);
 
 	/////////////////////////////////////////////////////////////////////
 	///////////////////// Network Editor ////////////////////////////////
 	/////////////////////////////////////////////////////////////////////
 
 
-	//void neuralNetworkGui(vtx::network::Network& network);
-
-	void neuralNetworkPlotWindow(network::Network& network);
+	std::vector<PlotInfo> neuralNetworkPlots(network::Network& network);
 }

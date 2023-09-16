@@ -66,7 +66,7 @@ namespace vtx {
 		options.rendererSettings.toneMapperSettings.invGamma = 1.0f / 2.2f;
 		options.rendererSettings.toneMapperSettings.isUpdated = false;
 
-		options.wavefrontSettings.active = false;
+		options.wavefrontSettings.active = true;
 		options.wavefrontSettings.fitWavefront = false;
 		options.wavefrontSettings.optixShade = false;
 		options.wavefrontSettings.parallelShade = false;

@@ -1,4 +1,4 @@
-#include "ExperimentsLayer.h"
+#include "ExperimentsWindow.h"
 
 #include "Core/CustomImGui/CustomImGui.h"
 #include "Device/CudaFunctions/cudaFunctions.h"
@@ -6,29 +6,23 @@
 #include "GuiElements/PlottingWrapper.h"
 #include "Scene/Nodes/Renderer.h"
 #include "ImGuiFileDialog.h"
+#include "GuiElements/NeuralNetworkGui.h"
 #include "Scene/Scene.h"
 #include "Serialization/Serializer.h"
 
 namespace vtx
 {
-	ExperimentsLayer::ExperimentsLayer()
+	ExperimentsWindow::ExperimentsWindow()
 	{
 		std::shared_ptr<graph::Scene> scene = graph::Scene::getScene();
 		renderer = scene->renderer;
-	}
-	void ExperimentsLayer::OnAttach()
-	{
 		network = &renderer->waveFrontIntegrator.network;
 		em = &network->experimentManager;
+		name = "Neural Path Guiding Experiments";
 	}
 
-	void ExperimentsLayer::OnDetach()
+	void ExperimentsWindow::OnUpdate(float ts)
 	{
-	}
-
-	void ExperimentsLayer::OnUpdate(float ts)
-	{
-
 		switch (em->stage)
 		{
 		case STAGE_REFERENCE_GENERATION:
@@ -45,21 +39,13 @@ namespace vtx
 			break;
 		}
 	}
-
-	void ExperimentsLayer::OnUIRender()
+	void ExperimentsWindow::renderMainContent()
 	{
-		ImGui::Begin("Experiment");
-
-		const float availableWidth = ImGui::GetContentRegionAvail().x;
-		const float plotWidth = availableWidth * 0.7f; // 75% for the plot
-		const float settingsWidth = availableWidth * 0.3f; // 25% for the settings
-
-		ImGui::BeginChild("Experiment Plot Child", ImVec2(plotWidth, 0), true);
-
 		gui::PlotInfo MapePlot;
 		MapePlot.title = "Mape";
 		MapePlot.xLabel = "samples";
 		MapePlot.yLabel = "Mape";
+
 		for (auto& experiment : em->experiments)
 		{
 			if (experiment.rendererSettings.samplingTechnique == S_MIS && !toggleMisExperiment)
@@ -76,17 +62,40 @@ namespace vtx
 			}
 		}
 
-		gui::gridPlot({ MapePlot });
+		std::vector<gui::PlotInfo> neuralNetworkPlots = gui::neuralNetworkPlots(renderer->waveFrontIntegrator.network);
+		if (!neuralNetworkPlots.empty())
+		{
+			const float totalAvailableHeight = ImGui::GetContentRegionAvail().y - resizerSize - ImGui::GetStyle().ItemSpacing.y * 3.0f;// -childPaddingHeight;
+			const float MapePlotHeight = totalAvailableHeight * (1.0f - lossesContentPercentage);
+			const float LossesPlotHeight = totalAvailableHeight * lossesContentPercentage;
 
-		ImGui::EndChild();
+			const float plotsWindowWidth = ImGui::GetContentRegionAvail().x;
+			// First child window
+			ImGui::BeginChild("Child1", ImVec2(plotsWindowWidth, MapePlotHeight), false);
+			{
+				gui::gridPlot({ MapePlot });
+			}
+			ImGui::EndChild();
+
+			// Resizing handle
+			vtxImGui::childWindowResizerButton(lossesContentPercentage, resizerSize, false);
+
+			// Second child window
+			ImGui::BeginChild("Child2", ImVec2(plotsWindowWidth, LossesPlotHeight), false);
+			{
+				gui::gridPlot(neuralNetworkPlots);
+			}
+			ImGui::EndChild();
+		}
+		else
+		{
+			gui::gridPlot({ MapePlot });
+		}
+	}
 
 
-		ImGui::SameLine();  // Position the next child window on the same line to the right
-
-
-		ImGui::BeginChild("Settings Child", ImVec2(settingsWidth, 0), true);
-		ImGui::PushItemWidth(settingsWidth);
-
+	void ExperimentsWindow::renderToolBar()
+	{
 		auto stageName = experimentStageNames[em->stage];
 		vtxImGui::halfSpaceWidget("Stage", vtxImGui::booleanText, "%s", stageName.c_str());
 
@@ -99,7 +108,6 @@ namespace vtx
 
 		const float halfItemWidth = ImGui::CalcItemWidth() * 0.5f;
 		ImVec2 buttonSize = ImVec2(halfItemWidth, 0);
-		//ImGui::PushItemWidth(halfItemWidth);
 
 		if (ImGui::Button("Generate Ground Truth", buttonSize))
 		{
@@ -191,7 +199,7 @@ namespace vtx
 
 		std::vector<int> toRemove;
 		int i = -1;
-		for(auto& experiment : em->experiments)
+		for (auto& experiment : em->experiments)
 		{
 			i++;
 			if (experiment.rendererSettings.samplingTechnique == S_MIS && !toggleMisExperiment)
@@ -229,13 +237,9 @@ namespace vtx
 			em->experiments.erase(em->experiments.begin() + i);
 			em->currentExperiment = std::min(0, em->currentExperiment - 1);
 		}
-
-		ImGui::EndChild();
-
-		ImGui::End();
 	}
 
-	void ExperimentsLayer::startNewRender(SamplingTechnique technique)
+	void ExperimentsWindow::startNewRender(SamplingTechnique technique)
 	{
 		renderer->settings.samplingTechnique = technique;
 		renderer->settings.iteration = -1;
@@ -253,7 +257,7 @@ namespace vtx
 
 	}
 
-	void ExperimentsLayer::mapeComputation()
+	void ExperimentsWindow::mapeComputation()
 	{
 		if (em->currentExperiment >= em->experiments.size())
 		{
@@ -311,7 +315,7 @@ namespace vtx
 		}
 		em->currentExperimentStep++;
 	}
-	void ExperimentsLayer::generateGroundTruth()
+	void ExperimentsWindow::generateGroundTruth()
 	{
 		if (em->currentExperimentStep == 0)
 		{
@@ -330,7 +334,7 @@ namespace vtx
 		}
 		em->currentExperimentStep++;
 	}
-	void ExperimentsLayer::runCurrentSettingsExperiment()
+	void ExperimentsWindow::runCurrentSettingsExperiment()
 	{
 		em->experiments.emplace_back();
 
@@ -345,7 +349,7 @@ namespace vtx
 		em->stage = STAGE_MAPE_COMPUTATION;
 	}
 
-	void ExperimentsLayer::stopExperiment()
+	void ExperimentsWindow::stopExperiment()
 	{
 		// HACK
 		if (em->stage == STAGE_REFERENCE_GENERATION)
@@ -358,7 +362,7 @@ namespace vtx
 		renderer->camera->lockCamera = false;
 	}
 
-	void ExperimentsLayer::storeGroundTruth()
+	void ExperimentsWindow::storeGroundTruth()
 	{
 		const size_t imageSize = (size_t)em->width * (size_t)em->height * sizeof(math::vec3f);
 

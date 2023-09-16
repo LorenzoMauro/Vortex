@@ -56,7 +56,7 @@ namespace vtx::gui
 	class SceneGraphGui
 	{
 	public:
-		static void draw();
+		static std::vector<int> draw(const std::shared_ptr<graph::Renderer>& renderer);
 	};
 
 

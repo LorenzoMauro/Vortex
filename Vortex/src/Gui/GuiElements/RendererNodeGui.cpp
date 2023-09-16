@@ -266,66 +266,77 @@ namespace vtx::gui
 
 	void rendererNodeGui(const std::shared_ptr<graph::Renderer>& renderNode)
     {
-		bool restartRendering = false;
 
 		const float availableWidth = ImGui::GetContentRegionAvail().x;
-
-		ImGui::PushItemWidth(availableWidth); // Set the width of the next widget to 200
-
-		restartRendering |= rendererSettingsEditorGui(renderNode->settings);
-
-		ImGui::Separator();
-
-		restartRendering |= wavefrontSettingsEditorGui(renderNode->waveFrontIntegrator.settings);
-
-		ImGui::Separator();
-
-		restartRendering |= adaptiveSettingsEditorGui(renderNode->settings.adaptiveSamplingSettings);
-
-		ImGui::Separator();
-
-		networkSettingsEditorGui(renderNode->waveFrontIntegrator.network.settings);
-
-		ImGui::Separator();
-
-		postProcessingSettingsEditorGui(renderNode->settings);
-
-		ImGui::Separator();
-
-		statisticsDisplayGui(renderNode);
-        
-		ImGui::PopItemWidth();
-
-
-
-		if(renderNode->waveFrontIntegrator.settings.active)
+		if (ImGui::CollapsingHeader("Renderer"))
 		{
-			if (renderNode->waveFrontIntegrator.network.settings.active)
+
+			ImGui::Indent();
+			ImGui::PushItemWidth(availableWidth);
+			vtxImGui::halfSpaceWidget("Node Id", ImGui::Text, std::to_string(renderNode->getID()).c_str());
+			ImGui::Separator();
+
+			bool restartRendering = false;
+
+			const float availableWidth = ImGui::GetContentRegionAvail().x;
+
+			ImGui::PushItemWidth(availableWidth); // Set the width of the next widget to 200
+
+			restartRendering |= rendererSettingsEditorGui(renderNode->settings);
+
+			ImGui::Separator();
+
+			restartRendering |= wavefrontSettingsEditorGui(renderNode->waveFrontIntegrator.settings);
+
+			ImGui::Separator();
+
+			restartRendering |= adaptiveSettingsEditorGui(renderNode->settings.adaptiveSamplingSettings);
+
+			ImGui::Separator();
+
+			networkSettingsEditorGui(renderNode->waveFrontIntegrator.network.settings);
+
+			ImGui::Separator();
+
+			postProcessingSettingsEditorGui(renderNode->settings);
+
+			ImGui::Separator();
+
+			statisticsDisplayGui(renderNode);
+
+			ImGui::PopItemWidth();
+
+
+
+			if (renderNode->waveFrontIntegrator.settings.active)
 			{
-				neuralNetworkPlotWindow(renderNode->waveFrontIntegrator.network);
-				if (renderNode->waveFrontIntegrator.network.settings.isUpdated)
+				if (renderNode->waveFrontIntegrator.network.settings.active)
 				{
-					renderNode->waveFrontIntegrator.network.reset();
-					restartRendering = true;
+					if (renderNode->waveFrontIntegrator.network.settings.isUpdated)
+					{
+						renderNode->waveFrontIntegrator.network.reset();
+						restartRendering = true;
+					}
 				}
 			}
-		}
-		else
-		{
-			renderNode->waveFrontIntegrator.network.settings.active = false;
+			else
+			{
+				renderNode->waveFrontIntegrator.network.settings.active = false;
+			}
+
+
+			if (renderNode->waveFrontIntegrator.network.settings.isAnyUpdated())
+			{
+				restartRendering = true;
+			}
+
+			if (restartRendering)
+			{
+				renderNode->settings.iteration = -1;
+			}
+
 		}
 		
-
-		if(renderNode->waveFrontIntegrator.network.settings.isAnyUpdated())
-		{
-			restartRendering = true;
-		}
-
-		if(restartRendering)
-		{
-			renderNode->settings.iteration = -1;
-		}
-
     }
 }
 

@@ -96,12 +96,7 @@ namespace vtx {
 
         ImGui::StyleColorsDark();
         // When viewports are enabled we tweak WindowRounding/WindowBg so platform windows can look identical to regular ones.
-        ImGuiStyle& style = ImGui::GetStyle();
-        if (io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable)
-        {
-            style.WindowRounding = 0.0f;
-            style.Colors[ImGuiCol_WindowBg].w = 1.0f;
-        }
+       
 
         // Send Vulkan Info to ImGui
         ImGui_ImplGlfw_InitForOpenGL(window, true);
@@ -114,6 +109,12 @@ namespace vtx {
         ImGui::LoadIniSettingsFromDisk(utl::absolutePath(getOptions()->imGuiIniFile).data());
 
         SetAppStyle();
+        ImGuiStyle& style = ImGui::GetStyle();
+        if (io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable)
+        {
+            style.WindowRounding = 0.0f;
+            style.Colors[ImGuiCol_WindowBg].w = 1.0f;
+        }
     }
 
     uint32_t vec4toImCol32(ImVec4 color)
@@ -122,22 +123,33 @@ namespace vtx {
     }
     void SetAppStyle() {
 
-        const ImVec4 darkGrey = ImVec4(0.12f, 0.12f, 0.12f, 1.00f);
-        const ImVec4 lightGrey = ImVec4(0.29f, 0.29f, 0.29f, 0.54f);
-        const ImVec4 orange = ImVec4(0.88f, 0.50f, 0.24f, 1.00f);
-        const ImVec4 orangeHovered = ImVec4(0.98f, 0.55f, 0.26f, 1.00f);
-        const ImVec4 orangeActive = ImVec4(0.98f, 0.43f, 0.06f, 1.00f);
+        const ImVec4 darkGrey = ImVec4(0.15f, 0.15f, 0.15f, 1.00f);
+        const ImVec4 lightGrey = ImVec4(0.2f, 0.2f, 0.2f, 1.0f);
         const ImVec4 transparent = ImVec4(0.0f, 0.0f, 0.0f, 0.0f);
-        const ImVec4 tabColor = darkGrey;
+        //const ImVec4 tabColor = darkGrey;
         const ImVec4 transparentGrey = ImVec4(0.26f, 0.26f, 0.26f, 0.50f);
+        const ImVec4 unifiedVeryDark = ImVec4(0.09f, 0.09f, 0.09f, 1.00f);
+
+
+        const ImVec4 orange = ImVec4(0.88f, 0.50f, 0.24f, 1.00f);
+        const ImVec4 orangeTownDown = ImVec4(0.98f, 0.55f, 0.26f, 1.00f);
+        const ImVec4 orangeActive = ImVec4(0.98f, 0.43f, 0.06f, 1.00f);
+
+        const ImVec4 coolColor = ImVec4(0.5f, 0.5f, 0.5f, 1.00f);
+        const ImVec4 coolColorTonedDown = ImVec4(0.4f, 0.4f, 0.4f, 1.00f);
+        const ImVec4 coolColorActive = ImVec4(0.55f, 0.55f, 0.55f, 1.00f);
+
+
+        const ImVec4 accent = coolColor;
+        const ImVec4 accentTownDown = coolColorTonedDown;
+        const ImVec4 accentStrong = coolColorActive;
 
         ImVec4* colors = ImGui::GetStyle().Colors;
         colors[ImGuiCol_Text] = ImVec4(0.94f, 0.94f, 0.94f, 1.00f);
         colors[ImGuiCol_TextDisabled] = ImVec4(0.50f, 0.50f, 0.50f, 1.00f);
-        colors[ImGuiCol_WindowBg] = darkGrey;
         colors[ImGuiCol_ChildBg] = darkGrey;
         colors[ImGuiCol_PopupBg] = darkGrey;
-        colors[ImGuiCol_Border] = ImVec4(0.31f, 0.30f, 0.30f, 0.50f);
+        colors[ImGuiCol_Border] = coolColorTonedDown;
         colors[ImGuiCol_BorderShadow] = transparent;
         colors[ImGuiCol_FrameBg] = lightGrey;
         colors[ImGuiCol_FrameBgHovered] = lightGrey;
@@ -145,17 +157,17 @@ namespace vtx {
         colors[ImGuiCol_TitleBg] = darkGrey;
         colors[ImGuiCol_TitleBgActive] = darkGrey;
         colors[ImGuiCol_TitleBgCollapsed] = darkGrey;
-        colors[ImGuiCol_MenuBarBg] = ImVec4(0.14f, 0.14f, 0.14f, 1.00f);
+        colors[ImGuiCol_MenuBarBg] = darkGrey;
         colors[ImGuiCol_ScrollbarBg] = ImVec4(0.02f, 0.02f, 0.02f, 0.53f);
         colors[ImGuiCol_ScrollbarGrab] = ImVec4(0.31f, 0.31f, 0.31f, 1.00f);
         colors[ImGuiCol_ScrollbarGrabHovered] = ImVec4(0.41f, 0.41f, 0.41f, 1.00f);
         colors[ImGuiCol_ScrollbarGrabActive] = ImVec4(0.51f, 0.51f, 0.51f, 1.00f);
         colors[ImGuiCol_CheckMark] = ImVec4(0.79f, 0.79f, 0.79f, 1.00f);
-        colors[ImGuiCol_SliderGrab] = orange;
-        colors[ImGuiCol_SliderGrabActive] = orangeHovered;
+        colors[ImGuiCol_SliderGrab] = accent;
+        colors[ImGuiCol_SliderGrabActive] = accentStrong;
         colors[ImGuiCol_Button] = lightGrey;
-        colors[ImGuiCol_ButtonHovered] = orangeHovered;
-        colors[ImGuiCol_ButtonActive] = orangeActive;
+        colors[ImGuiCol_ButtonHovered] = accentTownDown;
+        colors[ImGuiCol_ButtonActive] = accentStrong;
         colors[ImGuiCol_Header] = lightGrey;
         colors[ImGuiCol_HeaderHovered] = ImVec4(0.36f, 0.36f, 0.36f, 0.80f);
         colors[ImGuiCol_HeaderActive] = ImVec4(0.53f, 0.53f, 0.53f, 1.00f);
@@ -165,11 +177,10 @@ namespace vtx {
         colors[ImGuiCol_ResizeGrip] = ImVec4(0.88f, 0.00f, 1.00f, 0.20f);
         colors[ImGuiCol_ResizeGripHovered] = ImVec4(0.97f, 0.00f, 1.00f, 0.67f);
         colors[ImGuiCol_ResizeGripActive] = ImVec4(0.97f, 0.00f, 1.00f, 0.95f);
-        colors[ImGuiCol_Tab] = tabColor;
-        colors[ImGuiCol_TabHovered] = ImVec4(0.74f, 0.35f, 0.09f, 1.00f);
-        colors[ImGuiCol_TabActive] = ImVec4(0.74f, 0.35f, 0.09f, 1.00f);
-        colors[ImGuiCol_TabUnfocused] = tabColor;
-        colors[ImGuiCol_TabUnfocusedActive] = tabColor;
+        colors[ImGuiCol_Tab] = darkGrey;
+        colors[ImGuiCol_TabHovered] = lightGrey;
+        colors[ImGuiCol_TabActive] = lightGrey;
+        colors[ImGuiCol_TabUnfocusedActive] = darkGrey;
         colors[ImGuiCol_DockingPreview] = ImVec4(0.31f, 0.31f, 0.31f, 0.70f);
         colors[ImGuiCol_DockingEmptyBg] = ImVec4(0.20f, 0.20f, 0.20f, 1.00f);
         colors[ImGuiCol_PlotLines] = ImVec4(0.61f, 0.61f, 0.61f, 1.00f);
@@ -188,21 +199,28 @@ namespace vtx {
         colors[ImGuiCol_NavWindowingDimBg] = ImVec4(0.80f, 0.80f, 0.80f, 0.20f);
         colors[ImGuiCol_ModalWindowDimBg] = ImVec4(0.80f, 0.80f, 0.80f, 0.35f);
 
+        colors[ImGuiCol_WindowBg] = unifiedVeryDark;
+        colors[ImGuiCol_TitleBg] = unifiedVeryDark;
+        colors[ImGuiCol_TitleBgActive] = unifiedVeryDark;
+        colors[ImGuiCol_TitleBgCollapsed] = unifiedVeryDark;
+        colors[ImGuiCol_TabUnfocused] = unifiedVeryDark;
+
         ImGui::GetStyle().Alpha = 1.0f;
 
-        ImGui::GetStyle().WindowPadding = ImVec2(20.0f, 4.0f);
-        ImGui::GetStyle().FramePadding = ImVec2(4.0f, 2.0f);
-        ImGui::GetStyle().CellPadding = ImVec2(4.0f, 2.0f);
-        ImGui::GetStyle().ItemSpacing = ImVec2(11.0f, 4.0f);
-        ImGui::GetStyle().ItemInnerSpacing = ImVec2(4.0f, 4.0f);
-        ImGui::GetStyle().IndentSpacing = 21.0f;
+        ImGui::GetStyle().WindowPadding = ImVec2(2.0f, 2.0f);
+        ImGui::GetStyle().FramePadding = ImVec2(2.0f, 2.0f);
+        ImGui::GetStyle().CellPadding = ImVec2(2.0f, 2.0f);
+        ImGui::GetStyle().ItemSpacing = ImVec2(2.0f, 2.0f);
+        ImGui::GetStyle().ItemInnerSpacing = ImVec2(2.0f, 2.0f);
+        ImGui::GetStyle().IndentSpacing = 11.0f;
         ImGui::GetStyle().ScrollbarSize = 16.0f;
         ImGui::GetStyle().GrabMinSize = 4.0f;
 
-        ImGui::GetStyle().WindowBorderSize = 1;
+        ImGui::GetStyle().DockingSeparatorSize = 0.0f;
+        ImGui::GetStyle().WindowBorderSize = 0;
         ImGui::GetStyle().ChildBorderSize = 0;
         ImGui::GetStyle().PopupBorderSize = 1;
-        ImGui::GetStyle().FrameBorderSize = 1;
+        ImGui::GetStyle().FrameBorderSize = 0;
         ImGui::GetStyle().TabBorderSize = 0;
 
         ImGui::GetStyle().WindowRounding = 5;
@@ -221,32 +239,37 @@ namespace vtx {
         ImNodesStyle& style = ImNodes::GetStyle();
 
         // Set colors
-        style.Colors[ImNodesCol_GridBackground] = vec4toImCol32(darkGrey);
-        style.Colors[ImNodesCol_NodeBackground] = vec4toImCol32(lightGrey);
+        style.Colors[ImNodesCol_GridBackground] = vec4toImCol32(unifiedVeryDark);
+        style.Colors[ImNodesCol_NodeBackground] = vec4toImCol32(darkGrey);
         style.Colors[ImNodesCol_NodeBackgroundHovered] = vec4toImCol32(lightGrey);
         style.Colors[ImNodesCol_NodeBackgroundSelected] = vec4toImCol32(lightGrey);
         style.Colors[ImNodesCol_NodeOutline] = vec4toImCol32(lightGrey);
         style.Colors[ImNodesCol_TitleBar] = vec4toImCol32(lightGrey);
         style.Colors[ImNodesCol_TitleBarHovered] = vec4toImCol32(lightGrey);
         style.Colors[ImNodesCol_TitleBarSelected] = vec4toImCol32(lightGrey);
-        style.Colors[ImNodesCol_Link] = vec4toImCol32(orangeHovered);
-        style.Colors[ImNodesCol_LinkHovered] = vec4toImCol32(orangeHovered);
-        style.Colors[ImNodesCol_LinkSelected] = vec4toImCol32(orangeHovered);
-        style.Colors[ImNodesCol_Pin] = vec4toImCol32(orangeHovered);
+        style.Colors[ImNodesCol_Link] = vec4toImCol32(accentTownDown);
+        style.Colors[ImNodesCol_LinkHovered] = vec4toImCol32(accentTownDown);
+        style.Colors[ImNodesCol_LinkSelected] = vec4toImCol32(accentTownDown);
+        style.Colors[ImNodesCol_Pin] = vec4toImCol32(accentTownDown);
         // ... set other colors
 
         // Set style variables
         style.NodeCornerRounding = 5.0f;
         style.NodePadding = ImVec2(10.0f, 4.0f);
-        style.NodeBorderThickness = 1.0f;
+        style.NodeBorderThickness = 1.5f;
         style.LinkThickness = 1.5f;
         style.LinkLineSegmentsPerLength = 0.1f;
         style.LinkHoverDistance = 10.0f;
-        style.PinCircleRadius = 3.0f;
+        style.PinCircleRadius = 2.0f;
         // ... set other style variables
 
         // Set style flags
         style.Flags = ImNodesStyleFlags_NodeOutline;
+        style.Flags |= ImNodesStyleFlags_GridLines;
+        style.Flags |= ImNodesStyleFlags_DrawCirclesGrid;
+
+        style.GridDotSize = 1.0f;
+        style.GridSpacing = 10.0;
         // ... set other style flags
 
 

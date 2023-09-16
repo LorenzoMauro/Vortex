@@ -3,9 +3,9 @@
 int main() {
 	vtx::Log::Init();
 	try {
-		vtx::Application app;
+		vtx::Application app = vtx::Application();
 		app.init();
-		while (!glfwWindowShouldClose(app.window))
+		while (!glfwWindowShouldClose(app.glfwWindow))
 		{
 			app.run();
 		}

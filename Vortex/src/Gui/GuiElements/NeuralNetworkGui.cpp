@@ -333,7 +333,7 @@ namespace vtx::gui
 		}
 	}
 
-	void ngpPlots(network::GraphsData& graphsData, const network::DistributionType& dt)
+	std::vector<PlotInfo> ngpPlots(network::GraphsData& graphsData, const network::DistributionType& dt)
 	{
 		PlotInfo loss;
 		loss.title = "Loss";
@@ -365,7 +365,7 @@ namespace vtx::gui
 		samplingFraction.addPlot(graphsData.graphs[network::G_NGP_I_SAMPLING_FRACTION], "Sampling Fraction Inference");
 		samplingFraction.addPlot(graphsData.graphs[network::G_NGP_TAU], "Tau");
 
-		std::vector<PlotInfo> inferencePlots = { loss,target, samplingFraction, bsdf};
+		std::vector<PlotInfo> plots = { loss,target, samplingFraction, bsdf};
 
 		if(dt == network::D_SPHERICAL_GAUSSIAN)
 		{
@@ -376,7 +376,7 @@ namespace vtx::gui
 			concentration.addPlot(graphsData.graphs[network::G_SPHERICAL_GAUSSIAN_T_K], "Concentration Train");
 			concentration.addPlot(graphsData.graphs[network::G_SPHERICAL_GAUSSIAN_I_K], "Concentration Inference");
 
-			inferencePlots.push_back(concentration);
+			plots.push_back(concentration);
 		}
 
 		if(dt==network::D_NASG_ANGLE || dt == network::D_NASG_TRIG|| dt == network::D_NASG_AXIS_ANGLE)
@@ -395,16 +395,15 @@ namespace vtx::gui
 			a.addPlot(graphsData.graphs[network::G_NASG_T_A], "Anisotropy Train");
 			a.addPlot(graphsData.graphs[network::G_NASG_I_A], "Anisotropy Inference");
 
-			inferencePlots.push_back(lambda);
-			inferencePlots.push_back(a);
+			plots.push_back(lambda);
+			plots.push_back(a);
 		}
 		
 
-
-		gridPlot(inferencePlots);
+		return plots;
 	}
 
-	void sacPlots(network::GraphsData& graphsData)
+	std::vector<PlotInfo> sacPlots(network::GraphsData& graphsData)
 	{
 		PlotInfo q1q2Losses;
 		q1q2Losses.title = "Q1Q2Losses";
@@ -446,61 +445,20 @@ namespace vtx::gui
 		inferenceConcentration.yLabel = "Concentration";
 		inferenceConcentration.addPlot(graphsData.graphs[network::G_INFERENCE_CONCENTRATION], "Inference Concentration");
 
-		gridPlot({ q1q2Losses, alphaLosses, alphaValues, policyLosses, rewards, inferenceConcentration });
+		return { q1q2Losses, alphaLosses, alphaValues, policyLosses, rewards, inferenceConcentration };
 
 	}
-
-	void neuralNetworkGui(network::Network& network)
+	std::vector<PlotInfo> neuralNetworkPlots(network::Network& network)
 	{
-		const std::string hiddenLabel = "##hidden";
-
-		ImGui::Begin("Neural Net Settings");
-		// Get available width and calculate sizes for each child window
-		const float availableWidth = ImGui::GetContentRegionAvail().x;
-		const float plotWidth = availableWidth * 0.8f; // 75% for the plot
-		const float settingsWidth = availableWidth * 0.2f; // 25% for the settings
-
-		ImGui::BeginChild("Plot Child", ImVec2(plotWidth, 0), true);
-
 		if (network.settings.type == network::NT_SAC)
 		{
-			sacPlots(network.getGraphs());
+			return sacPlots(network.getGraphs());
 		}
-		else if (network.settings.type == network::NT_NGP)
+		if (network.settings.type == network::NT_NGP)
 		{
-			ngpPlots(network.getGraphs(), network.settings.pathGuidingSettings.distributionType);
+			return ngpPlots(network.getGraphs(), network.settings.pathGuidingSettings.distributionType);
 		}
-
-		ImGui::EndChild();
-
-		ImGui::SameLine();  // Position the next child window on the same line to the right
-
-		ImGui::BeginChild("Settings Child", ImVec2(settingsWidth, 0), true);
-		ImGui::PushItemWidth(settingsWidth); // Set the width of the next widget to 200
-
-		networkSettingsEditorGui(network.settings);
-
-
-		ImGui::EndChild();
-
-		ImGui::End();
-
-	}
-
-	void neuralNetworkPlotWindow(network::Network& network)
-	{
-		ImGui::Begin("Neural Network Plots");
-
-		if (network.settings.type == network::NT_SAC)
-		{
-			sacPlots(network.getGraphs());
-		}
-		else if (network.settings.type == network::NT_NGP)
-		{
-			ngpPlots(network.getGraphs(), network.settings.pathGuidingSettings.distributionType);
-		}
-
-		ImGui::End();
+		return {};
 	}
 }
 

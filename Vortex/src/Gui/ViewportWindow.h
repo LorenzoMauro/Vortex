@@ -1,24 +1,22 @@
 #pragma once
 #include "Scene/Nodes/Renderer.h"
-#include "Layers/GuiLayer.h"
+#include "Gui/GuiWindow.h"
 #include "Core/Options.h"
 #include "Device/DeviceVisitor.h"
 #include "GuiElements/MaterialNodeGui.h"
 #include "Scene/HostVisitor.h"
 
 namespace vtx {
-    class ViewportLayer : public Layer {
+    class ViewportWindow : public Window {
     public:
 
-        ViewportLayer();
+        ViewportWindow();
 
-        virtual void OnAttach();
+        virtual void OnUpdate(float ts) override;
 
-        virtual void OnDetach();
+        virtual void renderMainContent() override;
 
-        virtual void OnUpdate(float ts);
-
-        virtual void OnUIRender();
+        virtual void preRender() override;
 
     public:
         std::shared_ptr<graph::Renderer> renderer;
@@ -28,6 +26,5 @@ namespace vtx {
         bool        m_isResized = false;
         device::DeviceVisitor deviceVisitor;
         HostVisitor hostVisitor;
-        //gui::MaterialGui materialGui;
     };
 }
