@@ -1,4 +1,6 @@
 #include "Options.h"
+
+#include "Utils.h"
 #include "Device/DevicePrograms/LaunchParams.h"
 #include "NeuralNetworks/NetworkSettings.h"
 
@@ -12,9 +14,10 @@ namespace vtx {
 		options.width = 2100;
 		options.height = 900;
 		options.windowName = "Vortex";
-		options.dataFolder = "E:/Dev/VortexOptix/data/";
+		options.executablePath = utl::absolutePath(utl::getExecutablePath()) + '/';
+		options.dataFolder = options.executablePath + "assets/";
 		options.imGuiIniFile = options.dataFolder + "ImGui.ini";
-		options.dllPath = "./";
+		options.dllPath = options.executablePath;
 		options.clearColor[4] = (0.45f, 0.55f, 0.60f, 1.00f);
 #ifdef NDEBUG
 		options.isDebug = false;
@@ -134,12 +137,11 @@ namespace vtx {
 		////////////////////////////////////////////////////////////////////////////////////
 		/////////////////// MDL Options ////////////////////////////////////////////////////
 		////////////////////////////////////////////////////////////////////////////////////
-		options.mdlSearchPath = { options.dataFolder, "./" , "E:/Dev/OptixTut/bin/Debug-windows-x86_64/OptixApp/mdl" };
+		options.mdlSearchPath = { options.dataFolder, "./", options.dataFolder + "mdl/"};
 		options.numTextureSpaces = 1; //should be set to 1 for performance reasons If you do not use the hair BSDF.
 		options.numTextureResults = 16;
 		options.enable_derivatives = false;
 		options.mdlOptLevel = "2";
-		options.initialized = true;
 		options.mdlCallType = MDL_CUDA;
 
 		////////////////////////////////////////////////////////////////////////////////////
@@ -153,6 +155,7 @@ namespace vtx {
 		if(!options.initialized)
 		{
 			startOptions();
+			options.initialized = true;
 		}
 		return &options;
 	}

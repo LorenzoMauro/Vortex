@@ -33,7 +33,7 @@ namespace utl{
 	bool binaryDump(void* data, const size_t& size, const std::string& filePath);
 
 
-
+	std::string getExecutablePath();
 	
 	template<typename T>
 	std::vector<T> binaryLoad(const int& count, const std::string & filePath)

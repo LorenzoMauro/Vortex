@@ -1,0 +1,317 @@
+mdl 1.7;
+import ::math::*;
+import ::anno::*;
+import ::state::*;
+import ::base::*;
+import ::tex::*;
+
+
+export struct AnisotropicRoughness {
+    float3 tangent;
+    float2 roughness;
+};
+
+export float3 rotate_tangent(float rotation, float3 tangent = state::texture_tangent_u(0))
+{
+    float rot_angle = 2.0f * math::PI * rotation;
+    float3 bitangent = math::normalize(math::cross(state::normal(), tangent));
+    float cos_rot_angle = math::cos(rot_angle);
+    float sin_rot_angle = math::sin(rot_angle);
+    return cos_rot_angle * tangent - sin_rot_angle * bitangent;
+}
+
+export float luminance(color inputColor){
+    float3 fColor = float3(inputColor);
+    float red = fColor.x;
+    float green = fColor.y;
+    float blue = fColor.z;
+    float luminance = 0.2126 * red + 0.7152 * green + 0.0722 * blue;
+    return luminance;
+}
+
+export AnisotropicRoughness computeRoughnessAnisotropy(float roughness, float anisotropy = 0.0f, float anisotropyRotation = 0.0f){
+
+    float R2 = roughness * roughness;
+    float r = math::sqrt(1.0f - math::clamp(anisotropy, 0.0f, 0.98f));
+    float roughnessX = math::min(R2/ r, 1.0f);
+    float roughnessY = R2* r;
+
+    float3 tangent = anisotropyRotation != 0.0f? rotate_tangent(anisotropyRotation, state::texture_tangent_u(0)) : state::texture_tangent_u(0);
+
+    return AnisotropicRoughness(
+        tangent: tangent,
+        roughness: float2(roughnessX, roughnessY));
+}
+
+
+export struct ComplexIor
+{
+    color n; //refractive index
+    color k; //extinction coefficient
+};
+
+//[Gulbrandsen2014] Ole Gulbrandsen, 2014. Artist friendly metallic fresnel.
+export ComplexIor colorsToConductorFresnel(
+    color base,
+    color specular)
+{
+    float epsilon = 1.e-2;
+    color r = math::lerp(color(epsilon), color(1.0 - epsilon), base);
+    color g = specular;
+
+    color r_sqrt = math::sqrt(r);
+    color n_min = (1.0f - r) / (1.0f + r);
+    color n_max = (1.0f + r_sqrt) / (1.0f - r_sqrt);
+
+    color n = math::lerp(n_max, n_min, g);
+
+    color k2 = ((n + 1.0f) * (n + 1.0f) * r - (n - 1.0f) * (n - 1.0f)) / (1.0f - r);
+    k2 = math::max(k2, 0.0f);
+    color k = math::sqrt(k2);
+
+    return ComplexIor(n, k);
+}
+
+float3 transform_internal_to_tangent(float3 n)
+{
+	/* flip_tangent_v */
+    return
+        n.x* float3(state::texture_tangent_u(0).x,-state::texture_tangent_v(0).x,state::normal().x)+
+        n.y* float3(state::texture_tangent_u(0).y,-state::texture_tangent_v(0).y,state::normal().y)+
+        n.z* float3(state::texture_tangent_u(0).z,-state::texture_tangent_v(0).z,state::normal().z);
+}
+
+//  Returns the normal n in internal space, given n is in tangent space.
+float3 transform_tangent_to_internal(float3 n)
+{
+    return  state::texture_tangent_u(0) * n.x -
+            state::texture_tangent_v(0) * n.y + /* flip_tangent_v */
+            state::normal() * n.z;
+}
+
+//  Returns a normal by adding a detail normal to a global normal.
+export float3 add_detail_normal(float3 nd = state::normal(), float3 n = state::normal())
+{
+    // http://blog.selfshadow.com/publications/blending-in-detail/
+    float3  n_t = transform_internal_to_tangent(n);
+    float3 nd_t = transform_internal_to_tangent(nd);
+            n_t = n_t + float3(0.,0.,1.);
+           nd_t = nd_t *  float3(-1.,-1.,1.);
+              n = n_t * math::dot(n_t, nd_t)/n_t.z - nd_t;
+    return math::normalize(transform_tangent_to_internal(n));
+}
+
+uniform float4x4 rotation_translation_scale(
+    uniform float3 rotation = float3(0.)
+        [[ anno::description("Rotation applied to every UVW coordinate") ]],
+    uniform float3 translation = float3(0.)
+        [[ anno::description("Offset applied to every UVW coordinate") ]],
+    uniform float3 scaling = float3(1.)
+        [[ anno::description("Scale applied to every UVW coordinate") ]]
+)
+[[
+    anno::description("Construct a transformation matrix from euler rotation, translation and scale"),
+    anno::hidden()
+]]
+{
+    float4x4 scale =
+        float4x4(scaling.x         , 0.0               , 0.0               , 0.0,
+                 0.0               , scaling.y         , 0.0               , 0.0,
+                 0.0               , 0.0               , scaling.z         , 0.0,
+                 translation.x     , translation.y     , translation.z     , 1.0);
+
+    float3 s = math::sin(rotation);
+    float3 c = math::cos(rotation);
+    
+    float4x4 rotate =
+        float4x4(  c.y*c.z    , -c.x*s.z + s.x*s.y*c.z ,  s.x*s.z + c.x*s.y*c.z , 0.0,
+                   c.y*s.z    ,  c.x*c.z + s.x*s.y*s.z , -s.x*c.z + c.x*s.y*s.z , 0.0,
+                  -s.y        ,  s.x*c.y               ,  c.x*c.y               , 0.0,
+                   0.0        ,  0.0                   ,  0                     , 1.0);
+
+    return   scale * rotate;
+}
+
+export base::texture_coordinate_info standardTextCoord(
+    float3 position = state::texture_coordinate(0)
+        [[ anno::display_name("Texture coordinate"),
+           anno::description("Texture coordinate") ]],
+    float3 tangent_u = state::texture_tangent_u(0)
+        [[ anno::display_name("Tanget U"),
+            anno::description("Tangent in u direction") ]],
+    float3 tangent_v = state::texture_tangent_v(0)
+        [[ anno::display_name("Tangent V"),
+            anno::description("Tangent in v direction") ]]
+) {
+    return base::texture_coordinate_info(
+        position: position,
+        tangent_u: tangent_u,
+        tangent_v: tangent_v
+    );
+}
+
+export base::texture_coordinate_info transformCoordinate(
+    base::texture_coordinate_info coordinate = standardTextCoord(),
+	uniform float2 translation = float2(0.0) [[
+		anno::display_name("Texture Translate"),
+		anno::description("Controls position of texture."),
+		anno::in_group("UV")
+	]],
+	uniform float rotation = float(0.0) [[
+		anno::display_name("Texture Rotate"),
+		anno::description("Rotates angle of texture in degrees."),
+		anno::in_group("UV")
+	]],
+	uniform float2 scaling = float2(1.0) [[
+		anno::display_name("Texture Tiling"),
+		anno::description("Controls repetition of the texture."),
+		anno::in_group("UV")
+	]]
+){
+    return base::transform_coordinate(
+                                transform: rotation_translation_scale(
+                                    scaling: float3(scaling.x, scaling.y, 1.0),
+                                    rotation: float3(0.0, 0.0, rotation/180.*math::PI ),
+                                    translation: float3(translation.x, translation.y, 0.0)
+                                ),
+                                coordinate: coordinate 
+                            );
+}
+
+export float3 NormalTexture(
+    uniform texture_2d texture
+    [[
+        anno::display_name("Normal Map"),
+        anno::description("Normal map texture"),
+        anno::in_group("Normal Map")
+    ]],
+    uniform float factor = 1.0f
+    [[
+        anno::display_name("Normal Factor"),
+        anno::description("Normal factor"),
+        anno::in_group("Normal Map")
+    ]],
+    uniform bool flip_tangent_u = false
+    [[
+        anno::display_name("Flip Tangent U"),
+        anno::description("Flip tangent U"),
+        anno::in_group("Normal Map")
+    ]],
+    uniform bool flip_tangent_v = false
+    [[
+        anno::display_name("Flip Tangent V"),
+        anno::description("Flip tangent V"),
+        anno::in_group("Normal Map")
+    ]],
+    base::texture_coordinate_info coordinate = standardTextCoord()
+    [[
+        anno::display_name("Texture Coordinate"),
+        anno::description("Texture coordinate"),
+        anno::in_group("Normal Map")
+    ]]
+    ){
+	float3 the_normal = tex::texture_isvalid(texture) ?
+							base::tangent_space_normal_texture(
+							    texture:        texture,
+							    factor:         factor,
+							    uvw:            coordinate,
+							    flip_tangent_u: flip_tangent_u,
+							    flip_tangent_v: flip_tangent_v	// true for dx, false for opengl
+							    ): state::normal();		
+    return the_normal;
+}
+
+export float3 BumpTexture(
+    uniform texture_2d texture
+    [[
+        anno::display_name("Bump Map"),
+        anno::description("Bump map texture"),
+        anno::in_group("Bump Map")
+    ]],
+    uniform float factor = 1.0f
+    [[
+        anno::display_name("Bump Factor"),
+        anno::description("Bump factor"),
+        anno::in_group("Bump Map")
+    ]],
+    base::texture_coordinate_info coordinate = standardTextCoord()
+    [[
+        anno::display_name("Texture Coordinate"),
+        anno::description("Texture coordinate"),
+        anno::in_group("Bump Map")
+    ]]
+) {
+	float3 the_bump = tex::texture_isvalid(texture) ?
+							base::file_bump_texture(
+							    texture:        texture,
+							    factor:         factor,
+							    uvw:            coordinate
+							    ): state::normal();	
+    return the_bump;
+}
+
+export color ColorTexture(
+    uniform texture_2d texture
+    [[
+        anno::display_name("Color Texture"),
+        anno::description("Color map texture"),
+        anno::in_group("Color Map")
+    ]],
+    base::texture_coordinate_info coordinate = standardTextCoord()
+    [[
+        anno::display_name("Texture Coordinate"),
+        anno::description("Texture coordinate"),
+        anno::in_group("Color Map")
+    ]]
+){
+    return tex::texture_isvalid(texture) ?
+                    base::file_texture(
+                            texture: texture,
+                        mono_source: base::mono_luminance,
+                                uvw: coordinate,
+                                clip: false        
+                        ).tint : color(1.0f, 0.0f, 1.0f);
+
+}
+
+export float MonoTexture(
+    uniform texture_2d texture
+    [[
+        anno::display_name("Monochromatic Texture"),
+        anno::description("Mono map texture"),
+        anno::in_group("Mono Map")
+    ]],
+    base::texture_coordinate_info coordinate = standardTextCoord()
+    [[
+        anno::display_name("Texture Coordinate"),
+        anno::description("Texture coordinate"),
+        anno::in_group("Mono Map")]]
+) {
+    return tex::texture_isvalid(texture) ?
+                    base::file_texture(
+                            texture: texture,
+                        mono_source: base::mono_average,
+                                uvw: coordinate,
+                                clip: false        
+                        ).mono : 0.0f;
+}
+
+export float getChannel(
+    color inputColor = color(0.0f)
+    [[
+        anno::display_name("Input Color"),
+        anno::description("Input Color"),
+        anno::in_group("Color")
+    ]],
+    int channel = 0
+    [[
+        anno::display_name("Channel"),
+        anno::hard_range(0, 2),
+        anno::description("Channel"),
+        anno::in_group("Color")
+    ]]
+){
+    float3 inputValue = float3(inputColor);
+    float output = channel == 0 ? inputValue.x : channel == 1 ? inputValue.y : inputValue.z;
+    return output;
+}
