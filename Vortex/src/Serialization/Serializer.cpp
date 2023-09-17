@@ -31,6 +31,9 @@ namespace vtx::serializer
 		}
     };
 
+    static std::string previousModelPath;
+
+
     bool deserialize(const std::string& filePath, const std::shared_ptr<graph::Scene>& scene)
     {
         VTX_INFO("Deserializing scene from {0}", filePath);
@@ -65,7 +68,10 @@ namespace vtx::serializer
             VTX_INFO("HDRI Path: {0}", hdriPath);
         }
 
-        scene->renderer = ops::createNode<graph::Renderer>();
+        if(!scene->renderer)
+        {
+	        scene->renderer = ops::createNode<graph::Renderer>();
+        }
         scene->renderer->camera  = camera;
         if (scene->sceneRoot)
         {

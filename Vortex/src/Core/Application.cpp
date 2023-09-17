@@ -11,9 +11,12 @@
 #include "Gui/SceneHierarchyWindow.h"
 #include "Gui/GraphWindow.h"
 #include "Gui/PropertiesWindow.h"
+#include "Serialization/Serializer.h"
 
 namespace vtx
 {
+	static Application* appInstance = nullptr;
+
 	bool isWindowMinimized(GLFWwindow* window) {
 		int width, height;
 		glfwGetFramebufferSize(window, &width, &height);
@@ -21,6 +24,7 @@ namespace vtx
 	}
 
 	void Application::init() {
+		appInstance = this;
 		initWindow();
 		Input::SetWindowHandle(glfwWindow);
 		Init_ImGui(glfwWindow);
@@ -31,7 +35,9 @@ namespace vtx
 		windowManager = std::make_shared<WindowManager>();
 		windowManager->createWindow<AppWindow>();
 
-		ops::startUpOperations();
+		//ops::startUpOperations();
+		const std::shared_ptr<graph::Scene> scene = graph::Scene::getScene();
+		scene->renderer = ops::createNode<graph::Renderer>();
 		graph::Scene::getScene()->renderer->setWindow(glfwWindow);
 		windowManager->createWindow<SceneHierarchyWindow>();
 		windowManager->createWindow<ViewportWindow>();
@@ -111,11 +117,31 @@ namespace vtx
 			ImGuiDraw(glfwWindow);
 			glfwSwapBuffers(glfwWindow);
 		}
+		if (shouldLoadFile && iteration>3) { //>3 because I'd rather have the gui render first
+			loadFile();
+			shouldLoadFile = false;
+		}
 		windowManager->removeClosedWindows();
 		const auto time = static_cast<float>(glfwGetTime());
 		frameTime = time - lastFrameTime;
 		timeStep = std::min(frameTime, 0.0333f);
 		lastFrameTime = time;
+		iteration += 1;
+	}
+	void Application::setFileToLoad(const std::string& file)
+	{
+		fileToLoad = file;
+		shouldLoadFile = true;
+	}
+	void Application::loadFile() {
+		if (!fileToLoad.empty()) {
+			serializer::deserialize(fileToLoad, graph::Scene::getScene());
+			fileToLoad = "";
+		}
+	}
+	Application* Application::get()
+	{
+		return appInstance;
 	}
 }
 

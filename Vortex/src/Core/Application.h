@@ -21,6 +21,12 @@ namespace vtx {
 		void initWindow();
 		
 		void run();
+
+		void setFileToLoad(const std::string& file);
+
+		void loadFile();
+
+		static Application* get() ;
 		
 	public:
 		GLFWwindow*                         glfwWindow;
@@ -28,5 +34,8 @@ namespace vtx {
 		float                               timeStep      = 0.0f;
 		float                               frameTime     = 0.0f;
 		float                               lastFrameTime = 0.0f;
+		std::string                         fileToLoad;
+		bool shouldLoadFile = false;
+		unsigned							iteration = 0;
 	};
 }

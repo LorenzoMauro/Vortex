@@ -417,6 +417,11 @@ namespace vtx::gui {
 
     void MaterialGui::materialNodeEditorGui(const vtxID materialId)
     {
+        if(materialId == 0)
+        {
+	        // invalid ID, no material selected or no material at all available
+            return;
+        }
         const std::shared_ptr<graph::Material> material = graph::SIM::getNode<graph::Material>(materialId);
 
 

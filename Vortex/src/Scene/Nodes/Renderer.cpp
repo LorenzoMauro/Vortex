@@ -186,11 +186,12 @@ namespace vtx::graph
 		{
 			return;
 		}
-		if (width == _width && height == _height) {
+		if (_width <= 0 || _height <= 0)
+		{
 			return;
 		}
-		if( _width <= 0 || _height <= 0)
-		{
+		if (width == _width && height == _height) {
+			camera->resize(width, height);
 			return;
 		}
 		width = _width;

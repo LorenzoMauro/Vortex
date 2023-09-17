@@ -297,5 +297,14 @@ namespace vtx::mdl
         outModule = buildLinkedKernel(m_targetCodes, ptxFile.c_str(), kernelFunctionName.c_str(), &outKernelFunction);
         isDirty = false;
     }
+
+	CUfunction& MdlCudaLinker::getKernelFunction()
+    {
+        if(isDirty)
+        {
+            link();
+        }
+	    return outKernelFunction;
+    }
 }
 

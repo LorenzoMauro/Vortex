@@ -36,6 +36,14 @@ namespace vtx::graph
 	}
 
 	void Camera::resize(const uint32_t width, const uint32_t height) {
+		if (width == 0 || height == 0)
+		{
+						return;
+		}
+		if (width == resolution.x && height == resolution.y)
+		{
+			return;
+		}
 		resolution.x = width;
 		resolution.y = height;
 		aspect = static_cast<float>(width) / static_cast<float>(height);

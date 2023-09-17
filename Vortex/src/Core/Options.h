@@ -23,6 +23,7 @@ namespace vtx
 		int         width;
 		int         height;
 		std::string windowName;
+		std::string executablePath;
 		std::string dataFolder;
 		std::string imGuiIniFile;
 		std::string dllPath;

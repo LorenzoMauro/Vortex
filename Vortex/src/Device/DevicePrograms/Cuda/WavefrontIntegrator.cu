@@ -106,8 +106,10 @@ namespace vtx
 		{
 			optix::PipelineOptix::launchOptixKernel(math::vec2i{queueSizes.shadeQueueCounter, 1}, "wfShade");
 		}
-		else {
-			const CUfunction& cudaFunction = mdl::getMdlCudaLinker().outKernelFunction;
+		else{
+			const CUfunction& cudaFunction = mdl::getMdlCudaLinker().getKernelFunction();
+
+
 			constexpr int threadsPerBlockX = 256;
 			const int     numBlocksX = (queueSizes.shadeQueueCounter + threadsPerBlockX - 1) / threadsPerBlockX;
 			void* params[] = { &deviceParams };
