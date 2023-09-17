@@ -245,9 +245,35 @@ add_custom_command(TARGET Vortex POST_BUILD
                    ${MDL_DLLS}
                    $<TARGET_FILE_DIR:Vortex>)
 
+add_custom_command(TARGET Vortex POST_BUILD
+                   COMMAND ${CMAKE_COMMAND} -E make_directory $<TARGET_FILE_DIR:Vortex>/assets/fonts
+                   COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                   ${CMAKE_SOURCE_DIR}/assets/fonts/LucidaGrande.ttf
+                   $<TARGET_FILE_DIR:Vortex>/assets/fonts)
+
+add_custom_command(TARGET Vortex POST_BUILD
+                   COMMAND ${CMAKE_COMMAND} -E make_directory $<TARGET_FILE_DIR:Vortex>/assets/mdl
+                   COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                   ${CMAKE_SOURCE_DIR}/assets/mdl/VortexFunctions.mdl
+                   $<TARGET_FILE_DIR:Vortex>/assets/mdl)
+
+add_custom_command(TARGET Vortex POST_BUILD
+                   COMMAND ${CMAKE_COMMAND} -E make_directory $<TARGET_FILE_DIR:Vortex>/assets/mdl
+                   COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                   ${CMAKE_SOURCE_DIR}/assets/mdl/VortexPrincipledShader.mdl
+                   $<TARGET_FILE_DIR:Vortex>/assets/mdl)
+
+add_custom_command(TARGET Vortex POST_BUILD
+                   COMMAND xcopy /D /Y /F "\"${CMAKE_SOURCE_DIR}/assets/ImGui.ini\"" "\"$<TARGET_FILE_DIR:Vortex>/assets/\\\""
+                   COMMENT "Copying ImGui.ini from repo assets if newer..."
+)
+add_custom_command(TARGET Vortex POST_BUILD
+                   COMMAND if exist "\"$<TARGET_FILE_DIR:Vortex>/assets/ImGui.ini\"" (xcopy /D /Y /F "\"$<TARGET_FILE_DIR:Vortex>/assets/ImGui.ini\"" "\"${CMAKE_SOURCE_DIR}/assets/\\\"")
+                   COMMENT "Copying ImGui.ini from target folder to repo assets if newer..."
+)
 
 #install Target                   
-#set(CMAKE_INSTALL_PREFIX "${CMAKE_BINARY_DIR}/install" CACHE PATH "Default install path" FORCE)
+set(CMAKE_INSTALL_PREFIX "${CMAKE_BINARY_DIR}/install" CACHE PATH "Default install path" FORCE)
 
 # Copying the ptx folder
 install(DIRECTORY "$<TARGET_FILE_DIR:Vortex>/ptx"
@@ -255,6 +281,9 @@ install(DIRECTORY "$<TARGET_FILE_DIR:Vortex>/ptx"
 
 # Copying the bc folder
 install(DIRECTORY "$<TARGET_FILE_DIR:Vortex>/bc"
+        DESTINATION .)
+
+install(DIRECTORY "$<TARGET_FILE_DIR:Vortex>/assets"
         DESTINATION .)
 
 # Installing Torch DLLs based on configuration

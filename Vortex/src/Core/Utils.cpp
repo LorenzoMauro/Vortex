@@ -1,4 +1,5 @@
 #include "Utils.h"
+#include <windows.h>
 
 
 namespace utl{
@@ -159,6 +160,14 @@ namespace utl{
 		outFile.close();
 
 		return true;
+	}
+
+	std::string getExecutablePath()
+	{
+		char buffer[MAX_PATH];
+		GetModuleFileName(NULL, buffer, MAX_PATH);
+		std::string::size_type pos = std::string(buffer).find_last_of("\\/");
+		return std::string(buffer).substr(0, pos);
 	}
 
 

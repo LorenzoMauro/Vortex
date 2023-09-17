@@ -267,7 +267,7 @@ namespace vtx::mdl
 		startInterfaces();
 		if(getOptions()->mdlCallType == MDL_INLINE || getOptions()->mdlCallType == MDL_CUDA)
 		{
-			setRendererModule("./bc/MaterialDirectCallable.bc", "__direct_callable__EvaluateMaterial,__replace__EvaluateMaterial");
+			setRendererModule(getOptions()->executablePath + "bc/MaterialDirectCallable.bc", "__direct_callable__EvaluateMaterial,__replace__EvaluateMaterial");
 		}
 	}
 
@@ -288,6 +288,10 @@ namespace vtx::mdl
 
 	void addSearchPath(std::string path)
 	{
+		if(path.empty())
+		{
+			return;
+		}
 		MdlState& state = *getState();
 		state.result = state.config->add_mdl_path(path.c_str());
 		VTX_ASSERT_CONTINUE(state.result == 0, "add_mdl_path( {} ) failed with {}", path, state.result);

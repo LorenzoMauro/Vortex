@@ -1,0 +1,251 @@
+mdl 1.7;
+
+import ::df::*;
+import ::state::*;
+import ::math::*;
+import ::base::*;
+import ::tex::*;
+import ::anno::*;
+import ::anno::*;
+import ::limits::*;
+
+
+// Using absolute path to OmniShared library
+import VortexFunctions::*;
+
+export material principledVortex(
+	uniform bool isThinWalled = false
+    [[anno::display_name("Thin Walled"),
+      anno::in_group("Base Layer")]],
+
+    color BaseColor = color(1.0, 1.0, 1.0)
+    [[anno::display_name("Base Color"),
+	  anno::in_group("Base Layer")]],
+    float Metallic = 0.0
+	[[anno::display_name("Metallness"),
+	  anno::hard_range(0.0, 1.0),
+	  anno::in_group("Base Layer")]],
+   color SpecularTint = color(1.0f)
+     [[anno::display_name("Metallic Specular Tint"),
+       anno::in_group("Base Layer")]],
+    uniform float Ior = 1.5f
+	[[anno::display_name("Ior"),
+	  anno::hard_range(1.0, 2.42),
+      anno::in_group("Base Layer")]],
+    float Roughness = 0.5
+	[[anno::display_name("Roughness"),
+	  anno::hard_range(0.0, 1.0),
+      anno::in_group("Base Layer")]],
+    float Anisotropy = 0.0
+	[[anno::display_name("Anisotropic"),
+	  anno::hard_range(0.0, 1.0),
+	  anno::in_group("Base Layer")]],
+    float Anisotropy_rotation = 0.0
+	[[anno::display_name("Anisotropic Rotation"),
+	  anno::hard_range(0.0, 1.0),
+	  anno::in_group("Base Layer")]],
+	  
+    float Transmission = 0.0
+	[[anno::display_name("Transmission Ammount"),
+	  anno::hard_range(0.0, 1.0),
+	  anno::in_group("Transmission")]],
+    float TransmissionRoughness = 0.0
+	[[anno::display_name("Transmission Roughness"),
+	  anno::hard_range(0.0, 1.0),
+	  anno::in_group("Transmission")]],
+
+	float Coat = 0.0
+	[[anno::display_name("Coat Ammount"),
+	  anno::in_group("Coating"),
+	  anno::hard_range(0.0, 1.0)]],
+    float CoatRoughness = 0.00
+	[[anno::display_name("Coat Roughness"),
+	  anno::in_group("Coating"),
+	  anno::hard_range(0.0, 1.0)]],
+	float CoatTransparency = 1.0
+	[[anno::display_name("Coat Transparency"),
+	  anno::in_group("Coating"),
+	  anno::hard_range(0.0, 1.0)]],
+	color CoatColor = color(1.0, 1.0, 1.0)
+	[[anno::display_name("Coat Color"),
+	  anno::in_group("Coating")]],
+	float FilmAmmount = 0.0
+	[[anno::display_name("Film Ammount"),
+	  anno::hard_range(0.0, 1.0),
+	  anno::in_group("Coating")]],
+    float FilmIor = 1.0
+	[[anno::display_name("Film Ior"),
+	  anno::hard_range(1.0, 10.0),
+      anno::in_group("Coating")]],
+	float FilmThickness = 0.0
+	[[anno::display_name("Film Thickness"),
+	  anno::hard_range(0.0, 2000),
+	  anno::in_group("Coating")]],
+
+	  float EmissionIntensity = 0.0
+	[[anno::display_name("Emission Intensity"),
+	  anno::hard_range(0.0, 100000.0),
+	  anno::in_group("Emission")]],
+
+	  color EmissionColor = color(0.0, 0.0, 0.0)
+	[[anno::display_name("Emission Color"),
+	  anno::in_group("Emission")]],
+
+    float SheenAmmount = 0.0
+    [[anno::display_name("Sheen Ammount"),
+      anno::in_group("Sheen"),
+      anno::hard_range(0.0, 1.0)]],
+    color SheenTint = color(1.0f)
+    [[anno::display_name("Sheen Tint"),
+      anno::in_group("Sheen")]],
+      float SheenRoghness = 0.2
+      [[anno::display_name("Sheen Roughness"),
+      anno::in_group("Sheen"),
+      anno::hard_range(0.0, 1.0)]],
+
+    float3 Normal = state::normal()
+    [[anno::display_name("Normal"),
+      anno::in_group("Base Layer")]],
+    float3 ClearcoatNormal = state::normal()
+    [[anno::display_name("Clearcoat Normal"),
+      anno::in_group("Coating")]]
+) = let{
+    
+    VortexFunctions::AnisotropicRoughness aniRough = VortexFunctions::computeRoughnessAnisotropy(Roughness, Anisotropy, Anisotropy_rotation);
+    VortexFunctions::ComplexIor metal_ior = VortexFunctions::colorsToConductorFresnel(BaseColor, SpecularTint);
+    
+    //DIFFUSE BASE
+    bsdf diffuseBase = df::weighted_layer(
+		weight: 1.0,
+		layer:  df::diffuse_reflection_bsdf(
+			        tint:       BaseColor,
+			        roughness:  0.0f
+                ),
+        normal: Normal,
+		base:   bsdf()
+	);
+    
+    bsdf sheenBsdf = df::sheen_bsdf(
+        roughness: SheenRoghness*SheenRoghness,
+        tint: SheenTint,
+        multiscatter_tint: BaseColor * color(0.92),
+        multiscatter: diffuseBase
+    );
+
+    bsdf diffuseSheenMix = df::weighted_layer(
+        weight: SheenAmmount,
+        normal: Normal,
+        base: diffuseBase,
+        layer: sheenBsdf);
+
+    //Transmission BASE
+	bsdf diffuseTransmission = df::diffuse_transmission_bsdf(tint: BaseColor);
+	bsdf clarTransmission = df::microfacet_ggx_smith_bsdf(
+				roughness_u: 0.0,
+				tint: BaseColor,
+				mode: ::df::scatter_transmit);
+	bsdf transmissionBsdf = df::weighted_layer(
+		weight: TransmissionRoughness,
+		layer:  diffuseTransmission,
+		base:   clarTransmission,
+        normal: Normal
+	);
+
+    //BASE
+	bsdf BaseBsdf = df::weighted_layer(
+		weight: Transmission,
+		layer:  transmissionBsdf,
+		base:   diffuseSheenMix,
+        normal: Normal
+	);
+
+    //Glossiness Component
+	bsdf ggx_smith_dielectric = df::microfacet_ggx_smith_bsdf(
+		roughness_u:    aniRough.roughness.x,
+		roughness_v:    aniRough.roughness.y,
+        tangent_u: aniRough.tangent,
+		tint:           color(1.0f),
+		mode:           df::scatter_reflect
+	);
+	bsdf glossyFresnel = df::fresnel_layer(
+		ior: Ior,
+		weight: 1.0,
+		layer: ggx_smith_dielectric,
+        normal: Normal,
+		base: BaseBsdf); 
+
+    //Metallic Component
+    VortexFunctions::AnisotropicRoughness metlAniRough = VortexFunctions::computeRoughnessAnisotropy(Roughness*0.3, Anisotropy, Anisotropy_rotation);
+
+	bsdf metal = df::tint(BaseColor, ggx_smith_dielectric);
+
+    bsdf metal_brdf_fresnel_factored = df::fresnel_factor(
+        ior: metal_ior.n,
+        extinction_coefficient: metal_ior.k,
+        base: metal);
+
+
+    //Metallic Glossy Mix
+    bsdf MetalGlossyMix = df::weighted_layer(
+        weight: Metallic,
+        layer: metal_brdf_fresnel_factored,
+        base: glossyFresnel,
+        normal: Normal);
+    
+
+    //Coat
+    VortexFunctions::AnisotropicRoughness aniRoughCoat = VortexFunctions::computeRoughnessAnisotropy(CoatRoughness, Anisotropy, Anisotropy_rotation);
+	
+	bsdf coat_bsdf = df::microfacet_ggx_smith_bsdf(
+		roughness_u:    aniRoughCoat.roughness.x,
+		roughness_v:    aniRoughCoat.roughness.y,
+        tangent_u:      aniRoughCoat.tangent,
+		tint:           color(1.0),
+		mode:           df::scatter_reflect
+	);
+
+	bsdf opaque_coat = df::weighted_layer(
+        weight:     CoatTransparency,
+		layer:	    ::df::tint( tint: CoatColor, base: MetalGlossyMix),
+		base:	    ::df::diffuse_reflection_bsdf(tint: CoatColor)
+	);
+	
+	bsdf omni_PBR_coated_bsdf = df::fresnel_layer(
+		ior:     Ior,
+		weight:  Coat,
+		layer:   coat_bsdf,
+		base:    opaque_coat,
+		normal:  ClearcoatNormal 
+	);
+    
+    bsdf thinFilm = df::thin_film(
+        ior: color(FilmIor),
+        thickness: FilmThickness,
+        base: omni_PBR_coated_bsdf
+    );
+    bsdf ThinFilmMix = df::weighted_layer(
+        weight: FilmAmmount,
+        layer: thinFilm,
+        base: omni_PBR_coated_bsdf);
+    
+    bsdf finalBsdf = ThinFilmMix;
+
+    // Emission
+    color emission_value = EmissionColor * color(EmissionIntensity);
+
+    material_emission emission = material_emission(
+                                    df::diffuse_edf(),
+                                    intensity: emission_value 
+                                    );
+
+	material_surface finalSurface = material_surface(
+		scattering : finalBsdf,
+		emission : emission);
+
+} in material(
+    ior: color(Ior),
+	thin_walled: isThinWalled,
+	surface: finalSurface//,
+	//volume: local_volume
+
+);

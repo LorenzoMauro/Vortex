@@ -17,7 +17,7 @@ namespace vtx {
 		
 		auto deviceProgramModule = std::make_shared<optix::ModuleOptix>();
 		deviceProgramModule->name = "deviceProgram";
-		deviceProgramModule->path = "./ptx/devicePrograms.optixir";
+		deviceProgramModule->path = getOptions()->executablePath + "ptx/devicePrograms.optixir";
 
 
 
@@ -185,7 +185,7 @@ namespace vtx {
 		///////////////// Cuda Mdl Linker /////////////////////////////////
 		///////////////////////////////////////////////////////////////////
 		mdl::MdlCudaLinker& mdlCudaLinker = mdl::getMdlCudaLinker();
-		mdlCudaLinker.ptxFile = "./ptx/shadeKernel.ptx";
+		mdlCudaLinker.ptxFile = getOptions()->executablePath + "ptx/shadeKernel.ptx";
 		mdlCudaLinker.kernelFunctionName = "wfShadeEntry";
 		
 	}
