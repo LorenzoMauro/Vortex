@@ -1,6 +1,5 @@
 #include "CustomImGui.h"
 #include <vector>
-#include "ImGuiFileDialog.h"
 #include "Core/Log.h"
 
 namespace vtx::vtxImGui
@@ -255,31 +254,6 @@ namespace vtx::vtxImGui
 
         ImGui::PopItemWidth();
         return updated;
-    }
-
-    void openFileDialog(const std::string& key, const std::string& name, const std::string& extension)
-    {
-        ImGui::SetNextWindowSize(ImVec2(800, 600)); // set the window size you want
-        ImGuiFileDialog::Instance()->OpenDialog(key, name, extension.c_str(), ".");
-    }
-
-    std::tuple<bool, std::string, std::string> fileDialog(const std::string& label)
-    {
-        std::string filePathName;
-        std::string filePath;
-        bool        result = false;
-        if (ImGuiFileDialog::Instance()->Display(label))
-        {
-            if (ImGuiFileDialog::Instance()->IsOk())
-            {
-                filePathName = ImGuiFileDialog::Instance()->GetFilePathName();
-                filePath = ImGuiFileDialog::Instance()->GetCurrentPath();
-                result = true;
-            }
-            ImGuiFileDialog::Instance()->Close();
-        }
-
-        return { result, filePathName, filePath };
     }
 
     void DrawRowsBackground(int row_count, float line_height, float x1, float x2, float y_offset, ImU32 col_even, ImU32 col_odd)

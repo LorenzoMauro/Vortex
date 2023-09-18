@@ -8,6 +8,7 @@
 #include "imgui_impl_opengl3.h"
 #include "Core/Options.h"
 #include "glad/glad.h"
+#include "font.h"
 
 namespace vtx {
 
@@ -65,7 +66,8 @@ namespace vtx {
         std::string FontPath = utl::absolutePath(getOptions()->fontPath);
         ImFontConfig fontConfig01;
         fontConfig01.FontDataOwnedByAtlas = false;
-        ImFont* robotoFont = io.Fonts->AddFontFromFileTTF(FontPath.data(), 12.0f, &fontConfig01);
+        //ImFont* robotoFont = io.Fonts->AddFontFromFileTTF(FontPath.data(), 12.0f, &fontConfig01);
+        ImFont* robotoFont = io.Fonts->AddFontFromMemoryTTF(LucidaGrande_ttf, LucidaGrande_ttf_len, 12.0f, &fontConfig01);
         io.FontDefault = robotoFont;
 
         //Icond Font

@@ -169,7 +169,7 @@ target_link_libraries(Vortex PRIVATE
   Glad
   yaml-cpp
   imnodes
-  ImGuiFileDialog
+  #ImGuiFileDialog
   assimp::assimp
   CUDA::cudart_static
   CUDA::cuda_driver
@@ -188,11 +188,12 @@ endif()
 
 target_include_directories(Vortex PRIVATE
   ${CMAKE_SOURCE_DIR}/Vortex/src
+  ${CMAKE_SOURCE_DIR}/assets/fonts
   ${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES}
   ${OPTIX_INCLUDE_DIR}
   ${MDL_SDK_INCLUDE_DIRS}
   ${EXTERNAL}/imnodes
-  ${EXTERNAL}/ImGuiFileDialog
+  #${EXTERNAL}/ImGuiFileDialog
   ${EXTERNAL}/stbImage
   ${TORCH_INSTALL_PREFIX_DEBUG}/include
   ${TORCH_INSTALL_PREFIX_DEBUG}/include/torch/csrc/api/include

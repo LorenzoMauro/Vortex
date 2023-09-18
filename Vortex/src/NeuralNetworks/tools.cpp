@@ -62,6 +62,7 @@ namespace vtx::network
 	        VTX_ERROR("Tensor " + tensorName + " has zero values!" + "File: " + fileName + "Line: " + std::to_string(line));
 			return true;
 		}
+        return false;
     }
 
     void copyNetworkParameters(const std::shared_ptr<torch::nn::Module>& sourceNetwork, const std::shared_ptr<torch::nn::Module>& targetNetwork) {

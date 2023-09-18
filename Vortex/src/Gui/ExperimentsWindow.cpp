@@ -1,11 +1,11 @@
 #include "ExperimentsWindow.h"
 
+#include "Core/FileDialog.h"
 #include "Core/CustomImGui/CustomImGui.h"
 #include "Device/CudaFunctions/cudaFunctions.h"
 #include "Device/UploadCode/UploadData.h"
 #include "GuiElements/PlottingWrapper.h"
 #include "Scene/Nodes/Renderer.h"
-#include "ImGuiFileDialog.h"
 #include "GuiElements/NeuralNetworkGui.h"
 #include "Scene/Scene.h"
 #include "Serialization/Serializer.h"
@@ -136,26 +136,20 @@ namespace vtx
 
 		if (ImGui::Button("Save Experiments", buttonSize))
 		{
-			vtxImGui::openFileDialog("saveExperiments", "Save Experiments", ".yaml");
-		}
-		{
-			auto [result, filePathName, filePath] = vtxImGui::fileDialog("saveExperiments");
-			if (result)
+			std::string filepath = FileDialogs::saveFileDialog({"*.yaml"});
+			if (!filepath.empty())
 			{
-				serializer::serializeExperimentManger(filePathName, *em);
+				serializer::serializeExperimentManger(filepath, *em);
 			}
 		}
 		ImGui::SameLine();
 
 		if (ImGui::Button("Load Experiments", buttonSize))
 		{
-			vtxImGui::openFileDialog("loadExperiments", "Load Experiments", ".yaml");
-		}
-		{
-			auto [result, filePathName, filePath] = vtxImGui::fileDialog("loadExperiments");
-			if (result)
+			std::string filepath = FileDialogs::openFileDialog({ "*.yaml" });
+			if (!filepath.empty())
 			{
-				*em = serializer::deserializeExperimentManager(filePathName);
+				*em = serializer::deserializeExperimentManager(filepath);
 			}
 		}
 

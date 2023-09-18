@@ -7,6 +7,8 @@
 #include "ExperimentsWindow.h"
 #include "GraphWindow.h"
 #include "ShaderGraphWindow.h"
+#include "Core/Application.h"
+#include "Core/FileDialog.h"
 #include "GLFW/glfw3.h"
 
 namespace vtx {
@@ -77,8 +79,24 @@ namespace vtx {
             if (ImGui::BeginMenu("File"))
             {
                 if (ImGui::MenuItem("New")) { /* Do something on New */ }
-                if (ImGui::MenuItem("Open", "Ctrl+O")) { /* Do something on Open */ }
-                if (ImGui::MenuItem("Save", "Ctrl+S")) { /* Do something on Save */ }
+                if (ImGui::MenuItem("Open", "Ctrl+O"))
+                {
+					const std::string filePath = vtx::FileDialogs::openFileDialog({ "*.yaml" });
+                    if (!filePath.empty())
+                    {
+                        Application::get()->setFileToLoad(filePath);
+                        // Do something with the filePath, e.g., load the YAML data
+                    }
+                }
+
+                if (ImGui::MenuItem("Save", "Ctrl+S"))
+                {
+					const std::string savePath = vtx::FileDialogs::saveFileDialog({ "*.yaml" });
+                    if (!savePath.empty())
+                    {
+                        // Do something with the savePath, e.g., save your data to the YAML file
+                    }
+                }
                 if (ImGui::MenuItem("Exit")) { /* Exit or close your app */ }
                 ImGui::EndMenu();
             }

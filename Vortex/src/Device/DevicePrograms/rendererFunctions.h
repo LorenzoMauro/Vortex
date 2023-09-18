@@ -166,7 +166,6 @@ namespace vtx
     __forceinline__ __device__ math::vec3f missShader(EscapedWorkItem& ewi, LaunchParams* params)
     {
         math::vec3f emission = 0.0f;
-        float pdf = 0.0f;
         float misWeight = 1.0f;
         if (params->envLight != nullptr)
         {
@@ -201,7 +200,6 @@ namespace vtx
                 // then calculate light emission with multiple importance sampling for this implicit light hit as well.
                 bool MiSCondition = (params->settings->renderer.samplingTechnique == S_MIS && (ewi.eventType & (mi::neuraylib::BSDF_EVENT_DIFFUSE | mi::neuraylib::BSDF_EVENT_GLOSSY)));
                 float envSamplePdf = attrib.aliasMap[y * texture->dimension.x + x].pdf;
-                pdf = envSamplePdf;
                 if (ewi.pdf > 0.0f && MiSCondition)
                 {
                     misWeight = utl::heuristic(ewi.pdf, envSamplePdf);

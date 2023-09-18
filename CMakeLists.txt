@@ -70,14 +70,14 @@ find_package(assimp CONFIG REQUIRED)
 
 add_subdirectory(${EXTERNAL}/glad)
 add_subdirectory(${EXTERNAL}/imnodes)
-add_subdirectory(${EXTERNAL}/ImGuiFileDialog)
+#add_subdirectory(${EXTERNAL}/ImGuiFileDialog)
 
 add_subdirectory(Vortex/src)
 
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 # Organize them into folders
 set_property(TARGET Glad PROPERTY FOLDER "Dependencies")
-set_property(TARGET ImGuiFileDialog PROPERTY FOLDER "Dependencies")
+#set_property(TARGET ImGuiFileDialog PROPERTY FOLDER "Dependencies")
 set_property(TARGET imnodes PROPERTY FOLDER "Dependencies")
 
 configure_file(${CMAKE_SOURCE_DIR}/scripts/VortexInstaller.nsi.in ${CMAKE_BINARY_DIR}/VortexInstaller.nsi @ONLY)

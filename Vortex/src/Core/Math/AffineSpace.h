@@ -102,7 +102,8 @@ namespace gdt {
 			{
 				return Proxy(&l.vx.z, &l.vy.z, &l.vz.z, &p.z);
 			}
-		}
+        default: return Proxy(nullptr, nullptr, nullptr, nullptr);
+        }
     }
 
     ////////////////////////////////////////////////////////////////////////////////

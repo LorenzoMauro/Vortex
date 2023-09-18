@@ -67,10 +67,6 @@ namespace vtx::vtxImGui
         return valueChanged;
     }
 
-    void openFileDialog(const std::string&  key, const std::string&  name, const std::string&  extension);
-    std::tuple<bool, std::string, std::string> fileDialog(const std::string& label);
-
-
     void DrawRowsBackground(int row_count, float line_height, float x1, float x2, float y_offset, ImU32 col_even, ImU32 col_odd);
 
     void childWindowResizerButton(float& percentage, const float& resizerSize, bool isHorizontalSplit);
