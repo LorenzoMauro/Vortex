@@ -32,7 +32,7 @@ namespace vtx::serializer
     };
 
     static std::string previousModelPath;
-
+    static std::string previousHDRIPath;
 
     bool deserialize(const std::string& filePath, const std::shared_ptr<graph::Scene>& scene)
     {
@@ -57,6 +57,7 @@ namespace vtx::serializer
                 camera = ops::standardCamera();
             }
             scene->sceneRoot = _sceneRoot;
+            previousModelPath = modelPath;
         }
 
         if (data[keymap[YamlKey::HDRI_PATH]])
@@ -66,6 +67,7 @@ namespace vtx::serializer
             envLight->envTexture = ops::createNode<graph::Texture>(hdriPath);
             scene->sceneRoot->addChild(envLight);
             VTX_INFO("HDRI Path: {0}", hdriPath);
+            previousHDRIPath = hdriPath;
         }
 
         if(!scene->renderer)
@@ -81,6 +83,10 @@ namespace vtx::serializer
         return true;
     }
 
+    void serialize(const std::string& filePath)
+    {
+	    
+    }
 
     bool serializeExperimentManger(const std::string& filePath, ExperimentsManager& em)
     {
@@ -107,5 +113,13 @@ namespace vtx::serializer
         ExperimentsManager em;
         vtx::serializer::ExperimentsManagerSerializer::decode(node, em);
         return em;
+    }
+    std::string getPreviousModelPath()
+    {
+        return previousModelPath;
+    }
+    std::string getPreviousHDRIPath()
+    {
+        return previousHDRIPath;
     }
 }

@@ -51,12 +51,17 @@ namespace vtx
         }
 
         if (SUCCEEDED(hr)) {
-            std::vector<COMDLG_FILTERSPEC> filterSpecs;
+            std::wstring combinedExtensions;
             for (const auto& ext : extensions) {
-                filterSpecs.push_back({ L"File", stringToWstring(ext).c_str() });
+                combinedExtensions += stringToWstring(ext) + L";";
             }
+            combinedExtensions.pop_back();  // remove the last semicolon
+
+            std::vector<COMDLG_FILTERSPEC> filterSpecs;
+            filterSpecs.push_back({ L"Supported Files", combinedExtensions.c_str() });
 
             pfd->SetFileTypes(static_cast<UINT>(filterSpecs.size()), filterSpecs.data());
+
             hr = pfd->Show(NULL);
 
             if (SUCCEEDED(hr)) {

@@ -27,4 +27,10 @@ namespace vtx::serializer
 
 	ExperimentsManager deserializeExperimentManager(const std::string& filePath);
 
+	void serialize(const std::string& filePath);
+
+	std::string getPreviousModelPath();
+
+	std::string getPreviousHDRIPath();
+
 }

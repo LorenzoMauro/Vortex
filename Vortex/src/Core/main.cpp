@@ -10,7 +10,7 @@ int main(int argc, char** argv) {
 		app.init();
 		if (argc > 1) { // If there's more than one argument
 			std::string arg = argv[1];
-			app.setFileToLoad(arg);
+			app.setStartUpFile(arg);
 		}
 		while (!glfwWindowShouldClose(app.glfwWindow))
 		{

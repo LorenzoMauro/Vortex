@@ -41,7 +41,7 @@ namespace vtx {
 		bool createWindow = true;
 		bool isBorderLess = false;
 		bool useStripedBackground = false;
-		ImGuiWindowFlags windowFlags = ImGuiWindowFlags_AlwaysUseWindowPadding;
+		ImGuiWindowFlags windowFlags = 0;// = ImGuiWindowFlags_AlwaysUseWindowPadding;
 		float resizerSize = 2.0f;
 		float childPaddingHeight = 10.0f;
 		float childPaddingWidth = 10.0f;

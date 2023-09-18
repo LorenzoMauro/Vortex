@@ -22,9 +22,7 @@ namespace vtx {
 		
 		void run();
 
-		void setFileToLoad(const std::string& file);
-
-		void loadFile();
+		static void  setStartUpFile(const std::string& filePath);
 
 		static Application* get() ;
 		
@@ -34,8 +32,6 @@ namespace vtx {
 		float                               timeStep      = 0.0f;
 		float                               frameTime     = 0.0f;
 		float                               lastFrameTime = 0.0f;
-		std::string                         fileToLoad;
-		bool shouldLoadFile = false;
 		unsigned							iteration = 0;
 	};
 }

@@ -247,12 +247,6 @@ add_custom_command(TARGET Vortex POST_BUILD
                    $<TARGET_FILE_DIR:Vortex>)
 
 add_custom_command(TARGET Vortex POST_BUILD
-                   COMMAND ${CMAKE_COMMAND} -E make_directory $<TARGET_FILE_DIR:Vortex>/assets/fonts
-                   COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                   ${CMAKE_SOURCE_DIR}/assets/fonts/LucidaGrande.ttf
-                   $<TARGET_FILE_DIR:Vortex>/assets/fonts)
-
-add_custom_command(TARGET Vortex POST_BUILD
                    COMMAND ${CMAKE_COMMAND} -E make_directory $<TARGET_FILE_DIR:Vortex>/assets/mdl
                    COMMAND ${CMAKE_COMMAND} -E copy_if_different
                    ${CMAKE_SOURCE_DIR}/assets/mdl/VortexFunctions.mdl

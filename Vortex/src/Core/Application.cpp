@@ -2,6 +2,7 @@
 #include "ShutDownOperations.h"
 #include "glad/glad.h"
 #include "ImGuiOp.h"
+#include "LoadingSaving.h"
 #include "Device/OptixWrapper.h"
 #include "Device/PipelineConfiguration.h"
 #include "Gui/AppWindow.h"
@@ -113,13 +114,13 @@ namespace vtx
 		if(!isWindowMinimized(glfwWindow))
 		{
 			ImGuiRenderStart();
+			if(iteration >3) // it seems the minimum frame to render the initial gui
+			{
+				LoadingSaving::get().performLoadSave();
+			}
 			windowManager->renderWindows();
 			ImGuiDraw(glfwWindow);
 			glfwSwapBuffers(glfwWindow);
-		}
-		if (shouldLoadFile && iteration>3) { //>3 because I'd rather have the gui render first
-			loadFile();
-			shouldLoadFile = false;
 		}
 		windowManager->removeClosedWindows();
 		const auto time = static_cast<float>(glfwGetTime());
@@ -128,16 +129,9 @@ namespace vtx
 		lastFrameTime = time;
 		iteration += 1;
 	}
-	void Application::setFileToLoad(const std::string& file)
+	void Application::setStartUpFile(const std::string& filePath)
 	{
-		fileToLoad = file;
-		shouldLoadFile = true;
-	}
-	void Application::loadFile() {
-		if (!fileToLoad.empty()) {
-			serializer::deserialize(fileToLoad, graph::Scene::getScene());
-			fileToLoad = "";
-		}
+		LoadingSaving::get().setManualLoad(filePath);
 	}
 	Application* Application::get()
 	{
