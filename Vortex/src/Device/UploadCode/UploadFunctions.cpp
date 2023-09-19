@@ -316,8 +316,8 @@ namespace vtx::device
 			if (dp.pgEvaluateMaterial) {
 				dvConfig.idxCallEvaluateMaterialStandard = rp->getProgramSbt(dp.pgEvaluateMaterial->name);
 				dvConfig.idxCallEvaluateMaterialWavefront = rp->getProgramSbt(dp.pgEvaluateMaterial->name, "wfShade");
-				VTX_WARN("Fetching Shader {} EvaluateMaterial STANDARD program {} with SBT {}", material->name, dp.pgEvaluateMaterial->name, dvConfig.idxCallEvaluateMaterialStandard);
-				VTX_WARN("Fetching Shader {} EvaluateMaterial WAVEFRONT program {} with SBT {}", material->name, dp.pgEvaluateMaterial->name, dvConfig.idxCallEvaluateMaterialWavefront);
+				//VTX_WARN("Fetching Shader {} EvaluateMaterial STANDARD program {} with SBT {}", material->name, dp.pgEvaluateMaterial->name, dvConfig.idxCallEvaluateMaterialStandard);
+				//VTX_WARN("Fetching Shader {} EvaluateMaterial WAVEFRONT program {} with SBT {}", material->name, dp.pgEvaluateMaterial->name, dvConfig.idxCallEvaluateMaterialWavefront);
 			}
 			dvConfig.idxCallEvaluateMaterialWavefrontCuda = mdl::getMdlCudaLinker().getMdlFunctionIndices(material->name);
 		}

@@ -136,7 +136,6 @@ namespace vtx::mdl
             std::string prototype = extractFunctionPrototype(newCode, newEvaluateMaterialNameFunction, ".extern");
             src += prototype + ";\n";
             functionNames += newEvaluateMaterialNameFunction;
-            VTX_INFO("{}",prototype);
             fCount++;
         }
 
@@ -150,7 +149,7 @@ namespace vtx::mdl
         //printArrayU32(src, std::string("mdl_arg_block_indices"), fCount, abIndices);
         //printArrayU32(src, std::string("mdl_target_code_indices"), fCount, tcIndices);
 
-        VTX_INFO("{}",src);
+        VTX_INFO("Generated Mdl Function Array Ptx:\n{}",src);
         return src;
     }
 

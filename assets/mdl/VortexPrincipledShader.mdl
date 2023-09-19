@@ -174,9 +174,6 @@ export material principledVortex(
         normal: Normal,
 		base: BaseBsdf); 
 
-    //Metallic Component
-    VortexFunctions::AnisotropicRoughness metlAniRough = VortexFunctions::computeRoughnessAnisotropy(Roughness*0.3, Anisotropy, Anisotropy_rotation);
-
 	bsdf metal = df::tint(BaseColor, ggx_smith_dielectric);
 
     bsdf metal_brdf_fresnel_factored = df::fresnel_factor(
