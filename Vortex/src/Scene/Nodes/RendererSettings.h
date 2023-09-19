@@ -89,6 +89,7 @@ namespace vtx
 		FB_TANGENT,
 		FB_UV,
 		FB_NOISE,
+		FB_GBUFFER,
 		FB_SAMPLES,
 		FB_DEBUG_1,
 
@@ -121,6 +122,7 @@ namespace vtx
 			"Tangent",
 			"Uv",
 			"Noise",
+		    "GBuffer",
 			"Samples",
 			"Debug1",
 			"Network Inference State Position",

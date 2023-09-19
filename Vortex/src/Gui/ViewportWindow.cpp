@@ -29,7 +29,9 @@ namespace vtx {
             {
                 renderer->settings.iteration++;
                 renderer->settings.isUpdated = true;
-                //graph::computeMaterialsMultiThreadCode();
+
+                //This step speed up the material computation, but is not really coherent with the rest of the code
+                graph::computeMaterialsMultiThreadCode();
                 renderer->traverse(hostVisitor);
                 renderer->traverse(deviceVisitor);
                 device::incrementFrame();
@@ -44,7 +46,8 @@ namespace vtx {
 	        {
 	        	renderer->settings.iteration++;
 				renderer->settings.isUpdated = true;
-				//graph::computeMaterialsMultiThreadCode();
+                //This step speed up the material computation, but is not really coherent with the rest of the code
+				graph::computeMaterialsMultiThreadCode();
                 renderer->traverse(hostVisitor);
                 renderer->traverse(deviceVisitor);
 				device::incrementFrame();
@@ -57,13 +60,6 @@ namespace vtx {
 
     void ViewportWindow::renderMainContent()
     {
-        //gui::SceneGraphGui::draw();
-        //
-        //ImGui::Begin("Renderer Settings");
-        //gui::rendererNodeGui(renderer);
-        //ImGui::End();
-        //materialGui.materialGui();
-
         ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
         const int width = (int)ImGui::GetContentRegionAvail().x;
         const int height = (int)ImGui::GetContentRegionAvail().y;
@@ -73,8 +69,30 @@ namespace vtx {
         if (!renderer->camera->navigationActive) {
             renderer->camera->navigationActive = ImGui::IsItemHovered();
         }
+        if (ImGui::IsItemHovered() && ImGui::IsItemClicked()){
+            if (ImGui::GetIO().KeyCtrl)
+            {
+                selectedId = 0;
+            }
+            else
+            {
+                const ImVec2 mousePos = ImGui::GetMousePos();
+                const ImVec2 windowPos = ImGui::GetWindowPos();
+
+                const int mouseXRelativeToWindow = static_cast<int>(mousePos.x - windowPos.x);
+                const int mouseYRelativeToWindow = static_cast<int>(bf.height) - static_cast<int>(mousePos.y - windowPos.y);
+                const int pixelIndex = mouseYRelativeToWindow * width + mouseXRelativeToWindow;
+
+                selectedId = renderer->getInstanceIdOnClick(pixelIndex);
+            }
+			
+            windowManager->selectedNodes["ViewportWindow"] = { selectedId };
+            renderer->selectedId = selectedId;
+        }
+
         ImGui::PopStyleVar();
     }
+
     void ViewportWindow::preRender()
     {
         if (renderer->isSizeLocked)

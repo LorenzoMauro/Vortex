@@ -21,7 +21,17 @@ namespace vtx::utl
 		return a * (1.0f - t) + b * t;
 	}
 
-	__forceinline__ __device__ void accumulate(const math::vec3f& input, math::vec3f& buffer, float kFactor, float jFactor)
+	__forceinline__ __device__ float clampf(const float& value, const float& min, const float& max)
+	{
+		return fminf(fmaxf(value, min), max);
+	}
+
+	__forceinline__ __device__ float smoothstep(const float edge0, const float edge1, float x) {
+		x = clampf((x - edge0) / (edge1 - edge0), 0.0f, 1.0f);
+		return x * x * (3 - 2 * x);
+	}
+
+	__forceinline__ __device__ void accumulate(const math::vec3f& input, math::vec3f& buffer, const float kFactor, const float jFactor)
 	{
 		if(!isNan(input))
 		{
@@ -29,7 +39,7 @@ namespace vtx::utl
 		}
 	}
 
-	__forceinline__ __device__ void lerpAccumulate(const math::vec3f& input, math::vec3f& buffer, float samples)
+	__forceinline__ __device__ void lerpAccumulate(const math::vec3f& input, math::vec3f& buffer, const float samples)
 	{
 		if(!isNan(input))
 		{

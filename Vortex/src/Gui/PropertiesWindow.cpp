@@ -21,11 +21,14 @@ namespace vtx
 			{
 				for (const int idx : nodes)
 				{
-					areNodesSelected = true;
-					const vtxID nodeId = idx;
-					const std::shared_ptr<graph::Node> node = graph::SIM::getNode<graph::Node>(nodeId);
-					ImGui::SetNextItemOpen(true, ImGuiCond_Once);
-					node->accept(guiVisitor);
+					if(idx != 0)
+					{
+						areNodesSelected = true;
+						const vtxID nodeId = idx;
+						const std::shared_ptr<graph::Node> node = graph::SIM::getNode<graph::Node>(nodeId);
+						ImGui::SetNextItemOpen(true, ImGuiCond_Once);
+						node->accept(guiVisitor);
+					}
 				}
 			}
 		}

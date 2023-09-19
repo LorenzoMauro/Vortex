@@ -1,6 +1,8 @@
 ﻿#pragma once
 #include "Device/DevicePrograms/nvccUtils.h"
 #include "Core/Math.h"
+#include "Core/VortexID.h"
+#include "Device/DevicePrograms/Utils.h"
 #include "Device/UploadCode/CUDABuffer.h"
 #include "Device/Wrappers/KernelLaunch.h"
 
@@ -127,5 +129,171 @@ namespace vtx::cuda{
 		});
 
 		return output;
+	}
+
+
+	__forceinline__ __device__ float edgeTransform(float x, float curvature, float scale) {
+		if (x > 0.0f && x < 1.0f) {
+			//float value = fminf(1.0f, scale * expf((-powf((x - 1.0f), 2.0f)) / curvature));
+			float tX = x - 1.0f;
+			float value = scale * expf(-(tX * tX) / curvature);
+			return value;
+		}
+		else {
+			return 0.0f;
+		}
+	}
+
+	__forceinline__ __device__ void overlayEdgeKernel(
+		const int id,
+		const int width,
+		const float* edgeData,
+		math::vec4f* image,
+		const float curvature,
+		const float scale
+	) {
+		const int x = id % width;
+		const int y = id / width;
+
+		// Define the orange color
+		const math::vec3f orange = math::vec3f(1.0f, 0.5f, 0.0f);
+		float edgeValue = edgeData[y * width + x];
+		
+		edgeValue = edgeTransform(edgeValue, curvature, scale);
+
+		image[y * width + x] = math::vec4f(utl::lerp<math::vec3f>(math::vec3f(image[y * width + x]), orange, edgeValue), 1.0f);
+		//image[y * width + x] = math::vec4f(edgeValue, 1.0f);
+	}
+
+	void overlayEdgesOnImage(
+		float* d_edgeData,
+		math::vec4f* d_image,
+		int width,
+		int height,
+		const float curvature,
+		const float scale
+	)
+	{
+		const int dataSize = width * height;
+		gpuParallelFor("OverlayEdges",
+			dataSize,
+			[d_edgeData, d_image, width, curvature, scale] __device__(const int id)
+		{
+			overlayEdgeKernel(id, width, d_edgeData, d_image, curvature, scale);
+		});
+	}
+
+	__forceinline__ __device__ void selectionEdgeDevice(
+		const int id,
+		const int width,
+		const int height,
+		const float* data,
+		float* output,
+		const float value,
+		const int thickness
+	)
+	{
+		const int x = id % width;
+		const int y = id / width;
+
+		int matchCount = 0;      // Count of neighboring pixels matching the target value.
+		int nonMatchCount = 0;   // Count of neighboring pixels not matching the target value.
+		int totalNeighbors = 0;  // Total neighboring pixels within the thickness.
+
+		if(gdt::isEqual(data[id], value))
+		{
+			output[id] = 0.0f;
+		}
+		for (int dx = -thickness; dx <= thickness; dx++)
+		{
+			for (int dy = -thickness; dy <= thickness; dy++)
+			{
+				// Skip the center pixel.
+				//if (dx == 0 && dy == 0) continue;
+
+				const int nx = x + dx;
+				const int ny = y + dy;
+				if (nx >= 0 && nx < width && ny >= 0 && ny < height)
+				{
+					float neighborValue = data[ny * width + nx];
+
+					if (gdt::isEqual(neighborValue, value))
+					{
+						matchCount++;
+					}
+					else
+					{
+						nonMatchCount++;
+					}
+
+					totalNeighbors++;
+				}
+			}
+		}
+
+		// Compute the edge value based on the ratio of match and non-match counts.
+		if (matchCount == nonMatchCount)
+		{
+			output[id] = 1.0f;
+		}
+		else
+		{
+			float ratio = static_cast<float>(abs(matchCount - nonMatchCount)) / static_cast<float>(totalNeighbors);
+			output[id] = 1.0f - ratio;
+		}
+	}
+
+	float* selectionEdge(
+		float* d_data,
+		int    width,
+		int    height,
+		float  value,
+		int    thickness
+	)
+	{
+		const int  dataSize = width * height;
+		CUDABuffer cudaBuffer;
+		auto*      output = cudaBuffer.alloc<float>(dataSize);
+		gpuParallelFor("CustomEdge",
+					   dataSize,
+					   [output, width, height, d_data, value, thickness] __device__(const int id)
+					   {
+			selectionEdgeDevice(id, width, height, d_data, output, value, thickness);
+					   });
+		return output;
+	}
+
+	void overlaySelectionEdge(
+		float* gBuffer,
+		math::vec4f* outputImage,
+		int    width,
+		int    height,
+		float value,
+		const float curvature,
+		const float scale,
+		CUDABuffer* cudaBuffer = nullptr
+	)
+	{
+		const int  dataSize = width * height;
+		float* edgeMap = nullptr;
+		bool deleteBuffer = false;
+		if (cudaBuffer == nullptr)
+		{
+			cudaBuffer = new CUDABuffer();
+			deleteBuffer = true;
+		}
+		edgeMap = cudaBuffer->alloc<float>(dataSize);
+		gpuParallelFor("Overlay Selection Edge",
+			dataSize,
+		[edgeMap, width, height, gBuffer, value, outputImage, curvature, scale] __device__(const int id)
+		{
+			selectionEdgeDevice(id, width, height, gBuffer, edgeMap, value, 1);
+			overlayEdgeKernel(id, width, edgeMap, outputImage, curvature, scale);
+		});
+		if (deleteBuffer)
+		{
+			cudaBuffer->free();
+			delete cudaBuffer;
+		}
 	}
 }

@@ -14,27 +14,14 @@ namespace vtx::device
 {
 	struct Buffers
 	{
-		static Buffers* getInstance()
-		{
-			static Buffers buffersInstance;
-			return &buffersInstance;
-		}
+		static Buffers* getInstance();
 
 		Buffers(const Buffers&)            = delete; // Disable copy constructor
 		Buffers& operator=(const Buffers&) = delete; // Disable assignment operator
 		Buffers(Buffers&&)                 = delete; // Disable move constructor
 		Buffers& operator=(Buffers&&)      = delete; // Disable move assignment operator
 
-		void shutDown()
-		{
-			VTX_INFO("Shutting Down Buffers");
-			frameIdBuffer.free();
-			launchParamsBuffer.free();
-			rendererSettingsBuffer.free();
-			sbtProgramIdxBuffer.free();
-			instancesBuffer.free();
-			toneMapperSettingsBuffer.free();
-		}
+		void shutDown();
 
 
 		struct GeometryBuffers
@@ -363,6 +350,9 @@ namespace vtx::device
 			CUDABuffer cudaOutputBuffer;
 			CUDABuffer noiseDataBuffer;
 
+			CUDABuffer gBufferData;
+			CUDABuffer gBuffer;
+			CUDABuffer edgeMapBuffer;
 
 			FrameBufferBuffers() = default;
 
@@ -393,6 +383,9 @@ namespace vtx::device
 				directLight.free();
 				diffuseIndirect.free();
 				glossyIndirect.free();
+				gBuffer.free();
+				edgeMapBuffer.free();
+				gBufferData.free();
 			}
 		};
 

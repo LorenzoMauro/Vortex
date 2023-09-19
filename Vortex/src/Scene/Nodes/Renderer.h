@@ -35,6 +35,8 @@ namespace vtx::graph
 		void  setWindow(GLFWwindow* window);
 
 		void accept(NodeVisitor& visitor) override;
+
+		vtxID getInstanceIdOnClick(int pixelID);
 	public:
 		//GL Interop
 		WaveFrontIntegrator								waveFrontIntegrator;
@@ -51,6 +53,7 @@ namespace vtx::graph
 		bool											isSizeLocked = false;
 		RendererSettings								settings;
 		bool											resized = true;
+		vtxID         selectedId = 0;
 
 		vtx::Timer timer;
 

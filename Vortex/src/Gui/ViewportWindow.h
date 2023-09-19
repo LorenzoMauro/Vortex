@@ -26,5 +26,7 @@ namespace vtx {
         bool        m_isResized = false;
         device::DeviceVisitor deviceVisitor;
         HostVisitor hostVisitor;
+
+        vtxID selectedId = 0;
     };
 }

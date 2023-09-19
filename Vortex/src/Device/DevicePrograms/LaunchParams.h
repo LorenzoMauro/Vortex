@@ -229,6 +229,70 @@ namespace vtx {
         bool                        hasOpacity;
     };
 
+    struct gBufferHistory
+    {
+#define historySize 10
+
+        struct IdData
+        {
+            vtxID id = 0;
+            int count = 0;
+        };
+        vtxID mostFrequent = 0;
+        IdData idCounts[historySize];
+        int nSamples = 0;
+
+        __forceinline__ __device__ void recordId(const vtxID newId)
+        {
+            if (nSamples == historySize)
+            {
+                return;
+            }
+            nSamples++;
+
+            for (int i = 0; i < historySize; ++i)
+            {
+	            if (idCounts[i].id == newId)
+	            {
+	            	idCounts[i].count++;
+                    break;
+				}
+                if (idCounts[i].count == 0)
+                {
+	                idCounts[i].id = newId;
+					idCounts[i].count = 1;
+                    break;
+				}
+			}
+
+            if(mostFrequent == newId)
+            {
+                return;
+            }
+
+            int maxIndex = 0;
+            for (int i = 0; i< historySize; ++i)
+            {
+	            if (idCounts[i].count > idCounts[maxIndex].count)
+	            {
+	            	maxIndex = i;
+				}
+			}
+            mostFrequent = idCounts[maxIndex].id;
+        }
+
+        __forceinline__ __device__ void reset()
+        {
+	        for (int i = 0; i < historySize; ++i)
+	        {
+		        idCounts[i].id = 0;
+		        idCounts[i].count = 0;
+	        }
+			mostFrequent = 0;
+			nSamples = 0;
+        }
+    };
+
 
     struct FrameBufferData
     {
@@ -257,6 +321,9 @@ namespace vtx {
         NoiseData*   noiseBuffer;
         CUdeviceptr  outputBuffer{};
         math::vec2ui frameSize;
+
+        gBufferHistory* gBufferHistory;
+        float* gBuffer;
 	};
 
     

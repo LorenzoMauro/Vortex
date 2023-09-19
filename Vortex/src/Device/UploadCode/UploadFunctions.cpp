@@ -820,7 +820,9 @@ namespace vtx::device
 			UPLOAD_DATA->frameBufferData.uv = GET_BUFFER(Buffers::FrameBufferBuffers, rendererNodeId, uv).alloc<math::vec3f>(width*height);
 			UPLOAD_DATA->frameBufferData.debugColor1 = GET_BUFFER(Buffers::FrameBufferBuffers, rendererNodeId, debugColor1).alloc<math::vec3f>(width*height);
 			UPLOAD_DATA->frameBufferData.fireflyPass = GET_BUFFER(Buffers::FrameBufferBuffers, rendererNodeId, fireflyRemoval).alloc<math::vec3f>(width * height);
-			UPLOAD_DATA->frameBufferData.samples = GET_BUFFER(Buffers::FrameBufferBuffers, rendererNodeId, samples).alloc<int>(width*height);
+			UPLOAD_DATA->frameBufferData.samples = GET_BUFFER(Buffers::FrameBufferBuffers, rendererNodeId, samples).alloc<int>(width * height);
+			UPLOAD_DATA->frameBufferData.gBufferHistory = GET_BUFFER(Buffers::FrameBufferBuffers, rendererNodeId, gBufferData).alloc<gBufferHistory>(width * height);
+			UPLOAD_DATA->frameBufferData.gBuffer = GET_BUFFER(Buffers::FrameBufferBuffers, rendererNodeId, gBuffer).alloc<float>(width*height);
 
 			optix::getState()->denoiser.resize(rendererNode->width, rendererNode->height);
 

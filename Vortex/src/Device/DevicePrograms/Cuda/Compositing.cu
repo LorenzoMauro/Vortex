@@ -187,6 +187,17 @@ namespace vtx
 			outputBuffer[fbIndex] = math::vec4f(value, 1.0f);
 		}
 		break;
+		case(FB_GBUFFER):
+		{
+			vtxID instanceID = frameBuffer->gBuffer[fbIndex];
+			instanceID = ((instanceID << 5) | (instanceID >> 27)) ^ ((instanceID << 13) | (instanceID >> 19));;
+
+			math::vec3f color;
+			color.x = (instanceID & 0x000000FF) / 255.0f;
+			color.y = ((instanceID & 0x0000FF00) >> 8) / 255.0f;
+			color.z = ((instanceID & 0x00FF0000) >> 16) / 255.0f;
+			outputBuffer[fbIndex] = math::vec4f(color, 1.0f);
+		}
 		case(FB_SAMPLES):
 		{
 			float sampleMetric = (float)(frameBuffer->samples[fbIndex] - launchParams->settings->renderer.adaptiveSamplingSettings.minAdaptiveSamples) / (float)(launchParams->settings->renderer.iteration - launchParams->settings->renderer.adaptiveSamplingSettings.minAdaptiveSamples);

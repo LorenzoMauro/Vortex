@@ -126,6 +126,8 @@ namespace vtx
             frameBuffer->uv[id] = 0.0f;
             frameBuffer->fireflyPass[id] = 0.0f;
             frameBuffer->samples[id] = 0;
+            frameBuffer->gBufferHistory[id].reset();
+            frameBuffer->gBuffer[id] = 0.0f;
             reinterpret_cast<math::vec4f*>(frameBuffer->outputBuffer)[id] = math::vec4f(0.0f);
             frameBuffer->noiseBuffer[id].adaptiveSamples = 1;
             params->networkInterface->debugBuffer1[id] = 0.0f;
@@ -913,6 +915,23 @@ namespace vtx
 		}
     }
 
+    __forceinline__ __device__ void setGBuffer(const RayWorkItem& prd, const LaunchParams& params)
+    {
+	    if (prd.depth == 0)
+	    {
+            params.frameBuffer.gBufferHistory[prd.originPixel].recordId(prd.hitProperties.instanceId);
+            const bool smoothGBuffer = false;
+            if (smoothGBuffer)
+            {
+				const float value = params.frameBuffer.gBuffer[prd.originPixel] * ((float)params.frameBuffer.samples[prd.originPixel] - 1.0f) + (float)prd.hitProperties.instanceId;
+				params.frameBuffer.gBuffer[prd.originPixel] = value/(float)params.frameBuffer.samples[prd.originPixel];
+            }
+            else
+            {
+                params.frameBuffer.gBuffer[prd.originPixel] = (float)params.frameBuffer.gBufferHistory[prd.originPixel].mostFrequent;
+            }
+		}
+	}
     __forceinline__ __device__ void shade(LaunchParams* params, RayWorkItem& prd, ShadowWorkItem& swi, TraceWorkItem& twi, const int& shadeQueueIndex = 0)
     {
         prd.hitProperties.calculate(params, prd.direction);
@@ -922,6 +941,8 @@ namespace vtx
                 prd.originPixel, prd.depth,
                 prd.hitProperties.position, prd.hitProperties.shadingNormal, prd.direction);
         }
+
+        setGBuffer(prd, *params);
 
         mdl::MaterialEvaluation matEval{};
         twi.extendRay = false;

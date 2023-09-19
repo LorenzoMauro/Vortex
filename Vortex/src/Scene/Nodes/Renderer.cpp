@@ -10,6 +10,7 @@
 #include "Scene/Traversal.h"
 #include "device_launch_parameters.h"
 #include "cuda_runtime.h"
+#include "Device/CudaFunctions/cudaFunctions.h"
 #include "Device/DevicePrograms/CudaKernels.h"
 #include "Device/Wrappers/KernelTimings.h"
 #include "Scene/Utility/Operations.h"
@@ -50,6 +51,18 @@ namespace vtx::graph
 	void Renderer::accept(NodeVisitor& visitor)
 	{
 		visitor.visit(as<Renderer>());
+	}
+
+	vtxID Renderer::getInstanceIdOnClick(int pixelID)
+	{
+		const gBufferHistory* gBufferPtr = GET_BUFFER(device::Buffers::FrameBufferBuffers, getID(), gBufferData).castedPointer<gBufferHistory>();
+		const gBufferHistory* pixelGBufferPtr = gBufferPtr + pixelID;
+		const auto* pixelDataPtr = reinterpret_cast<const vtxID*>(pixelGBufferPtr);
+
+		vtxID hostValue;
+		cudaMemcpy(&hostValue, pixelDataPtr, sizeof(vtxID), cudaMemcpyDeviceToHost);
+
+		return hostValue;
 	}
 
 	bool Renderer::isReady(const bool setBusy) {
@@ -166,8 +179,18 @@ namespace vtx::graph
 				optix::getState()->denoiser.setInputs(denoiserRadianceInput, albedoBuffer, normalBuffer);
 				beauty = optix::getState()->denoiser.denoise(settings.denoiserSettings.denoiserBlend);
 			}
-
 			switchOutput(launchParamsBuffer.castedPointer<LaunchParams>(), width, height, beauty);
+
+			// Selection edge
+			{
+				if (selectedId != 0)
+				{
+					auto* gBuffer = GET_BUFFER(device::Buffers::FrameBufferBuffers, getID(), gBuffer).castedPointer<float>();
+					auto* outputBuffer = GET_BUFFER(device::Buffers::FrameBufferBuffers, getID(), cudaOutputBuffer).castedPointer<math::vec4f>();
+					CUDABuffer edgeMapBuffer = GET_BUFFER(device::Buffers::FrameBufferBuffers, getID(), edgeMapBuffer);
+					cuda::overlaySelectionEdge(gBuffer, outputBuffer, width, height, (float)selectedId, 0.2f, 1.35f, &edgeMapBuffer);
+				}
+			}
 			cudaEventRecord(events.second);
 		}
 

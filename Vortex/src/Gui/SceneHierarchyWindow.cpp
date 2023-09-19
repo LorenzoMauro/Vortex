@@ -78,11 +78,11 @@ namespace vtx
         displayNode(renderer);
         if(selection_mask == -1)
         {
-	        			windowManager->selectedNodes["SceneHierarchyWindow"] = {};
+	        windowManager->selectedNodes["SceneHierarchyWindow"] = {};
 		}
         else
         {
-	        windowManager->selectedNodes["SceneHierarchyWindow"] = {selection_mask};
+	        windowManager->selectedNodes["SceneHierarchyWindow"] = {(vtxID)selection_mask};
         }
 	}
 }
