@@ -1,4 +1,6 @@
 #include "CustomImGui.h"
+
+#include <stack>
 #include <vector>
 #include "Core/Log.h"
 
@@ -191,7 +193,7 @@ namespace vtx::vtxImGui
         ImGui::EndGroup();
     }
 
-    bool customVectorInput(const char* label, float& value, ImU32 labelColor, bool disableEdit)
+    bool customVectorInput(const char* label, float& value, const ImU32 labelColor, const bool disableEdit)
     {
         float availableWidth = ImGui::CalcItemWidth();
 
@@ -231,7 +233,7 @@ namespace vtx::vtxImGui
         return updated;
     }
 
-    bool vectorGui(float* data, bool disableEdit)
+    bool vectorGui(float* data, const bool disableEdit)
     {
         bool updated = false;
 
@@ -256,7 +258,32 @@ namespace vtx::vtxImGui
         return updated;
     }
 
-    void DrawRowsBackground(int row_count, float line_height, float x1, float x2, float y_offset, ImU32 col_even, ImU32 col_odd)
+    static float             halfWidgetFraction = 0.3f;
+    static std::stack<float> halfWidgetFractionStack = std::stack<float>();
+
+    void pushHalfSpaceWidgetFraction(const float fraction)
+    {
+        halfWidgetFractionStack.push(halfWidgetFraction);
+    }
+
+    void popHalfSpaceWidgetFraction()
+    {
+        if (!halfWidgetFractionStack.empty())
+        {
+			halfWidgetFractionStack.pop();
+		}
+    }
+
+    float getHalfWidgetFraction()
+    {
+        if (halfWidgetFractionStack.empty())
+        {
+            halfWidgetFractionStack.push(halfWidgetFraction);
+        }
+        return halfWidgetFractionStack.top();
+    }
+
+    void DrawRowsBackground(const int row_count, const float line_height, const float x1, const float x2, const float y_offset, const ImU32 col_even, const ImU32 col_odd)
     {
         ImDrawList* draw_list = ImGui::GetWindowDrawList();
         float y0 = ImGui::GetCursorScreenPos().y + (float)(int)y_offset;
@@ -275,7 +302,7 @@ namespace vtx::vtxImGui
         }
     }
 
-    void childWindowResizerButton(float& percentage, const float& resizerSize, bool isHorizontalSplit)
+    void childWindowResizerButton(float& percentage, const float& resizerSize, const bool isHorizontalSplit)
     {
         const ImVec2 buttonSize = isHorizontalSplit ? ImVec2(resizerSize, ImGui::GetContentRegionAvail().y) : ImVec2(ImGui::GetContentRegionAvail().x, resizerSize);
         if (ImGui::Button("##resizer", buttonSize))

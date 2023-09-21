@@ -14,7 +14,7 @@ namespace vtx
 	{
 		SOA() = default;
 
-		SOA(int n) : nAlloc(n)
+		SOA(const int n) : nAlloc(n)
 		{
 			this->x = CUDABufferManager::allocate<float>(n * 3);
 			this->y = this->x + n;
@@ -51,12 +51,12 @@ namespace vtx
 			int  i;
 		};
 
-		__forceinline__ __device__ Proxy operator[](int i)
+		__forceinline__ __device__ Proxy operator[](const int i)
 		{
 			return Proxy{this, i};
 		}
 
-		__forceinline__ __device__ math::vec3f operator[](int i) const
+		__forceinline__ __device__ math::vec3f operator[](const int i) const
 		{
 			return { this->x[i], this->y[i], this->z[i] };
 		}
@@ -71,7 +71,7 @@ namespace vtx
     struct SOA<math::affine3f> {
         SOA() = default;
 
-        SOA(int n) : nAlloc(n) {
+        SOA(const int n) : nAlloc(n) {
             // Linear Part
             this->m00 = CUDABufferManager::allocate<float>(n * 12);
             this->m01 = this->m00 + n;
@@ -164,11 +164,11 @@ namespace vtx
         };
 
 
-        __forceinline__ __device__ Proxy operator[](int i) {
+        __forceinline__ __device__ Proxy operator[](const int i) {
             return Proxy{ this, i };
         }
 
-        __forceinline__ __device__ math::affine3f operator[](int i) const {
+        __forceinline__ __device__ math::affine3f operator[](const int i) const {
             math::affine3f r;
 
             math::vec3f& c0 = r.l.vx;
@@ -207,7 +207,7 @@ namespace vtx
 	struct SOA<AccumulationWorkItem> {
         SOA() = default;
 
-        SOA(int n) : nAlloc(n) {
+        SOA(const int n) : nAlloc(n) {
 
             originPixel = CUDABufferManager::allocate<int>(n);
             depth = CUDABufferManager::allocate<int>(n);
@@ -243,10 +243,10 @@ namespace vtx
             int i;
         };
 
-        __forceinline__ __device__ Proxy operator[](int i) {
+        __forceinline__ __device__ Proxy operator[](const int i) {
             return Proxy{ this, i };
         }
-        __forceinline__ __device__ AccumulationWorkItem operator[](int i) const {
+        __forceinline__ __device__ AccumulationWorkItem operator[](const int i) const {
             AccumulationWorkItem r;
 
             r.originPixel = this->originPixel[i];
@@ -266,7 +266,7 @@ namespace vtx
 	struct SOA<TraceWorkItem> {
         SOA() = default;
 
-        SOA(int n) : nAlloc(n) {
+        SOA(const int n) : nAlloc(n) {
             originPixel = CUDABufferManager::allocate<int>(n);
             depth = CUDABufferManager::allocate<int>(n);
             pdf = CUDABufferManager::allocate<float>(n);
@@ -333,7 +333,7 @@ namespace vtx
             int i;
         };
 
-        __forceinline__ __device__ Proxy operator[](int i) {
+        __forceinline__ __device__ Proxy operator[](const int i) {
             return Proxy{ this, i };
         }
         __forceinline__ __device__ TraceWorkItem operator[](int i)const {
@@ -370,7 +370,7 @@ namespace vtx
 	struct SOA<ShadowWorkItem> {
         SOA() = default;
 
-        SOA(int n) : nAlloc(n) {
+        SOA(const int n) : nAlloc(n) {
 
             distance = CUDABufferManager::allocate<float>(n);
             originPixel = CUDABufferManager::allocate<int>(n);
@@ -422,10 +422,10 @@ namespace vtx
             int i;
         };
 
-        __forceinline__ __device__ Proxy operator[](int i) {
+        __forceinline__ __device__ Proxy operator[](const int i) {
             return Proxy{ this, i };
         }
-        __forceinline__ __device__ ShadowWorkItem operator[](int i) const {
+        __forceinline__ __device__ ShadowWorkItem operator[](const int i) const {
             ShadowWorkItem r;
 
             r.originPixel = this->originPixel[i];
@@ -536,7 +536,7 @@ namespace vtx
             int i;
         };
 
-        __forceinline__ __device__ Proxy operator[](int i) {
+        __forceinline__ __device__ Proxy operator[](const int i) {
             return Proxy{ this, i };
         }
         __forceinline__ __device__ RayWorkItem operator[](int i)const {
@@ -582,7 +582,7 @@ namespace vtx
 	struct SOA<EscapedWorkItem> {
         SOA() = default;
 
-        SOA(int n) : nAlloc(n) {
+        SOA(const int n) : nAlloc(n) {
 
             originPixel = CUDABufferManager::allocate<int>(n);
             depth = CUDABufferManager::allocate<int>(n);
@@ -639,10 +639,10 @@ namespace vtx
             int i;
         };
 
-        __forceinline__ __device__ Proxy operator[](int i) {
+        __forceinline__ __device__ Proxy operator[](const int i) {
             return Proxy{ this, i };
         }
-        __forceinline__ __device__ EscapedWorkItem operator[](int i)const {
+        __forceinline__ __device__ EscapedWorkItem operator[](const int i)const {
             EscapedWorkItem r;
 
             r.originPixel = this->originPixel[i];

@@ -6,7 +6,7 @@
 
 namespace vtx::device
 {
-	std::tuple<InstanceData, InstanceData*> createInstanceData(std::shared_ptr<graph::Instance> instanceNode, const math::affine3f& transform);
+	std::tuple<InstanceData, InstanceData*> createInstanceData(const std::shared_ptr<graph::Instance>& instanceNode, const math::affine3f& transform);
 
 	std::tuple<LightData, LightData*> createMeshLightData(const std::shared_ptr<graph::MeshLight>& meshLight);
 

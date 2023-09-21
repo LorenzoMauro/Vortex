@@ -20,7 +20,7 @@ namespace vtx::mdl
 		return &mdlState;
 	}
 
-	const char* messageKindToString(IMessage::Kind message_kind)
+	const char* messageKindToString(const IMessage::Kind message_kind)
 	{
 		switch (message_kind)
 		{
@@ -525,7 +525,6 @@ namespace vtx::mdl
 	
 	graph::Configuration determineShaderConfiguration(const std::string& materialDbName)
 	{
-
 		MdlState& state = *getState();
 		TransactionInterfaces* tI = state.getTransactionInterfaces();
 		graph::Configuration config;
@@ -700,7 +699,7 @@ namespace vtx::mdl
 			// These are all expressions required for a materials which does everything supported in this renderer. 
 			// The Target_function_description only stores the C-pointers to the base names!
 			// Make sure these are not destroyed as long as the descs vector is used.
-			fNames = graph::SIM::Get()->getNode<graph::Material>(shaderIndex)->getFunctionNames();
+			fNames = graph::SIM::get()->getNode<graph::Material>(shaderIndex)->getFunctionNames();
 
 			// Centralize the init functions in a single material init().
 			// This will only save time when there would have been multiple init functions inside the shader.
@@ -882,7 +881,7 @@ namespace vtx::mdl
 		std::vector<std::shared_ptr<graph::Texture>> textures;
 		// TODO We have to store the textures, light profiles and bsdf indices since these will be refencered by the mdl lookup functions
 		for (Size i = 1, n = targetCode->get_texture_count(); i < n; ++i) {
-			auto texture = std::make_shared<graph::Texture>(targetCode->get_texture(i), targetCode->get_texture_shape(i));
+			auto texture = ops::createNode<graph::Texture>(targetCode->get_texture(i), targetCode->get_texture_shape(i));
 			texture->mdlIndex = i;
 			textures.emplace_back(texture);
 		}
@@ -896,7 +895,7 @@ namespace vtx::mdl
 		{
 			for (mi::Size i = 1, n = targetCode->get_light_profile_count(); i < n; ++i)
 			{
-				auto lightProfile = std::make_shared<graph::LightProfile>(targetCode->get_light_profile(i));
+				auto lightProfile = ops::createNode<graph::LightProfile>(targetCode->get_light_profile(i));
 				lightProfile->mdlIndex = i;
 				lightProfiles.emplace_back(lightProfile);
 			}
@@ -911,7 +910,7 @@ namespace vtx::mdl
 		{
 			for (mi::Size i = 1, n = targetCode->get_bsdf_measurement_count(); i < n; ++i)
 			{
-				auto bsdfMeasurement = std::make_shared<graph::BsdfMeasurement>(targetCode->get_bsdf_measurement(i));
+				auto bsdfMeasurement = ops::createNode<graph::BsdfMeasurement>(targetCode->get_bsdf_measurement(i));
 				bsdfMeasurement->mdlIndex = i;
 				bsdfMeasurements.emplace_back(bsdfMeasurement);
 			}
@@ -1217,12 +1216,12 @@ namespace vtx::mdl
 	}
 
 	std::vector<graph::shader::ParameterInfo> getArgumentBlockData(
-		const std::string& materialDbName,
-		const std::string& functionDefinitionSignature,
-		const Handle<ITarget_code const>& targetCode,
-		Handle<ITarget_argument_block>& argumentBlockClone,
+		const std::string&                                                   materialDbName,
+		const std::string&                                                   functionDefinitionSignature,
+		const Handle<ITarget_code const>&                                    targetCode,
+		Handle<ITarget_argument_block>&                                      argumentBlockClone,
 		std::map<std::string, std::shared_ptr<graph::shader::EnumTypeInfo>>& mapEnumTypes,
-		int materialAdditionIndex)
+		const int                                                            materialAdditionIndex)
 	{
 		char* argBlockData = nullptr;
 		Handle<ITarget_value_layout const> argBlockLayout;
@@ -1512,7 +1511,7 @@ namespace vtx::mdl
 		return data;
 	}
 
-	void dumpModuleInfo(const IModule* module, IMdl_factory* factory, ITransaction* transaction, bool dumpDefinitions = false) {
+	void dumpModuleInfo(const IModule* module, IMdl_factory* factory, ITransaction* transaction, const bool dumpDefinitions = false) {
 		MdlState&                    state = *getState();
 		const TransactionInterfaces* tI    = state.getTransactionInterfaces();
 
@@ -1903,8 +1902,41 @@ namespace vtx::mdl
 		const Handle<IValue_texture>   argValue(factory->create_texture(tI->transaction.get(), textureName.c_str(), shape, gamma, nullptr, true, nullptr));
 		VTX_INFO("Texture {} loaded with gamma : {} ", textureName, argValue->get_gamma());
 		const Handle<IExpression>      argExpr(ef->create_constant(argValue.get()));
+
 		return argExpr;
 	};
+
+	std::string getTexturePathFromExpr(const Handle<IExpression>& expr)
+	{
+		const IExpression::Kind            kind = expr->get_kind();
+		if(kind != IExpression::EK_CONSTANT)
+		{
+			VTX_WARN("getTexturePathFromExpr : expr is not a constant");
+			return "";
+		}
+		const Handle<IExpression_constant> argConstant(expr->get_interface<IExpression_constant>());
+		const Handle<IValue>               value(argConstant->get_value());
+		const IValue::Kind                 valueKind = value->get_kind();
+		if (valueKind != IValue::VK_TEXTURE)
+		{
+			VTX_WARN("getTexturePathFromExpr : value is not a texture");
+			return "";
+		}
+		const Handle<IValue_texture>       argValueTexture(value->get_interface<IValue_texture>());
+
+		const char*                  texturePathFromExpr = argValueTexture->get_file_path();
+		if (texturePathFromExpr == nullptr)
+		{
+			// return the DB Name
+			texturePathFromExpr = argValueTexture->get_value();
+		}
+		if (texturePathFromExpr == nullptr)
+		{
+			// return the DB Name
+			return "";
+		}
+		return texturePathFromExpr;
+	}
 
 	void createShaderGraphFunctionCalls(std::shared_ptr<graph::shader::ShaderNode> shaderGraph)
 	{

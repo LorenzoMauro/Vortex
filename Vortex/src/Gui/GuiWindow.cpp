@@ -31,11 +31,37 @@ namespace vtx
 		{
 			return;
 		}
+		bool popMenuBarFramePaddingPush = false;
+		if(windowFlags & ImGuiWindowFlags_MenuBar)
+		{
+			ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, { 2.0f, 20.0f });
+			popMenuBarFramePaddingPush = true;
+
+		}
 		if (ImGui::Begin(name.c_str(), &isOpen, windowFlags))
 		{
 			auto contentRegionAvail = ImGui::GetContentRegionAvail();
 			auto itemSpacing = ImGui::GetStyle().ItemSpacing;
-			renderMenuBar();
+			if (windowFlags & ImGuiWindowFlags_MenuBar)
+			{
+				if(ImGui::BeginMenuBar())
+				{
+					menuBarContent();
+					ImGui::EndMenuBar();
+				}
+				ImGui::PopStyleVar();
+				popMenuBarFramePaddingPush = false;
+			}
+			else if(renderCustomMenuBar)
+			{
+				float newMenuBarHeight = menuBarHeight > 0.0f ? menuBarHeight : ImGui::GetFontSize();
+				newMenuBarHeight += ImGui::GetStyle().WindowPadding.y * 2.0f;
+				if(ImGui::BeginChild("Custom Menu Bar", ImVec2(contentRegionAvail.x, newMenuBarHeight), false, ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse))
+				{
+					menuBarContent(); // Render the menu bar if the window doesn't have the menu bar flag, it's a virtual function so it can be overridden
+				}
+				ImGui::EndChild();
+			}
 
 			prepareChildWindow();
 			float mainContentWidth;
@@ -68,7 +94,7 @@ namespace vtx
 				const float availableWidth = ImGui::GetContentRegionAvail().x;
 				ImGui::PushItemWidth(availableWidth); // Set the width of the next widget to 200
 				endChildWindowPrep();
-				renderMainContent();   // Placeholder function for the main content
+				mainContent();   // Placeholder function for the main content
 				ImGui::PopItemWidth();
 			}
 			
@@ -93,7 +119,7 @@ namespace vtx
 					endChildWindowPrep();
 
 					// Reset the cursor to the start of the button for the next widget
-					renderToolBar();  // Call renderToolBar outside of the Sidebar child
+					toolBarContent();  // Call toolBarContent outside of the Sidebar child
 					ImGui::PopItemWidth();
 
 				}
@@ -104,7 +130,10 @@ namespace vtx
 
 		}
 		ImGui::End();  // End main window
-
+		if (popMenuBarFramePaddingPush)
+		{
+			ImGui::PopStyleVar();
+		}
 	}
 	inline void Window::drawStripedBackground()
 	{

@@ -137,13 +137,13 @@ namespace gdt {
 
   // inline __both__ float abs(float f)      { return fabsf(f); }
   // inline __both__ double abs(double f)    { return fabs(f); }
-  inline __both__ float rcp(float f)      { return 1.f/f; }
-  inline __both__ double rcp(double d)    { return 1./d; }
+  inline __both__ float  rcp(const float f)      { return 1.f/f; }
+  inline __both__ double rcp(const double d)    { return 1./d; }
   
-  inline __both__ int32_t divRoundUp(int32_t a, int32_t b) { return (a+b-1)/b; }
-  inline __both__ uint32_t divRoundUp(uint32_t a, uint32_t b) { return (a+b-1)/b; }
-  inline __both__ int64_t divRoundUp(int64_t a, int64_t b) { return (a+b-1)/b; }
-  inline __both__ uint64_t divRoundUp(uint64_t a, uint64_t b) { return (a+b-1)/b; }
+  inline __both__ int32_t  divRoundUp(const int32_t a, const int32_t b) { return (a+b-1)/b; }
+  inline __both__ uint32_t divRoundUp(const uint32_t a, const uint32_t b) { return (a+b-1)/b; }
+  inline __both__ int64_t  divRoundUp(const int64_t a, const int64_t b) { return (a+b-1)/b; }
+  inline __both__ uint64_t divRoundUp(const uint64_t a, const uint64_t b) { return (a+b-1)/b; }
   
 #ifdef __CUDACC__
   using ::sin; // this is the double version

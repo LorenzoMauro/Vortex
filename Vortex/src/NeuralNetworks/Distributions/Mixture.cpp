@@ -25,7 +25,7 @@ namespace vtx::distribution
         return mixtureParameters;
     }
 
-    torch::Tensor Mixture::prob(const torch::Tensor& x, const torch::Tensor& mixtureParams, const torch::Tensor& mixtureWeights, network::DistributionType type)
+    torch::Tensor Mixture::prob(const torch::Tensor& x, const torch::Tensor& mixtureParams, const torch::Tensor& mixtureWeights, const network::DistributionType type)
     {
         // expand x if not 3D to match the Batch Size x Mixture Size x x last dim
 
@@ -55,7 +55,7 @@ namespace vtx::distribution
         return weightedP;
     }
 
-    std::tuple<torch::Tensor, torch::Tensor> Mixture::sample(const torch::Tensor& mixtureParams, const torch::Tensor& mixtureWeights, network::DistributionType type)
+    std::tuple<torch::Tensor, torch::Tensor> Mixture::sample(const torch::Tensor& mixtureParams, const torch::Tensor& mixtureWeights, const network::DistributionType type)
     {
         // Select mixture from mixtureWeights tensor
         const torch::Tensor selectedMixture = multinomial(mixtureWeights, 1);
@@ -90,7 +90,7 @@ namespace vtx::distribution
         return { sampleTensor, prob };
     }
 
-    void Mixture::setGraphData(network::DistributionType type, const torch::Tensor& params, const torch::Tensor& mixtureWeights, network::GraphsData& graphData, const bool isTraining, const int depth)
+    void Mixture::setGraphData(const network::DistributionType type, const torch::Tensor& params, const torch::Tensor& mixtureWeights, network::GraphsData& graphData, const bool isTraining, const int depth)
     {
         if (type == network::DistributionType::D_SPHERICAL_GAUSSIAN)
         {

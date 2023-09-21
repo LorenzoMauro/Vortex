@@ -27,10 +27,12 @@ namespace vtx::ops {
     std::shared_ptr<T> createNode(Ts... optionalArgs) {
         static_assert(std::is_base_of_v<graph::Node, T>, "Pushed type is not subclass of Node!");
         std::shared_ptr<T> node = std::make_shared<T>(optionalArgs...);
-        graph::SIM::record(node);
+        graph::SIM::get()->record(node);
         return node;
     }
 
+
+    void restartRender();
     // A simple unit cube built from 12 triangles.
     std::shared_ptr<graph::Mesh> createBox(float sideLength=2.0f);
 

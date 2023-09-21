@@ -248,7 +248,7 @@ namespace vtx {
 			setBounceAsTerminal(originPixel, depth);
 		}
 
-		__forceinline__ __device__ math::vec3f outgoingDirectLight(const int& originPixel, const int& depth, bool useMIS)
+		__forceinline__ __device__ math::vec3f outgoingDirectLight(const int& originPixel, const int& depth, const bool useMIS)
 		{
 			assertBounceValidity(originPixel, depth);
 			const Bounce& bounce = paths[originPixel][depth];
@@ -261,7 +261,7 @@ namespace vtx {
 			return { 0.0f };
 		}
 
-		__forceinline__ __device__ math::vec3f outgoingSurfaceEmission(const int& originPixel, const int& depth, bool useMIS)
+		__forceinline__ __device__ math::vec3f outgoingSurfaceEmission(const int& originPixel, const int& depth, const bool useMIS)
 		{
 			assertBounceValidity(originPixel, depth);
 			const Bounce& bounce = paths[originPixel][depth];
@@ -274,7 +274,7 @@ namespace vtx {
 			return { 0.0f };
 		}
 
-		__forceinline__ __device__ math::vec3f outgoingIndirectLight(const int& originPixel, const int& depth, bool useMis)
+		__forceinline__ __device__ math::vec3f outgoingIndirectLight(const int& originPixel, const int& depth, const bool useMis)
 		{
 			assertBounceValidity(originPixel, depth);
 			math::vec3f indirectLight(0.0f);
@@ -347,7 +347,7 @@ namespace vtx {
 			pathsAccumulator[originPixel] += getTotalOutgoingRadiance(originPixel, 0);
 		}
 
-		__forceinline__ __device__ void registerValidLightSample(const int& originPixel, const int& depth, EmissionSampleType type)
+		__forceinline__ __device__ void registerValidLightSample(const int& originPixel, const int& depth, const EmissionSampleType type)
 		{
 			if (depth == 0)
 			{
@@ -359,7 +359,7 @@ namespace vtx {
 			validLightSample[idx].z = type;
 		}
 		
-		__forceinline__ __device__ void selectRandomBounce(unsigned& seed, int* selectedPixel, int* selectedDepth, network::SamplingStrategy strategy)
+		__forceinline__ __device__ void selectRandomBounce(unsigned& seed, int* selectedPixel, int* selectedDepth, const network::SamplingStrategy strategy)
 		{
 
 			int* validPixelsArray;
@@ -413,10 +413,10 @@ namespace vtx {
 		};
 
 		__forceinline__ __device__ void getRandomPathSample(
-			unsigned&                                seed,
-			network::TrainingBatchGenerationSettings settings,
-			int&                                     sampledPixel, int&      sampledDepth,
-			Hit*                                     hit, LightContribution* lightContribution, bool& isTerminal, Hit* nextHit = nullptr)
+			unsigned&                                      seed,
+			const network::TrainingBatchGenerationSettings settings,
+			int&                                           sampledPixel, int&      sampledDepth,
+			Hit*                                           hit, LightContribution* lightContribution, bool& isTerminal, Hit* nextHit = nullptr)
 		{
 			int randomOriginPixel;
 			int randomDepth;
@@ -478,10 +478,10 @@ namespace vtx {
 		}
 
 		__forceinline__ __device__ void getRandomLightSamplePath(
-			unsigned& seed,
-			network::TrainingBatchGenerationSettings settings,
-			int& sampledPixel, int& sampledDepth,
-			Hit* hit, LightContribution* lightContribution, bool& isTerminal, Hit* nextHit = nullptr)
+			unsigned&                                      seed,
+			const network::TrainingBatchGenerationSettings settings,
+			int&                                           sampledPixel, int&      sampledDepth,
+			Hit*                                           hit, LightContribution* lightContribution, bool& isTerminal, Hit* nextHit = nullptr)
 		{
 			math::vec3i& sample = validLightSample[(int)(rng(seed) * (float)validLightSampleCount)];
 			const int& originPixel = sample.x;

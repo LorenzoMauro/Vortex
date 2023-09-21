@@ -56,7 +56,7 @@ namespace vtx
 		return dot(rgb, ntscLuminance);
 	}
 
-	__forceinline__ __device__ float getNoise(const math::vec3f* buffer, const int x, const int y, const int width, const int height, const int kernelSize, const NoiseType noiseType, bool normalize = true)
+	__forceinline__ __device__ float getNoise(const math::vec3f* buffer, const int x, const int y, const int width, const int height, const int kernelSize, const NoiseType noiseType, const bool normalize = true)
 	{
 		// kernelSize is assumed to be an odd number
 		const int halfKernel = kernelSize / 2;

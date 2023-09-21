@@ -355,7 +355,7 @@ namespace gdt {
   }
 
   /*! helper function that creates a semi-random color from an ID */
-  inline __both__ vec3f randomColor(int i)
+  inline __both__ vec3f randomColor(const int i)
   {
     int r = unsigned(i)*13*17 + 0x234235;
     int g = unsigned(i)*7*3*5 + 0x773477;
@@ -366,7 +366,7 @@ namespace gdt {
   }
 
   /*! helper function that creates a semi-random color from an ID */
-  inline __both__ vec3f randomColor(size_t idx)
+  inline __both__ vec3f randomColor(const size_t idx)
   {
     unsigned int r = (unsigned int)(idx*13*17 + 0x234235);
     unsigned int g = (unsigned int)(idx*7*3*5 + 0x773477);

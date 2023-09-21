@@ -41,7 +41,7 @@ namespace vtx::mdl
     using namespace base;
     using namespace neuraylib;
     // Helper function to create PTX source code for a non-empty 32-bit value array.
-    void printArrayU32(std::string& str, std::string const& name, unsigned count, std::string const& content)
+    void printArrayU32(std::string& str, std::string const& name, const unsigned count, std::string const& content)
     {
         str += ".visible .const .align 4 .u32 " + name + "[";
         if (count == 0) {
@@ -54,7 +54,7 @@ namespace vtx::mdl
     }
 
     // Helper function to create PTX source code for a non-empty function pointer array.
-    void printArrayFunc(std::string& str, std::string const& name, unsigned count, std::string const& content)
+    void printArrayFunc(std::string& str, std::string const& name, const unsigned count, std::string const& content)
     {
         str += ".visible .const .align 8 .u64 " + name + "[";
         if (count == 0) {

@@ -11,49 +11,36 @@ namespace vtx::graph
 	public:
 
 		SIM();
-		static std::shared_ptr<SIM> Get();
+		static std::shared_ptr<SIM> get();
 
-		static vtxID getFreeIndex();
+		vtxID getFreeIndex();
 
-		static void releaseIndex(vtxID id);
+		void releaseIndex(vtxID id);
 
-		template<typename T>
-		static void record(std::shared_ptr<T> node) {
+		void record(const std::shared_ptr<Node>& node);
 
-			const auto sim = Get();
-			const NodeType& type = node->getType();
-			static_assert(std::is_base_of_v<Node, T>, "Template type is not a subclass of Node!");
-			if (sim->map.size() == 0) {
-				sim->map.resize(NT_NUM_NODE_TYPES + 1);
+		std::shared_ptr<Node> operator[](const vtxID id) {
+			const auto it = nodesById.find(id);
+			if (it == nodesById.end()) {
+				VTX_WARN("The requested Node Id either doesn't exist or has not been registered!");
+				return nullptr;
 			}
-			sim->map[static_cast<int>(type)].insert({ node->getID(), node });
-			sim->idToType.insert({ node->getID(), type });
 
-			if (sim->vectorsOfNodes.find(type) != sim->vectorsOfNodes.end())
-			{
-				sim->vectorsOfNodes[type].push_back(node);
+			std::shared_ptr<Node> node = it->second.lock();
+			if (!node) {
+				VTX_WARN("The requested Node Id has been deleted, removing references!");
+				removeNodeReference(id);
 			}
-			else
-			{
-				std::vector<std::shared_ptr<Node>> vector;
-				vector.push_back(node);
-				sim->vectorsOfNodes.insert({ type,  vector});
-			}
+			return node;
 		}
 
-		// Operator[] definition
-		std::shared_ptr<Node>& operator[](const vtxID id) {
-			const NodeType type = idToType[id];
-			return map[static_cast<int>(type)][id];
-		}
+		void removeNodeReference(vtxID id);
 
 		// Template function to return the statically-casted shared_ptr based on NodeType
 		template<typename T>
-		static std::shared_ptr<T> getNode(vtxID id) {
-			const auto sim = Get();
-
+		std::shared_ptr<T> getNode(const vtxID id) {
 			static_assert(std::is_base_of_v<Node, T>, "Template type is not a subclass of Node!");
-			const std::shared_ptr<T>& nodePtr = std::dynamic_pointer_cast<T>((*sim)[id]);
+			const std::shared_ptr<T>& nodePtr = std::dynamic_pointer_cast<T>((*this)[id]);
 			if(!nodePtr)
 			{
 				VTX_WARN("The requested Node Id doesn't match it's type!");
@@ -63,35 +50,43 @@ namespace vtx::graph
 		}
 
 		template<typename T>
-		static bool hasNode(vtxID id)
+		bool hasNode(const vtxID id)
 		{
-			const auto sim = Get();
-			static_assert(std::is_base_of_v<Node, T>, "Template type is not a subclass of Node!");
-			const std::shared_ptr<T>& nodePtr = std::dynamic_pointer_cast<T>((*sim)[id]);
-			return nodePtr != nullptr;
+			const bool hasNode = getNode<T>(id) != nullptr;
+			return hasNode;
 		}
 
 		template<typename T>
-		static std::vector<std::shared_ptr<T>> getAllNodeOfType(NodeType nodeType)
+		std::vector<std::shared_ptr<T>> getAllNodeOfType(const NodeType nodeType)
 		{
-			const auto sim = Get();
-
 			std::vector<std::shared_ptr<T>> nodes;
-			for(std::shared_ptr<Node> node : sim->vectorsOfNodes[nodeType])
+
+			const std::vector<vtxID>& ids = nodesByType[nodeType];
+
+			for (const vtxID id : ids)
 			{
-				if(std::shared_ptr<T> tNode = std::dynamic_pointer_cast<T>(node))
+				if (const std::shared_ptr<T>& nodePtr = getNode<T>(id))
 				{
-					nodes.push_back(tNode);
+					nodes.push_back(nodePtr);
 				}
 			}
 			return nodes;
 
 		}
 
+		template<typename T>
+		std::vector<vtxID> getAllNodeIdByType(const NodeType nodeType)
+		{
+			return nodesByType[nodeType];
+		}
+
 		vtxID														nextIndex = 1; // Index Zero is reserved for Invalid Index, maybe I can use invalid unsigned
 		std::set<vtxID>												freeIndices;
-		std::vector<std::map<vtxID, std::shared_ptr<Node>>>			map;
-		std::map<NodeType, std::vector<std::shared_ptr<Node>>>		vectorsOfNodes;
+
+		// Currently the use of weak_ptr allows for the automatic removal of nodes which are not reference by any other node
+		// However we can revert to shared_ptr if we want to keep the nodes alive even if they are not referenced by any other node have them be removed manually
+		std::map<vtxID, std::weak_ptr<Node>>						nodesById; 
+		std::map<NodeType, std::vector<vtxID>>						nodesByType;
 		std::map<vtxID, NodeType>									idToType;
 	};
 

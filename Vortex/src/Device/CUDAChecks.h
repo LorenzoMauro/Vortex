@@ -14,14 +14,14 @@ enum OptixLogLevels {
     OPTIX_CALLBACK_INFO
 };
 
-static void checkCudaError(cudaError_t rc, std::string file, int line, bool close=true) {
+static void checkCudaError(const cudaError_t rc, std::string file, const int line, const bool close =true) {
     if(close) 
         VTX_ASSERT_CLOSE(rc == cudaSuccess, "CUDA Runtime API Error, ({}: line {}), {} ({})", file, line, cudaGetErrorName(rc), cudaGetErrorString(rc));
     else
         VTX_ASSERT_CONTINUE(rc == cudaSuccess, "CUDA Runtime API Error, ({}: line {}), {} ({})", file, line, cudaGetErrorName(rc), cudaGetErrorString(rc));
 }
 
-static void checkCuResultError(CUresult rc, std::string file, int line, bool close = true) {
+static void checkCuResultError(const CUresult rc, std::string file, const int line, const bool close = true) {
     const char* errorName = nullptr;
     const char* errorString = nullptr;
 
@@ -34,7 +34,7 @@ static void checkCuResultError(CUresult rc, std::string file, int line, bool clo
         VTX_ASSERT_CONTINUE(rc == CUDA_SUCCESS, "CUDA Driver API Error, ({}: line {}),  {} ({})", file, line, errorName, errorString);
 }
 
-static void checkOptixError(OptixResult res, const std::string& call_str, std::string file, int line, bool close = true) {
+static void checkOptixError(const OptixResult res, const std::string& call_str, std::string file, const int line, const bool close = true) {
     if (close)
     {
         VTX_ASSERT_CLOSE(res == OPTIX_SUCCESS, "Optix Error Check: file: {} line: {}\n\tCall ({}) failed with code {}", file, line, call_str, (int)res);
@@ -43,7 +43,7 @@ static void checkOptixError(OptixResult res, const std::string& call_str, std::s
         VTX_ASSERT_CONTINUE(res == OPTIX_SUCCESS, "Optix Error Check: file: {} line: {}\n\tCall ({}) failed with code {}", file, line, call_str, (int)res);
 }
 
-static void cudaSynchronize(std::string file, int line, bool close = true) {
+static void cudaSynchronize(std::string file, const int line, const bool close = true) {
     cudaDeviceSynchronize();
     cudaError_t error = cudaGetLastError();
     if (close)
@@ -53,10 +53,10 @@ static void cudaSynchronize(std::string file, int line, bool close = true) {
 }
 
 
-static void context_log_cb(unsigned int level,
-    const char* tag,
-    const char* message,
-    void*)
+static void context_log_cb(const unsigned int level,
+						   const char*        tag,
+						   const char*        message,
+						   void*)
 {
     if(strlen(message) == 0)
     {

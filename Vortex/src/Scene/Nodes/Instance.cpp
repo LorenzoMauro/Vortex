@@ -77,7 +77,7 @@ namespace vtx::graph
 			if (materialSlots[i].material->getID() == matID)
 			{
 				materialSlots[i].material = nullptr;
-				SIM::releaseIndex(materialSlots[i].meshLight->getID());
+				SIM::get()->releaseIndex(materialSlots[i].meshLight->getID());
 				materialSlots[i].meshLight = nullptr;
 
 				materialSlots.erase(materialSlots.begin() + i);
@@ -99,7 +99,7 @@ namespace vtx::graph
 	{
 		for (auto it : materialSlots)
 		{
-			SIM::releaseIndex(it.meshLight->getID());
+			SIM::get()->releaseIndex(it.meshLight->getID());
 			it.meshLight = nullptr;
 		}
 	}
@@ -110,7 +110,7 @@ namespace vtx::graph
 		{
 			if(it.material->getID() == matID)
 			{
-				SIM::releaseIndex(it.meshLight->getID());
+				SIM::get()->releaseIndex(it.meshLight->getID());
 				it.meshLight = nullptr;
 			}
 		}

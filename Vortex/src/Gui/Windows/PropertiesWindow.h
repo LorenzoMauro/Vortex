@@ -1,13 +1,18 @@
 ﻿#pragma once
 #include "Gui/GuiWindow.h"
-#include "GuiElements/SceneGraph.h"
+#include "Gui/GuiVisitor.h"
 
 namespace vtx {
-    class PropertiesWindow : public Window {
+	namespace graph
+	{
+		class Renderer;
+	}
+
+	class PropertiesWindow : public Window {
     public:
         PropertiesWindow();
 
-        void renderMainContent() override;
+        void mainContent() override;
 
         std::shared_ptr<graph::Renderer> renderer;
         gui::GuiVisitor                  guiVisitor;

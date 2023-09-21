@@ -4,7 +4,7 @@
 
 namespace vtx::network
 {
-	InputComposer::InputComposer(torch::Device _device, InputSettings* _settings) :
+	InputComposer::InputComposer(const torch::Device _device, InputSettings* _settings) :
 		device(_device)
 	{
 		settings = _settings;

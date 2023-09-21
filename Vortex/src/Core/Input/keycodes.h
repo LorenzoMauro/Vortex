@@ -170,7 +170,7 @@ namespace vtx {
 		Middle = Button2
 	} Button;
 
-	static ImGuiKey MapInputToImGui(MouseButton button) {
+	static ImGuiKey MapInputToImGui(const MouseButton button) {
 		switch (button) {
 			case(MouseButton::Left): return ImGuiKey_MouseLeft;
 			case(MouseButton::Right): return ImGuiKey_MouseRight;

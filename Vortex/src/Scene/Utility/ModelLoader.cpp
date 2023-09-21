@@ -453,7 +453,7 @@ namespace vtx::importer
         std::shared_ptr<graph::Mesh> meshNode;
         if (meshMap.find(assimpMeshId) != meshMap.end())
         {
-            meshNode = graph::SIM::getNode<graph::Mesh>(meshMap[assimpMeshId]);
+            meshNode = graph::SIM::get()->getNode<graph::Mesh>(meshMap[assimpMeshId]);
         }
         else
         {

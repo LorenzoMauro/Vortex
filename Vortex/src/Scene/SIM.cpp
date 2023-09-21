@@ -10,64 +10,68 @@ namespace vtx::graph
 		sInstance = std::shared_ptr<SIM>(this);
 	}
 
-	std::shared_ptr<SIM> SIM::Get() {
+	std::shared_ptr<SIM> SIM::get() {
 		return sInstance;
 	}
 
 	vtxID SIM::getFreeIndex() {
-		const auto sim = Get();
 
-		if (sim->freeIndices.empty()) {
+		if (freeIndices.empty()) {
 			// If no free indices available, create a new one
-			return sim->nextIndex++;
+			return nextIndex++;
 		}
 		
 		// If there are free indices, use the first one and remove it from the set
-		const auto it = sim->freeIndices.begin();
+		const auto it = freeIndices.begin();
 		const vtxID idx = *it;
-		sim->freeIndices.erase(it);
+		freeIndices.erase(it);
 		return idx;
 	}
 
-	void SIM::releaseIndex(vtxID id) {
+	void SIM::releaseIndex(const vtxID id) {
 
-		const auto sim = Get();
-
-		const std::shared_ptr<Node> nodePtr = (*sim)[id];
-		if(nodePtr == nullptr)
-		{
-			return;
-		}
-		const NodeType              type    = nodePtr->getType();
-		auto&                       vector  = sim->vectorsOfNodes[type];
-
-		int vectorReleaseIndex = -1;
-		for(int i = 0; i<vector.size(); i++)
-		{
-			if(vector[i]->getID() == id)
-			{
-				vectorReleaseIndex = i;
-				break;
-			}
-		}
-		vector.erase(vector.begin() + vectorReleaseIndex);
-
-		//verify id has been used to register a node:
-		// This approach is caused by the fact that just generating a node will use a new index, but the node is not registered automatically
-		if (sim->idToType.find(id) != sim->idToType.end())
-		{
-			const NodeType type = sim->idToType[id];
-			sim->map[type].erase(id);
-			sim->idToType.erase(id);
-		}
-
-		if (id + 1 == sim->nextIndex) {
-			// If the released index is the last one, just decrement sim->nextIndex
-			--sim->nextIndex;
+		// Release the index
+		if (id + 1 == nextIndex) {
+			// If the released index is the last one, just decrement nextIndex
+			--nextIndex;
 		}
 		else {
 			// Otherwise, add it to the set of free indices
-			sim->freeIndices.insert(id);
+			freeIndices.insert(id);
 		}
+		removeNodeReference(id);
+	}
+
+	void SIM::record(const std::shared_ptr<Node>& node) {
+
+		const NodeType& type = node->getType();
+		// check if node is already in the map
+		if (nodesById.find(node->getID()) != nodesById.end())
+		{
+			const std::shared_ptr<Node>& previousNode = getNode<Node>(node->getID());
+			if (previousNode && previousNode == node)
+			{
+				return;
+			}
+			return;
+		}
+
+		nodesById.insert({ node->getID(), node });
+		if (nodesByType.find(type) == nodesByType.end())
+		{
+			nodesByType[type] = {};
+		}
+		nodesByType[type].push_back(node->getID());
+		idToType.insert({ node->getID(), type });
+	}
+
+	void SIM::removeNodeReference(const vtxID id)
+	{
+		const NodeType type = idToType[id];
+		idToType.erase(id);
+		nodesById.erase(id);
+
+		std::vector<vtxID>& nodesOfType = nodesByType[type];
+		nodesOfType.erase(std::remove(nodesOfType.begin(), nodesOfType.end(), id), nodesOfType.end());
 	}
 }

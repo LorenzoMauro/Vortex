@@ -29,10 +29,10 @@ namespace vtx::mdl
 
 	class MdlLogger : public mi::base::Interface_implement<mi::base::ILogger> {
 	public:
-		void message(mi::base::Message_severity level,
-		             const char* /* module_category */,
-		             const mi::base::Message_details& /* details */,
-		             const char* message) override
+		void message(const mi::base::Message_severity level,
+					 const char* /* module_category */,
+					 const mi::base::Message_details& /* details */,
+					 const char* message) override
 		{
 			const char* severity = nullptr;
 
@@ -225,10 +225,12 @@ namespace vtx::mdl
 	mi::base::Handle<mi::neuraylib::IExpression> createConstantInt(const int value);
 
 	mi::base::Handle<mi::neuraylib::IExpression> createTextureConstant(const std::string& texturePath, const mi::neuraylib::IType_texture::Shape shape = mi::neuraylib::IType_texture::TS_2D, const float gamma = 2.2f);
+
+	std::string getTexturePathFromExpr(const mi::base::Handle<mi::neuraylib::IExpression>& expr);
 	
 	// Utility function to dump the arguments of a material instance or function call.
 	template <class T>
-	void dumpInstance(mi::neuraylib::IExpression_factory* expression_factory, const T* instance, std::string name)
+	void dumpInstance(mi::neuraylib::IExpression_factory* expression_factory, const T* instance, const std::string name)
 	{
 		using namespace mi::neuraylib;
 		using namespace mi::base;

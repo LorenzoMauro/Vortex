@@ -25,7 +25,7 @@ namespace vtx::graph
 
 	/* Translation utility given vector */
 
-	void Transform::scale(float scale)
+	void Transform::scale(const float scale)
 	{
 		const math::affine3f scaleMatrix = math::affine3f::scale(scale);
 		affineTransform = scaleMatrix * affineTransform;

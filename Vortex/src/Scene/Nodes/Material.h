@@ -66,7 +66,7 @@ namespace vtx::graph
 
 		FunctionNames() = default;
 
-		FunctionNames(const std::string& suffix, bool cuda = false)
+		FunctionNames(const std::string& suffix, const bool cuda = false)
 		{
 			if(!cuda)
 			{

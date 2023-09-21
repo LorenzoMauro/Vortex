@@ -16,8 +16,8 @@ namespace vtx {
 
         virtual void OnUpdate(float ts);
 
-        virtual void renderMainContent() override;
-        virtual void renderToolBar() override;
+        virtual void mainContent() override;
+        virtual void toolBarContent() override;
 
         void startNewRender(SamplingTechnique technique);
 

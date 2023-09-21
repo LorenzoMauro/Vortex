@@ -30,7 +30,7 @@ namespace vtx
 			*size = 0;
 		}
 
-		__forceinline__ __device__ int addInferenceQuery(const RayWorkItem& prd, int index)
+		__forceinline__ __device__ int addInferenceQuery(const RayWorkItem& prd, const int index)
 		{
 			const int newSize = cuAtomicAdd(size, 1);
 			state->addState(index, prd.hitProperties.position, prd.direction, prd.hitProperties.shadingNormal);

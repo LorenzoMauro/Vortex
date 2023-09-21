@@ -5,14 +5,13 @@
 #include "LoadingSaving.h"
 #include "Device/OptixWrapper.h"
 #include "Device/PipelineConfiguration.h"
-#include "Gui/AppWindow.h"
-#include "Gui/ShaderGraphWindow.h"
-#include "Gui/ViewportWindow.h"
-#include "Gui/ExperimentsWindow.h"
-#include "Gui/SceneHierarchyWindow.h"
-#include "Gui/GraphWindow.h"
-#include "Gui/PropertiesWindow.h"
-#include "Serialization/Serializer.h"
+#include "Gui/Windows/AppWindow.h"
+#include "Gui/Windows/ShaderGraphWindow.h"
+#include "Gui/Windows/ViewportWindow.h"
+#include "Gui/Windows/ExperimentsWindow.h"
+#include "Gui/Windows/SceneHierarchyWindow.h"
+#include "Gui/Windows/GraphWindow.h"
+#include "Gui/Windows/PropertiesWindow.h"
 
 namespace vtx
 {
@@ -56,7 +55,7 @@ namespace vtx
 		VTX_INFO("GLFW DESTROYED");
 	}
 
-	void framebuffer_size_callback(GLFWwindow* window, int width, int height)
+	void framebuffer_size_callback(GLFWwindow* window, const int width, const int height)
 	{
 		// Here you can set your new window size. You could, for example, update
 		// your options object. Without knowing the structure of your options
@@ -97,7 +96,7 @@ namespace vtx
 		// Initialize the window
 		glfwSetWindowUserPointer(glfwWindow, this);
 		glfwSetScrollCallback(glfwWindow, 
-			[](GLFWwindow* window, double xOffset, double yOffset)
+			[](GLFWwindow* window, const double xOffset, const double yOffset)
 			{
 				ImGuiIO& io = ImGui::GetIO();
 				io.MouseWheelH += (float)xOffset;

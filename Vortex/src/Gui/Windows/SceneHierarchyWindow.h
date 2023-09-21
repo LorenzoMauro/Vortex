@@ -1,5 +1,5 @@
 ﻿#pragma once
-#include "GuiWindow.h"
+#include "Gui/GuiWindow.h"
 
 namespace vtx
 {
@@ -16,7 +16,7 @@ namespace vtx
 
         void displayNode(const std::shared_ptr<graph::Node>& node);
 
-		void renderMainContent() override;
+		void mainContent() override;
 
 	private:
 		std::shared_ptr<graph::Renderer> renderer;

@@ -1,19 +1,18 @@
-#include "TransformNodeGui.h"
+#include "Gui/GuiProvider.h"
 #include "imgui.h"
 #include "Core/CustomImGui/CustomImGui.h"
 #include "Scene/Nodes/Transform.h"
 
 namespace vtx::gui
 {
-	bool transformNodeGui(const std::shared_ptr<graph::Transform>& transformNode)
+	bool GuiProvider::drawEditGui(const std::shared_ptr<graph::Transform>& transformNode)
 	{
-		const float availableWidth = ImGui::GetContentRegionAvail().x;
-
 		bool updated = false;
 		ImGui::PushID(transformNode->getID());
 		if(ImGui::CollapsingHeader("Transform"))
 		{
 			ImGui::Indent();
+			const float availableWidth = ImGui::GetContentRegionAvail().x;
 			ImGui::PushItemWidth(availableWidth);
 			vtxImGui::halfSpaceWidget("Node Id", ImGui::Text, std::to_string(transformNode->getID()).c_str());
 			ImGui::Separator();

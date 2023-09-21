@@ -1,5 +1,4 @@
 ﻿#include "PropertiesWindow.h"
-#include "GuiElements/RendererNodeGui.h"
 #include "Scene/Scene.h"
 
 namespace vtx
@@ -12,7 +11,7 @@ namespace vtx
 		renderer = graph::Scene::getScene()->renderer;
 	}
 
-	void PropertiesWindow::renderMainContent()
+	void PropertiesWindow::mainContent()
 	{
 		bool areNodesSelected = false;
 		if(!windowManager->selectedNodes.empty())
@@ -25,9 +24,13 @@ namespace vtx
 					{
 						areNodesSelected = true;
 						const vtxID nodeId = idx;
-						const std::shared_ptr<graph::Node> node = graph::SIM::getNode<graph::Node>(nodeId);
-						ImGui::SetNextItemOpen(true, ImGuiCond_Once);
-						node->accept(guiVisitor);
+						const std::shared_ptr<graph::Node>& node = graph::SIM::get()->getNode<graph::Node>(nodeId);
+						if(node)
+						{
+							ImGui::SetNextItemOpen(true, ImGuiCond_Once);
+							guiVisitor.changed = false;
+							node->accept(guiVisitor);
+						}
 					}
 				}
 			}

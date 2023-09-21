@@ -57,7 +57,7 @@ namespace vtx
 		std::vector<float>       mape;
 		std::string              name = "Unnamed";
 
-		void constructName(int experimentNumber)
+		void constructName(const int experimentNumber)
 		{
 			name = "Experiment_" + std::to_string(experimentNumber);
 		}

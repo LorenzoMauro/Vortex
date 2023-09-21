@@ -10,7 +10,7 @@ namespace vtx
 
         CUDABufferManager() = delete;
         template <typename T>
-        static T* allocate(size_t count) {
+        static T* allocate(const size_t count) {
             std::lock_guard<std::mutex> lock(mutex); // Protect against concurrent access
 
             CUDABuffer* buffer = new CUDABuffer();
@@ -23,7 +23,7 @@ namespace vtx
         }
 
         template <typename T>
-        static CUDABuffer* allocateReturnBuffer(size_t count) {
+        static CUDABuffer* allocateReturnBuffer(const size_t count) {
             std::lock_guard<std::mutex> lock(mutex); // Protect against concurrent access
 
             CUDABuffer* buffer = new CUDABuffer();

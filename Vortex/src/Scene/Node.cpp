@@ -5,18 +5,17 @@
 namespace vtx::graph
 {
 
-	Node::Node(NodeType _type) : type(_type)
+	Node::Node(const NodeType _type) : type(_type)
 	{
-		sim = SIM::Get();
+		sim = SIM::get();
 		id  = sim->getFreeIndex();
 		name = nodeNames[type] + "_" + std::to_string(id);
-		//outputSocket.setType(type, true);
 	}
 
 	Node::~Node()
 	{
-		std::shared_ptr<SIM> sim = SIM::Get();
 		sim->releaseIndex(id);
+		VTX_WARN("Node ID: {} Name: {} destroyed", id, name);
 	}
         
 	NodeType Node::getType() const {

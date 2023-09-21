@@ -3,7 +3,7 @@
 #include <shobjidl.h>
 
 #include "Application.h"
-#include "Gui/ViewportWindow.h"
+#include "Gui/Windows/ViewportWindow.h"
 #include <GLFW/glfw3.h>
 #define GLFW_EXPOSE_NATIVE_WIN32
 #include <GLFW/glfw3native.h>
@@ -19,7 +19,7 @@ namespace vtx
         return filter;
     }
 
-    std::string FileDialogs::openFileDialog(const std::vector<std::string>& extensions, FileDialogType type) {
+    std::string FileDialogs::openFileDialog(const std::vector<std::string>& extensions, const FileDialogType type) {
         if (type == FileDialogType::Modern) {
             return fileDialog(true, extensions);
         }
@@ -28,7 +28,7 @@ namespace vtx
         }
     }
 
-    std::string FileDialogs::saveFileDialog(const std::vector<std::string>& extensions, FileDialogType type) {
+    std::string FileDialogs::saveFileDialog(const std::vector<std::string>& extensions, const FileDialogType type) {
         if (type == FileDialogType::Modern) {
             return fileDialog(true, extensions);
         }
@@ -37,7 +37,7 @@ namespace vtx
         }
     }
 
-    std::string FileDialogs::fileDialog(bool open, const std::vector<std::string>& extensions) {
+    std::string FileDialogs::fileDialog(const bool open, const std::vector<std::string>& extensions) {
         IFileDialog* pfd = nullptr;
         HRESULT hr;
 

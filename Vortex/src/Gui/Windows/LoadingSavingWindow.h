@@ -1,5 +1,5 @@
 ﻿#pragma once
-#include "GuiWindow.h"
+#include "Gui/GuiWindow.h"
 
 namespace vtx {
     class LoadingWindow : public Window {
@@ -11,7 +11,7 @@ namespace vtx {
 
         virtual void OnUpdate(float ts) override;
 
-        virtual void renderMainContent() override;
+        virtual void mainContent() override;
 
     public:
     };
@@ -25,7 +25,7 @@ namespace vtx {
 
         virtual void OnUpdate(float ts) override;
 
-        virtual void renderMainContent() override;
+        virtual void mainContent() override;
 
     public:
     };

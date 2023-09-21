@@ -26,6 +26,10 @@ namespace vtx::vtxImGui
 
     bool vectorGui(float* data, bool disableEdit = false);
 
+    void pushHalfSpaceWidgetFraction(const float fraction);
+    void popHalfSpaceWidgetFraction();
+    float getHalfWidgetFraction();
+
 	template<typename Func, typename ...Args>
     bool halfSpaceWidget(const char* label, Func&& widgetFunc, Args&&... args) {
         bool              valueChanged = false;
@@ -34,7 +38,7 @@ namespace vtx::vtxImGui
         // Start a new ImGui ID Scope
         ImGui::PushID(label);
 
-        constexpr float labelFraction = 0.3f;
+        const float labelFraction = getHalfWidgetFraction();
 
         // Calculate the size of the text and button
 		const float totalItemWidth = ImGui::CalcItemWidth();

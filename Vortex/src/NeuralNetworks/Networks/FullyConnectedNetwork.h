@@ -11,10 +11,10 @@ namespace vtx::network
         FcNetworkImpl() = default;
 
         FcNetworkImpl(
-            int64_t inputDim,
-            int64_t outputDim,
-            int64_t hiddenSize,
-            const int numberOfHiddenLayers,
+			const int64_t        inputDim,
+			const int64_t        outputDim,
+			const int64_t        hiddenSize,
+            const int            numberOfHiddenLayers,
             const ActivationType hiddenActivation = AT_RELU,
             const ActivationType outputActivation = AT_NONE)
         {

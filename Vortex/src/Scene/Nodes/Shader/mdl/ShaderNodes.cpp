@@ -9,7 +9,7 @@ namespace vtx::graph::shader
 	{
 		for (auto& [name, socket] : sockets)
 		{
-			SIM::releaseIndex(socket.Id);
+			SIM::get()->releaseIndex(socket.Id);
 		}
 	}
 
@@ -24,7 +24,7 @@ namespace vtx::graph::shader
 		isUpdated = true;
 	}
 
-	ShaderNode::ShaderNode(const NodeType cNodeType, std::string modulePath, std::string functionName, bool isMdlPath) :
+	ShaderNode::ShaderNode(const NodeType cNodeType, std::string modulePath, std::string functionName, const bool isMdlPath) :
 		Node(cNodeType)
 	{
 		isUpdated = true;
@@ -44,7 +44,7 @@ namespace vtx::graph::shader
 
 	void ShaderNode::generateOutputSocket()
 	{
-		outputSocket.Id = SIM::getFreeIndex();
+		outputSocket.Id = SIM::get()->getFreeIndex();
 		outputSocket.parameterInfo.expressionKind = functionInfo.returnType->skip_all_type_aliases()->get_kind();
 		outputSocket.parameterInfo.annotation.displayName = mdl::ITypeToString[outputSocket.parameterInfo.
 			expressionKind];
@@ -56,7 +56,7 @@ namespace vtx::graph::shader
 		vtxID socketId = 1;
 		for(auto& parameter : parameters)
 		{
-			sockets[parameter.argumentName] = ShaderNodeSocket{nullptr, parameter, SIM::getFreeIndex(), {} };
+			sockets[parameter.argumentName] = ShaderNodeSocket{nullptr, parameter, SIM::get()->getFreeIndex(), {} };
 			socketId++;
 			if (socketsGroupedByGroup.count(parameter.annotation.groupName) > 0)
 			{
@@ -83,7 +83,7 @@ namespace vtx::graph::shader
 			if (isSameType)
 			{
 				sockets[socketName].node = inputNode;
-				sockets[socketName].linkId = SIM::getFreeIndex();
+				sockets[socketName].linkId = SIM::get()->getFreeIndex();
 			}
 		}
 	}
@@ -200,6 +200,7 @@ namespace vtx::graph::shader
 	//DEFINE_SHADER_NODE_GET_CHILDREN(NormalMix)
 	//DEFINE_SHADER_NODE_GET_CHILDREN(GetChannel)
 
+	DEFINE_SHADER_NODE_ACCEPT(ShaderNode)
 	DEFINE_SHADER_NODE_ACCEPT(DiffuseReflection)
 	DEFINE_SHADER_NODE_ACCEPT(MaterialSurface)
 	DEFINE_SHADER_NODE_ACCEPT(Material)

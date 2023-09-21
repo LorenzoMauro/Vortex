@@ -1,10 +1,6 @@
 #include "ViewportWindow.h"
 #include "imgui.h"
-#include "GuiElements/RendererNodeGui.h"
-#include "GuiElements/MaterialNodeGui.h"
-#include "GuiElements/SceneGraph.h"
 #include "Scene/Scene.h"
-#include "Scene/Nodes/Material.h"
 
 namespace vtx {
     ViewportWindow::ViewportWindow()
@@ -15,7 +11,7 @@ namespace vtx {
         isBorderLess = true;
     }
 
-    void ViewportWindow::OnUpdate(float ts)
+    void ViewportWindow::OnUpdate(const float ts)
     {
         renderer->camera->onUpdate(ts);
         if (renderer->camera->isUpdated)
@@ -58,7 +54,7 @@ namespace vtx {
 
     }
 
-    void ViewportWindow::renderMainContent()
+    void ViewportWindow::mainContent()
     {
         ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
         const int width = (int)ImGui::GetContentRegionAvail().x;

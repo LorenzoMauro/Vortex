@@ -72,7 +72,7 @@ namespace vtx
 
     }
 
-	void SceneHierarchyWindow::renderMainContent()
+	void SceneHierarchyWindow::mainContent()
 	{
         // Now proceed with your node rendering as usual.
         displayNode(renderer);

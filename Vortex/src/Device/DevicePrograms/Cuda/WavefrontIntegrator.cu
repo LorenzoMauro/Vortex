@@ -52,7 +52,7 @@ namespace vtx
 		}
 	}
 
-	void WaveFrontIntegrator::downloadQueueSize(const int* deviceSize, int& hostSize, int maxSize)
+	void WaveFrontIntegrator::downloadQueueSize(const int* deviceSize, int& hostSize, const int maxSize)
 	{
 		if (settings.fitWavefront)
 		{
@@ -72,7 +72,7 @@ namespace vtx
 		auto deviceParamsCopy = deviceParams;
 		gpuParallelFor(eventNames[K_GEN_CAMERA_RAY],
 			maxTraceQueueSize,
-			[deviceParamsCopy] __device__(int id)
+			[deviceParamsCopy] __device__(const int id)
 		{
 			wfInitRayEntry(id, deviceParamsCopy);
 		});
@@ -159,7 +159,7 @@ namespace vtx
 		}
 		gpuParallelFor(eventNames[K_HANDLE_ESCAPED_RAY],
 			queueSizes.escapedQueueCounter,
-			[deviceParamsCopy] __device__(int id)
+			[deviceParamsCopy] __device__(const int id)
 		{
 			wfEscapedEntry(id, deviceParamsCopy);
 		});
@@ -176,7 +176,7 @@ namespace vtx
 		auto deviceParamsCopy = deviceParams;
 		gpuParallelFor(eventNames[K_ACCUMULATE_RAY],
 			queueSizes.accumulationQueueCounter,
-			[deviceParamsCopy] __device__(int id)
+			[deviceParamsCopy] __device__(const int id)
 		{
 			wfAccumulateEntry(id, deviceParamsCopy);
 		});

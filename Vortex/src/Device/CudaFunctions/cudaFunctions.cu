@@ -132,7 +132,7 @@ namespace vtx::cuda{
 	}
 
 
-	__forceinline__ __device__ float edgeTransform(float x, float curvature, float scale) {
+	__forceinline__ __device__ float edgeTransform(const float x, const float curvature, const float scale) {
 		if (x > 0.0f && x < 1.0f) {
 			//float value = fminf(1.0f, scale * expf((-powf((x - 1.0f), 2.0f)) / curvature));
 			float tX = x - 1.0f;
@@ -166,12 +166,12 @@ namespace vtx::cuda{
 	}
 
 	void overlayEdgesOnImage(
-		float* d_edgeData,
+		float*       d_edgeData,
 		math::vec4f* d_image,
-		int width,
-		int height,
-		const float curvature,
-		const float scale
+		int          width,
+		const int    height,
+		const float  curvature,
+		const float  scale
 	)
 	{
 		const int dataSize = width * height;

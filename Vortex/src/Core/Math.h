@@ -90,7 +90,7 @@ namespace vtx::math
 		return gdt::length(a);
 	}
 
-	__inline__ __both__ float saturate(float f)
+	__inline__ __both__ float saturate(const float f)
 	{
 		return min(1.f, max(0.f, f));
 	}
@@ -114,7 +114,7 @@ namespace vtx::math
 		return vec3f(saturate(v.x), saturate(v.y), saturate(v.z));
 	}
 
-	inline __both__ vec3f randomColor(int i)
+	inline __both__ vec3f randomColor(const int i)
 	{
 		return gdt::randomColor(i);
 	}

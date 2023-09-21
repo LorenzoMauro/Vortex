@@ -174,7 +174,7 @@ namespace vtx::optix
 		return fullFunctionName.substr(prefix.size());
 	}
 
-	std::shared_ptr<ProgramOptix> createDcProgram(const std::shared_ptr<ModuleOptix>& module, const std::string& functionName, vtxID id, const std::vector<std::string>& sbtName)
+	std::shared_ptr<ProgramOptix> createDcProgram(const std::shared_ptr<ModuleOptix>& module, const std::string& functionName, const vtxID id, const std::vector<std::string>& sbtName)
 	{
 		const auto function = std::make_shared<optix::FunctionOptix>();
 		function->name = functionName;
@@ -760,7 +760,7 @@ namespace vtx::optix
 		return traversable;
 	}
 
-	OptixInstance createInstance(uint32_t instanceId, const math::affine3f& transform, OptixTraversableHandle traversable)
+	OptixInstance createInstance(const uint32_t instanceId, const math::affine3f& transform, const OptixTraversableHandle traversable)
 	{
 		// First check if there is a valid material assigned to this instance.
 

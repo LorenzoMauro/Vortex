@@ -19,7 +19,7 @@ namespace vtx::graph
 		{
 		}
 
-		Texture(const char* _databaseName, ITarget_code::Texture_shape _shape):
+		Texture(const char* _databaseName, const ITarget_code::Texture_shape _shape):
 			Node(NT_MDL_TEXTURE),
 			databaseName(_databaseName),
 			shape(_shape)

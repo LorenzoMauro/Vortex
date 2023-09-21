@@ -53,7 +53,7 @@ namespace vtx
 	}
 
 
-	__global__ void fireFlyPass(LaunchParams* launchParams, int kernelSize, NoiseType noiseType, float threshold)
+	__global__ void fireFlyPass(LaunchParams* launchParams, const int kernelSize, const NoiseType noiseType, const float threshold)
 	{
 		const int x = threadIdx.x + blockIdx.x * blockDim.x;
 		const int y = threadIdx.y + blockIdx.y * blockDim.y;
@@ -76,7 +76,7 @@ namespace vtx
 		frameBuffer->fireflyPass[fbIndex] = filteredRadiance;
 	}
 
-	__forceinline__ __device__ void prepareOutput(math::vec3f* inputBuffer, LaunchParams* params, int pixelId, bool normalizeBySamples, bool dotoneMap)
+	__forceinline__ __device__ void prepareOutput(math::vec3f* inputBuffer, LaunchParams* params, const int pixelId, const bool normalizeBySamples, const bool dotoneMap)
 	{
 		math::vec3f output3f = inputBuffer[pixelId];
 		if(normalizeBySamples)
@@ -295,7 +295,7 @@ namespace vtx
 		}
 	}
 
-	void removeFireflies(LaunchParams* launchParams, int kernelSize, float threshold, int width, int height)
+	void removeFireflies(LaunchParams* launchParams, const int kernelSize, const float threshold, const int width, const int height)
 	{
 		dim3 threadsPerBlock(16, 16);  // a common choice for 2D data
 		// Calculate the number of blocks needed in each dimension
@@ -305,7 +305,7 @@ namespace vtx
 		CUDA_SYNC_CHECK();
 	}
 
-	void switchOutput(LaunchParams* launchParams, int width, int height, math::vec3f* beauty)
+	void switchOutput(LaunchParams* launchParams, const int width, const int height, math::vec3f* beauty)
 	{
 		dim3 threadsPerBlock(16, 16);  // a common choice for 2D data
 		// Calculate the number of blocks needed in each dimension

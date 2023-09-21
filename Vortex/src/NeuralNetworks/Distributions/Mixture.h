@@ -149,7 +149,7 @@ namespace vtx::distribution
 		}
 
 #endif
-		__forceinline__ __device__ __host__ static int getDistributionParametersCount(const network::DistributionType& type, bool forNetwork = false)
+		__forceinline__ __device__ __host__ static int getDistributionParametersCount(const network::DistributionType& type, const bool forNetwork = false)
 		{
 			if (type == network::D_SPHERICAL_GAUSSIAN)
 			{

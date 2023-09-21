@@ -45,7 +45,7 @@ namespace vtx
 
 	}
 
-	Path::Path(Bounce* deviceBouncePtr, int _maxAllocDepth)
+	Path::Path(Bounce* deviceBouncePtr, const int _maxAllocDepth)
 	{
 		maxDepth = 0;
 		bounces = deviceBouncePtr;

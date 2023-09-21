@@ -167,7 +167,7 @@ namespace vtx {
             }
         }
     private:
-        __host__ void resize(int new_capacity) {
+        __host__ void resize(const int new_capacity) {
             TKey* new_keys = new TKey[new_capacity];
             TValue* new_values = new TValue[new_capacity];
 

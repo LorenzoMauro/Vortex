@@ -42,6 +42,8 @@ namespace vtx::graph
 			shader::ParameterInfo* parameterInfo = nullptr;
 			std::shared_ptr<graph::shader::ShaderNode> shaderNode = materialGraph;
 			bool foundSocket = true;
+
+			// basically we are traversing the shader graph to find the socket that matches the argument name
 			for( auto& shaderSocketName : potentialShaderGraphPath)
 			{
 				if (shaderNode->sockets.count(shaderSocketName) > 0) {
@@ -59,6 +61,7 @@ namespace vtx::graph
 					break;
 				}
 			}
+			// if we found the socket that matches the argument name, we can set the parameter info
 			if(foundSocket)
 			{
 				parameterInfo->kind = param.kind;
@@ -82,7 +85,7 @@ namespace vtx::graph
 		return materialDbName;
 	}
 
-	FunctionNames& Material::getFunctionNames(bool cuda)
+	FunctionNames& Material::getFunctionNames(const bool cuda)
 	{
 		const std::string suffix = std::to_string(getID());
 		fNames                   = FunctionNames(suffix, cuda);
@@ -443,7 +446,7 @@ namespace vtx::graph
 
 	void computeMaterialsMultiThreadCode()
 	{
-		std::vector<std::shared_ptr<Material>> materials = SIM::getAllNodeOfType<graph::Material>(NT_MATERIAL);
+		std::vector<std::shared_ptr<Material>> materials = SIM::get()->getAllNodeOfType<graph::Material>(NT_MATERIAL);
 
 		std::vector<std::thread> threads;
 

@@ -3,7 +3,6 @@
 #include "Gui/GuiWindow.h"
 #include "Core/Options.h"
 #include "Device/DeviceVisitor.h"
-#include "GuiElements/MaterialNodeGui.h"
 #include "Scene/HostVisitor.h"
 
 namespace vtx {
@@ -14,7 +13,7 @@ namespace vtx {
 
         virtual void OnUpdate(float ts) override;
 
-        virtual void renderMainContent() override;
+        virtual void mainContent() override;
 
         virtual void preRender() override;
 

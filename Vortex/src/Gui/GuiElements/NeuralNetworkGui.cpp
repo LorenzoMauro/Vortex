@@ -1,12 +1,11 @@
-#include "NeuralNetworkGui.h"
 #include "Core/CustomImGui/CustomImGui.h"
 #include "NeuralNetworks/NeuralNetworkGraphs.h"
-#include "PlottingWrapper.h"
 #include "NeuralNetworks/NeuralNetwork.h"
+#include "Gui/GuiProvider.h"
 
 namespace vtx::gui
 {
-	bool encodingSettingsEditorGui(network::EncodingSettings& settings, const std::string& encodedFeatureName)
+	bool GuiProvider::drawEditGui(network::EncodingSettings& settings, const std::string& encodedFeatureName)
 	{
 		if (ImGui::CollapsingHeader((encodedFeatureName).c_str()))
 		{
@@ -26,7 +25,7 @@ namespace vtx::gui
 		return settings.isUpdated;
 	}
 
-	void encodingSettingsDisplay(network::EncodingSettings& settings, const std::string& encodedFeatureName)
+	void GuiProvider::drawDisplayGui(network::EncodingSettings& settings, const std::string& encodedFeatureName)
 	{
 		if (ImGui::CollapsingHeader((encodedFeatureName + " :").c_str()))
 		{
@@ -35,30 +34,30 @@ namespace vtx::gui
 		}
 	}
 
-	bool networkInputSettingsEditor(network::InputSettings& settings)
+	bool GuiProvider::drawEditGui(network::InputSettings& settings)
 	{
 		if (ImGui::CollapsingHeader("Network Input Settings"))
 		{
 			ImGui::Indent();
-			settings.isUpdated |= encodingSettingsEditorGui(settings.positionEncoding, "Position");
-			settings.isUpdated |= encodingSettingsEditorGui(settings.woEncoding, "Outgoing Direction");
-			settings.isUpdated |= encodingSettingsEditorGui(settings.normalEncoding, "Normal");
+			settings.isUpdated |= GuiProvider::drawEditGui(settings.positionEncoding, "Position");
+			settings.isUpdated |= GuiProvider::drawEditGui(settings.woEncoding, "Outgoing Direction");
+			settings.isUpdated |= GuiProvider::drawEditGui(settings.normalEncoding, "Normal");
 			ImGui::Unindent();
 		}
 		return settings.isUpdated;
 	}
 
-	void networkInputSettingsDisplay(network::InputSettings& settings)
+	void GuiProvider::drawDisplayGui(network::InputSettings& settings)
 	{
 		if (ImGui::CollapsingHeader("Network Input Settings"))
 		{
-			encodingSettingsDisplay(settings.positionEncoding, "Position");
-			encodingSettingsDisplay(settings.woEncoding, "Outgoing Direction");
-			encodingSettingsDisplay(settings.normalEncoding, "Normal");
+			GuiProvider::drawDisplayGui(settings.positionEncoding, "Position");
+			GuiProvider::drawDisplayGui(settings.woEncoding, "Outgoing Direction");
+			GuiProvider::drawDisplayGui(settings.normalEncoding, "Normal");
 		}
 	}
 
-	bool pathGuidingNetworkSettingsEditor(network::PathGuidingNetworkSettings& settings)
+	bool GuiProvider::drawEditGui(network::PathGuidingNetworkSettings& settings)
 	{
 		if (ImGui::CollapsingHeader("Path Guiding Network Settings"))
 		{
@@ -89,7 +88,7 @@ namespace vtx::gui
 		return settings.isUpdated;
 	}
 
-	void pathGuidingNetworkSettingsDisplay(network::PathGuidingNetworkSettings& settings)
+	void GuiProvider::drawDisplayGui(network::PathGuidingNetworkSettings& settings)
 	{
 		if (ImGui::CollapsingHeader("Path Guiding Network Settings"))
 		{
@@ -99,7 +98,7 @@ namespace vtx::gui
 		}
 	}
 
-	bool sacSettingsEditorGui(network::SacSettings& settings)
+	bool GuiProvider::drawEditGui(network::SacSettings& settings)
 	{
 		if (ImGui::CollapsingHeader("Soft Actor Critic Settings"))
 		{
@@ -142,7 +141,7 @@ namespace vtx::gui
 		return settings.isUpdated;
 	}
 
-	void sacSettingsDisplayGui(network::SacSettings& settings)
+	void GuiProvider::drawDisplayGui(network::SacSettings& settings)
 	{
 		if (ImGui::CollapsingHeader("Soft Actor Critic Settings"))
 		{
@@ -156,7 +155,7 @@ namespace vtx::gui
 		}
 	}
 
-	bool npgSettingsEditorGui(network::NpgSettings& settings)
+	bool GuiProvider::drawEditGui(network::NpgSettings& settings)
 	{
 		if (ImGui::CollapsingHeader("Neural Path Guiding Settings"))
 		{
@@ -202,7 +201,7 @@ namespace vtx::gui
 		return settings.isUpdated;
 	}
 
-	void npgSettingsDisplayGui(network::NpgSettings& settings)
+	void GuiProvider::drawDisplayGui(network::NpgSettings& settings)
 	{
 		if (ImGui::CollapsingHeader("Neural Path Guiding Settings"))
 		{
@@ -211,7 +210,7 @@ namespace vtx::gui
 		}
 	}
 
-	bool trainingBatchGenerationEditorGui(network::TrainingBatchGenerationSettings& settings)
+	bool GuiProvider::drawEditGui(network::TrainingBatchGenerationSettings& settings)
 	{
 		if (ImGui::CollapsingHeader("Training Batch Generation Settings"))
 		{
@@ -233,7 +232,8 @@ namespace vtx::gui
 		
 		return settings.isUpdated;
 	}
-	bool networkSettingsEditorGui(network::NetworkSettings& settings)
+
+	bool GuiProvider::drawEditGui(network::NetworkSettings& settings)
 	{
 		if (ImGui::CollapsingHeader("Network Settings"))
 		{
@@ -291,17 +291,17 @@ namespace vtx::gui
 
 
 			ImGui::Indent();
-			settings.isUpdated |= trainingBatchGenerationEditorGui(settings.trainingBatchGenerationSettings);
-			settings.isUpdated |= networkInputSettingsEditor(settings.inputSettings);
-			settings.isUpdated |= pathGuidingNetworkSettingsEditor(settings.pathGuidingSettings);
+			settings.isUpdated |= GuiProvider::drawEditGui(settings.trainingBatchGenerationSettings);
+			settings.isUpdated |= GuiProvider::drawEditGui(settings.inputSettings);
+			settings.isUpdated |= GuiProvider::drawEditGui(settings.pathGuidingSettings);
 
 			if (settings.type == network::NT_SAC)
 			{
-				settings.isUpdated |= sacSettingsEditorGui(settings.sac);
+				settings.isUpdated |= GuiProvider::drawEditGui(settings.sac);
 			}
 			else if (settings.type == network::NT_NGP)
 			{
-				settings.isUpdated |= npgSettingsEditorGui(settings.npg);
+				settings.isUpdated |= GuiProvider::drawEditGui(settings.npg);
 			}
 			ImGui::Unindent();
 
@@ -311,7 +311,7 @@ namespace vtx::gui
 		return settings.isUpdated;
 	}
 
-	void networkSettingsDisplayGui(network::NetworkSettings& settings)
+	void GuiProvider::drawDisplayGui(network::NetworkSettings& settings)
 	{
 		if (ImGui::CollapsingHeader("Network Settings"))
 		{
@@ -320,15 +320,15 @@ namespace vtx::gui
 			vtxImGui::halfSpaceWidget("Do Inference", vtxImGui::booleanText, "%d", settings.doInference);
 			vtxImGui::halfSpaceWidget("Inference Start", vtxImGui::booleanText, "%d", settings.inferenceIterationStart);
 			vtxImGui::halfSpaceWidget("Clear buffer on Inference Start", vtxImGui::booleanText, "%d", settings.clearOnInferenceStart);
-			networkInputSettingsDisplay(settings.inputSettings);
-			pathGuidingNetworkSettingsDisplay(settings.pathGuidingSettings);
+			GuiProvider::drawDisplayGui(settings.inputSettings);
+			GuiProvider::drawDisplayGui(settings.pathGuidingSettings);
 			if (settings.type == network::NT_SAC)
 			{
-				sacSettingsDisplayGui(settings.sac);
+				GuiProvider::drawDisplayGui(settings.sac);
 			}
 			else if (settings.type == network::NT_NGP)
 			{
-				npgSettingsDisplayGui(settings.npg);
+				GuiProvider::drawDisplayGui(settings.npg);
 			}
 		}
 	}
@@ -448,7 +448,8 @@ namespace vtx::gui
 		return { q1q2Losses, alphaLosses, alphaValues, policyLosses, rewards, inferenceConcentration };
 
 	}
-	std::vector<PlotInfo> neuralNetworkPlots(network::Network& network)
+
+	std::vector<PlotInfo> GuiProvider::getPlots(network::Network& network)
 	{
 		if (network.settings.type == network::NT_SAC)
 		{

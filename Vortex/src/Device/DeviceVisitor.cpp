@@ -14,7 +14,7 @@
 
 namespace vtx::device
 {
-	void DeviceVisitor::visit(std::shared_ptr<graph::Instance> instance)
+	void DeviceVisitor::visit(const std::shared_ptr<graph::Instance>& instance)
 	{
 		// If the child node is a mesh, then it's leaf therefore we can safely create the instance.
 		// This supposes that child and transform are traversed before the instance visitor is accepted.
@@ -44,17 +44,17 @@ namespace vtx::device
 		//popTransform();
 	}
 
-	void DeviceVisitor::visit(std::shared_ptr<graph::Transform> transform)
+	void DeviceVisitor::visit(const std::shared_ptr<graph::Transform>& transform)
 	{
 		//pushTransform(transform->getID(), transform->isUpdated);
 	}
 
-	void DeviceVisitor::visit(std::shared_ptr<graph::Group> group)
+	void DeviceVisitor::visit(const std::shared_ptr<graph::Group>& group)
 	{
 		//popTransform();
 	}
 
-	void DeviceVisitor::visit(std::shared_ptr<graph::Mesh> mesh)
+	void DeviceVisitor::visit(const std::shared_ptr<graph::Mesh>& mesh)
 	{
 		//TODO : Check if the mesh has been updated
 		if (const vtxID meshId = mesh->getID(); !UPLOAD_DATA->geometryDataMap.contains(meshId)) {
@@ -63,7 +63,7 @@ namespace vtx::device
 		}
 	}
 
-	void DeviceVisitor::visit(std::shared_ptr<graph::Material> material)
+	void DeviceVisitor::visit(const std::shared_ptr<graph::Material>& material)
 	{
 		//TODO : Check if the texture has been updated
 		if (const vtxID materialId = material->getID(); (!UPLOAD_DATA->materialDataMap.contains(materialId) || material->isUpdated)) {
@@ -74,17 +74,17 @@ namespace vtx::device
 		}
 	}
 
-	void DeviceVisitor::visit(std::shared_ptr<graph::Camera> camera)
+	void DeviceVisitor::visit(const std::shared_ptr<graph::Camera>& camera)
 	{
 		setCameraData(camera);
 	}
 
-	void DeviceVisitor::visit(std::shared_ptr < graph::Renderer > renderer)
+	void DeviceVisitor::visit(const std::shared_ptr < graph::Renderer >& renderer)
 	{
 		setRendererData(renderer);
 	}
 
-	void DeviceVisitor::visit(std::shared_ptr<graph::Texture> textureNode)
+	void DeviceVisitor::visit(const std::shared_ptr<graph::Texture>& textureNode)
 	{
 		//TODO : Check if the texture has been updated
 		if (const vtxID textureId = textureNode->getID(); !UPLOAD_DATA->textureDataMap.contains(textureId)) {
@@ -93,7 +93,7 @@ namespace vtx::device
 		}
 	}
 
-	void DeviceVisitor::visit(std::shared_ptr<graph::BsdfMeasurement> bsdfMeasurementNode)
+	void DeviceVisitor::visit(const std::shared_ptr<graph::BsdfMeasurement>& bsdfMeasurementNode)
 	{
 		///TODO : Check if the texture has been updated
 		if (const vtxID bsdfId = bsdfMeasurementNode->getID(); !UPLOAD_DATA->bsdfDataMap.contains(bsdfId)) {
@@ -102,7 +102,7 @@ namespace vtx::device
 		}
 	}
 
-	void DeviceVisitor::visit(std::shared_ptr<graph::LightProfile> lightProfile)
+	void DeviceVisitor::visit(const std::shared_ptr<graph::LightProfile>& lightProfile)
 	{
 		///TODO : Check if the light Profile has been updated
 		if (const vtxID lightProfileId = lightProfile->getID(); !UPLOAD_DATA->lightProfileDataMap.contains(lightProfileId)) {
@@ -111,7 +111,7 @@ namespace vtx::device
 		}
 	}
 
-	void DeviceVisitor::visit(std::shared_ptr<graph::MeshLight> meshLight)
+	void DeviceVisitor::visit(const std::shared_ptr<graph::MeshLight>& meshLight)
 	{
 		//TODO : Check if the mesh has been updated
 		if (const vtxID lightId = meshLight->getID(); !UPLOAD_DATA->lightDataMap.contains(lightId)) {
@@ -129,7 +129,7 @@ namespace vtx::device
 		}
 	}
 
-	void DeviceVisitor::visit(std::shared_ptr<graph::EnvironmentLight> envLight)
+	void DeviceVisitor::visit(const std::shared_ptr<graph::EnvironmentLight>& envLight)
 	{
 		//TODO : Check if the mesh has been updated
 		if (const vtxID lightId = envLight->getID(); !UPLOAD_DATA->lightDataMap.contains(lightId)) {

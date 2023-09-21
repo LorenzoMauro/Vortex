@@ -45,6 +45,17 @@ namespace vtx::graph
 			return {};
 		}
 
+		bool isAnyChildUpdated()
+		{
+			for (const auto& child : getChildren())
+			{
+				if (child->isUpdated)
+				{
+					return true;
+				}
+			}
+		}
+
 		bool isInitialized = false;
 		bool isUpdated = true;
 		std::string name;

@@ -901,7 +901,7 @@ extern "C" __device__ float df_light_profile_pdf(
 // Implementation of bsdf_measurement_isvalid() for an MBSDF.
 extern "C" __device__ bool df_bsdf_measurement_isvalid(
     Texture_handler_base const* self_base,
-    unsigned int bsdf_measurement_index)
+	const unsigned int          bsdf_measurement_index)
 {
 
     const BsdfData* bm = getBsdf(self_base, bsdf_measurement_index);
@@ -918,9 +918,9 @@ extern "C" __device__ bool df_bsdf_measurement_isvalid(
 // The returned triple consists of: number of equi-spaced steps of theta_i and theta_o,
 // number of equi-spaced steps of phi, and number of color channels (1 or 3).
 extern "C" __device__ void df_bsdf_measurement_resolution(
-    unsigned int result[3],
-    Texture_handler_base const* self_base,
-    unsigned int bsdf_measurement_index,
+    unsigned int                    result[3],
+    Texture_handler_base const*     self_base,
+	const unsigned int              bsdf_measurement_index,
     const mi::neuraylib::Mbsdf_part part)
 {
 	const BsdfSamplingPartData* bmp = getBsdfPart(self_base, bsdf_measurement_index,part);
@@ -973,12 +973,12 @@ __forceinline__ __device__ T bsdfMeasurementLookup(
 
 // Implementation of df::bsdf_measurement_evaluate() for an MBSDF.
 extern "C" __device__ void df_bsdf_measurement_evaluate(
-    float result[3],
+    float                       result[3],
     Texture_handler_base const* self_base,
-    unsigned int bsdf_measurement_index,
-    float const theta_phi_in[2],
-    float const theta_phi_out[2],
-    const Mbsdf_part part)
+	const unsigned int          bsdf_measurement_index,
+    float const                 theta_phi_in[2],
+    float const                 theta_phi_out[2],
+    const Mbsdf_part            part)
 {
     const BsdfSamplingPartData* bmp = getBsdfPart(self_base, bsdf_measurement_index, part);
 
@@ -1003,12 +1003,12 @@ extern "C" __device__ void df_bsdf_measurement_evaluate(
 
 // Implementation of df::bsdf_measurement_sample() for an MBSDF.
 extern "C" __device__ void df_bsdf_measurement_sample(
-    float result[3], // output: theta, phi, pdf
+    float                       result[3], // output: theta, phi, pdf
     Texture_handler_base const* self_base,
-    unsigned int bsdf_measurement_index,
-    float const theta_phi_out[2],
-    float const xi[3], // uniform random values
-    const Mbsdf_part part)
+	const unsigned int          bsdf_measurement_index,
+    float const                 theta_phi_out[2],
+    float const                 xi[3], // uniform random values
+    const Mbsdf_part            part)
 {
     result[0] = -1.0f; // negative theta means absorption
     result[1] = -1.0f;
@@ -1107,10 +1107,10 @@ extern "C" __device__ void df_bsdf_measurement_sample(
 // Implementation of df::bsdf_measurement_pdf() for an MBSDF.
 extern "C" __device__ float df_bsdf_measurement_pdf(
     Texture_handler_base const* self_base,
-    unsigned int bsdf_measurement_index,
-    float const theta_phi_in[2],
-    float const theta_phi_out[2],
-    Mbsdf_part part)
+	const unsigned int          bsdf_measurement_index,
+    float const                 theta_phi_in[2],
+    float const                 theta_phi_out[2],
+	const Mbsdf_part            part)
 {
     const BsdfSamplingPartData* bmp = getBsdfPart(self_base, bsdf_measurement_index, part);
 
@@ -1173,8 +1173,8 @@ extern "C" __device__ void df_bsdf_measurement_albedos(
     // [2] albedoAccumulator trans. for theta_phi
     // [3] max albedoAccumulator trans. global
     Texture_handler_base const* self_base,
-    unsigned int bsdf_measurement_index,
-    float const theta_phi[2])
+	const unsigned int          bsdf_measurement_index,
+    float const                 theta_phi[2])
 {
     result[0] = 0.0f;
     result[1] = 0.0f;

@@ -59,10 +59,10 @@ namespace gdt {
     { /* intentionally empty so we can use it in device vars that
          don't allow dynamic initialization (ie, PRD) */
     }
-    inline __both__ LCG(unsigned int val0, unsigned int val1)
+    inline __both__ LCG(const unsigned int val0, const unsigned int val1)
     { init(val0,val1); }
     
-    inline __both__ void init(unsigned int val0, unsigned int val1)
+    inline __both__ void init(const unsigned int val0, const unsigned int val1)
     {
       unsigned int v0 = val0;
       unsigned int v1 = val1;

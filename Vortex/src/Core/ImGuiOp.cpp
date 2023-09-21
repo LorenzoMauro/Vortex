@@ -13,7 +13,7 @@
 namespace vtx {
 
     // Callback function for GLFW window UI
-    void SetWindowTitleBarColor(GLFWwindow* window, float r, float g, float b)
+    void SetWindowTitleBarColor(GLFWwindow* window, const float r, const float g, const float b)
     {
         // Retrieve the GLFW window handle
         GLFWwindow* glfwWindow = static_cast<GLFWwindow*>(ImGui::GetIO().UserData);
@@ -119,7 +119,7 @@ namespace vtx {
         }
     }
 
-    uint32_t vec4toImCol32(ImVec4 color)
+    uint32_t vec4toImCol32(const ImVec4 color)
     {
 	    return IM_COL32((uint8_t)(color.x * 255.0f), (uint8_t)(color.y * 255.0f), (uint8_t)(color.z * 255.0f), (uint8_t)(color.w * 255.0f));
     }
@@ -207,71 +207,73 @@ namespace vtx {
         colors[ImGuiCol_TitleBgCollapsed] = unifiedVeryDark;
         colors[ImGuiCol_TabUnfocused] = unifiedVeryDark;
 
-        ImGui::GetStyle().Alpha = 1.0f;
+        auto& imguiStyle = ImGui::GetStyle();
+        imguiStyle.Alpha = 1.0f;
 
-        ImGui::GetStyle().WindowPadding = ImVec2(2.0f, 2.0f);
-        ImGui::GetStyle().FramePadding = ImVec2(2.0f, 2.0f);
-        ImGui::GetStyle().CellPadding = ImVec2(2.0f, 2.0f);
-        ImGui::GetStyle().ItemSpacing = ImVec2(2.0f, 2.0f);
-        ImGui::GetStyle().ItemInnerSpacing = ImVec2(2.0f, 2.0f);
-        ImGui::GetStyle().IndentSpacing = 11.0f;
-        ImGui::GetStyle().ScrollbarSize = 16.0f;
-        ImGui::GetStyle().GrabMinSize = 4.0f;
+        imguiStyle.WindowPadding = ImVec2(2.0f, 2.0f);
+        imguiStyle.FramePadding = ImVec2(2.0f, 2.0f);
+        imguiStyle.CellPadding = ImVec2(2.0f, 2.0f);
+        imguiStyle.ItemSpacing = ImVec2(2.0f, 2.0f);
+        imguiStyle.ItemInnerSpacing = ImVec2(2.0f, 2.0f);
+        imguiStyle.IndentSpacing = 11.0f;
+        imguiStyle.ScrollbarSize = 16.0f;
+        imguiStyle.GrabMinSize = 4.0f;
 
-        ImGui::GetStyle().DockingSeparatorSize = 0.0f;
-        ImGui::GetStyle().WindowBorderSize = 0;
-        ImGui::GetStyle().ChildBorderSize = 0;
-        ImGui::GetStyle().PopupBorderSize = 1;
-        ImGui::GetStyle().FrameBorderSize = 0;
-        ImGui::GetStyle().TabBorderSize = 0;
+        imguiStyle.DockingSeparatorSize = 0.0f;
+        imguiStyle.WindowBorderSize = 0;
+        imguiStyle.ChildBorderSize = 0;
+        imguiStyle.PopupBorderSize = 1;
+        imguiStyle.FrameBorderSize = 0;
+        imguiStyle.TabBorderSize = 0;
 
-        ImGui::GetStyle().WindowRounding = 5;
-        ImGui::GetStyle().ChildRounding = 5;
-        ImGui::GetStyle().FrameRounding = 5;
-        ImGui::GetStyle().PopupRounding = 5;
-        ImGui::GetStyle().ScrollbarRounding = 5;
-        ImGui::GetStyle().GrabRounding = 5;
-        ImGui::GetStyle().TabRounding = 5;
+        imguiStyle.WindowRounding = 5;
+        imguiStyle.ChildRounding = 5;
+        imguiStyle.FrameRounding = 5;
+        imguiStyle.PopupRounding = 5;
+        imguiStyle.ScrollbarRounding = 5;
+        imguiStyle.GrabRounding = 5;
+        imguiStyle.TabRounding = 5;
 
-        //ImGui::GetStyle().WindowTitleAlign = ;
-        ImGui::GetStyle().WindowMenuButtonPosition = 1;
-        ImGui::GetStyle().ColorButtonPosition = 0;
-        //ImGui::GetStyle().ButtonTextAlign = ;
+        //imguiStyle.WindowTitleAlign = ;
+        imguiStyle.WindowMenuButtonPosition = 1;
+        imguiStyle.ColorButtonPosition = 0;
+        //imguiStyle.ButtonTextAlign = ;
 
-        ImNodesStyle& style = ImNodes::GetStyle();
+        ImNodesStyle& ImNodesStyle = ImNodes::GetStyle();
 
         // Set colors
-        style.Colors[ImNodesCol_GridBackground] = vec4toImCol32(unifiedVeryDark);
-        style.Colors[ImNodesCol_NodeBackground] = vec4toImCol32(darkGrey);
-        style.Colors[ImNodesCol_NodeBackgroundHovered] = vec4toImCol32(lightGrey);
-        style.Colors[ImNodesCol_NodeBackgroundSelected] = vec4toImCol32(lightGrey);
-        style.Colors[ImNodesCol_NodeOutline] = vec4toImCol32(lightGrey);
-        style.Colors[ImNodesCol_TitleBar] = vec4toImCol32(lightGrey);
-        style.Colors[ImNodesCol_TitleBarHovered] = vec4toImCol32(lightGrey);
-        style.Colors[ImNodesCol_TitleBarSelected] = vec4toImCol32(lightGrey);
-        style.Colors[ImNodesCol_Link] = vec4toImCol32(accentTownDown);
-        style.Colors[ImNodesCol_LinkHovered] = vec4toImCol32(accentTownDown);
-        style.Colors[ImNodesCol_LinkSelected] = vec4toImCol32(accentTownDown);
-        style.Colors[ImNodesCol_Pin] = vec4toImCol32(accentTownDown);
+        ImNodesStyle.Colors[ImNodesCol_GridBackground] = vec4toImCol32(unifiedVeryDark);
+        ImNodesStyle.Colors[ImNodesCol_NodeBackground] = vec4toImCol32(darkGrey);
+        ImNodesStyle.Colors[ImNodesCol_NodeBackgroundHovered] = vec4toImCol32(lightGrey);
+        ImNodesStyle.Colors[ImNodesCol_NodeBackgroundSelected] = vec4toImCol32(lightGrey);
+        ImNodesStyle.Colors[ImNodesCol_NodeOutline] = vec4toImCol32(lightGrey);
+        ImNodesStyle.Colors[ImNodesCol_TitleBar] = vec4toImCol32(lightGrey);
+        ImNodesStyle.Colors[ImNodesCol_TitleBarHovered] = vec4toImCol32(lightGrey);
+        ImNodesStyle.Colors[ImNodesCol_TitleBarSelected] = vec4toImCol32(lightGrey);
+        ImNodesStyle.Colors[ImNodesCol_Link] = vec4toImCol32(accentTownDown);
+        ImNodesStyle.Colors[ImNodesCol_LinkHovered] = vec4toImCol32(accentTownDown);
+        ImNodesStyle.Colors[ImNodesCol_LinkSelected] = vec4toImCol32(accentTownDown);
+        ImNodesStyle.Colors[ImNodesCol_Pin] = vec4toImCol32(accentTownDown);
         // ... set other colors
 
-        // Set style variables
-        style.NodeCornerRounding = 5.0f;
-        style.NodePadding = ImVec2(10.0f, 4.0f);
-        style.NodeBorderThickness = 1.5f;
-        style.LinkThickness = 1.5f;
-        style.LinkLineSegmentsPerLength = 0.1f;
-        style.LinkHoverDistance = 10.0f;
-        style.PinCircleRadius = 2.0f;
-        // ... set other style variables
+        // Set ImNodesStyle variables
+        ImNodesStyle.NodeCornerRounding = 5.0f;
+        ImNodesStyle.NodePadding = ImVec2(10.0f, 4.0f);
+        ImNodesStyle.NodeBorderThickness = 1.5f;
+        ImNodesStyle.LinkThickness = 1.5f;
+        ImNodesStyle.LinkLineSegmentsPerLength = 0.1f;
+        ImNodesStyle.BezierDeviationFactor = 0.025;
+        ImNodesStyle.LinkHoverDistance = 10.0f;
+        ImNodesStyle.PinCircleRadius = 2.0f;
+        // ... set other ImNodesStyle variables
 
-        // Set style flags
-        style.Flags = ImNodesStyleFlags_NodeOutline;
-        style.Flags |= ImNodesStyleFlags_GridLines;
-        style.Flags |= ImNodesStyleFlags_DrawCirclesGrid;
+        // Set ImNodesStyle flags
+        ImNodesStyle.Flags = ImNodesStyleFlags_NodeOutline;
+        ImNodesStyle.Flags |= ImNodesStyleFlags_GridLines;
+        ImNodesStyle.Flags |= ImNodesStyleFlags_DrawCirclesGrid;
 
-        style.GridDotSize = 1.0f;
-        style.GridSpacing = 10.0;
+        ImNodesStyle.GridDotSize = 1.0f;
+        ImNodesStyle.GridSpacing = 10.0;
         // ... set other style flags
 
 

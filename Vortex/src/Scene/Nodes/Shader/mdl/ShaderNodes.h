@@ -37,6 +37,8 @@ namespace vtx::graph::shader
 
 		void init() override;
 
+		void                               accept(NodeVisitor& visitor) override;
+
 		std::vector<std::shared_ptr<Node>> getChildren() const override
 		{
 			std::vector<std::shared_ptr<Node>> children; 
@@ -116,7 +118,7 @@ namespace vtx::graph::shader
 	class ImportedNode : public ShaderNode
 	{
 	public:
-		ImportedNode(std::string modulePath, std::string functionName, bool isMdlPath = false) : ShaderNode(
+		ImportedNode(std::string modulePath, std::string functionName, const bool isMdlPath = false) : ShaderNode(
 			NT_SHADER_IMPORTED, modulePath, functionName, isMdlPath)
 		{
 		}

@@ -14,7 +14,7 @@ namespace vtx::mdl
 	};
 
 	template<>
-	static inline bool getValue(Handle<IExpression const> expr)
+	static inline bool getValue(const Handle<IExpression const> expr)
 	{
 		const Handle exprConstant(expr->get_interface<IExpression_constant>());
 		const Handle<IValue const> value(exprConstant->get_value());
@@ -23,7 +23,7 @@ namespace vtx::mdl
 	}
 
 	template<>
-	static inline std::string getValue(Handle<IExpression const> expr)
+	static inline std::string getValue(const Handle<IExpression const> expr)
 	{
 		const Handle exprConstant(expr->get_interface<IExpression_constant>());
 		const Handle value(exprConstant->get_value());
@@ -32,7 +32,7 @@ namespace vtx::mdl
 	}
 
 	template<>
-	static inline int getValue(Handle<IExpression const> expr)
+	static inline int getValue(const Handle<IExpression const> expr)
 	{
 
 		const Handle exprConstant(expr->get_interface<IExpression_constant>());
@@ -47,7 +47,7 @@ namespace vtx::mdl
 	}
 
 	template<>
-	static inline float getValue(Handle<IExpression const> expr)
+	static inline float getValue(const Handle<IExpression const> expr)
 	{
 		const Handle exprConstant(expr->get_interface<IExpression_constant>());
 		const Handle value(exprConstant->get_value());
@@ -57,7 +57,7 @@ namespace vtx::mdl
 
 
 	template<>
-	static inline double getValue(Handle<IExpression const> expr)
+	static inline double getValue(const Handle<IExpression const> expr)
 	{
 		const Handle exprConstant(expr->get_interface<IExpression_constant>());
 		const Handle value(exprConstant->get_value());
@@ -66,7 +66,7 @@ namespace vtx::mdl
 	}
 
 	template<>
-	static inline math::vec3f getValue(Handle<IExpression const> expr)
+	static inline math::vec3f getValue(const Handle<IExpression const> expr)
 	{
 		const Handle exprConstant(expr->get_interface<IExpression_constant>());
 		const Handle value(exprConstant->get_value());
@@ -88,7 +88,7 @@ namespace vtx::mdl
 	};
 
 	template<typename T>
-	ExprEvaluation<T> analyzeExpression(const mi::base::Handle<const mi::neuraylib::ICompiled_material> compiledMaterial, std::string exprName)
+	ExprEvaluation<T> analyzeExpression(const mi::base::Handle<const mi::neuraylib::ICompiled_material> compiledMaterial, const std::string exprName)
 	{
 		Handle<IExpression const> expr(compiledMaterial->lookup_sub_expression(exprName.c_str()));
 

@@ -7,7 +7,7 @@
 
 namespace vtx {
 
-	static void glfwErrorCallback(int error, const char* description)
+	static void glfwErrorCallback(const int error, const char* description)
 	{
 		VTX_ERROR("Glfw Error {}: {}", error, description);
 	}

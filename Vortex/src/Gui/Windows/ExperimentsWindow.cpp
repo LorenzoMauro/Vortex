@@ -4,9 +4,9 @@
 #include "Core/CustomImGui/CustomImGui.h"
 #include "Device/CudaFunctions/cudaFunctions.h"
 #include "Device/UploadCode/UploadData.h"
-#include "GuiElements/PlottingWrapper.h"
+#include "Gui/PlottingWrapper.h"
+#include "Gui/GuiProvider.h"
 #include "Scene/Nodes/Renderer.h"
-#include "GuiElements/NeuralNetworkGui.h"
 #include "Scene/Scene.h"
 #include "Serialization/Serializer.h"
 
@@ -39,7 +39,7 @@ namespace vtx
 			break;
 		}
 	}
-	void ExperimentsWindow::renderMainContent()
+	void ExperimentsWindow::mainContent()
 	{
 		gui::PlotInfo MapePlot;
 		MapePlot.title = "Mape";
@@ -62,7 +62,7 @@ namespace vtx
 			}
 		}
 
-		std::vector<gui::PlotInfo> neuralNetworkPlots = gui::neuralNetworkPlots(renderer->waveFrontIntegrator.network);
+		std::vector<gui::PlotInfo> neuralNetworkPlots = gui::GuiProvider::getPlots(renderer->waveFrontIntegrator.network);
 		if (!neuralNetworkPlots.empty())
 		{
 			const float totalAvailableHeight = ImGui::GetContentRegionAvail().y - resizerSize - ImGui::GetStyle().ItemSpacing.y * 3.0f;// -childPaddingHeight;
@@ -94,7 +94,7 @@ namespace vtx
 	}
 
 
-	void ExperimentsWindow::renderToolBar()
+	void ExperimentsWindow::toolBarContent()
 	{
 		auto stageName = experimentStageNames[em->stage];
 		vtxImGui::halfSpaceWidget("Stage", vtxImGui::booleanText, "%s", stageName.c_str());
@@ -233,7 +233,7 @@ namespace vtx
 		}
 	}
 
-	void ExperimentsWindow::startNewRender(SamplingTechnique technique)
+	void ExperimentsWindow::startNewRender(const SamplingTechnique technique)
 	{
 		renderer->settings.samplingTechnique = technique;
 		renderer->settings.iteration = -1;

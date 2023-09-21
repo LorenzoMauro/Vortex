@@ -90,7 +90,7 @@ namespace vtx::optix
 		OPTIX_CHECK(result);
 	}
 
-	math::vec3f* OptixDenoiserWrapper::denoise(float blend) const
+	math::vec3f* OptixDenoiserWrapper::denoise(const float blend) const
 	{
 		bool isReady = (radiance != nullptr && albedo != nullptr && normal != nullptr);
 		isReady &= (width > 0 && height > 0);

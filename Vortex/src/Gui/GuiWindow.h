@@ -22,9 +22,9 @@ namespace vtx {
 		virtual void OnUpdate(float ts) {}
 
 		virtual void preRender(){}
-		virtual void renderMainContent(){}
-		virtual void renderMenuBar(){}
-		virtual void renderToolBar(){}
+		virtual void mainContent(){}
+		virtual void menuBarContent(){}
+		virtual void toolBarContent(){}
 
 		void prepareChildWindow();
 		void endChildWindowPrep();
@@ -36,17 +36,19 @@ namespace vtx {
 		void setWindowManager(const std::shared_ptr<vtx::WindowManager>& _windowManager);
 		std::shared_ptr<vtx::WindowManager> windowManager = nullptr;
 
-		bool isOpen = true;
-		std::string name = "Window";
-		float toolbarPercentage = 0.1f;
-		bool useToolbar = true;
-		bool createWindow = true;
-		bool isBorderLess = false;
-		bool useStripedBackground = false;
-		ImGuiWindowFlags windowFlags = 0;// = ImGuiWindowFlags_AlwaysUseWindowPadding;
-		float resizerSize = 2.0f;
-		float childPaddingHeight = 10.0f;
-		float childPaddingWidth = 10.0f;
+		bool             isOpen               = true;
+		std::string      name                 = "Window";
+		float            toolbarPercentage    = 0.1f;
+		bool             useToolbar           = true;
+		bool             createWindow         = true;
+		bool             isBorderLess         = false;
+		bool             useStripedBackground = false;
+		ImGuiWindowFlags windowFlags          = 0; // = ImGuiWindowFlags_AlwaysUseWindowPadding;
+		float            resizerSize          = 2.0f;
+		float            childPaddingHeight   = 10.0f;
+		float            childPaddingWidth    = 10.0f;
+		bool              renderCustomMenuBar = false;
+		float			  menuBarHeight = 0.0f;
 	};
 
 	class WindowManager : public std::enable_shared_from_this<WindowManager>

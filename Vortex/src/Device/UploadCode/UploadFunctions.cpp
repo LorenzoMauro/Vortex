@@ -13,7 +13,7 @@
 
 namespace vtx::device
 {
-	std::tuple<InstanceData, InstanceData*> createInstanceData(std::shared_ptr<graph::Instance> instanceNode, const math::affine3f& transform)
+	std::tuple<InstanceData, InstanceData*> createInstanceData(const std::shared_ptr<graph::Instance>& instanceNode, const math::affine3f& transform)
 	{
 		//CUDA_SYNC_CHECK();
 
@@ -57,7 +57,7 @@ namespace vtx::device
 
 				if(!instanceData.hasOpacity)
 				{
-					auto materialNode = graph::SIM::getNode<graph::Material>(materialId);
+					const std::shared_ptr<graph::Material>& materialNode = graph::SIM::get()->getNode<graph::Material>(materialId);
 					if (materialNode->useOpacity())
 					{
 						instanceData.hasOpacity = true;
@@ -431,7 +431,7 @@ namespace vtx::device
 		
 	}
 
-	std::tuple<MaterialData, MaterialData*> createMaterialData(const std::shared_ptr<graph::Material>& material, int matQueueId)
+	std::tuple<MaterialData, MaterialData*> createMaterialData(const std::shared_ptr<graph::Material>& material, const int matQueueId)
 	{
 
 		MaterialData materialData; // Set everything to zero.

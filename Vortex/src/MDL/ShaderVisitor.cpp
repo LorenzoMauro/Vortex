@@ -8,7 +8,7 @@ namespace vtx::mdl
 	using namespace graph::shader;
 
 	#define STANDARD_SHADER_NODE_VISIT(SHADER_NODE_NAME) \
-	void ShaderVisitor::visit(std::shared_ptr<SHADER_NODE_NAME> shaderNode)\
+	void ShaderVisitor::visit(const std::shared_ptr<SHADER_NODE_NAME>& shaderNode)\
 	{\
 		shaderNode->init();\
 	}

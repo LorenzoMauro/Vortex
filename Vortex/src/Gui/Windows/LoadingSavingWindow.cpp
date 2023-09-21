@@ -33,7 +33,7 @@ namespace vtx
 		}
 	}
 
-	void LoadingWindow::renderMainContent()
+	void LoadingWindow::mainContent()
 	{
 		const std::string filePathToLoad = LoadingSaving::get().getFilePathToLoad();
 		ImGui::TextWrapped("Loading file: \n%s", filePathToLoad.c_str());
@@ -59,7 +59,7 @@ namespace vtx
 		}
 	}
 
-	void SavingWindow::renderMainContent()
+	void SavingWindow::mainContent()
 	{
 		const std::string filePathToSave = LoadingSaving::get().getFilePathToSave();
 		ImGui::TextWrapped("Saving file:\n%s", filePathToSave.c_str());

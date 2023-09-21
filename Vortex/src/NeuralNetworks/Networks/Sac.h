@@ -182,7 +182,7 @@ namespace vtx::network
 
     private:
     	
-        std::tuple<torch::Tensor, torch::Tensor> policyTargetValue(torch::Tensor& states, bool useTargetQ) {
+        std::tuple<torch::Tensor, torch::Tensor> policyTargetValue(torch::Tensor& states, const bool useTargetQ) {
             auto [action, p] = policyNetwork.sample(states);
             torch::Tensor logL = torch::log(p + EPS);
             torch::Tensor q1Value;

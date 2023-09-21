@@ -53,7 +53,7 @@ namespace vtx::graph
 		visitor.visit(as<Renderer>());
 	}
 
-	vtxID Renderer::getInstanceIdOnClick(int pixelID)
+	vtxID Renderer::getInstanceIdOnClick(const int pixelID)
 	{
 		const gBufferHistory* gBufferPtr = GET_BUFFER(device::Buffers::FrameBufferBuffers, getID(), gBufferData).castedPointer<gBufferHistory>();
 		const gBufferHistory* pixelGBufferPtr = gBufferPtr + pixelID;
@@ -204,7 +204,7 @@ namespace vtx::graph
 		CudaEventTimes cuTimes = getCudaEventTimes();
 	}
 
-	void Renderer::resize(int _width, int _height) {
+	void Renderer::resize(const int _width, const int _height) {
 		if(isSizeLocked)
 		{
 			return;

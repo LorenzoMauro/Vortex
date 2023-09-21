@@ -1,8 +1,6 @@
-﻿#include "RendererNodeGui.h"
+﻿#include "Gui/GuiProvider.h"
 
 #include "imgui.h"
-#include "NeuralNetworkGui.h"
-#include "SceneGraph.h"
 #include "Core/Application.h"
 #include "Core/CustomImGui/CustomImGui.h"
 #include "Device/Wrappers/KernelTimings.h"
@@ -264,9 +262,8 @@ namespace vtx::gui
 		return restartRendering;
 	}
 
-	void rendererNodeGui(const std::shared_ptr<graph::Renderer>& renderNode)
+	bool GuiProvider::drawEditGui(const std::shared_ptr<graph::Renderer>& renderNode)
     {
-
 		const float availableWidth = ImGui::GetContentRegionAvail().x;
 		if (ImGui::CollapsingHeader("Renderer"))
 		{
@@ -294,7 +291,7 @@ namespace vtx::gui
 
 			ImGui::Separator();
 
-			networkSettingsEditorGui(renderNode->waveFrontIntegrator.network.settings);
+			drawEditGui(renderNode->waveFrontIntegrator.network.settings);
 
 			ImGui::Separator();
 
@@ -336,6 +333,8 @@ namespace vtx::gui
 			}
 
 		}
+
+		return false;
 		
     }
 }

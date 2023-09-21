@@ -29,7 +29,7 @@ namespace vtx::distribution
 	{
 	public:
 
-		__forceinline__ __device__ __host__ static int getParametersCount(network::DistributionType dt, bool forNetworkOutput = false)
+		__forceinline__ __device__ __host__ static int getParametersCount(const network::DistributionType dt, const bool forNetworkOutput = false)
 		{
 			int paramCount;
 			if (forNetworkOutput){

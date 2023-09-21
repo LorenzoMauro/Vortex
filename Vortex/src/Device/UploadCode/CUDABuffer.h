@@ -55,7 +55,7 @@ namespace vtx {
         }
 
         template<typename T>
-        __host__ T* upload(T* uploadArray, size_t count)
+        __host__ T* upload(T* uploadArray, const size_t count)
         {
             const size_t newSize = sizeof(T) * count;
             uploadImplementation(uploadArray, newSize);

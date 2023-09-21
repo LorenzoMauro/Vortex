@@ -1,0 +1,136 @@
+#include "GuiVisitor.h"
+
+#include "GuiProvider.h"
+#include "Scene/Graph.h"
+
+namespace vtx::gui
+{
+
+	void GuiVisitor::callOnChildren(const std::shared_ptr<graph::Node>& node)
+	{
+		const std::vector<std::shared_ptr<graph::Node>> children = node->getChildren();
+		if (!children.empty())
+		{
+			ImGui::PushID(node->getID());
+			if (ImGui::CollapsingHeader("Node Children"))
+			{
+				ImGui::Indent();
+				for (const auto& child : children)
+				{
+					child->accept(*this);
+				}
+				ImGui::Unindent();
+			}
+			ImGui::PopID();
+		}
+		
+		
+	}
+	void GuiVisitor::visit(const std::shared_ptr<graph::Instance>& node)
+	{
+		callOnChildren(node);
+	}
+
+	void GuiVisitor::visit(const std::shared_ptr<graph::Transform>& node)
+	{
+		changed |= GuiProvider::drawEditGui(node);
+		callOnChildren(node);
+	}
+
+	void GuiVisitor::visit(const std::shared_ptr<graph::Group>& node)
+	{
+
+
+		callOnChildren(node);
+	}
+
+	void GuiVisitor::visit(const std::shared_ptr<graph::Mesh>& node)
+	{
+
+
+		callOnChildren(node);
+	}
+
+	void GuiVisitor::visit(const std::shared_ptr<graph::Material>& node)
+	{
+		changed |= GuiProvider::drawEditGui(node);
+
+		const std::vector<std::shared_ptr<graph::Node>> children = node->getChildren();
+
+		if (!children.empty())
+		{
+			ImGui::PushID(node->getID());
+			if (ImGui::CollapsingHeader("Node Children"))
+			{
+				ImGui::Indent();
+				for (const auto& child : children)
+				{
+					if (child != node->materialGraph)
+					{
+						child->accept(*this);
+					}
+				}
+				ImGui::Unindent();
+			}
+			ImGui::PopID();
+		}
+
+		if(changed)
+		{
+			node->isUpdated = true;
+			ops::restartRender();
+		}
+	}
+
+	void GuiVisitor::visit(const std::shared_ptr<graph::Camera>& node)
+	{
+
+		changed |= GuiProvider::drawEditGui(node);
+		callOnChildren(node);
+	}
+
+	void GuiVisitor::visit(const std::shared_ptr<graph::Renderer>& node)
+	{
+		changed |= GuiProvider::drawEditGui(node);
+		callOnChildren(node);
+	}
+
+	void GuiVisitor::visit(const std::shared_ptr<graph::Texture>& node)
+	{
+
+
+		callOnChildren(node);
+	}
+
+	void GuiVisitor::visit(const std::shared_ptr<graph::BsdfMeasurement>& node)
+	{
+
+
+		callOnChildren(node);
+	}
+
+	void GuiVisitor::visit(const std::shared_ptr<graph::LightProfile>& node)
+	{
+
+
+		callOnChildren(node);
+	}
+
+	void GuiVisitor::visit(const std::shared_ptr<graph::EnvironmentLight>& node)
+	{
+
+		callOnChildren(node);
+	}
+
+	void GuiVisitor::visit(const std::shared_ptr<graph::MeshLight>& node)
+	{
+
+		callOnChildren(node);
+	}
+
+
+	void GuiVisitor::visit(const std::shared_ptr<graph::shader::ShaderNode>& node)
+	{
+		changed |= GuiProvider::drawEditGui(node, isNodeEditor);
+	}
+}
