@@ -1,21 +1,23 @@
 #include "InferenceQueries.h"
 
+#include "Device/UploadCode/UploadBuffers.h"
+
 namespace vtx
 {
-	InferenceQueries* InferenceQueries::upload(const int& numberOfPixels, const network::DistributionType& type, const int& _mixtureSize)
+	InferenceQueries* InferenceQueries::upload(device::InferenceBuffers& buffers, const int& numberOfPixels, const network::DistributionType& type, const int& _mixtureSize)
 	{
-		const InferenceQueries inferenceQueries(numberOfPixels, type, _mixtureSize);
-		return UPLOAD_BUFFERS->networkInterfaceBuffer.inferenceBuffers.inferenceStructBuffer.upload(inferenceQueries);
+		const InferenceQueries inferenceQueries(buffers, numberOfPixels, type, _mixtureSize);
+		return buffers.inferenceStructBuffer.upload(inferenceQueries);
 	}
 
-	InferenceQueries* InferenceQueries::getPreviouslyUploaded()
+	InferenceQueries* InferenceQueries::getPreviouslyUploaded(const device::InferenceBuffers& buffers)
 	{
-		return UPLOAD_BUFFERS->networkInterfaceBuffer.inferenceBuffers.inferenceStructBuffer.castedPointer<InferenceQueries>();
+		return buffers.inferenceStructBuffer.castedPointer<InferenceQueries>();
 	}
 
-	InferenceQueries::InferenceQueries(const int& numberOfPixels, const network::DistributionType& type, const int& _mixtureSize)
+	InferenceQueries::InferenceQueries(device::InferenceBuffers& buffers, const int& numberOfPixels, const network::DistributionType& type, const int& _mixtureSize)
 	{
-		device::Buffers::InferenceBuffers& inferenceBuffers = UPLOAD_BUFFERS->networkInterfaceBuffer.inferenceBuffers;
+		device::InferenceBuffers& inferenceBuffers = buffers;
 		distributionParameters = inferenceBuffers.distributionParameters.alloc<float>(numberOfPixels * _mixtureSize * distribution::Mixture::getDistributionParametersCount(type));
 		mixtureWeights = inferenceBuffers.mixtureWeightBuffer.alloc<float>(numberOfPixels * _mixtureSize);
 		samplingFractionArray = inferenceBuffers.samplingFractionArrayBuffer.alloc<float>(numberOfPixels);

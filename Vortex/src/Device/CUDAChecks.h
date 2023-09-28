@@ -90,6 +90,7 @@ static void context_log_cb(const unsigned int level,
 
 #define CU_CHECK_CONTINUE(call) checkCuResultError(call,__FILE__, __LINE__, false)
 
+//#define CUDA_CHECK_ALSO_ON_RELEASE
 #ifdef CUDA_CHECK_ALSO_ON_RELEASE
 #define CUDA_SYNC_CHECK() cudaSynchronize(__FILE__, __LINE__, true)
 

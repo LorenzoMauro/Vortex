@@ -10,12 +10,18 @@ namespace vtx::graph
 	EnvironmentLight::EnvironmentLight() : Node(NT_ENV_LIGHT)
 	{
 		transform = ops::createNode<Transform>();
+		typeID = SIM::get()->getTypeId<EnvironmentLight>();
+	}
+
+	EnvironmentLight::~EnvironmentLight()
+	{
+		SIM::get()->releaseTypeId<EnvironmentLight>(typeID);
 	}
 
 	void EnvironmentLight::init()
 	{
 		computeCdfAliasMaps();
-		isInitialized = true;
+		state.isInitialized = true;
 	}
 
 	std::vector<std::shared_ptr<Node>> EnvironmentLight::getChildren() const

@@ -12,17 +12,22 @@
 
 namespace vtx
 {
+	namespace device
+	{
+		struct InferenceBuffers;
+	}
+
 	struct RayWorkItem;
 	struct NetworkInput;
 
 	struct InferenceQueries
 	{
-		static InferenceQueries* upload(const int& numberOfPixels, const network::DistributionType& type, const int& _mixtureSize);
+		static InferenceQueries* upload(device::InferenceBuffers& buffers, const int& numberOfPixels, const network::DistributionType& type, const int& _mixtureSize);
 
-		static InferenceQueries* getPreviouslyUploaded();
+		static InferenceQueries* getPreviouslyUploaded(const device::InferenceBuffers& buffers);
 
 	private:
-		InferenceQueries(const int& numberOfPixels, const network::DistributionType& type, const int& _mixtureSize);
+		InferenceQueries(device::InferenceBuffers& buffers, const int& numberOfPixels, const network::DistributionType& type, const int& _mixtureSize);
 	public:
 
 		__forceinline__ __device__ void reset()

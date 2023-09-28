@@ -7,16 +7,11 @@ namespace vtx::graph {
 	class LightProfile : public Node
 	{
 	public:
-		LightProfile() :
-			Node(NT_MDL_LIGHTPROFILE)
-		{
-		}
+		LightProfile();
 
-		LightProfile(char const* _databaseName) :
-			Node(NT_MDL_LIGHTPROFILE),
-			databaseName(_databaseName)
-		{
-		}
+		LightProfile(char const* _databaseName);
+
+		~LightProfile() override;
 
 		struct LightProfileData{
 			math::vec2ui resolution;

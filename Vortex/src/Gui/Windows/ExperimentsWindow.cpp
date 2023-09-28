@@ -3,7 +3,7 @@
 #include "Core/FileDialog.h"
 #include "Core/CustomImGui/CustomImGui.h"
 #include "Device/CudaFunctions/cudaFunctions.h"
-#include "Device/UploadCode/UploadData.h"
+#include "Device/UploadCode/DeviceDataCoordinator.h"
 #include "Gui/PlottingWrapper.h"
 #include "Gui/GuiProvider.h"
 #include "Scene/Nodes/Renderer.h"
@@ -298,7 +298,7 @@ namespace vtx
 			return;
 		}
 
-		const float mape = cuda::computeMape(em->groundTruth, UPLOAD_DATA->frameBufferData.tmRadiance, em->width, em->height);
+		const float mape = cuda::computeMape(em->groundTruth, onDeviceData->launchParamsData.getHostImage().frameBuffer.tmRadiance, em->width, em->height);
 		experiment.mape.push_back(mape);
 
 		if (renderer->settings.iteration == em->maxSamples)
@@ -362,7 +362,7 @@ namespace vtx
 
 		em->groundTruthBuffer.resize(imageSize);
 		em->groundTruth = em->groundTruthBuffer.castedPointer<math::vec3f>();
-		const void* groundTruthRendered = UPLOAD_DATA->frameBufferData.tmRadiance;
+		const void* groundTruthRendered = onDeviceData->launchParamsData.getHostImage().frameBuffer.tmRadiance;
 
 		cudaError_t        error = cudaMemcpy((void*)em->groundTruth, groundTruthRendered, imageSize, cudaMemcpyDeviceToDevice);
 		em->isGroundTruthReady = true;

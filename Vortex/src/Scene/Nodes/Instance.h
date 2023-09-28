@@ -1,6 +1,5 @@
 #pragma once
 #include "Scene/Node.h"
-#include "Light.h"
 #include "Material.h"
 #include "Transform.h"
 
@@ -31,6 +30,7 @@ namespace vtx::graph
 	public:
 		Instance();
 
+		~Instance() override;
 
 		std::shared_ptr<Node> getChild();
 

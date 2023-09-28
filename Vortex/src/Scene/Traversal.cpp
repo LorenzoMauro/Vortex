@@ -34,8 +34,8 @@ namespace vtx
 			{
 				depthWidth[depth] += 1;
 			}
-			//VTX_INFO("Node ID: {} Name: {} \t\t Depth: {} Width: {} Overall Width: {}", node->getID(), node->name, depth, width, overallWidth);
-			nodesDepthsAndWidths[node->getID()] = { depth, width, depthWidth[depth] };// , currentWidth + parent
+			//VTX_INFO("Node ID: {} Name: {} \t\t Depth: {} Width: {} Overall Width: {}", node->getUID(), node->name, depth, width, overallWidth);
+			nodesDepthsAndWidths[node->getUID()] = { depth, width, depthWidth[depth] };// , currentWidth + parent
 			if (!widthStack.empty())
 			{
 				int& currentWidth = widthStack.top();
@@ -44,8 +44,8 @@ namespace vtx
 
 			widthStack.push(0);
 
-			nodesParents[node->getID()] = parentPath;
-			parentPath.push_back(node->getID());
+			nodesParents[node->getUID()] = parentPath;
+			parentPath.push_back(node->getUID());
 		}
 
 		if (collectTransforms)
@@ -57,7 +57,13 @@ namespace vtx
 				{
 					tmpTransforms.push(currentTransform);
 					foundTransform = true;
+					transform->parentGlobalTransform = currentTransform;
+					transform->reciprocalParentGlobalTransform = gdt::rcp(currentTransform);
 					currentTransform = currentTransform * transform->affineTransform;
+					if(transform->globalTransform != currentTransform)
+					{
+						transform->state.updateOnDevice = true;
+					}
 					transform->globalTransform = currentTransform;
 					break;
 				}
@@ -69,7 +75,7 @@ namespace vtx
 	{
 		if (collectWidthsAndDepths)
 		{
-			//VTX_INFO("Node ID: {} Name: {} Popping: \t\t Depth Stack Size: {} Width Stack Size: {}", node->getID(), node->name, depthStack.size(), widthStack.size());
+			//VTX_INFO("Node ID: {} Name: {} Popping: \t\t Depth Stack Size: {} Width Stack Size: {}", node->getUID(), node->name, depthStack.size(), widthStack.size());
 			depthStack.pop();
 			widthStack.pop();
 			parentPath.pop_back();

@@ -109,20 +109,20 @@ namespace vtx::optix
 	struct SbtPipeline
 	{
 		ProgramMap																programs;
-		CudaMap<uint32_t, sbtPosition>											sbtMap;
+		std::map<uint32_t, sbtPosition>											sbtMap;
 		std::vector<OptixProgramGroup>											programGroups;
 		bool																	isDirty = true;
 		OptixShaderBindingTable													sbt = {};
 		SbtMap																	sbtPrograms;
 		CUDABuffer																sbtRecordHeadersBuffer;
 
-		void                                  initSbtMap();
-		std::vector<OptixProgramGroup>        getProgramGroups();
-		void                                  createSbt();
-		void                                  registerProgram(const std::shared_ptr<ProgramOptix>& program);
-		const OptixShaderBindingTable&        getSbt();
-		const CudaMap<uint32_t, sbtPosition>& getSbtMap();
-		int                                   getProgramSbt(std::string programName);
+		void                                   initSbtMap();
+		std::vector<OptixProgramGroup>         getProgramGroups();
+		void                                   createSbt();
+		void                                   registerProgram(const std::shared_ptr<ProgramOptix>& program);
+		const OptixShaderBindingTable&         getSbt();
+		const std::map<uint32_t, sbtPosition>& getSbtMap();
+		int                                    getProgramSbt(std::string programName);
 		//static int getProgramSbt(const CudaMap<uint32_t, sbtPosition>& map, std::string programName);
 	};
 
@@ -188,7 +188,7 @@ namespace vtx::optix
 
 	OptixInstance createInstance(uint32_t instanceId, const math::affine3f& transform, OptixTraversableHandle traversable);
 
-	OptixTraversableHandle createInstanceAcceleration(const std::vector<OptixInstance>& optixInstances);
+	OptixTraversableHandle createInstanceAcceleration(const std::vector<OptixInstance>& optixInstances, OptixTraversableHandle& topTraversable);
 
 
 }

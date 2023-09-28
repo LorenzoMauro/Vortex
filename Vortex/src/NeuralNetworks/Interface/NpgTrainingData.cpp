@@ -4,24 +4,23 @@
 
 namespace vtx
 {
-	NpgTrainingData* NpgTrainingData::upload(const int& maxDatasetSize)
+	NpgTrainingData* NpgTrainingData::upload(device::NpgTrainingDataBuffers& buffers, const int& maxDatasetSize)
 	{
-		const NpgTrainingData npgTrainingData(maxDatasetSize);
-		return UPLOAD_BUFFERS->networkInterfaceBuffer.npgTrainingDataBuffers.npgTrainingDataStructBuffers.upload(npgTrainingData);
+		const NpgTrainingData npgTrainingData(buffers, maxDatasetSize);
+		return buffers.npgTrainingDataStructBuffers.upload(npgTrainingData);
 	}
 
-	NpgTrainingData* NpgTrainingData::getPreviouslyUploaded()
+	NpgTrainingData* NpgTrainingData::getPreviouslyUploaded(const device::NpgTrainingDataBuffers& buffers)
 	{
-		return UPLOAD_BUFFERS->networkInterfaceBuffer.npgTrainingDataBuffers.npgTrainingDataStructBuffers.castedPointer<NpgTrainingData>();
+		return buffers.npgTrainingDataStructBuffers.castedPointer<NpgTrainingData>();
 	}
 
-	NpgTrainingData::NpgTrainingData(const int& maxDatasetSize)
+	NpgTrainingData::NpgTrainingData(device::NpgTrainingDataBuffers& buffers, const int& maxDatasetSize)
 	{
-		device::Buffers::NpgTrainingDataBuffers& ngpTrainingDataBuffers = UPLOAD_BUFFERS->networkInterfaceBuffer.npgTrainingDataBuffers;
-		luminance = ngpTrainingDataBuffers.outgoingRadianceBuffer.alloc<float>(maxDatasetSize);
-		incomingDirection = ngpTrainingDataBuffers.incomingDirectionBuffer.alloc<math::vec3f>(maxDatasetSize);
-		bsdfProbabilities = ngpTrainingDataBuffers.bsdfProbabilitiesBuffer.alloc<float>(maxDatasetSize);
-		inputs = NetworkInput::upload(maxDatasetSize, ngpTrainingDataBuffers.inputBuffer);
+		luminance = buffers.outgoingRadianceBuffer.alloc<float>(maxDatasetSize);
+		incomingDirection = buffers.incomingDirectionBuffer.alloc<math::vec3f>(maxDatasetSize);
+		bsdfProbabilities = buffers.bsdfProbabilitiesBuffer.alloc<float>(maxDatasetSize);
+		inputs = NetworkInput::upload(maxDatasetSize, buffers.inputBuffer);
 		nAlloc = maxDatasetSize;
 	}
 }

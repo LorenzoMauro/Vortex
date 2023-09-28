@@ -18,12 +18,7 @@ namespace vtx
 	void GraphWindow::mainContent()
 	{
 		nodeEditor.draw();
-		std::vector<vtxID> selectedNodes(nodeEditor.selectedNodes.size());
-		for (int i = 0; i < nodeEditor.selectedNodes.size(); ++i)
-			selectedNodes[i] = (vtxID)nodeEditor.selectedNodes[i];
-
-		windowManager->selectedNodes["SceneGraphWindow"] = selectedNodes;
-
+		graph::Scene::getScene()->setSelected(nodeEditor.getSelected());
 	}
 	void GraphWindow::menuBarContent()
 	{

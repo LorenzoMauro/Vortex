@@ -506,7 +506,7 @@ namespace vtx::ops
 
 	void computeVertexNormals(std::shared_ptr<Mesh> mesh)
 	{
-		//VTX_INFO("Computing vertex normals Mesh {}", mesh->getID());
+		//VTX_INFO("Computing vertex normals Mesh {}", mesh->getUID());
 		//std::vector<VertexAttributes>& vertices = mesh->vertices;
 		//std::vector<vtxID>& indices = mesh->indices;
 		//// Initialize normals, tangents, and bitangents to zero
@@ -548,7 +548,7 @@ namespace vtx::ops
 
 	void computeVertexTangentSpace(const std::shared_ptr<Mesh>& mesh)
 	{
-		VTX_INFO("Computing vertex tangents Space for Mesh {}", mesh->getID());
+		VTX_INFO("Computing vertex tangents Space for Mesh {}", mesh->getUID());
 		std::vector<VertexAttributes>& vertices = mesh->vertices;
 		std::vector<vtxID>& indices = mesh->indices;
 		// Initialize normals, tangents, and bitangents to zero
@@ -632,24 +632,24 @@ namespace vtx::ops
 			if(math::isZero(n))
 			{
 				n = math::vec3f(0.0f, 0.0f, 1.0f);
-				VTX_WARN("Normal Vector was Zero in mesh Id: {}, vertex index {}", mesh->getID(), i);
+				VTX_WARN("Normal Vector was Zero in mesh Id: {}, vertex index {}", mesh->getUID(), i);
 			}
 			if(math::isZero(t))
 			{
 				t = math::vec3f(1.0f, 0.0f, 0.0f);
-				VTX_WARN("Tangent Vector was Zero in mesh Id: {}, vertex index {}", mesh->getID(), i);
+				VTX_WARN("Tangent Vector was Zero in mesh Id: {}, vertex index {}", mesh->getUID(), i);
 			}
 			if (math::isZero(b))
 			{
 				b = math::vec3f(0.0f, 1.0f, 0.0f);
-				VTX_WARN("Bitangent Vector was Zero in mesh Id: {}, vertex index {}", mesh->getID(), i);
+				VTX_WARN("Bitangent Vector was Zero in mesh Id: {}, vertex index {}", mesh->getUID(), i);
 			}
 
 			n = math::normalize(n);
 			if (math::isNan(n))
 			{
 				n = math::vec3f(0.0f, 0.0f, 1.0f);
-				VTX_WARN("Normal Vector was Nan in mesh Id: {}, vertex index {}", mesh->getID(), i);
+				VTX_WARN("Normal Vector was Nan in mesh Id: {}, vertex index {}", mesh->getUID(), i);
 			}
 
 			t -= n * dot(n, t);
@@ -661,12 +661,12 @@ namespace vtx::ops
 			if (math::isNan(t))
 			{
 				t = math::vec3f(1.0f, 0.0f, 0.0f);
-				VTX_WARN("Tangent Vector was Nan in mesh Id: {}, vertex index {}", mesh->getID(), i);
+				VTX_WARN("Tangent Vector was Nan in mesh Id: {}, vertex index {}", mesh->getUID(), i);
 			}
 			if (math::isNan(b))
 			{
 				b = math::vec3f(0.0f, 1.0f, 0.0f);
-				VTX_WARN("Bitangent Vector was Nan in mesh Id: {}, vertex index {}", mesh->getID(), i);
+				VTX_WARN("Bitangent Vector was Nan in mesh Id: {}, vertex index {}", mesh->getUID(), i);
 			}
 
 			VTX_ASSERT_CLOSE(!math::isNan(n));

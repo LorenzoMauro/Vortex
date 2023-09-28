@@ -2,7 +2,7 @@
 #include "ImGuiOp.h"
 #include "Device/OptixWrapper.h"
 #include "Device/UploadCode/UploadBuffers.h"
-#include "Device/UploadCode/UploadData.h"
+#include "Device/UploadCode/DeviceDataCoordinator.h"
 #include "MDL/MdlWrapper.h"
 #include "Scene/SIM.h"
 #include "Scene/Nodes/Renderer.h"

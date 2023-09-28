@@ -8,16 +8,11 @@ namespace vtx::graph
 	class BsdfMeasurement : public Node
 	{
 	public:
-		BsdfMeasurement() :
-			Node(NT_MDL_BSDF)
-		{
-		}
+		BsdfMeasurement();
 
-		BsdfMeasurement(char const* _databaseName) :
-			Node(NT_MDL_BSDF),
-			databaseName(_databaseName)
-		{
-		}
+		BsdfMeasurement(char const* _databaseName);
+
+		~BsdfMeasurement() override;
 
 		struct BsdfPartData
 		{

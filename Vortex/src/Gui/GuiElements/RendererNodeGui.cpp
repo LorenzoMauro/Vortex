@@ -219,6 +219,7 @@ namespace vtx::gui
 			{
 				settings.isUpdated = true;
 				settings.isMaxBounceChanged = true;
+				restartRendering = true;
 			}
 			if (vtxImGui::halfSpaceWidget("Max Samples", ImGui::DragInt, (hiddenLabel + "_Max Samples").c_str(), &settings.maxSamples, 1.0f, 1, 1000000, "%d", 0))
 			{
@@ -270,7 +271,7 @@ namespace vtx::gui
 
 			ImGui::Indent();
 			ImGui::PushItemWidth(availableWidth);
-			vtxImGui::halfSpaceWidget("Node Id", ImGui::Text, std::to_string(renderNode->getID()).c_str());
+			vtxImGui::halfSpaceWidget("Node Id", ImGui::Text, std::to_string(renderNode->getUID()).c_str());
 			ImGui::Separator();
 
 			bool restartRendering = false;

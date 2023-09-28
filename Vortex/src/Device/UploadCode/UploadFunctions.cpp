@@ -1,5 +1,5 @@
 ﻿#include "UploadFunctions.h"
-#include "UploadData.h"
+#include "DeviceDataCoordinator.h"
 #include "Device/CUDAChecks.h"
 #include "Scene/Graph.h"
 #include <cudaGL.h>
@@ -7,32 +7,33 @@
 #include "Device/Wrappers/SoaWorkItems.h"
 #include "Device/Wrappers/WorkItems.h"
 
-#include "Device/DevicePrograms/randomNumberGenerator.h"
 #include "MDL/CudaLinker.h"
 #include "NeuralNetworks/Interface/NetworkInterface.h"
+#include "UploadBuffers.h"
 
 namespace vtx::device
 {
-	std::tuple<InstanceData, InstanceData*> createInstanceData(const std::shared_ptr<graph::Instance>& instanceNode, const math::affine3f& transform)
+	InstanceData createInstanceData(const std::shared_ptr<graph::Instance>& instanceNode)
 	{
 		//CUDA_SYNC_CHECK();
 
-		const vtxID& instanceId = instanceNode->getID();
+		const vtxID& instanceId = instanceNode->getUID();
 		VTX_INFO("Device Visitor: Creating Instance {} data", instanceId);
 
-		CudaMap<vtxID, std::tuple<GeometryData, GeometryData*>>& geometryDataMap = UPLOAD_DATA->geometryDataMap;
-		CudaMap<vtxID, std::tuple<MaterialData, MaterialData*>>& materialDataMap = UPLOAD_DATA->materialDataMap;
-		CudaMap<vtxID, std::tuple<LightData, LightData*, bool>>& lightDataMap    = UPLOAD_DATA->lightDataMap;
+		auto & geometryDataMap = onDeviceData->geometryDataMap;
+		auto & materialDataMap = onDeviceData->materialDataMap;
+		auto & lightDataMap    = onDeviceData->lightDataMap;
 
 		InstanceData instanceData{};
-		instanceData.instanceId = instanceId;
-		instanceData.transform  = transform;
+		instanceData.instanceId = instanceNode->getTypeID();
+		instanceData.transform  = instanceNode->transform->globalTransform;
+		instanceNode->transform->state.updateOnDevice = false;
 
 
-		const vtxID& meshId = instanceNode->getChild()->getID();
+		const vtxID& meshId = instanceNode->getChild()->getUID();
 		if (geometryDataMap.contains(meshId))
 		{
-			instanceData.geometryData = std::get<1>(geometryDataMap[meshId]);
+			instanceData.geometryData = geometryDataMap[meshId].getDeviceImage();
 		}
 		else
 		{
@@ -40,22 +41,22 @@ namespace vtx::device
 		}
 
 		instanceData.hasEmission = false;
-		instanceData.hasOpacity  = false;
+		instanceData.hasOpacity = false;
 		std::vector<InstanceData::SlotIds> materialSlots;
 		for (const graph::MaterialSlot& materialSlot : instanceNode->getMaterialSlots())
 		{
-			InstanceData::SlotIds slotIds{nullptr,nullptr};
+			InstanceData::SlotIds slotIds{nullptr, nullptr};
 
-			if (vtxID materialId = materialSlot.material->getID(); materialDataMap.contains(materialId))
+			if (vtxID materialId = materialSlot.material->getUID(); materialDataMap.contains(materialId))
 			{
-				slotIds.material = std::get<1>(materialDataMap[materialId]);
+				slotIds.material = materialDataMap[materialId].getDeviceImage();
 
-				if (vtxID lightId = materialSlot.meshLight->getID(); lightDataMap.contains(lightId)) {
+				if (vtxID lightId = materialSlot.meshLight->getUID(); lightDataMap.contains(lightId)) {
 					instanceData.hasEmission = std::dynamic_pointer_cast<graph::Material>(materialSlot.material)->useAsLight;
-					slotIds.meshLight = std::get<1>(lightDataMap[lightId]);
+					slotIds.meshLight = lightDataMap[lightId].getDeviceImage();
 				}
 
-				if(!instanceData.hasOpacity)
+				if (!instanceData.hasOpacity)
 				{
 					const std::shared_ptr<graph::Material>& materialNode = graph::SIM::get()->getNode<graph::Material>(materialId);
 					if (materialNode->useOpacity())
@@ -73,38 +74,34 @@ namespace vtx::device
 		}
 		if (!materialSlots.empty())
 		{
-			CUDABuffer& materialSlotsBuffer = GET_BUFFER(Buffers::InstanceBuffers, instanceId, materialSlotsBuffer);
+			CUDABuffer& materialSlotsBuffer = onDeviceData->instanceDataMap.getResourceBuffers(instanceId).materialSlotsBuffer;
 			materialSlotsBuffer.upload(materialSlots);
 			instanceData.materialSlots = materialSlotsBuffer.castedPointer<InstanceData::SlotIds>();
-			instanceData.numberOfSlots   = materialSlots.size();
+			instanceData.numberOfSlots = materialSlots.size();
 		}
 		else
 		{
 			instanceData.materialSlots = nullptr;
 		}
 
-		CUDABuffer& instanceDataBuffer = GET_BUFFER(Buffers::InstanceBuffers, instanceId, instanceDataBuffer);
-		instanceDataBuffer.upload(instanceData);
-
-		return { instanceData, instanceDataBuffer.castedPointer<InstanceData>() };
+		return instanceData;
 	}
 
-
-	std::tuple<LightData, LightData*> createMeshLightData(const std::shared_ptr<graph::MeshLight>& meshLight)
+	LightData createMeshLightData(const std::shared_ptr<graph::MeshLight>& meshLight)
 	{
 		LightData lightData;
 		MeshLightAttributesData meshLightData;
 
-		CUDABuffer& areaCdfBuffer = GET_BUFFER(Buffers::LightBuffers, meshLight->getID(), areaCdfBuffer);
+		CUDABuffer& areaCdfBuffer = onDeviceData->lightDataMap.getResourceBuffers(meshLight->getUID()).areaCdfBuffer;
 		areaCdfBuffer.upload(meshLight->cdfAreas);
 
-		CUDABuffer& actualTriangleIndices = GET_BUFFER(Buffers::LightBuffers, meshLight->getID(), actualTriangleIndices);
+		CUDABuffer& actualTriangleIndices = onDeviceData->lightDataMap.getResourceBuffers(meshLight->getUID()).actualTriangleIndices;
 		actualTriangleIndices.upload(meshLight->actualTriangleIndices);
 
-		vtxID meshId = meshLight->mesh->getID();
-		vtxID materialId = meshLight->material->getID();
-		GeometryData* geometryData = std::get<1>(UPLOAD_DATA->geometryDataMap[meshId]);
-		MaterialData* materialData = std::get<1>(UPLOAD_DATA->materialDataMap[materialId]);
+		vtxID meshId = meshLight->mesh->getUID();
+		vtxID materialId = meshLight->material->getUID();
+		GeometryData* geometryData = onDeviceData->geometryDataMap[meshId].getDeviceImage();
+		MaterialData* materialData = onDeviceData->materialDataMap[materialId].getDeviceImage();
 
 		meshLightData.instanceId = meshLight->parentInstanceId;
 		meshLightData.geometryData = geometryData;
@@ -114,53 +111,48 @@ namespace vtx::device
 		meshLightData.size = meshLight->cdfAreas.size();
 		meshLightData.totalArea = meshLight->area;
 
-		CUDABuffer& attributeBuffer = GET_BUFFER(Buffers::LightBuffers, meshLight->getID(), attributeBuffer);
+		CUDABuffer& attributeBuffer = onDeviceData->lightDataMap.getResourceBuffers(meshLight->getUID()).attributeBuffer;
 		attributeBuffer.upload(meshLightData);
 
 		lightData.type = L_MESH;
 		lightData.attributes = attributeBuffer.dPointer();
 
-		CUDABuffer& lightDataBuffer = GET_BUFFER(Buffers::LightBuffers, meshLight->getID(), lightDataBuffer);
-		lightDataBuffer.upload(lightData);
-		return { lightData, lightDataBuffer.castedPointer<LightData>() };
-
+		return lightData;
 	}
 
-	std::tuple<LightData, LightData*> createEnvLightData(std::shared_ptr<graph::EnvironmentLight> envLight)
+	LightData createEnvLightData(std::shared_ptr<graph::EnvironmentLight> envLight)
 	{
 		LightData lightData{};
-		
+
 		EnvLightAttributesData envLightData{};
 
-		CUDABuffer& aliasBuffer = GET_BUFFER(Buffers::LightBuffers, envLight->getID(), aliasBuffer);
+		CUDABuffer& aliasBuffer = onDeviceData->lightDataMap.getResourceBuffers(envLight->getUID()).aliasBuffer;
 		aliasBuffer.upload(envLight->aliasMap);
 
-		TextureData* texture = std::get<1>(UPLOAD_DATA->textureDataMap[envLight->envTexture->getID()]);
+		TextureData* texture = onDeviceData->textureDataMap[envLight->envTexture->getUID()].getDeviceImage();
 		envLightData.texture = texture;
 		envLightData.transformation = envLight->transform->affineTransform;
 		envLightData.invTransformation = math::affine3f(envLightData.transformation.l.inverse(), envLightData.transformation.p);
 		envLightData.aliasMap = aliasBuffer.castedPointer<AliasData>();
 
-		CUDABuffer& attributeBuffer = GET_BUFFER(Buffers::LightBuffers, envLight->getID(), attributeBuffer);
+		CUDABuffer& attributeBuffer = onDeviceData->lightDataMap.getResourceBuffers(envLight->getUID()).attributeBuffer;
 		attributeBuffer.upload(envLightData);
 
 		lightData.type = L_ENV;
 		lightData.attributes = attributeBuffer.dPointer();
 
-		CUDABuffer& lightDataBuffer = GET_BUFFER(Buffers::LightBuffers, envLight->getID(), lightDataBuffer);
-		lightDataBuffer.upload(lightData);
-		return { lightData, lightDataBuffer.castedPointer<LightData>() };
+		return lightData;
 	}
 
-	std::tuple<GeometryData, GeometryData*> createGeometryData(const std::shared_ptr<graph::Mesh>& meshNode)
+	GeometryData createGeometryData(const std::shared_ptr<graph::Mesh>& meshNode)
 	{
 		VTX_INFO("Computing BLAS");
 
 		/// Uploading Vertex and Index Buffer ///
 
-		CUDABuffer& vertexBuffer = GET_BUFFER(Buffers::GeometryBuffers, meshNode->getID(), vertexBuffer);
-		CUDABuffer& indexBuffer  = GET_BUFFER(Buffers::GeometryBuffers, meshNode->getID(), indexBuffer);
-		CUDABuffer& faceBuffer   = GET_BUFFER(Buffers::GeometryBuffers, meshNode->getID(), faceBuffer);
+		CUDABuffer& vertexBuffer = onDeviceData->geometryDataMap.getResourceBuffers(meshNode->getUID()).vertexBuffer;
+		CUDABuffer& indexBuffer = onDeviceData->geometryDataMap.getResourceBuffers(meshNode->getUID()).indexBuffer;
+		CUDABuffer& faceBuffer = onDeviceData->geometryDataMap.getResourceBuffers(meshNode->getUID()).faceBuffer;
 
 		vertexBuffer.upload(meshNode->vertices);
 		indexBuffer.upload(meshNode->indices);
@@ -168,7 +160,7 @@ namespace vtx::device
 
 
 		const CUdeviceptr vertexData = vertexBuffer.dPointer();
-		const CUdeviceptr indexData  = indexBuffer.dPointer();
+		const CUdeviceptr indexData = indexBuffer.dPointer();
 
 		const OptixTraversableHandle traversable = optix::createGeometryAcceleration(vertexData,
 			static_cast<uint32_t>(meshNode->vertices.size()),
@@ -179,20 +171,15 @@ namespace vtx::device
 
 		GeometryData data;
 
-		data.type                = PT_TRIANGLES;
-		data.traversable         = traversable;
+		data.type = PT_TRIANGLES;
+		data.traversable = traversable;
 		data.vertexAttributeData = vertexBuffer.castedPointer<graph::VertexAttributes>();
-		data.indicesData         = indexBuffer.castedPointer<vtxID>();
-		data.faceAttributeData   = faceBuffer.castedPointer<graph::FaceAttributes>();
-		data.numVertices         = meshNode->vertices.size();
-		data.numIndices          = meshNode->indices.size();
-		data.numFaces            = meshNode->faceAttributes.size();
-
-		CUDABuffer& geometryDataBuffer = GET_BUFFER(Buffers::GeometryBuffers, meshNode->getID(), geometryDataBuffer);
-		geometryDataBuffer.upload(data);
-
-		std::tuple<GeometryData, GeometryData*> tuple = std::make_tuple(data, geometryDataBuffer.castedPointer<GeometryData>());
-		return tuple;
+		data.indicesData = indexBuffer.castedPointer<vtxID>();
+		data.faceAttributeData = faceBuffer.castedPointer<graph::FaceAttributes>();
+		data.numVertices = meshNode->vertices.size();
+		data.numIndices = meshNode->indices.size();
+		data.numFaces = meshNode->faceAttributes.size();
+		return data;
 	}
 
 	DeviceShaderConfiguration* createDeviceShaderConfiguration(const std::shared_ptr<graph::Material>& material)
@@ -307,9 +294,9 @@ namespace vtx::device
 				dvConfig.idxCallHairEval = rp->getProgramSbt(dp.pgHairEval->name);
 			}
 		}
-		else if( getOptions()->mdlCallType == MDL_INLINE)
+		else if (getOptions()->mdlCallType == MDL_INLINE)
 		{
-			
+
 		}
 		else if (getOptions()->mdlCallType == MDL_CUDA || getOptions()->mdlCallType == MDL_INLINE)
 		{
@@ -323,7 +310,7 @@ namespace vtx::device
 		}
 
 
-		CUDABuffer& materialConfigBuffer = GET_BUFFER(Buffers::MaterialBuffers, material->getID(), materialConfigBuffer);
+		CUDABuffer& materialConfigBuffer = onDeviceData->materialDataMap.getResourceBuffers(material->getUID()).materialConfigBuffer;
 		materialConfigBuffer.upload(dvConfig);
 		return materialConfigBuffer.castedPointer<DeviceShaderConfiguration>();
 	}
@@ -332,9 +319,9 @@ namespace vtx::device
 	{
 		TextureHandler textureHandler{};
 
-		const CudaMap<vtxID, std::tuple<TextureData, TextureData*>>& textureDataMap = UPLOAD_DATA->textureDataMap;
-		const CudaMap<vtxID, std::tuple<BsdfData, BsdfData*>>& bsdfDataMap = UPLOAD_DATA->bsdfDataMap;
-		const CudaMap<vtxID, std::tuple<LightProfileData, LightProfileData*>>& lightProfileDataMap = UPLOAD_DATA->lightProfileDataMap;
+		auto& textureDataMap = onDeviceData->textureDataMap;
+		auto& bsdfDataMap = onDeviceData->bsdfDataMap;
+		auto& lightProfileDataMap = onDeviceData->lightProfileDataMap;
 
 		// The following code was based on different assumptions on how mdl can access textures, it was probably wrong
 		// It seems like mdl will provide indices to shader resource based on the order by whihch they are declared in the mdl file (target code)
@@ -344,19 +331,18 @@ namespace vtx::device
 			std::vector<TextureData*> textures(size);
 			for (const std::shared_ptr<graph::Texture> texture : material->getTextures())
 			{
-				vtxID          textureId = texture->getID();
+				vtxID          textureId = texture->getUID();
 				const uint32_t mdlIndex = texture->mdlIndex;
 				if (textureDataMap.contains(textureId))
 				{
-					textures[mdlIndex - 1] = std::get<1>(textureDataMap[textureId]);
-					//textures.push_back(textureId);
+					textures[mdlIndex - 1] = textureDataMap[textureId].getDeviceImage();
 				}
 				else
 				{
 					VTX_ERROR("Requesting Texture device Data of texture Node {} but not found!", textureId);
 				}
 			}
-			CUDABuffer& textureIdBuffer = GET_BUFFER(Buffers::MaterialBuffers, material->getID(), textureIdBuffer);
+			CUDABuffer& textureIdBuffer = onDeviceData->materialDataMap.getResourceBuffers(material->getUID()).textureIdBuffer;
 			textureIdBuffer.upload(textures);
 			textureHandler.numTextures = textures.size();
 			textureHandler.textures = textureIdBuffer.castedPointer<TextureData*>();
@@ -373,18 +359,18 @@ namespace vtx::device
 			std::vector<BsdfData*> bsdfs(size);
 			for (const std::shared_ptr<graph::BsdfMeasurement> bsdf : material->getBsdfs())
 			{
-				vtxID          bsdfId = bsdf->getID();
+				vtxID          bsdfId = bsdf->getUID();
 				const uint32_t mdlIndex = bsdf->mdlIndex;
 				if (bsdfDataMap.contains(bsdfId))
 				{
-					bsdfs[mdlIndex] = std::get<1>(bsdfDataMap[bsdfId]);
+					bsdfs[mdlIndex] = bsdfDataMap[bsdfId].getDeviceImage();
 				}
 				else
 				{
 					VTX_ERROR("Requesting Bsdf device Data of Bsdf Node {} but not found!", bsdfId);
 				}
 			}
-			CUDABuffer& bsdfIdBuffer = GET_BUFFER(Buffers::MaterialBuffers, material->getID(), bsdfIdBuffer);
+			CUDABuffer& bsdfIdBuffer = onDeviceData->materialDataMap.getResourceBuffers(material->getUID()).bsdfIdBuffer;
 			bsdfIdBuffer.upload(bsdfs);
 			textureHandler.bsdfs = bsdfIdBuffer.castedPointer<BsdfData*>();
 			textureHandler.numBsdfs = bsdfs.size();
@@ -400,11 +386,11 @@ namespace vtx::device
 			std::vector<LightProfileData*> lightProfiles(size);
 			for (const std::shared_ptr<graph::LightProfile> lightProfile : material->getLightProfiles())
 			{
-				vtxID          lightProfileId = lightProfile->getID();
+				vtxID          lightProfileId = lightProfile->getUID();
 				const uint32_t mdlIndex = lightProfile->mdlIndex;
 				if (lightProfileDataMap.contains(lightProfileId))
 				{
-					lightProfiles[mdlIndex] = std::get<1>(lightProfileDataMap[lightProfileId]);
+					lightProfiles[mdlIndex] = lightProfileDataMap[lightProfileId].getDeviceImage();
 					//lightProfiles.push_back(lightProfileId);
 				}
 				else
@@ -412,7 +398,7 @@ namespace vtx::device
 					VTX_ERROR("Requesting Light profile device Data of light profile Node {} but not found!", lightProfileId);
 				}
 			}
-			CUDABuffer& lightProfileBuffer = GET_BUFFER(Buffers::MaterialBuffers, material->getID(), lightProfileBuffer);
+			CUDABuffer& lightProfileBuffer = onDeviceData->materialDataMap.getResourceBuffers(material->getUID()).lightProfileBuffer;
 			lightProfileBuffer.upload(lightProfiles);
 			textureHandler.lightProfiles = lightProfileBuffer.castedPointer<LightProfileData*>();
 			textureHandler.numLightProfiles = lightProfiles.size();
@@ -425,17 +411,16 @@ namespace vtx::device
 
 
 
-		CUDABuffer& textureHandlerBuffer = GET_BUFFER(Buffers::MaterialBuffers, material->getID(), TextureHandlerBuffer);
+		CUDABuffer& textureHandlerBuffer = onDeviceData->materialDataMap.getResourceBuffers(material->getUID()).TextureHandlerBuffer;
 		textureHandlerBuffer.upload(textureHandler);
 		return textureHandlerBuffer.castedPointer<TextureHandler>();
 		
 	}
 
-	std::tuple<MaterialData, MaterialData*> createMaterialData(const std::shared_ptr<graph::Material>& material, const int matQueueId)
+	MaterialData createMaterialData(const std::shared_ptr<graph::Material>& material)
 	{
-
 		MaterialData materialData; // Set everything to zero.
-		CUDABuffer&  argBlockBuffer = GET_BUFFER(Buffers::MaterialBuffers, material->getID(), argBlockBuffer);
+		CUDABuffer&  argBlockBuffer = onDeviceData->materialDataMap.getResourceBuffers(material->getUID()).argBlockBuffer;
 		// If the material has an argument block, allocate and upload it.
 		if (const size_t sizeArgumentBlock = material->getArgumentBlockSize(); sizeArgumentBlock > 0)
 		{
@@ -447,17 +432,12 @@ namespace vtx::device
 
 		materialData.argBlock = argBlockBuffer.castedPointer<char>();
 
-		materialData.materialWorkQueue = matQueueId;
-		CUDABuffer& materialDataBuffer = GET_BUFFER(Buffers::MaterialBuffers, material->getID(), materialDataBuffer);
-		materialDataBuffer.upload(materialData);
-
-		return std::tuple(materialData, materialDataBuffer.castedPointer<MaterialData>());
-
+		return materialData;
 	}
 
-	std::tuple<TextureData, TextureData *> createTextureData(const std::shared_ptr<vtx::graph::Texture>& textureNode)
+	TextureData createTextureData(const std::shared_ptr<vtx::graph::Texture>& textureNode)
 	{
-		VTX_INFO("Creating Texture Data for Texture Node ID: {} Name: {}", textureNode->getID(), textureNode->databaseName);
+		VTX_INFO("Creating Texture Data for Texture Node ID: {} Name: {}", textureNode->getUID(), textureNode->databaseName);
 		CUDA_ARRAY3D_DESCRIPTOR descArray3D = {};
 		descArray3D.Format = textureNode->format;
 		descArray3D.Width = textureNode->dimension.x;
@@ -512,10 +492,10 @@ namespace vtx::device
 
 		TextureData textureData;
 
-		CUresult result;
-		CUarray& textureArray = GET_BUFFER(Buffers::TextureBuffers, textureNode->getID(), textureArray);
-		cudaTextureObject_t& texObj = GET_BUFFER(Buffers::TextureBuffers, textureNode->getID(), texObj);
-		cudaTextureObject_t& texObjUnfiltered = GET_BUFFER(Buffers::TextureBuffers, textureNode->getID(), texObjUnfiltered);
+		CUresult             result;
+		CUarray&             textureArray     = onDeviceData->textureDataMap.getResourceBuffers(textureNode->getUID()).textureArray;
+		cudaTextureObject_t& texObj           = onDeviceData->textureDataMap.getResourceBuffers(textureNode->getUID()).texObj;
+		cudaTextureObject_t& texObjUnfiltered = onDeviceData->textureDataMap.getResourceBuffers(textureNode->getUID()).texObjUnfiltered;
 
 		const CUDA_RESOURCE_DESC resourceDescription = uploadTexture(textureNode->imageLayersPointers, descArray3D, textureNode->pixelBytesSize, textureArray);
 
@@ -530,13 +510,10 @@ namespace vtx::device
 		textureData.dimension = textureNode->dimension;
 		textureData.invSize = math::vec3f{ 1.0f / textureData.dimension.x, 1.0f / textureData.dimension.y, 1.0f / textureData.dimension.z };
 
-		CUDABuffer& textureDataBuffer = GET_BUFFER(Buffers::TextureBuffers, textureNode->getID(), textureDataBuffer);
-		textureDataBuffer.upload(textureData);
-
-		return { textureData, textureDataBuffer.castedPointer<TextureData>() };
+		return textureData;
 	}
 
-	BsdfSamplingPartData createBsdfPartData(const graph::BsdfMeasurement::BsdfPartData& bsdfData, Buffers::BsdfPartBuffer& buffers)
+	BsdfSamplingPartData createBsdfPartData(const graph::BsdfMeasurement::BsdfPartData& bsdfData, BsdfPartBuffer& buffers)
 	{
 		BsdfSamplingPartData bsdfSamplingData;
 		CUDABuffer& sampleData = buffers.sampleData;
@@ -600,12 +577,12 @@ namespace vtx::device
 		return bsdfSamplingData;
 	}
 
-	std::tuple < BsdfData, BsdfData *> createBsdfData(const std::shared_ptr<graph::BsdfMeasurement>& bsdfMeasurement)
+	BsdfData createBsdfData(const std::shared_ptr<graph::BsdfMeasurement>& bsdfMeasurement)
 	{
 		BsdfData bsdfData;
 		if (bsdfMeasurement->reflectionBsdf.isValid)
 		{
-			Buffers::BsdfPartBuffer& reflectionPartBuffer = GET_BUFFER(Buffers::BsdfBuffers, bsdfMeasurement->getID(), reflectionPartBuffer);
+			BsdfPartBuffer&   reflectionPartBuffer     = onDeviceData->bsdfDataMap.getResourceBuffers(bsdfMeasurement->getUID()).reflectionPartBuffer;
 			const BsdfSamplingPartData reflectionBsdfDeviceData = createBsdfPartData(bsdfMeasurement->reflectionBsdf, reflectionPartBuffer);
 
 			CUDABuffer& partBuffer = reflectionPartBuffer.partBuffer;
@@ -616,7 +593,7 @@ namespace vtx::device
 		}
 		if (bsdfMeasurement->transmissionBsdf.isValid)
 		{
-			Buffers::BsdfPartBuffer& transmissionPartBuffer = GET_BUFFER(Buffers::BsdfBuffers, bsdfMeasurement->getID(), transmissionPartBuffer);
+			BsdfPartBuffer&   transmissionPartBuffer     = onDeviceData->bsdfDataMap.getResourceBuffers(bsdfMeasurement->getUID()).transmissionPartBuffer;
 			const BsdfSamplingPartData transmissionBsdfDeviceData = createBsdfPartData(bsdfMeasurement->transmissionBsdf, transmissionPartBuffer);
 
 			CUDABuffer& partBuffer = transmissionPartBuffer.partBuffer;
@@ -624,17 +601,13 @@ namespace vtx::device
 			bsdfData.transmissionBsdf = partBuffer.castedPointer<BsdfSamplingPartData>();
 			bsdfData.hasTransmissionBsdf = true;
 		}
-
-		CUDABuffer& bsdfDataBuffer = GET_BUFFER(Buffers::BsdfBuffers, bsdfMeasurement->getID(), bsdfDataBuffer);
-		bsdfDataBuffer.upload(bsdfData);
-
-		return { bsdfData, bsdfDataBuffer.castedPointer<BsdfData>() };
+		return bsdfData;
 	}
 
-	std::tuple < LightProfileData, LightProfileData *> createLightProfileData(std::shared_ptr<graph::LightProfile> lightProfile)
+	LightProfileData createLightProfileData(std::shared_ptr<graph::LightProfile> lightProfile)
 	{
 		// Copy entire CDF data buffer to GPU
-		CUDABuffer& cdfBuffer = GET_BUFFER(Buffers::LightProfileBuffers, lightProfile->getID(), cdfBuffer);
+		CUDABuffer& cdfBuffer = onDeviceData->lightProfileDataMap.getResourceBuffers(lightProfile->getUID()).cdfBuffer;
 		cdfBuffer.upload(lightProfile->lightProfileData.cdfData);
 
 		// --------------------------------------------------------------------------------------------
@@ -652,8 +625,8 @@ namespace vtx::device
 		std::vector<const void*> pointers;
 		pointers.push_back(lightProfile->lightProfileData.sourceData);
 
-		CUarray& lightProfileSourceArray = GET_BUFFER(Buffers::LightProfileBuffers, lightProfile->getID(), lightProfileSourceArray);
-		const CUDA_RESOURCE_DESC resourceDescription = uploadTexture(pointers, descArray3D, sizeof(float), lightProfileSourceArray);
+		CUarray&                 lightProfileSourceArray = onDeviceData->lightProfileDataMap.getResourceBuffers(lightProfile->getUID()).lightProfileSourceArray;
+		const CUDA_RESOURCE_DESC resourceDescription     = uploadTexture(pointers, descArray3D, sizeof(float), lightProfileSourceArray);
 
 
 		CUDA_TEXTURE_DESC textureDescription = {}; // This contains all texture parameters which can be set individually or as a whole.
@@ -673,7 +646,7 @@ namespace vtx::device
 		textureDescription.borderColor[1] = 1.0f;
 		textureDescription.borderColor[2] = 1.0f;
 		textureDescription.borderColor[3] = 1.0f;
-		CUtexObject& evalData = GET_BUFFER(Buffers::LightProfileBuffers, lightProfile->getID(), evalData);
+		CUtexObject& evalData = onDeviceData->lightProfileDataMap.getResourceBuffers(lightProfile->getUID()).evalData;
 		CU_CHECK(cuTexObjectCreate(&evalData, &resourceDescription, &textureDescription, nullptr));
 
 		LightProfileData lightProfileData{};
@@ -689,110 +662,81 @@ namespace vtx::device
 		lightProfileData.candelaMultiplier = static_cast<float>(lightProfile->lightProfileData.candelaMultiplier);
 		lightProfileData.totalPower = static_cast<float>(lightProfile->lightProfileData.totalPower * lightProfile->lightProfileData.candelaMultiplier);
 
-
-		CUDABuffer& bsdfDataBuffer = GET_BUFFER(Buffers::LightProfileBuffers, lightProfile->getID(), lightProfileDataBuffer);
-		bsdfDataBuffer.upload(lightProfileData);
-
-		return { lightProfileData, bsdfDataBuffer.castedPointer<LightProfileData>() };
+		return lightProfileData;
 	}
 
-	void uploadNetworkData(
-		network::Network& network,
-		const int& maxBounces,
-		const int& width,
-		const int& height,
-		const ToneMapperSettings& toneMapperSettings,
-		NetworkInterface::WhatChanged& changed)
+	QueuesData createQueuesData(const int width, const int height, const int maxBounces)
 	{
-		if (network.settings.isDatasetSizeUpdated)
-		{
-			changed.maxDatasetSize = true;
-			network.settings.isDatasetSizeUpdated = false;
-		}
+		int totPixels = width * height;
 
-		if (network.settings.pathGuidingSettings.isUpdated)
-		{
-			changed.distributionType = true;
-			network.settings.pathGuidingSettings.isUpdated = false;
-		}
+		const int maxShadowQueue = totPixels * (maxBounces + 1);
+		const int maxAccumulationQueue = totPixels * (maxBounces + 1); // each bounce can produce an emissive hit
 
-		const int              totPixels = width * height;
-		UPLOAD_DATA->launchParams.networkInterface = NetworkInterface::upload(
-			totPixels,
-			network.settings.batchSize * network.settings.maxTrainingStepPerFrame,
-			maxBounces,
-			UPLOAD_DATA->frameId,
-			network.settings.pathGuidingSettings.distributionType,
-			network.settings.pathGuidingSettings.mixtureSize,
-			toneMapperSettings,
-			changed);
+		CUDABufferManager::deallocateAll();
 
-		if(network.settings.isAnyUpdated())
-		{
-			UPLOAD_DATA->settings.neural = network.settings;
-			UPLOAD_DATA->isSettingsUpdated = true;
+		const WorkQueueSOA<TraceWorkItem> radianceTraceQueue(totPixels, "radianceTraceQueue");
 
-			network.settings.resetUpdate();
-		}
+		QueuesData queuesData;
+		queuesData.radianceTraceQueue = onDeviceData->workQueuesData.resourceBuffers.radianceTraceQueueBuffer.upload(radianceTraceQueue);
+
+		const WorkQueueSOA<RayWorkItem> shadeQueue(totPixels, "shadeQueue");
+		queuesData.shadeQueue = onDeviceData->workQueuesData.resourceBuffers.shadeQueueBuffer.upload(shadeQueue);
+
+		const WorkQueueSOA<EscapedWorkItem> escapedQueue(totPixels, "escapedQueue");
+		queuesData.escapedQueue = onDeviceData->workQueuesData.resourceBuffers.escapedQueueBuffer.upload(escapedQueue);
+
+		const WorkQueueSOA<AccumulationWorkItem> accumulationQueue(maxShadowQueue, "accumulationQueue");
+		queuesData.accumulationQueue = onDeviceData->workQueuesData.resourceBuffers.accumulationQueueBuffer.upload(accumulationQueue);
+
+		const WorkQueueSOA<ShadowWorkItem> shadowQueue(maxAccumulationQueue, "shadowQueue");
+		queuesData.shadowQueue = onDeviceData->workQueuesData.resourceBuffers.shadowQueueBuffer.upload(shadowQueue);
+
+		Counters counters{};
+		queuesData.queueCounters = onDeviceData->workQueuesData.resourceBuffers.countersBuffer.upload(counters);
+
+		return queuesData;
 	}
 
-
-	void uploadWavefrontData(WaveFrontIntegrator& wavefrontIntegrator, const int& width, const int& height, bool isResized, bool isMaxBounceChanged)
+	FrameBufferData prepareFrameBuffers(const int width, const int height)
 	{
-		if(isResized || isMaxBounceChanged)
-		{
-			int totPixels = width * height;
-			UPLOAD_DATA->isSettingsUpdated = true;
+		FrameBufferData frameBufferData;
+		frameBufferData.outputBuffer = (CUdeviceptr)(onDeviceData->frameBufferData.resourceBuffers.cudaOutputBuffer.alloc<math::vec4f>(width * height));
+		frameBufferData.radianceAccumulator = onDeviceData->frameBufferData.resourceBuffers.rawRadiance.alloc<math::vec3f>(width * height);
+		frameBufferData.albedoAccumulator = onDeviceData->frameBufferData.resourceBuffers.albedo.alloc<math::vec3f>(width * height);
+		frameBufferData.normalAccumulator = onDeviceData->frameBufferData.resourceBuffers.normal.alloc<math::vec3f>(width * height);
+		frameBufferData.tmRadiance = onDeviceData->frameBufferData.resourceBuffers.tmRadiance.alloc<math::vec3f>(width * height);
+		frameBufferData.hdriRadiance = onDeviceData->frameBufferData.resourceBuffers.hdriRadiance.alloc<math::vec3f>(width * height);
+		frameBufferData.normalNormalized = onDeviceData->frameBufferData.resourceBuffers.normalNormalized.alloc<math::vec3f>(width * height);
+		frameBufferData.albedoNormalized = onDeviceData->frameBufferData.resourceBuffers.albedoNormalized.alloc<math::vec3f>(width * height);
+		frameBufferData.trueNormal = onDeviceData->frameBufferData.resourceBuffers.trueNormal.alloc<math::vec3f>(width * height);
+		frameBufferData.tangent = onDeviceData->frameBufferData.resourceBuffers.tangent.alloc<math::vec3f>(width * height);
+		frameBufferData.orientation = onDeviceData->frameBufferData.resourceBuffers.orientation.alloc<math::vec3f>(width * height);
+		frameBufferData.uv = onDeviceData->frameBufferData.resourceBuffers.uv.alloc<math::vec3f>(width * height);
+		frameBufferData.debugColor1 = onDeviceData->frameBufferData.resourceBuffers.debugColor1.alloc<math::vec3f>(width * height);
+		frameBufferData.fireflyPass = onDeviceData->frameBufferData.resourceBuffers.fireflyRemoval.alloc<math::vec3f>(width * height);
+		frameBufferData.samples = onDeviceData->frameBufferData.resourceBuffers.samples.alloc<int>(width * height);
+		frameBufferData.gBufferHistory = onDeviceData->frameBufferData.resourceBuffers.gBufferData.alloc<gBufferHistory>(width * height);
+		frameBufferData.gBuffer = onDeviceData->frameBufferData.resourceBuffers.gBuffer.alloc<float>(width * height);
+		frameBufferData.noiseBuffer = onDeviceData->frameBufferData.resourceBuffers.noiseDataBuffer.alloc<NoiseData>(width * height);
 
-			const int maxShadowQueue = totPixels * (wavefrontIntegrator.rendererSettings->maxBounces + 1);
-			const int maxAccumulationQueue = totPixels * (wavefrontIntegrator.rendererSettings->maxBounces + 1); // each bounce can produce an emissive hit
+		frameBufferData.frameSize.x = width;
+		frameBufferData.frameSize.y = height;
 
-			CUDABufferManager::deallocateAll();
+		return frameBufferData;
+	}
 
-			const WorkQueueSOA<TraceWorkItem> radianceTraceQueue(totPixels, "radianceTraceQueue");
+	void prepareNoiseComputationBuffers(const std::shared_ptr<graph::Renderer>& rendererNode)
+	{
+		const int size = rendererNode->width * rendererNode->height;
+		constexpr int threadsPerBlock = 256;
+		const int numBlocks = (size + threadsPerBlock - 1) / threadsPerBlock;
 
-			UPLOAD_DATA->launchParams.radianceTraceQueue = UPLOAD_BUFFERS->workQueueBuffers.radianceTraceQueueBuffer.upload(radianceTraceQueue);
-
-			const WorkQueueSOA<RayWorkItem> shadeQueue(totPixels, "shadeQueue");
-			UPLOAD_DATA->launchParams.shadeQueue = UPLOAD_BUFFERS->workQueueBuffers.shadeQueueBuffer.upload(shadeQueue);
-
-			const WorkQueueSOA<EscapedWorkItem> escapedQueue(totPixels, "escapedQueue");
-			UPLOAD_DATA->launchParams.escapedQueue = UPLOAD_BUFFERS->workQueueBuffers.escapedQueueBuffer.upload(escapedQueue);
-
-			const WorkQueueSOA<AccumulationWorkItem> accumulationQueue(maxShadowQueue, "accumulationQueue");
-			UPLOAD_DATA->launchParams.accumulationQueue = UPLOAD_BUFFERS->workQueueBuffers.accumulationQueueBuffer.upload(accumulationQueue);
-
-			const WorkQueueSOA<ShadowWorkItem> shadowQueue(maxAccumulationQueue, "shadowQueue");
-			UPLOAD_DATA->launchParams.shadowQueue = UPLOAD_BUFFERS->workQueueBuffers.shadowQueueBuffer.upload(shadowQueue);
-
-			Counters counters{};
-			UPLOAD_DATA->launchParams.queueCounters = UPLOAD_BUFFERS->workQueueBuffers.countersBuffer.upload(counters);
-
-			UPLOAD_DATA->isWorkQueueUpdated = true;
-		}
-
-		if(wavefrontIntegrator.settings.isUpdated)
-		{
-			UPLOAD_DATA->settings.wavefront = wavefrontIntegrator.settings;
-			UPLOAD_DATA->isSettingsUpdated = true;
-			wavefrontIntegrator.settings.isUpdated = false;
-		}
-
-		//Neural Network
-		{
-			NetworkInterface::WhatChanged changed;
-			if (isMaxBounceChanged)
-			{
-				changed.maxDepth = true;
-			}
-
-			if (isResized)
-			{
-				changed.numberOfPixels = true;
-			}
-
-			uploadNetworkData(wavefrontIntegrator.network, wavefrontIntegrator.rendererSettings->maxBounces, width, height, wavefrontIntegrator.rendererSettings->toneMapperSettings, changed);
-		}
+		onDeviceData->noiseComputationData.resourceBuffers.radianceRangeBuffer.resize(numBlocks * sizeof(math::vec2f));
+		onDeviceData->noiseComputationData.resourceBuffers.albedoRangeBuffer.resize(numBlocks * sizeof(math::vec2f));
+		onDeviceData->noiseComputationData.resourceBuffers.normalRangeBuffer.resize(numBlocks * sizeof(math::vec2f));
+		onDeviceData->noiseComputationData.resourceBuffers.globalRadianceRangeBuffer.resize(sizeof(math::vec2f));
+		onDeviceData->noiseComputationData.resourceBuffers.globalAlbedoRangeBuffer.resize(sizeof(math::vec2f));
+		onDeviceData->noiseComputationData.resourceBuffers.globalNormalRangeBuffer.resize(sizeof(math::vec2f));
 	}
 
 	void setRendererData(const std::shared_ptr<graph::Renderer>& rendererNode)
@@ -802,103 +746,99 @@ namespace vtx::device
 
 			rendererNode->threadData.bufferUpdateReady = false;
 
-			const uint32_t& width          = rendererNode->width;
-			const uint32_t& height         = rendererNode->height;
-			const vtxID     rendererNodeId = rendererNode->getID();
-
-			UPLOAD_DATA->frameBufferData.outputBuffer = (CUdeviceptr)(GET_BUFFER(Buffers::FrameBufferBuffers, rendererNodeId, cudaOutputBuffer).alloc<math::vec4f>(width*height));
-			UPLOAD_DATA->frameBufferData.radianceAccumulator = GET_BUFFER(Buffers::FrameBufferBuffers, rendererNodeId, rawRadiance).alloc<math::vec3f>(width*height);
-			UPLOAD_DATA->frameBufferData.albedoAccumulator = GET_BUFFER(Buffers::FrameBufferBuffers, rendererNodeId, albedo).alloc<math::vec3f>(width*height);
-			UPLOAD_DATA->frameBufferData.normalAccumulator = GET_BUFFER(Buffers::FrameBufferBuffers, rendererNodeId, normal).alloc<math::vec3f>(width*height);
-			UPLOAD_DATA->frameBufferData.tmRadiance = GET_BUFFER(Buffers::FrameBufferBuffers, rendererNodeId, tmRadiance).alloc<math::vec3f>(width*height);
-			UPLOAD_DATA->frameBufferData.hdriRadiance = GET_BUFFER(Buffers::FrameBufferBuffers, rendererNodeId, hdriRadiance).alloc<math::vec3f>(width*height);
-			UPLOAD_DATA->frameBufferData.normalNormalized = GET_BUFFER(Buffers::FrameBufferBuffers, rendererNodeId, normalNormalized).alloc<math::vec3f>(width*height);
-			UPLOAD_DATA->frameBufferData.albedoNormalized = GET_BUFFER(Buffers::FrameBufferBuffers, rendererNodeId, albedoNormalized).alloc<math::vec3f>(width*height);
-			UPLOAD_DATA->frameBufferData.trueNormal = GET_BUFFER(Buffers::FrameBufferBuffers, rendererNodeId, trueNormal).alloc<math::vec3f>(width*height);
-			UPLOAD_DATA->frameBufferData.tangent = GET_BUFFER(Buffers::FrameBufferBuffers, rendererNodeId, tangent).alloc<math::vec3f>(width*height);
-			UPLOAD_DATA->frameBufferData.orientation = GET_BUFFER(Buffers::FrameBufferBuffers, rendererNodeId, orientation).alloc<math::vec3f>(width*height);
-			UPLOAD_DATA->frameBufferData.uv = GET_BUFFER(Buffers::FrameBufferBuffers, rendererNodeId, uv).alloc<math::vec3f>(width*height);
-			UPLOAD_DATA->frameBufferData.debugColor1 = GET_BUFFER(Buffers::FrameBufferBuffers, rendererNodeId, debugColor1).alloc<math::vec3f>(width*height);
-			UPLOAD_DATA->frameBufferData.fireflyPass = GET_BUFFER(Buffers::FrameBufferBuffers, rendererNodeId, fireflyRemoval).alloc<math::vec3f>(width * height);
-			UPLOAD_DATA->frameBufferData.samples = GET_BUFFER(Buffers::FrameBufferBuffers, rendererNodeId, samples).alloc<int>(width * height);
-			UPLOAD_DATA->frameBufferData.gBufferHistory = GET_BUFFER(Buffers::FrameBufferBuffers, rendererNodeId, gBufferData).alloc<gBufferHistory>(width * height);
-			UPLOAD_DATA->frameBufferData.gBuffer = GET_BUFFER(Buffers::FrameBufferBuffers, rendererNodeId, gBuffer).alloc<float>(width*height);
+			onDeviceData->launchParamsData.editableHostImage().frameBuffer = prepareFrameBuffers(rendererNode->width, rendererNode->height);
 
 			optix::getState()->denoiser.resize(rendererNode->width, rendererNode->height);
 
 			//TODO Smarter way to set these value, I don't want to waste memory if we are not using adaptive samplig
 			{
-				UPLOAD_DATA->frameBufferData.noiseBuffer = GET_BUFFER(Buffers::FrameBufferBuffers, rendererNodeId, noiseDataBuffer).alloc<NoiseData>(width*height);
-
-				const int size = rendererNode->width * rendererNode->height;
-				constexpr int threadsPerBlock = 256;
-				const int numBlocks = (size + threadsPerBlock - 1) / threadsPerBlock;
-
-				GET_BUFFER(Buffers::NoiseComputationBuffers, rendererNode->getID(), radianceRangeBuffer).resize(numBlocks * sizeof(math::vec2f));
-				GET_BUFFER(Buffers::NoiseComputationBuffers, rendererNode->getID(), albedoRangeBuffer).resize(numBlocks * sizeof(math::vec2f));
-				GET_BUFFER(Buffers::NoiseComputationBuffers, rendererNode->getID(), normalRangeBuffer).resize(numBlocks * sizeof(math::vec2f));
-
-				CUDABuffer& globalRadianceRangeBuffer = GET_BUFFER(Buffers::NoiseComputationBuffers, rendererNode->getID(), globalRadianceRangeBuffer);
-				if(globalRadianceRangeBuffer.castedPointer<void>() == nullptr)
-				{
-					globalRadianceRangeBuffer.alloc(sizeof(math::vec2f));
-					GET_BUFFER(Buffers::NoiseComputationBuffers, rendererNode->getID(), globalAlbedoRangeBuffer).alloc(sizeof(math::vec2f));
-					GET_BUFFER(Buffers::NoiseComputationBuffers, rendererNode->getID(), globalNormalRangeBuffer).alloc(sizeof(math::vec2f));
-				}
-
+				prepareNoiseComputationBuffers(rendererNode);
 			}
 
-			UPLOAD_DATA->frameBufferData.frameSize.x = rendererNode->width;
-			UPLOAD_DATA->frameBufferData.frameSize.y = rendererNode->height;
-
 			rendererNode->resized             = false;
-			UPLOAD_DATA->isFrameBufferUpdated = true;
 			rendererNode->resizeGlBuffer      = true;
 		}
 
-		const bool isMaxBouncesUpdated = rendererNode->settings.isMaxBounceChanged;
-		if(rendererNode->settings.isAnyUpdated())
-		{
-			UPLOAD_DATA->settings.renderer = rendererNode->settings;
-			UPLOAD_DATA->isSettingsUpdated   = true;
-			rendererNode->settings.resetUpdate();
-		}
 
 		//Wavefront Architecture
 		{
-			uploadWavefrontData(rendererNode->waveFrontIntegrator, rendererNode->width, rendererNode->height, isResized, isMaxBouncesUpdated);
+			if (isResized || rendererNode->settings.isMaxBounceChanged)
+			{
+				onDeviceData->launchParamsData.editableHostImage().queues = createQueuesData(rendererNode->width, rendererNode->height, rendererNode->settings.maxBounces);
+			}
+
+			if (rendererNode->waveFrontIntegrator.settings.isUpdated)
+			{
+
+				onDeviceData->launchParamsData.editableHostImage().settings.wavefront = rendererNode->waveFrontIntegrator.settings;
+				rendererNode->waveFrontIntegrator.settings.isUpdated = false;
+			}
+
+			//Neural Network
+			{
+				NetworkInterface::WhatChanged changed;
+				if (rendererNode->settings.isMaxBounceChanged)
+				{
+					changed.maxDepth = true;
+				}
+
+				if (isResized)
+				{
+					changed.numberOfPixels = true;
+				}
+
+				{
+					if (rendererNode->waveFrontIntegrator.network.settings.isDatasetSizeUpdated)
+					{
+						changed.maxDatasetSize = true;
+						rendererNode->waveFrontIntegrator.network.settings.isDatasetSizeUpdated = false;
+					}
+
+					if (rendererNode->waveFrontIntegrator.network.settings.pathGuidingSettings.isUpdated)
+					{
+						changed.distributionType = true;
+						rendererNode->waveFrontIntegrator.network.settings.pathGuidingSettings.isUpdated = false;
+					}
+
+					const int              totPixels = rendererNode->width * rendererNode->height;
+					onDeviceData->launchParamsData.editableHostImage().networkInterface
+					= NetworkInterface::upload(
+						totPixels,
+						rendererNode->waveFrontIntegrator.network.settings.batchSize * rendererNode->waveFrontIntegrator.network.settings.maxTrainingStepPerFrame,
+						rendererNode->settings.maxBounces,
+						onDeviceData->frameId,
+						rendererNode->waveFrontIntegrator.network.settings.pathGuidingSettings.distributionType,
+						rendererNode->waveFrontIntegrator.network.settings.pathGuidingSettings.mixtureSize,
+						rendererNode->settings.toneMapperSettings,
+						changed, onDeviceData->networkInterfaceData.resourceBuffers);
+
+					if (rendererNode->waveFrontIntegrator.network.settings.isAnyUpdated())
+					{
+						onDeviceData->launchParamsData.editableHostImage().settings.neural = rendererNode->waveFrontIntegrator.network.settings;
+						rendererNode->waveFrontIntegrator.network.settings.resetUpdate();
+					}
+				}
+			}
 		}
 
-	}
-
-	void setCameraData(const std::shared_ptr<graph::Camera>& cameraNode)
-	{
-		if (cameraNode->isUpdated) {
-			UPLOAD_DATA->cameraData.position   = cameraNode->position;
-			UPLOAD_DATA->cameraData.direction  = cameraNode->direction;
-			const float radianFov              = (cameraNode->fovY * M_PI) / 180.0f;
-			UPLOAD_DATA->cameraData.vertical   = tanf(radianFov*0.5f) * cameraNode->vertical;
-			UPLOAD_DATA->cameraData.horizontal = tanf(radianFov*0.5f) * cameraNode->aspect * cameraNode->horizontal;
-			cameraNode->isUpdated                = false;
-			UPLOAD_DATA->isCameraUpdated       = true;
+		if (rendererNode->settings.isAnyUpdated())
+		{
+			onDeviceData->launchParamsData.editableHostImage().settings.renderer = rendererNode->settings;
+			rendererNode->settings.resetUpdate();
 		}
 	}
 
-	SbtProgramIdx setProgramsSbt()
+	CameraData createCameraData(const std::shared_ptr<graph::Camera>& cameraNode)
 	{
-		// This is hard Coded, I didn't find a better way which didn't have some hardcoded design or some hash map conversion from string on the device
-		SbtProgramIdx                             pg;
-		optix::PipelineOptix*                     rp     = optix::getRenderingPipeline();
+		CameraData cameraData;
+		cameraData.position = cameraNode->position;
+		cameraData.direction = cameraNode->direction;
+		const float radianFov = (cameraNode->fovY * M_PI) / 180.0f;
+		cameraData.vertical = tanf(radianFov * 0.5f) * cameraNode->vertical;
+		cameraData.horizontal = tanf(radianFov * 0.5f) * cameraNode->aspect * cameraNode->horizontal;
 
-		pg.raygen          = rp->getProgramSbt("raygen");
-		pg.exception       = rp->getProgramSbt("exception");
-		pg.miss            = rp->getProgramSbt("miss");
-		pg.hit             = rp->getProgramSbt("hit");
-		pg.pinhole         = rp->getProgramSbt("pinhole");
-		pg.meshLightSample = rp->getProgramSbt("meshLightSample");
-		pg.envLightSample  = rp->getProgramSbt("envLightSample");
+		return cameraData;
 
-		return pg;
 	}
 
 	CUDA_RESOURCE_DESC uploadTexture(

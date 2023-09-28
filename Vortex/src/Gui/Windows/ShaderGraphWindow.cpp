@@ -3,6 +3,7 @@
 #include "imgui.h"
 #include "Scene/Nodes/Material.h"
 #include "imnodes.h"
+#include "Scene/Scene.h"
 
 namespace vtx {
     ShaderGraphWindow::ShaderGraphWindow()
@@ -44,18 +45,7 @@ namespace vtx {
         {
 	        nodeEditor.arrangeNodes(gui::NodeEditor::LayoutDirection::Horizontal);
 		}
-        std::vector<vtxID> selectedNodes(nodeEditor.selectedNodes.size());
-        for (int i = 0; i < nodeEditor.selectedNodes.size(); ++i)
-            selectedNodes[i] = (vtxID)nodeEditor.selectedNodes[i];
-
-        windowManager->selectedNodes["SceneGraphWindow"] = selectedNodes;
-
-
-        if(isMaterialUpdated)
-        {
-            graph::SIM::get()->getNode<graph::Material>(materialOpened)->isUpdated = true;
-            ops::restartRender();
-        }
+        graph::Scene::getScene()->setSelected(nodeEditor.getSelected());
     }
     void ShaderGraphWindow::materialSelector()
     {
@@ -73,11 +63,11 @@ namespace vtx {
 			{
 		        const std::shared_ptr<graph::Material>& material = graph::SIM::get()->getNode<graph::Material>(
 					materialId);
-				const bool isSelected = material->getID() == materialOpened;
+				const bool isSelected = material->getUID() == materialOpened;
 				if (ImGui::Selectable(material->name.c_str(), isSelected))
 				{
                     previousMaterial = materialOpened;
-					materialOpened = material->getID();
+					materialOpened = material->getUID();
                     openedMaterialName = material->name;
                     materialOpenedChanged = true;
                 }

@@ -10,6 +10,12 @@ namespace vtx::graph
 	{
 		transform = ops::createNode<Transform>();
 		child = nullptr;
+		typeID = SIM::get()->getTypeId<Instance>();
+	}
+
+	Instance::~Instance()
+	{
+		SIM::get()->releaseTypeId<Transform>(typeID);
 	}
 
 	void Instance::accept(NodeVisitor& visitor)
@@ -23,7 +29,7 @@ namespace vtx::graph
 
 	void Instance::setChild(const std::shared_ptr<Node>& _child) {
 		if (child && childIsMesh) {
-			if (_child->getID() != child->getID()) {
+			if (_child->getUID() != child->getUID()) {
 				clearMeshLights();
 			}
 		}
@@ -34,7 +40,7 @@ namespace vtx::graph
 			for (auto& [material, slotIndex, meshLight] : materialSlots)
 			{
 				meshLight->mesh = child->as<Mesh>();
-				meshLight->isInitialized = false;
+				meshLight->state.isInitialized = false;
 			}
 		}
 		else
@@ -48,7 +54,7 @@ namespace vtx::graph
 		MaterialSlot* materialSlot;
 		if(slot <= materialSlots.size() - 1 && slot != -1)
 		{
-			const vtxID matId = materialSlots[slot].material->getID();
+			const vtxID matId = materialSlots[slot].material->getUID();
 			removeMaterial(matId);
 			materialSlot = &materialSlots[slot];
 		}
@@ -61,7 +67,7 @@ namespace vtx::graph
 		materialSlot->meshLight = ops::createNode<graph::MeshLight>();
 		materialSlot->meshLight->material = materialSlot->material;
 		materialSlot->meshLight->materialRelativeIndex = materialSlots.size() - 1;
-		materialSlot->meshLight->parentInstanceId = getID();
+		materialSlot->meshLight->parentInstanceId = getTypeID();
 
 		if (childIsMesh)
 		{
@@ -74,10 +80,11 @@ namespace vtx::graph
 		// Remove Related Material Slot
 		for(int i = 0; i < materialSlots.size(); i++)
 		{
-			if (materialSlots[i].material->getID() == matID)
+			if (materialSlots[i].material->getUID() == matID)
 			{
 				materialSlots[i].material = nullptr;
-				SIM::get()->releaseIndex(materialSlots[i].meshLight->getID());
+				SIM::get()->releaseUID(materialSlots[i].meshLight->getUID());
+				SIM::get()->releaseTypeId<MeshLight>(materialSlots[i].meshLight->getTypeID());
 				materialSlots[i].meshLight = nullptr;
 
 				materialSlots.erase(materialSlots.begin() + i);
@@ -99,7 +106,8 @@ namespace vtx::graph
 	{
 		for (auto it : materialSlots)
 		{
-			SIM::get()->releaseIndex(it.meshLight->getID());
+			SIM::get()->releaseUID(it.meshLight->getUID());
+			SIM::get()->releaseTypeId<MeshLight>(it.meshLight->getTypeID());
 			it.meshLight = nullptr;
 		}
 	}
@@ -108,9 +116,10 @@ namespace vtx::graph
 	{
 		for (auto it : materialSlots)
 		{
-			if(it.material->getID() == matID)
+			if(it.material->getUID() == matID)
 			{
-				SIM::get()->releaseIndex(it.meshLight->getID());
+				SIM::get()->releaseUID(it.meshLight->getUID());
+				SIM::get()->releaseTypeId<MeshLight>(it.meshLight->getTypeID());
 				it.meshLight = nullptr;
 			}
 		}
@@ -120,7 +129,7 @@ namespace vtx::graph
 	{
 		for (auto& it : materialSlots)
 		{
-			if (it.material->getID() == materialId)
+			if (it.material->getUID() == materialId)
 			{
 				return it.meshLight;
 			}

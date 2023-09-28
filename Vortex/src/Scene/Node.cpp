@@ -8,35 +8,45 @@ namespace vtx::graph
 	Node::Node(const NodeType _type) : type(_type)
 	{
 		sim = SIM::get();
-		id  = sim->getFreeIndex();
-		name = nodeNames[type] + "_" + std::to_string(id);
+		UID  = sim->getUID();
+		name = nodeNames[type] + "_" + std::to_string(UID);
 	}
 
 	Node::~Node()
 	{
-		sim->releaseIndex(id);
-		VTX_WARN("Node ID: {} Name: {} destroyed", id, name);
+		sim->releaseUID(UID);
+		VTX_WARN("Node ID: {} Name: {} destroyed", UID, name);
 	}
         
 	NodeType Node::getType() const {
 		return type;
 	}
         
-	vtxID Node::getID() const {
-		return id;
+	vtxID Node::getUID() const {
+		return UID;
+	}
+
+	vtxID Node::getTypeID() const
+	{
+		return typeID;
 	}
 
 	void Node::traverse(NodeVisitor& visitor)
 	{
+
+		//TEMPORARY CHECK TO MAKE SURE TYPE ID DEFINITION IN CONSTRUCTOR AND DESTRUCTOR IN DERIVED CLASS IS DEFINED
+		if (typeID == 0)
+		{
+			VTX_ERROR("Node ID: {} Name: {} typeID not defined", UID, name);
+		}
 		visitor.visitBegin(as<Node>());
 
 		traverseChildren(visitor);
 
-		if (!isInitialized)
+		if (!state.isInitialized)
 		{
 			init();
-			isInitialized = true;
-			isUpdated = true;
+			state.isInitialized = true;
 		}
 
 		accept(visitor);

@@ -10,6 +10,8 @@ namespace vtx::graph
 	public:
 		EnvironmentLight();
 
+		~EnvironmentLight() override;
+
 		void init() override;
 
 		std::vector<std::shared_ptr<Node>> getChildren() const override;

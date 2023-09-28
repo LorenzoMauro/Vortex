@@ -5,8 +5,7 @@
 #include "Device/UploadCode/UploadBuffers.h"
 #include "Scene/Nodes/RendererSettings.h"
 #include <curand_kernel.h>
-
-#include "Device/UploadCode/UploadData.h"
+#include "Device/UploadCode/DeviceDataCoordinator.h"
 
 namespace vtx
 {
@@ -167,7 +166,7 @@ namespace vtx
 
 		curandState_t state;
 		const float noise = noiseBuffer[y * width + x].noiseAbsolute;
-		curand_init(x, y, (int)noise + params->settings->renderer.iteration, &state);
+		curand_init(x, y, (int)noise + params->settings.renderer.iteration, &state);
 		noiseBuffer[y * width + x].normalizedNoise = noise / (*noiseSum);
 		noiseBuffer[y * width + x].adaptiveSamples = 0;
 
@@ -210,7 +209,7 @@ namespace vtx
 
 		curandState_t state;
 		const float noise = noiseBuffer[y * width + x].noiseAbsolute;
-		curand_init(x, y, (int)noise + params->settings->renderer.iteration, &state);
+		curand_init(x, y, (int)noise + params->settings.renderer.iteration, &state);
 		noiseBuffer[y * width + x].normalizedNoise = noise / (*noiseSum);
 		noiseBuffer[y * width + x].adaptiveSamples = 0;
 
@@ -307,64 +306,25 @@ namespace vtx
 
 	void noiseComputation(const LaunchParams* deviceParams, const int& rendererNodeId)
 	{
-
-		/*const CUDABuffer& tmRadianceBuffer = GET_BUFFER(device::Buffers::FrameBufferBuffers, rendererNodeId, tmRadiance);
-		const auto*       tmRadiance       = tmRadianceBuffer.castedPointer<math::vec3f>();
-		const CUDABuffer & albedoNormalizedBuffer = GET_BUFFER(device::Buffers::FrameBufferBuffers, rendererNodeId, albedoNormalized);
-		const auto*        albedoNormalized       = albedoNormalizedBuffer.castedPointer<math::vec3f>();
-		const CUDABuffer & normalNormalizedBuffer = GET_BUFFER(device::Buffers::FrameBufferBuffers, rendererNodeId, normalNormalized);
-		const auto*        normalNormalized       = normalNormalizedBuffer.castedPointer<math::vec3f>();*/
-
-		const CUDABuffer& radianceRangeBuffer = GET_BUFFER(device::Buffers::NoiseComputationBuffers, rendererNodeId, radianceRangeBuffer);
+		const CUDABuffer& radianceRangeBuffer = onDeviceData->noiseComputationData.resourceBuffers.radianceRangeBuffer;
 		auto* radianceRange = radianceRangeBuffer.castedPointer<math::vec2f>();
 
-		const CUDABuffer & albedoRangeBuffer = GET_BUFFER(device::Buffers::NoiseComputationBuffers, rendererNodeId, albedoRangeBuffer);
+		const CUDABuffer & albedoRangeBuffer = onDeviceData->noiseComputationData.resourceBuffers.albedoRangeBuffer;
 		auto* albedoRange = albedoRangeBuffer.castedPointer<math::vec2f>();
 
-		const CUDABuffer & normalRangeBuffer = GET_BUFFER(device::Buffers::NoiseComputationBuffers, rendererNodeId, normalRangeBuffer);
+		const CUDABuffer & normalRangeBuffer = onDeviceData->noiseComputationData.resourceBuffers.normalRangeBuffer;
 		auto* normalRange = normalRangeBuffer.castedPointer<math::vec2f>();
 
-		// Initialize the global ranges to the maximum and minimum possible values
-		/*math::vec2f initRange;
-		initRange.x = FLT_MAX;
-		initRange.y = -FLT_MAX;
-		CUDABuffer& globalRadianceRangeBuffer = GET_BUFFER(device::Buffers::NoiseComputationBuffers, rendererNodeId, globalRadianceRangeBuffer);
-		globalRadianceRangeBuffer.upload<math::vec2f>(initRange);
-		auto* globalRadianceRange = globalRadianceRangeBuffer.castedPointer<math::vec2f>();
-		CUDABuffer& globalAlbedoRangeBuffer = GET_BUFFER(device::Buffers::NoiseComputationBuffers, rendererNodeId, globalAlbedoRangeBuffer);
-		globalAlbedoRangeBuffer.upload<math::vec2f>(initRange);
-		auto* globalAlbedoRange = globalAlbedoRangeBuffer.castedPointer<math::vec2f>();
-		CUDABuffer& globalNormalRangeBuffer = GET_BUFFER(device::Buffers::NoiseComputationBuffers, rendererNodeId, globalNormalRangeBuffer);
-		globalNormalRangeBuffer.upload<math::vec2f>(initRange);
-		auto* globalNormalRange = globalNormalRangeBuffer.castedPointer<math::vec2f>();*/
-
-		CUDABuffer& noiseSumBuffer = GET_BUFFER(device::Buffers::NoiseComputationBuffers, rendererNodeId, noiseSumBuffer);
+		CUDABuffer& noiseSumBuffer = onDeviceData->noiseComputationData.resourceBuffers.noiseSumBuffer;
 		noiseSumBuffer.upload<float>(0.0f);
 		auto* noiseSum = noiseSumBuffer.castedPointer<float>();
 
-		const int width = UPLOAD_DATA->frameBufferData.frameSize.x;
-		const int height = UPLOAD_DATA->frameBufferData.frameSize.y;
+		const int width = onDeviceData->launchParamsData.getHostImage().frameBuffer.frameSize.x;
+		const int height = onDeviceData->launchParamsData.getHostImage().frameBuffer.frameSize.y;
 
-		CUDABuffer& remainingSamplesBuffer = GET_BUFFER(device::Buffers::NoiseComputationBuffers, rendererNodeId, remainingSamplesBuffer);
+		CUDABuffer& remainingSamplesBuffer = onDeviceData->noiseComputationData.resourceBuffers.remainingSamplesBuffer;
 		remainingSamplesBuffer.upload<int>(width*height);
 		auto* remainingSamples = remainingSamplesBuffer.castedPointer<int>();
-
-		//Fetch Radiance, Albedo and Normal Value Range
-		//{
-		//	const int size = width * height;
-		//	constexpr int threadsPerBlock = 256;
-		//	const int numBlocks = (size + threadsPerBlock - 1) / threadsPerBlock;
-		//	// Launch the kernel to compute the block sums
-		//	//CUDA_CHECK(cudaDeviceSynchronize());
-		//	rangeKernel<<<numBlocks, threadsPerBlock>>>(tmRadiance, radianceRange, size, LUMINANCE);
-		//	rangeKernel<<<numBlocks, threadsPerBlock>>>(albedoNormalized, albedoRange, size, COLOR);
-		//	rangeKernel<<<numBlocks, threadsPerBlock>>>(normalNormalized, normalRange, size, COLOR);
-		//	// Calculate the number of threads per block
-		//	int threadsPerBlockTot = numBlocks > 1024 ? 1024 : numBlocks;
-		//	totalRange<<<1, threadsPerBlockTot, threadsPerBlockTot * 2 * sizeof(float)>>>(radianceRange, globalRadianceRange, numBlocks);
-		//	totalRange<<<1, threadsPerBlockTot, threadsPerBlockTot * 2 * sizeof(float)>>>(albedoRange, globalAlbedoRange, numBlocks);
-		//	totalRange<<<1, threadsPerBlockTot, threadsPerBlockTot * 2 * sizeof(float)>>>(normalRange, globalNormalRange, numBlocks);
-		//}
 
 		{
 			dim3 threadsPerBlock(16, 16);  // a common choice for 2D data
@@ -372,7 +332,7 @@ namespace vtx
 			dim3 numBlocks((width + threadsPerBlock.x - 1) / threadsPerBlock.x,
 						   (height + threadsPerBlock.y - 1) / threadsPerBlock.y);
 
-			computeNoise<<<numBlocks, threadsPerBlock>>> (deviceParams, noiseSum, deviceParams->settings->renderer.adaptiveSamplingSettings.noiseKernelSize, deviceParams->settings->renderer.adaptiveSamplingSettings.albedoNormalNoiseInfluence);
+			computeNoise<<<numBlocks, threadsPerBlock>>> (deviceParams, noiseSum, deviceParams->settings.renderer.adaptiveSamplingSettings.noiseKernelSize, deviceParams->settings.renderer.adaptiveSamplingSettings.albedoNormalNoiseInfluence);
 		}
 
 		{

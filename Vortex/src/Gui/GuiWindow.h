@@ -73,7 +73,7 @@ namespace vtx {
 
 		void removeClosedWindows();
 
-		std::map<std::string, std::vector<vtxID>> selectedNodes;
+		//std::map<std::string, std::vector<vtxID>> selectedNodes;
 	private:
 		std::vector<std::shared_ptr<Window>> windows;
 		std::unordered_map<std::type_index, std::shared_ptr<Window>> windowMap;

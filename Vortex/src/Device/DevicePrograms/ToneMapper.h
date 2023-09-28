@@ -28,7 +28,7 @@ namespace vtx
         return math::vec3f(r, g, b);
     }
 
-    __forceinline__ __device__ math::vec3f toneMap(ToneMapperSettings& tm, const math::vec3f& radianceSample)
+    __forceinline__ __device__ math::vec3f toneMap(const ToneMapperSettings& tm, const math::vec3f& radianceSample)
     {
         math::vec3f ldrColor = tm.invWhitePoint * tm.colorBalance * radianceSample;
 

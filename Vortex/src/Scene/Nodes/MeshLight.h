@@ -7,7 +7,9 @@ namespace vtx::graph
 	class MeshLight : public Node
 	{
 	public:
-		MeshLight() : Node(NT_MESH_LIGHT) {}
+		MeshLight();
+
+		~MeshLight() override;
 
 		void init() override;
 

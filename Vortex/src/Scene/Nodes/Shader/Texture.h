@@ -13,33 +13,13 @@ namespace vtx::graph
 	class Texture : public Node
 	{
 	public:
-		Texture() :
-			Node(NT_MDL_TEXTURE),
-			shape(ITarget_code::Texture_shape_invalid)
-		{
-		}
+		Texture();
 
-		Texture(const char* _databaseName, const ITarget_code::Texture_shape _shape):
-			Node(NT_MDL_TEXTURE),
-			databaseName(_databaseName),
-			shape(_shape)
-		{
-		}
+		Texture(const char* _databaseName, const ITarget_code::Texture_shape _shape);
 
-		Texture(std::string filePath) :
-			Node(NT_MDL_TEXTURE)
-		{
-			this->filePath = filePath;
-			loadFromFile = true;
-		}
+		Texture(std::string filePath);
 
-		~Texture() override
-		{
-			for (const auto& ptr : imageLayersPointers)
-			{
-				free(const_cast<void*>(ptr));
-			}
-		}
+		~Texture() override;
 
 		void init() override;
 

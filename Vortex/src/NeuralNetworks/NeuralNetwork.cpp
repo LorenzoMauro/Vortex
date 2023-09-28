@@ -4,7 +4,7 @@
 #include "Device/DevicePrograms/LaunchParams.h" 
 #include "Device/UploadCode/UploadBuffers.h"
 
-#include "Device/UploadCode/UploadData.h"
+#include "Device/UploadCode/DeviceDataCoordinator.h"
 #include "Networks/Sac.h"
 #include "Networks/Npg.h"
 
@@ -49,7 +49,7 @@ namespace vtx::network
 
     bool Network::doInference()
     {
-        return UPLOAD_DATA->settings.renderer.iteration >= settings.inferenceIterationStart && settings.active && settings.doInference;
+        return onDeviceData->launchParamsData.getHostImage().settings.renderer.iteration >= settings.inferenceIterationStart && settings.active && settings.doInference;
     }
 
     NetworkSettings& Network::getNeuralNetSettings()

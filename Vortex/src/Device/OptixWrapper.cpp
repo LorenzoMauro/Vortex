@@ -8,6 +8,7 @@
 #include "Core/Options.h"
 #include "Core/Utils.h"
 #include "UploadCode/UploadBuffers.h"
+#include "UploadCode/DeviceDataCoordinator.h"
 
 namespace vtx::optix
 {
@@ -376,7 +377,7 @@ namespace vtx::optix
 				{
 					programGroups.push_back(program->getProgramGroup());
 					uint32_t hash = stringHash(program->name.data());
-					sbtMap.insert(hash, sbtPosition{ globalSbtPosition,localSbtPosition });
+					sbtMap[hash] = sbtPosition{globalSbtPosition,localSbtPosition};
 					++globalSbtPosition;
 					++localSbtPosition;
 				}
@@ -452,7 +453,7 @@ namespace vtx::optix
 		return sbt;
 	}
 
-	const CudaMap<uint32_t, sbtPosition>& SbtPipeline::getSbtMap()
+	const std::map<uint32_t, sbtPosition>& SbtPipeline::getSbtMap()
 	{
 		if (isDirty)
 		{
@@ -463,11 +464,12 @@ namespace vtx::optix
 
 	int SbtPipeline::getProgramSbt(std::string programName)
 	{
-		const CudaMap<uint32_t, sbtPosition>& map = getSbtMap();
-		const uint32_t hash = stringHash(programName.data());
-		if (map.contains(hash))
+		const std::map<uint32_t, sbtPosition>& map  = getSbtMap();
+		const uint32_t                        hash = stringHash(programName.data());
+		if (map.find(hash) != map.end())
 		{
-			return map[hash].y;
+			const sbtPosition& pos = map.at(hash);
+			return pos.y;
 		}
 		else
 		{
@@ -600,18 +602,19 @@ namespace vtx::optix
 		//VTX_ASSERT_CONTINUE(logSize <= 1, log);
 		OPTIX_CHECK(result);
 
+		// We do it here to avoid infinite loop where getPipeline() calls createPipeline() which calls getPipeline()...
+		isDirty = false;
 		computeStackSize();
 
 		for(auto& [sbtName, sbtPipe] : sbtPipelines)
 		{
 			sbtPipe.initSbtMap();
 		}
-		isDirty = false;
 	}
 
 	const OptixPipeline& PipelineOptix::getPipeline()
 	{
-		if (!pipeline)
+		if (!pipeline || isDirty)
 		{
 			createPipeline();
 		}
@@ -647,8 +650,8 @@ namespace vtx::optix
 		const auto result = optixLaunch(/*! pipeline we're launching launch: */
 			pipeline, state.stream,
 			/*! parameters and SBT */
-			UPLOAD_BUFFERS->launchParamsBuffer.dPointer(),
-			UPLOAD_BUFFERS->launchParamsBuffer.bytesSize(),
+			onDeviceData->launchParamsData.getDevicePtr(),
+			onDeviceData->launchParamsData.imageBuffer.bytesSize(),
 			&sbt,
 			/*! dimensions of the launch: */
 			launchDimension.x,
@@ -783,7 +786,9 @@ namespace vtx::optix
 		return optixInstance;
 	}
 
-	OptixTraversableHandle createInstanceAcceleration(const std::vector<OptixInstance>& optixInstances)
+	static CUDABuffer IASBuffer;
+
+	OptixTraversableHandle createInstanceAcceleration(const std::vector<OptixInstance>& optixInstances, OptixTraversableHandle& topTraversable)
 	{
 		//CUDA_SYNC_CHECK();
 		VTX_INFO("Optix Wrapper: Computing TLAS");
@@ -806,9 +811,17 @@ namespace vtx::optix
 
 		OptixAccelBuildOptions accelBuildOptions = {};
 
-		accelBuildOptions.buildFlags = OPTIX_BUILD_FLAG_NONE;
+		accelBuildOptions.buildFlags = OPTIX_BUILD_FLAG_ALLOW_UPDATE;
 		accelBuildOptions.buildFlags |= OPTIX_BUILD_FLAG_PREFER_FAST_TRACE;
-		accelBuildOptions.operation = OPTIX_BUILD_OPERATION_BUILD;
+
+		if (topTraversable == 0) {
+			VTX_INFO("Optix Wrapper: Building TLAS");
+			accelBuildOptions.operation = OPTIX_BUILD_OPERATION_BUILD;
+		}
+		else {
+			VTX_INFO("Optix Wrapper: Updating TLAS");
+			accelBuildOptions.operation = OPTIX_BUILD_OPERATION_UPDATE;
+		}
 
 
 		OptixAccelBufferSizes accelBufferSizes;
@@ -822,10 +835,7 @@ namespace vtx::optix
 		CUDABuffer tempBuffer;
 		tempBuffer.alloc(accelBufferSizes.tempSizeInBytes);
 
-		CUDABuffer IAS;
-		IAS.alloc(accelBufferSizes.outputSizeInBytes);
-
-		OptixTraversableHandle TopTraversable;
+		IASBuffer.resize(accelBufferSizes.outputSizeInBytes);
 
 		OPTIX_CHECK(optixAccelBuild(optixContext,
 									stream,
@@ -834,9 +844,9 @@ namespace vtx::optix
 									1,
 									tempBuffer.dPointer(),
 									tempBuffer.bytesSize(),
-									IAS.dPointer(),
-									IAS.bytesSize(),
-									&TopTraversable,
+									IASBuffer.dPointer(),
+									IASBuffer.bytesSize(),
+									&topTraversable,
 									nullptr, 0));
 
 		CUDA_SYNC_CHECK();
@@ -845,7 +855,7 @@ namespace vtx::optix
 		tempBuffer.free();
 		instancesBuffer.free();
 
-		return TopTraversable;
+		return topTraversable;
 	}
 }
 

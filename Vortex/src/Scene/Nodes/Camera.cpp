@@ -21,6 +21,13 @@ namespace vtx::graph
 		zoomSensibility(0.1f)
 	{
 		transform = ops::createNode<Transform>();
+		state.updateOnDevice= true;
+		typeID = SIM::get()->getTypeId<Camera>();
+	}
+
+	Camera::~Camera()
+	{
+		SIM::get()->releaseTypeId<Camera>(typeID);
 	}
 
 	void Camera::updateDirections() {
@@ -47,7 +54,7 @@ namespace vtx::graph
 		resolution.x = width;
 		resolution.y = height;
 		aspect = static_cast<float>(width) / static_cast<float>(height);
-		isUpdated = true;
+		state.updateOnDevice= true;
 	}
 
 	void Camera::onUpdate(const float ts) {
@@ -55,7 +62,7 @@ namespace vtx::graph
 		{
 			return;
 		}
-		math::vec2f lastMousePosition = mousePosition;
+		const math::vec2f lastMousePosition = mousePosition;
 		mousePosition = Input::GetMousePosition();
 		mouseDelta = (mousePosition - lastMousePosition);
 		//VTX_INFO("Mouse Delta: {0}, {1}", mouseDelta.x, mouseDelta.y);
@@ -69,7 +76,7 @@ namespace vtx::graph
 		if (Input::IsMouseButtonDown(MouseButton::Middle) && navigationActive)
 		{
 			if (navigationActive && !(delta.x == 0.0f && delta.y == 0.0f)) {
-				isUpdated = true;
+				state.updateOnDevice= true;
 				if (Input::IsKeyDown(KeyCode::LeftShift) || Input::IsKeyDown(KeyCode::RightShift)) {
 					navigationMode = NAV_PAN;
 				}
@@ -83,7 +90,7 @@ namespace vtx::graph
 		}
 		else if (Input::MouseWheel() != 0.0f && navigationActive)
 		{
-			isUpdated = true;
+			state.updateOnDevice= true;
 			if (Input::IsKeyDown(KeyCode::LeftAlt) || Input::IsKeyDown(KeyCode::RightAlt))
 			{
 				navigationMode = NAV_FOV;
@@ -142,8 +149,47 @@ namespace vtx::graph
 		return { transform };
 	}
 
+	const math::vec2f Camera::project(const math::vec3f& worldPosition, bool flipY) const
+	{
+		const float       cameraSpaceX        = math::dot(horizontal, worldPosition - position);
+		const float       cameraSpaceY        = math::dot(vertical, worldPosition - position);
+		const float       cameraSpaceZ        = math::dot(direction, worldPosition - position);
+		const math::vec3f cameraSpacePosition = math::vec3f(cameraSpaceX, cameraSpaceY, cameraSpaceZ);
+		//const math::vec3f cameraSpacePosition = math::transformVector3F(transform->rcpAffineTransform, worldPosition);
+		const float tanFovY = tanf((fovY*M_PI )/ (180.0f*2.0f));
+		const float ndcX    = cameraSpaceX / (cameraSpaceZ * tanFovY * aspect);
+		const float ndcY    = cameraSpaceY / (cameraSpaceZ * tanFovY);
+		// Transform to screen coordinates
+		const float screenX = (ndcX + 1.0f) * 0.5f * (float)resolution.x;
+		float screenY = (ndcY + 1.0f) * 0.5f * (float)resolution.y;
+		if(flipY)
+		{
+			screenY = (float)resolution.y - screenY;
+		}
+
+		return math::vec2f{ screenX, screenY };
+
+	}
+
+	const math::vec3f Camera::projectPixelAtPointDepth(const math::vec2f& pixel, const math::vec3f& worldPoint) const
+	{
+		const float cameraSpaceZ = math::dot(direction, worldPoint - position);
+
+		const float       tanFovY      = tanf((fovY * M_PI) / (180.0f * 2.0f));
+		const math::vec2f ndc          = (pixel / math::vec2f((float)resolution.x,(float)resolution.y)) * 2.0f - 1.0f;
+		const float       cameraSpaceX = ndc.x * (cameraSpaceZ * tanFovY * aspect);
+		const float       cameraSpaceY = ndc.y * (cameraSpaceZ * tanFovY);
+
+		const math::vec3f worldProjection = position + horizontal * cameraSpaceX + vertical * cameraSpaceY + direction * cameraSpaceZ;
+
+		return worldProjection;
+
+	}
+
 	void Camera::accept(NodeVisitor& visitor)
 	{
 		visitor.visit(as<Camera>());
 	}
 }
+
+

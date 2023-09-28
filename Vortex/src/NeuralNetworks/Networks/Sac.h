@@ -101,10 +101,10 @@ namespace vtx::network
         void train() override {
             const std::pair<cudaEvent_t, cudaEvent_t> events = GetProfilerEvents(eventNames[N_TRAIN]);
             cudaEventRecord(events.first);
-            const auto deviceParams = UPLOAD_BUFFERS->launchParamsBuffer.castedPointer<LaunchParams>();
+            LaunchParams* deviceParams = onDeviceData->launchParamsData.getDeviceImage();
             shuffleDataset(deviceParams);
 
-			const device::Buffers::ReplayBufferBuffers& buffers = UPLOAD_BUFFERS->networkInterfaceBuffer.replayBufferBuffers;
+			const device::ReplayBufferBuffers& buffers = onDeviceData->networkInterfaceData.resourceBuffers.replayBufferBuffers;
 
             const auto actionPtr = buffers.actionBuffer.castedPointer<float>();
             const auto rewardPtr = buffers.rewardBuffer.castedPointer<float>();
@@ -133,7 +133,7 @@ namespace vtx::network
 
         void inference(const int& depth) override {
 
-            device::Buffers::InferenceBuffers& buffers = UPLOAD_BUFFERS->networkInterfaceBuffer.inferenceBuffers;
+            device::InferenceBuffers& buffers = onDeviceData->networkInterfaceData.resourceBuffers.inferenceBuffers;
             CUDABuffer inferenceSizeBuffers = buffers.inferenceSize;
             int inferenceSize;
             inferenceSizeBuffers.download(&inferenceSize);

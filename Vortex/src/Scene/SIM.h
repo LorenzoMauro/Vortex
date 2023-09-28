@@ -1,9 +1,11 @@
 #pragma once
 #include <map>
 #include <set>
+#include <typeindex>
 
 #include "Node.h"
 #include "Core/Log.h"
+#include "Core/Math.h"
 
 namespace vtx::graph
 {
@@ -13,22 +15,58 @@ namespace vtx::graph
 		SIM();
 		static std::shared_ptr<SIM> get();
 
-		vtxID getFreeIndex();
+		vtxID getUID();
 
-		void releaseIndex(vtxID id);
+
+		template<typename T>
+		vtxID getTypeId()
+		{
+			// No free indices for this type, create a new one
+			const auto typeIndex = std::type_index(typeid(T));
+			if (freeTID.find(typeIndex) == freeTID.end() || freeTID[std::type_index(typeid(T))].empty())
+			{
+				if (nextTID.find(typeIndex) == nextTID.end())
+				{
+					nextTID[typeIndex] = 1;
+				}
+				return nextTID[typeIndex]++;
+			}
+
+			const auto it = freeTID[typeIndex].begin();
+			const vtxID idx = *it;
+			freeTID[typeIndex].erase(it);
+			return idx;
+		}
+
+		void releaseUID(vtxID id);
+
+		template<typename T>
+		void releaseTypeId(const vtxID id)
+		{
+
+			const auto typeIndex = std::type_index(typeid(T));
+			if (id + 1 == nextTID[typeIndex])
+			{
+				--nextTID[typeIndex];
+			}
+			else
+			{
+				freeTID[typeIndex].insert(id);
+			}
+		}
 
 		void record(const std::shared_ptr<Node>& node);
 
 		std::shared_ptr<Node> operator[](const vtxID id) {
-			const auto it = nodesById.find(id);
-			if (it == nodesById.end()) {
-				VTX_WARN("The requested Node Id either doesn't exist or has not been registered!");
+			const auto it = nodesByUID.find(id);
+			if (it == nodesByUID.end()) {
+				//VTX_WARN("The requested Node Id either doesn't exist or has not been registered!");
 				return nullptr;
 			}
 
 			std::shared_ptr<Node> node = it->second.lock();
 			if (!node) {
-				VTX_WARN("The requested Node Id has been deleted, removing references!");
+				//VTX_WARN("The requested Node Id has been deleted, removing references!");
 				removeNodeReference(id);
 			}
 			return node;
@@ -80,14 +118,30 @@ namespace vtx::graph
 			return nodesByType[nodeType];
 		}
 
-		vtxID														nextIndex = 1; // Index Zero is reserved for Invalid Index, maybe I can use invalid unsigned
-		std::set<vtxID>												freeIndices;
+		std::vector<math::vec2ui> getDeletedNodesByType(const NodeType nodeType);
+
+		void cleanDeletedNodesByType(const NodeType nodeType);
+
+		vtxID UIDfromTID(const NodeType nodeType, const vtxID UID);
+
+		vtxID TIDfromUID(const vtxID typeID);
+
+		NodeType nodeTypeFromUID(const vtxID id);
+
+	private:
+		vtxID														nextUID = 1; // Index Zero is reserved for Invalid Index, maybe I can use invalid unsigned
+		std::set<vtxID>												freeUID;
 
 		// Currently the use of weak_ptr allows for the automatic removal of nodes which are not reference by any other node
 		// However we can revert to shared_ptr if we want to keep the nodes alive even if they are not referenced by any other node have them be removed manually
-		std::map<vtxID, std::weak_ptr<Node>>						nodesById; 
+		std::map<vtxID, std::weak_ptr<Node>>						nodesByUID; 
 		std::map<NodeType, std::vector<vtxID>>						nodesByType;
-		std::map<vtxID, NodeType>									idToType;
+		std::map<vtxID, NodeType>									UIDtoNodeType;
+		std::map<std::type_index, std::set<vtxID>>					freeTID;
+		std::map<std::type_index, vtxID>							nextTID;
+		std::map<NodeType, std::vector<math::vec2ui>>				deletedNodes;
+		std::map<vtxID,vtxID>										UIDtoTID;
+		std::map<NodeType, std::map<vtxID, vtxID>>					TIDtoUID;
 	};
 
 }

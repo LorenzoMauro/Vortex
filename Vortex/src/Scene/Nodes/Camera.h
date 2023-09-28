@@ -23,6 +23,7 @@ namespace vtx::graph
 	public:
 		Camera();
 
+		~Camera() override;
 		void updateDirections();
 
 		void resize(const uint32_t width, const uint32_t height);
@@ -32,6 +33,10 @@ namespace vtx::graph
 		void orbitNavigation(const float ts);
 
 		std::vector<std::shared_ptr<Node>> getChildren() const override;
+
+		const math::vec2f project(const math::vec3f& worldPosition, bool flipY = false) const;
+
+		const math::vec3f Camera::projectPixelAtPointDepth(const math::vec2f& pixel, const math::vec3f& worldPoint) const;
 
 	protected:
 		void accept(NodeVisitor& visitor) override;

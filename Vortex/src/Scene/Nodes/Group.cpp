@@ -8,6 +8,12 @@ namespace vtx::graph
 	Group::Group() : Node(NT_GROUP)
 	{
 		transform = ops::createNode<Transform>();
+		typeID = SIM::get()->getTypeId<Group>();
+	}
+
+	Group::~Group()
+	{
+		SIM::get()->releaseTypeId<Group>(typeID);
 	}
 
 	std::vector<std::shared_ptr<Node>> Group::getChildren() const

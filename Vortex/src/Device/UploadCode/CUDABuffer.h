@@ -45,6 +45,21 @@ namespace vtx {
             return castedPointer<T>();
         }
 
+        template<typename T>
+        __host__ T* uploadAtPtr(const T& uploadData, T* ptr)
+        {
+	        const size_t dataSize = sizeof(T);
+            const char* endOfData = (char*)ptr + dataSize;
+            const char* allocationEnd = (char*)d_ptr + sizeInBytes;
+            if (endOfData > allocationEnd)
+            {
+				VTX_ERROR("CudaBuffer: trying to upload data at a pointer that is not inside the allocated memory");
+                return nullptr;
+			}
+			CUDA_CHECK(cudaMemcpy((void*)ptr, &uploadData, dataSize, cudaMemcpyHostToDevice));
+			return ptr;
+		}
+
         /*upload a std::vector type, the function takes care of eventual resizing and allocation*/
         template<typename T>
         __host__ T* upload(const std::vector<T>& uploadVector)

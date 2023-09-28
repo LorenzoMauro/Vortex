@@ -10,11 +10,11 @@ namespace vtx
 	void device::Buffers::shutDown()
 	{
 		VTX_INFO("Shutting Down Buffers");
-		frameIdBuffer.free();
-		launchParamsBuffer.free();
-		rendererSettingsBuffer.free();
-		sbtProgramIdxBuffer.free();
-		instancesBuffer.free();
-		toneMapperSettingsBuffer.free();
+		//frameIdBuffer.free();
+		//launchParamsBuffer.free();
+		//rendererSettingsBuffer.free();
+		//sbtProgramIdxBuffer.free();
+		//instancesBuffer.free();
+		//toneMapperSettingsBuffer.free();
 	}
 }

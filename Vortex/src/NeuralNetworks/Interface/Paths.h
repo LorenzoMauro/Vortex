@@ -6,6 +6,11 @@
 #include "NeuralNetworks/NetworkSettings.h"
 
 namespace vtx {
+	namespace device
+	{
+		struct PathsBuffer;
+	}
+
 	struct Hit
 	{
 		math::vec3f position;
@@ -64,13 +69,13 @@ namespace vtx {
 
 	struct Paths
 	{
-		static Paths* upload(const int& _maxDepth, const int& _numberOfPixels);
+		static Paths* upload(device::PathsBuffer& buffers, const int& _maxDepth, const int& _numberOfPixels);
 
-		static Paths* getPreviouslyUploaded();
+		static Paths* getPreviouslyUploaded(const device::PathsBuffer& buffers);
 
 
 	private:
-		Paths(const int& _maxDepth, const int& _numberOfPixels);
+		Paths(device::PathsBuffer& buffers, const int& _maxDepth, const int& _numberOfPixels);
 
 	public:
 

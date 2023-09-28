@@ -8,7 +8,6 @@
 #include "NeuralNetworks/Experiment.h"
 #include "Scene/Scene.h"
 #include "Scene/Nodes/EnvironmentLight.h"
-#include "Scene/Nodes/Light.h"
 #include "Scene/Nodes/Renderer.h"
 #include "Scene/Utility/ModelLoader.h"
 #include "Scene/Utility/Operations.h"

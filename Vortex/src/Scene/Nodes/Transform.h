@@ -8,16 +8,21 @@ namespace vtx::graph
 	public:
 		Transform();
 
+		 ~Transform() override;
+
 		math::vec3f transformVector(const math::vec3f& vector);
 
 		math::vec3f transformNormal(const math::vec3f& vector);
 
 		math::vec3f transformPoint(const math::vec3f& vector);
 
+		void applyLocalTransform(const math::affine3f& transform);
+		void applyGlobalSpaceTransform(const math::affine3f& transform);
+
 		void setAffine(const math::affine3f& affine);
 
 		/* Scale utility given float */
-		void scale(float scale);
+		void scale(const math::vec3f& scale);
 
 		/* Translation utility given vector */
 		void translate(const math::vec3f& translation);
@@ -55,8 +60,11 @@ namespace vtx::graph
 		math::vec3f scaleVector{ 1.0f };
 		math::vec3f translation{ 0.0f };
 		math::vec3f eulerAngles{ 0.0f };
+		math::affine3f rcpAffineTransform = math::affine3f(math::Identity);
 		math::affine3f affineTransform = math::affine3f(math::Identity);
 		math::affine3f globalTransform = math::affine3f(math::Identity);
+		math::affine3f parentGlobalTransform = math::affine3f(math::Identity);
+		math::affine3f reciprocalParentGlobalTransform = math::affine3f(math::Identity);
 
 	};
 }

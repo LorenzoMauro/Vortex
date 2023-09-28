@@ -4,7 +4,7 @@
 #include "../rendererFunctions.h"
 #include "Device/OptixWrapper.h"
 #include "Device/UploadCode/UploadBuffers.h"
-#include "Device/UploadCode/UploadData.h"
+#include "Device/UploadCode/DeviceDataCoordinator.h"
 #include "Device/Wrappers/KernelLaunch.h"
 #include "Device/Wrappers/KernelTimings.h"
 #include "MDL/CudaLinker.h"
@@ -15,9 +15,9 @@ namespace vtx
 	
 	void WaveFrontIntegrator::render()
 	{
-		hostParams = &UPLOAD_DATA->launchParams;
-		deviceParams = UPLOAD_BUFFERS->launchParamsBuffer.castedPointer<LaunchParams>();
-		maxTraceQueueSize = UPLOAD_DATA->frameBufferData.frameSize.x * UPLOAD_DATA->frameBufferData.frameSize.y;
+		hostParams = &onDeviceData->launchParamsData.getHostImage();
+		deviceParams = onDeviceData->launchParamsData.getDeviceImage();
+		maxTraceQueueSize = hostParams->frameBuffer.frameSize.x * hostParams->frameBuffer.frameSize.y;
 
 		generatePixelQueue();
 
@@ -46,7 +46,7 @@ namespace vtx
 			const std::pair<cudaEvent_t, cudaEvent_t> events = GetProfilerEvents(eventNames[K_RETRIEVE_QUEUE_SIZE]);
 			
 			cudaEventRecord(events.first, nullptr);
-			UPLOAD_BUFFERS->workQueueBuffers.countersBuffer.download(&deviceCountersPointers);
+			onDeviceData->workQueuesData.resourceBuffers.countersBuffer.download(&deviceCountersPointers);
 			cudaEventRecord(events.second, nullptr);
 			CUDA_SYNC_CHECK();
 		}

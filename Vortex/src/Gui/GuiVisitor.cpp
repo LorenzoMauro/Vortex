@@ -11,7 +11,7 @@ namespace vtx::gui
 		const std::vector<std::shared_ptr<graph::Node>> children = node->getChildren();
 		if (!children.empty())
 		{
-			ImGui::PushID(node->getID());
+			ImGui::PushID(node->getUID());
 			if (ImGui::CollapsingHeader("Node Children"))
 			{
 				ImGui::Indent();
@@ -59,7 +59,7 @@ namespace vtx::gui
 
 		if (!children.empty())
 		{
-			ImGui::PushID(node->getID());
+			ImGui::PushID(node->getUID());
 			if (ImGui::CollapsingHeader("Node Children"))
 			{
 				ImGui::Indent();
@@ -73,12 +73,6 @@ namespace vtx::gui
 				ImGui::Unindent();
 			}
 			ImGui::PopID();
-		}
-
-		if(changed)
-		{
-			node->isUpdated = true;
-			ops::restartRender();
 		}
 	}
 

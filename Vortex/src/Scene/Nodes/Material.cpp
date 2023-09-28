@@ -11,12 +11,20 @@
 
 namespace vtx::graph
 {
+	Material::Material() : Node(NT_MATERIAL)
+	{
+		typeID = SIM::get()->getTypeId<Material>();
+	}
+	Material::~Material()
+	{
+		SIM::get()->releaseTypeId<Material>(typeID);
+	}
 	void Material::init()
 	{
 		mdl::compileMaterial(materialGraph->name, getMaterialDbName());
 
 		config = mdl::determineShaderConfiguration(getMaterialDbName());
-		targetCode = mdl::createTargetCode(getMaterialDbName(), config, getID());
+		targetCode = mdl::createTargetCode(getMaterialDbName(), config, getUID());
 
 		mdl::getMdlCudaLinker().submitTargetCode(targetCode, name);
 
@@ -27,8 +35,8 @@ namespace vtx::graph
 
 		dispatchParameters(mdl::getArgumentBlockData(getMaterialDbName(), materialGraph->functionInfo.signature, targetCode, argBlock, mapEnumTypes));
 
-		isUpdated = true;
-		isInitialized = true;
+		state.updateOnDevice = true;
+		state.isInitialized = true;
 	}
 
 	void Material::dispatchParameters(std::vector<shader::ParameterInfo> params)
@@ -79,7 +87,7 @@ namespace vtx::graph
 		if(materialDbName.empty())
 		{
 			name = materialGraph->name;
-			materialDbName = "compiledMaterial_" + name + "_" + std::to_string(getID());
+			materialDbName = "compiledMaterial_" + name + "_" + std::to_string(getUID());
 
 		}
 		return materialDbName;
@@ -87,7 +95,7 @@ namespace vtx::graph
 
 	FunctionNames& Material::getFunctionNames(const bool cuda)
 	{
-		const std::string suffix = std::to_string(getID());
+		const std::string suffix = std::to_string(getUID());
 		fNames                   = FunctionNames(suffix, cuda);
 
 		return fNames;
@@ -175,10 +183,10 @@ namespace vtx::graph
 	{
 		const auto module = std::make_shared<optix::ModuleOptix>();
 		module->name = name;
-		module->code = utl::replaceFunctionNameInPTX(targetCode->get_code(), "__replace__EvaluateMaterial", "unused_" + std::to_string(getID())); ;
+		module->code = utl::replaceFunctionNameInPTX(targetCode->get_code(), "__replace__EvaluateMaterial", "unused_" + std::to_string(getUID())); ;
 		if (getOptions()->mdlCallType == MDL_DIRECT_CALL)
 		{
-			const auto fNames = graph::FunctionNames(std::to_string(getID()));
+			const auto fNames = graph::FunctionNames(std::to_string(getUID()));
 
 			devicePrograms.pgInit = optix::createDcProgram(module, fNames.init);
 
@@ -299,14 +307,14 @@ namespace vtx::graph
 		}
 		else if(getOptions()->mdlCallType== MDL_INLINE || getOptions()->mdlCallType == MDL_CUDA)
 		{
-			devicePrograms.pgEvaluateMaterial = optix::createDcProgram(module, "__direct_callable__EvaluateMaterial", getID(), {"Default", "wfShade", "wfRadianceTrace"});
+			devicePrograms.pgEvaluateMaterial = optix::createDcProgram(module, "__direct_callable__EvaluateMaterial", getUID(), {"Default", "wfShade", "wfRadianceTrace"});
 			mdl::getMdlCudaLinker().submitTargetCode(targetCode, name);
 		}
 	}
 
 	const Configuration& Material::getConfiguration()
 	{
-		if (!isInitialized)
+		if (!state.isInitialized)
 		{
 			init();
 		}
@@ -316,7 +324,7 @@ namespace vtx::graph
 
 	const DevicePrograms& Material::getPrograms()
 	{
-		if (!isInitialized)
+		if (!state.isInitialized)
 		{
 			init();
 		}
@@ -326,7 +334,7 @@ namespace vtx::graph
 
 	std::vector<std::shared_ptr<graph::Texture>>  Material::getTextures()
 	{
-		if (!isInitialized)
+		if (!state.isInitialized)
 		{
 			init();
 		}
@@ -335,7 +343,7 @@ namespace vtx::graph
 
 	std::vector<std::shared_ptr<graph::BsdfMeasurement>> Material::getBsdfs()
 	{
-		if (!isInitialized)
+		if (!state.isInitialized)
 		{
 			init();
 		}
@@ -344,7 +352,7 @@ namespace vtx::graph
 
 	std::vector<std::shared_ptr<graph::LightProfile>> Material::getLightProfiles()
 	{
-		if (!isInitialized)
+		if (!state.isInitialized)
 		{
 			init();
 		}
@@ -361,7 +369,7 @@ namespace vtx::graph
 
 	bool Material::useEmission()
 	{
-		if (!isInitialized)
+		if (!state.isInitialized)
 		{
 			init();
 		}
@@ -403,7 +411,7 @@ namespace vtx::graph
 
 	bool Material::useOpacity()
 	{
-		if (!isInitialized)
+		if (!state.isInitialized)
 		{
 			init();
 		}
@@ -420,7 +428,7 @@ namespace vtx::graph
 
 	void processMaterial(std::shared_ptr<Material>& material)
 	{
-		if (!material->isInitialized)
+		if (!material->state.isInitialized)
 		{
 			mdl::ShaderVisitor visitor;
 			material->materialGraph->traverse(visitor);
@@ -428,7 +436,7 @@ namespace vtx::graph
 			material->config = mdl::determineShaderConfiguration(material->getMaterialDbName());
 
 			Handle<ILink_unit> linkUnit;
-			mdl::addMaterialToLinkUnit(material->getMaterialDbName(), material->config, material->getID(), linkUnit);
+			mdl::addMaterialToLinkUnit(material->getMaterialDbName(), material->config, material->getUID(), linkUnit);
 			VTX_INFO("Creating target code for shader {}", material->getMaterialDbName());
 			Handle<ITarget_code const> targetCode = mdl::generateTargetCode(linkUnit);
 
@@ -438,9 +446,8 @@ namespace vtx::graph
 			material->targetCode = targetCode;
 			material->createPrograms();
 			material->dispatchParameters(mdl::getArgumentBlockData(material->getMaterialDbName(), material->materialGraph->functionInfo.signature, material->targetCode, material->argBlock, material->mapEnumTypes, 0));
-			material->isInitialized = true;
-			material->isUpdated = true;
-
+			material->state.isInitialized = true;
+			material->state.updateOnDevice= true;
 		}
 	}
 

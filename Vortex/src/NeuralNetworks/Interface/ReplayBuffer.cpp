@@ -4,25 +4,24 @@
 
 namespace vtx
 {
-	ReplayBuffer* ReplayBuffer::upload(const int& maxReplayBufferSize)
+	ReplayBuffer* ReplayBuffer::upload(device::ReplayBufferBuffers& buffers, const int& maxReplayBufferSize)
 	{
-		const ReplayBuffer replayBuffer(maxReplayBufferSize);
-		return UPLOAD_BUFFERS->networkInterfaceBuffer.replayBufferBuffers.replayBufferStructBuffer.upload(replayBuffer);
+		const ReplayBuffer replayBuffer(buffers, maxReplayBufferSize);
+		return buffers.replayBufferStructBuffer.upload(replayBuffer);
 	}
 
-	ReplayBuffer* ReplayBuffer::getPreviouslyUploaded()
+	ReplayBuffer* ReplayBuffer::getPreviouslyUploaded(const device::ReplayBufferBuffers& buffers)
 	{
-		return UPLOAD_BUFFERS->networkInterfaceBuffer.replayBufferBuffers.replayBufferStructBuffer.castedPointer<ReplayBuffer>();
+		return buffers.replayBufferStructBuffer.castedPointer<ReplayBuffer>();
 	}
 
-	ReplayBuffer::ReplayBuffer(const int& maxReplayBufferSize)
+	ReplayBuffer::ReplayBuffer(device::ReplayBufferBuffers& buffers, const int& maxReplayBufferSize)
 	{
-		device::Buffers::ReplayBufferBuffers& replayBufferBuffers = UPLOAD_BUFFERS->networkInterfaceBuffer.replayBufferBuffers;
-		action = replayBufferBuffers.actionBuffer.alloc<math::vec3f>(maxReplayBufferSize);
-		reward = replayBufferBuffers.rewardBuffer.alloc<float>(maxReplayBufferSize);
-		doneSignal = replayBufferBuffers.doneBuffer.alloc<int>(maxReplayBufferSize);
-		state = NetworkInput::upload(maxReplayBufferSize, replayBufferBuffers.stateBuffer);
-		nextState = NetworkInput::upload(maxReplayBufferSize, replayBufferBuffers.nextStatesBuffer);
+		action = buffers.actionBuffer.alloc<math::vec3f>(maxReplayBufferSize);
+		reward = buffers.rewardBuffer.alloc<float>(maxReplayBufferSize);
+		doneSignal = buffers.doneBuffer.alloc<int>(maxReplayBufferSize);
+		state = NetworkInput::upload(maxReplayBufferSize, buffers.stateBuffer);
+		nextState = NetworkInput::upload(maxReplayBufferSize, buffers.nextStatesBuffer);
 		nAlloc = maxReplayBufferSize;
 	}
 }

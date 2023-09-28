@@ -28,7 +28,7 @@ namespace vtx::network
 		inputPrepared = false;
 	}
 
-	void InputComposer::setFromBuffer(const device::Buffers::NetworkInputBuffers& inputBuffer, const int inputCount, const int startIdx)
+	void InputComposer::setFromBuffer(const device::NetworkInputBuffers& inputBuffer, const int inputCount, const int startIdx)
 	{
 		const auto positionPtr = inputBuffer.positionBuffer.castedPointer<float>();
 		const auto woPtr = inputBuffer.woBuffer.castedPointer<float>();

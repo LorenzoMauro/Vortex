@@ -147,7 +147,7 @@ namespace vtx::gui
         const std::string title = (utl::splitString(functionSignature, "::")).back();
         bool isTitleHeaderOpen = false;
 
-        ImGui::PushID(shaderNode->getID());
+        ImGui::PushID(shaderNode->getUID());
         if (isNodeEditor)
         {
             ImNodes::BeginNodeTitleBar();
@@ -162,9 +162,9 @@ namespace vtx::gui
         if (isNodeEditor || isTitleHeaderOpen)
         {
             vtxImGui::halfSpaceWidget("Function Signature", vtxImGui::clippedText, functionSignature.c_str());
-            vtxImGui::halfSpaceWidget("Node Id:", vtxImGui::clippedText, std::to_string(shaderNode->getID()).c_str());
+            vtxImGui::halfSpaceWidget("Node Id:", vtxImGui::clippedText, std::to_string(shaderNode->getUID()).c_str());
 
-            isNodeEditor ? ImNodes::BeginOutputAttribute(shaderNode->getID()) : 0;
+            isNodeEditor ? ImNodes::BeginOutputAttribute(shaderNode->getUID()) : 0;
             vtxImGui::halfSpaceWidget("Output Type", vtxImGui::clippedText, shaderNode->outputSocket.parameterInfo.annotation.displayName.c_str());
             isNodeEditor ? ImNodes::EndOutputAttribute() : 0;
 
@@ -206,6 +206,11 @@ namespace vtx::gui
 
         }
         ImGui::PopID();
+
+        if(changed)
+        {
+	        shaderNode->state.isShaderArgBlockUpdated = true;
+        }
 
         return changed;
 	}

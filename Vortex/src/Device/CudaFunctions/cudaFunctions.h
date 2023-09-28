@@ -16,22 +16,15 @@ namespace vtx::cuda
 		const float scale
 	);
 
-	float* selectionEdge(
-		float* d_data,
-		int    width,
-		int    height,
-		float  value,
-		int    thickness
-	);
-
 	void overlaySelectionEdge(
 		float* gBuffer,
 		math::vec4f* outputImage,
 		int    width,
 		int    height,
-		float value,
+		std::vector<float> selectedIds,
 		const float curvature,
 		const float scale,
-		CUDABuffer* cudaBuffer = nullptr
+		CUDABuffer* edgeMapBuffer = nullptr,
+		CUDABuffer* valuesBuffer = nullptr
 	);
 }

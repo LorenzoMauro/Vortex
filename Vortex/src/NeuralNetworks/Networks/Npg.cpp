@@ -1,5 +1,6 @@
 #include "Npg.h"
 #include "InputComposer.h"
+#include "Device/UploadCode/DeviceDataCoordinator.h"
 #include "Device/Wrappers/KernelTimings.h"
 #include "NeuralNetworks/tools.h"
 #include "NeuralNetworks/Distributions/Mixture.h"
@@ -34,11 +35,11 @@ namespace vtx::network
         }
         const std::pair<cudaEvent_t, cudaEvent_t> events = GetProfilerEvents(eventNames[N_TRAIN]);
         cudaEventRecord(events.first);
-        const auto deviceParams = UPLOAD_BUFFERS->launchParamsBuffer.castedPointer<LaunchParams>();
+        LaunchParams* deviceParams = onDeviceData->launchParamsData.getDeviceImage();
 
         shuffleDataset(deviceParams);
 
-        const device::Buffers::NpgTrainingDataBuffers& buffers = UPLOAD_BUFFERS->networkInterfaceBuffer.npgTrainingDataBuffers;
+        const device::NpgTrainingDataBuffers& buffers = onDeviceData->networkInterfaceData.resourceBuffers.npgTrainingDataBuffers;
 
         const auto incomingDirectionPtr = buffers.incomingDirectionBuffer.castedPointer<float>();
         const auto bsdfPdfPtr = buffers.bsdfProbabilitiesBuffer.castedPointer<float>();
@@ -69,7 +70,7 @@ namespace vtx::network
     }
 
     void Npg::inference(const int& depth) {
-        device::Buffers::InferenceBuffers& buffers = UPLOAD_BUFFERS->networkInterfaceBuffer.inferenceBuffers;
+        device::InferenceBuffers& buffers = onDeviceData->networkInterfaceData.resourceBuffers.inferenceBuffers;
         CUDABuffer inferenceSizeBuffers = buffers.inferenceSize;
         int inferenceSize;
         inferenceSizeBuffers.download(&inferenceSize);

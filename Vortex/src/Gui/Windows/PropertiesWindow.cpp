@@ -13,24 +13,21 @@ namespace vtx
 
 	void PropertiesWindow::mainContent()
 	{
-		bool areNodesSelected = false;
-		if(!windowManager->selectedNodes.empty())
+		bool                     areNodesSelected = false;
+		if(const std::set<vtxID> selected = graph::Scene::getScene()->getSelected(); !selected.empty())
 		{
-			for(auto [key, nodes]: windowManager->selectedNodes)
+			areNodesSelected = true;
+			for (const vtxID idx : selected)
 			{
-				for (const int idx : nodes)
+				if (idx != 0)
 				{
-					if(idx != 0)
+					areNodesSelected = true;
+					const vtxID nodeId = idx;
+					if (const std::shared_ptr<graph::Node>& node = graph::SIM::get()->getNode<graph::Node>(nodeId))
 					{
-						areNodesSelected = true;
-						const vtxID nodeId = idx;
-						const std::shared_ptr<graph::Node>& node = graph::SIM::get()->getNode<graph::Node>(nodeId);
-						if(node)
-						{
-							ImGui::SetNextItemOpen(true, ImGuiCond_Once);
-							guiVisitor.changed = false;
-							node->accept(guiVisitor);
-						}
+						ImGui::SetNextItemOpen(true, ImGuiCond_Once);
+						guiVisitor.changed = false;
+						node->accept(guiVisitor);
 					}
 				}
 			}

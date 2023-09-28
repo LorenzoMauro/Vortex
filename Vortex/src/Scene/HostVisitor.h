@@ -5,7 +5,9 @@ namespace vtx
 {
 	class HostVisitor : public NodeVisitor {
 	public:
-		HostVisitor() = default;
+		HostVisitor(){
+			collectTransforms = true;
+		};
 		void visit(const std::shared_ptr<graph::Instance>& instance) override;
 		void visit(const std::shared_ptr<graph::Transform>& transform) override;
 		void visit(const std::shared_ptr<graph::Group>& group) override;

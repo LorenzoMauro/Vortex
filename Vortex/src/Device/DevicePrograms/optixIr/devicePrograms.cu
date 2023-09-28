@@ -76,14 +76,14 @@ namespace vtx
 		cleanFrameBuffer(fbIndex, &optixLaunchParams);
 
 		const int samplesPerLaunch = getAdaptiveSampleCount(fbIndex, &optixLaunchParams);
-
+		
 		TraceWorkItem twi;
-
+		
 		for (int i = 0; i < samplesPerLaunch; i++)
 		{
-			twi.seed = tea<4>(fbIndex + i, optixLaunchParams.settings->renderer.iteration + *optixLaunchParams.frameID);
+			twi.seed = tea<4>(fbIndex + i, optixLaunchParams.settings.renderer.iteration + *optixLaunchParams.frameID);
 			generateCameraRay(fbIndex, &optixLaunchParams, twi);
-			for (int i = 0; i < optixLaunchParams.settings->renderer.maxBounces; i++)
+			for (int i = 0; i < optixLaunchParams.settings.renderer.maxBounces; i++)
 			{
 				elaborateRadianceTrace(twi, optixLaunchParams, A_FULL_OPTIX);
 				if(!twi.extendRay)

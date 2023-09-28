@@ -12,6 +12,7 @@ namespace vtx
 {
 	namespace graph
 	{
+		class Node;
 		class Camera;
 		class Group;
 		class Instance;
@@ -22,6 +23,13 @@ namespace vtx
 
 namespace vtx::importer
 {
+
+	enum class SwapType
+	{
+		None,
+		yToZ
+	};
+
     template<typename T>
     struct TextureAndValue
     {
@@ -55,13 +63,13 @@ namespace vtx::importer
     // Process materials in the aiScene
 	std::vector<std::shared_ptr<graph::Material>> processMaterials(const aiScene* scene, std::string scenePath);
 
-    void convertAssimpMeshToMeshNode(const aiMesh* aiMesh, std::shared_ptr<graph::Mesh> meshNode);
+	std::shared_ptr<graph::Mesh> convertAssimpMeshToMeshNode(const aiMesh* aiMesh, SwapType swap, float scaleFactor);
 
-    math::affine3f convertAssimpMatrix(const aiMatrix4x4& aiMatrix);
+    math::affine3f convertAssimpMatrix(const aiMatrix4x4& aiMatrix, SwapType swap, float scaleFactor);
 
-    std::shared_ptr<graph::Instance> processAssimpNode(aiMesh* node, const unsigned assimpMeshId, std::map<unsigned, vtxID>& meshMap, const std::vector<std::shared_ptr<graph::Material>>& importedMaterials);
+    std::shared_ptr<graph::Instance> processAssimpNode(aiMesh* node, const unsigned assimpMeshId, std::map<unsigned, vtxID>& meshMap, const std::vector<std::shared_ptr<graph::Material>>& importedMaterials, SwapType swap, float scaleFactor);
 
-	std::shared_ptr<graph::Group> processAssimpNode(const aiNode* node, const aiScene* scene, std::map<unsigned, vtxID>& meshMap, const std::vector<std::shared_ptr<graph::Material>>& importedMaterials);
+	std::shared_ptr<graph::Node> processAssimpNode(const aiNode* node, const aiScene* scene, std::map<unsigned, vtxID>& meshMap, const std::vector<std::shared_ptr<graph::Material>>& importedMaterials, SwapType swap, float scaleFactor);
 
 	std::tuple<std::shared_ptr<graph::Group>, std::vector<std::shared_ptr<graph::Camera>>> importSceneFile(std::string filePath);
 }

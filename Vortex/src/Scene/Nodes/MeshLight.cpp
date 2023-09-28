@@ -7,11 +7,21 @@ namespace vtx::graph
 {
 	struct FaceAttributes;
 
+	MeshLight::MeshLight() : Node(NT_MESH_LIGHT)
+	{
+		typeID = SIM::get()->getTypeId<MeshLight>();
+	}
+
+	MeshLight::~MeshLight()
+	{
+		SIM::get()->releaseTypeId<MeshLight>(typeID);
+	}
+
 	void MeshLight::init()
 	{
 		computeAreaCdf();
 		isValid = (cdfAreas.size() > 1);
-		isInitialized = true;
+		state.isInitialized = true;
 	}
 
 	std::vector<std::shared_ptr<Node>> MeshLight::getChildren() const
@@ -30,7 +40,7 @@ namespace vtx::graph
 
 	inline void MeshLight::computeAreaCdf()
 	{
-		VTX_INFO("Computing Mesh Area Light for Mesh {} with Material {}", mesh->getID(), material->getID());
+		VTX_INFO("Computing Mesh Area Light for Mesh {} with Material {}", mesh->getUID(), material->getUID());
 		const size_t numTriangles = mesh->indices.size() / 3;
 		size_t actualNumTriangles = 0;
 
@@ -97,7 +107,7 @@ namespace vtx::graph
 
 		area = areaSurface;
 
-		VTX_INFO("Fnished Computation of Mesh Area Light for Mesh {} with Material {}", mesh->getID(), material->getID());
+		VTX_INFO("Fnished Computation of Mesh Area Light for Mesh {} with Material {}", mesh->getUID(), material->getUID());
 	}
 
 }

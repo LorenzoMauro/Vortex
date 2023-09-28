@@ -1,9 +1,18 @@
 #include "Transform.h"
+#include "Scene/SIM.h"
 #include "Scene/Traversal.h"
 
 namespace vtx::graph
 {
-	Transform::Transform() : Node(NT_TRANSFORM) {}
+	Transform::Transform() : Node(NT_TRANSFORM)
+	{
+		typeID = SIM::get()->getTypeId<Transform>();
+	}
+
+	Transform::~Transform()
+	{
+		SIM::get()->releaseTypeId<Transform>(typeID);
+	}
 
 	math::vec3f Transform::transformVector(const math::vec3f& vector) {
 		return transformVector3F(affineTransform, vector);
@@ -17,6 +26,19 @@ namespace vtx::graph
 		return transformPoint3F(affineTransform, vector);
 	}
 
+	void Transform::applyLocalTransform(const math::affine3f& transform)
+	{
+		affineTransform = transform * affineTransform;
+		updateFromAffine();
+	}
+
+	void Transform::applyGlobalSpaceTransform(const math::affine3f& transform)
+	{
+		const math::affine3f newTransform = reciprocalParentGlobalTransform * transform * parentGlobalTransform * affineTransform;
+		affineTransform = newTransform;
+		updateFromAffine();
+	}
+
 	void Transform::setAffine(const math::affine3f& affine)
 	{
 		affineTransform = affine;
@@ -25,7 +47,7 @@ namespace vtx::graph
 
 	/* Translation utility given vector */
 
-	void Transform::scale(const float scale)
+	void Transform::scale(const math::vec3f& scale)
 	{
 		const math::affine3f scaleMatrix = math::affine3f::scale(scale);
 		affineTransform = scaleMatrix * affineTransform;
@@ -91,12 +113,16 @@ namespace vtx::graph
 
 	void Transform::updateFromVectors() {
 		affineTransform = math::affine3f::translate(translation) * math::AffineFromEuler<math::LinearSpace3f>(eulerAngles) * math::affine3f::scale(scaleVector);
+		rcpAffineTransform = rcp(affineTransform);
+		state.updateOnDevice = true;
 	}
 
 	/* Update the vector representation given the affine matrix*/
 
 	void Transform::updateFromAffine() {
 		math::VectorFromAffine<math::LinearSpace3f>(affineTransform, translation, scaleVector, eulerAngles);
+		rcpAffineTransform = rcp(affineTransform);
+		state.updateOnDevice = true;
 	}
 	void Transform::accept(NodeVisitor& visitor)
 	{

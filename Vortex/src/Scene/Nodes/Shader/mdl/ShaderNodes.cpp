@@ -9,7 +9,7 @@ namespace vtx::graph::shader
 	{
 		for (auto& [name, socket] : sockets)
 		{
-			SIM::get()->releaseIndex(socket.Id);
+			SIM::get()->releaseUID(socket.Id);
 		}
 	}
 
@@ -21,13 +21,13 @@ namespace vtx::graph::shader
 		generateOutputSocket();
 		defineName();
 		initializeSockets();
-		isUpdated = true;
+		state.isShaderCodeUpdated = true;
 	}
 
 	ShaderNode::ShaderNode(const NodeType cNodeType, std::string modulePath, std::string functionName, const bool isMdlPath) :
 		Node(cNodeType)
 	{
-		isUpdated = true;
+		state.isShaderCodeUpdated = true;
 		functionInfo = mdl::MdlFunctionInfo{};
 		if (!isMdlPath)
 		{
@@ -44,7 +44,7 @@ namespace vtx::graph::shader
 
 	void ShaderNode::generateOutputSocket()
 	{
-		outputSocket.Id = SIM::get()->getFreeIndex();
+		outputSocket.Id = SIM::get()->getUID();
 		outputSocket.parameterInfo.expressionKind = functionInfo.returnType->skip_all_type_aliases()->get_kind();
 		outputSocket.parameterInfo.annotation.displayName = mdl::ITypeToString[outputSocket.parameterInfo.
 			expressionKind];
@@ -56,7 +56,7 @@ namespace vtx::graph::shader
 		vtxID socketId = 1;
 		for(auto& parameter : parameters)
 		{
-			sockets[parameter.argumentName] = ShaderNodeSocket{nullptr, parameter, SIM::get()->getFreeIndex(), {} };
+			sockets[parameter.argumentName] = ShaderNodeSocket{nullptr, parameter, SIM::get()->getUID(), {} };
 			socketId++;
 			if (socketsGroupedByGroup.count(parameter.annotation.groupName) > 0)
 			{
@@ -83,7 +83,7 @@ namespace vtx::graph::shader
 			if (isSameType)
 			{
 				sockets[socketName].node = inputNode;
-				sockets[socketName].linkId = SIM::get()->getFreeIndex();
+				sockets[socketName].linkId = SIM::get()->getUID();
 			}
 		}
 	}
@@ -114,7 +114,7 @@ namespace vtx::graph::shader
 		{
 			extractedName = functionInfo.name.substr(lastColon + 2);
 		}
-		name = (extractedName + "_" + std::to_string(getID()));
+		name = (extractedName + "_" + std::to_string(getUID()));
 	}
 
 	void ShaderNode::printSocketInfos()
@@ -132,73 +132,34 @@ namespace vtx::graph::shader
 
 	void ShaderNode::init()
 	{
-		if (isUpdated)
+		if (state.isShaderCodeUpdated )
 		{
 			bool Success = mdl::generateFunctionExpression(functionInfo.signature, sockets, name); 
 			if (Success) {
 				
-					isUpdated = false; 
+					state.isShaderCodeUpdated = false; 
 			}
 		}
 	}
 
-//#define DEFINE_SHADER_NODE_TRAVERSE_CHILDREN(NODE_NAME) \
-//	void NODE_NAME::traverseChildren(NodeVisitor& visitor) \
-//	{\
-//		for (auto& [name, socket] : sockets)\
-//		{\
-//			if (socket.node)\
-//			{\
-//				socket.node->traverse(visitor);\
-//			}\
-//		}\
-//	}
+	void ShaderNode::resetIsShaderArgBlockUpdated()
+	{
+		for (const auto& child : getChildren())
+		{
+			if (const std::shared_ptr<ShaderNode>& shaderNode = child->as<ShaderNode>(); shaderNode)
+			{
+				shaderNode->resetIsShaderArgBlockUpdated();
+			}
+		}
+		state.isShaderArgBlockUpdated = false;
+	}
+
 
 #define DEFINE_SHADER_NODE_ACCEPT(NODE_NAME) \
 	void NODE_NAME::accept(NodeVisitor& visitor) \
 	{\
 		ACCEPT(NODE_NAME, visitor)\
 	}
-
-//#define DEFINE_SHADER_NODE_GET_CHILDREN(NODE_NAME) \
-//	std::vector<std::shared_ptr<Node>> NODE_NAME::getChildren() const\
-//	{\
-//		std::vector<std::shared_ptr<Node>> children;\
-//		for (auto& [name, socket] : sockets)\
-//		{\
-//			if (socket.node)\
-//			{\
-//				children.push_back(socket.node);\
-//			}\
-//		}\
-//		return children;\
-//	}
-
-	//DEFINE_SHADER_NODE_TRAVERSE_CHILDREN(DiffuseReflection)
-	//DEFINE_SHADER_NODE_TRAVERSE_CHILDREN(MaterialSurface)
-	//DEFINE_SHADER_NODE_TRAVERSE_CHILDREN(Material)
-	//DEFINE_SHADER_NODE_TRAVERSE_CHILDREN(ImportedNode)
-	//DEFINE_SHADER_NODE_TRAVERSE_CHILDREN(PrincipledMaterial)
-	//DEFINE_SHADER_NODE_TRAVERSE_CHILDREN(ColorTexture)
-	//DEFINE_SHADER_NODE_TRAVERSE_CHILDREN(MonoTexture)
-	//DEFINE_SHADER_NODE_TRAVERSE_CHILDREN(NormalTexture)
-	//DEFINE_SHADER_NODE_TRAVERSE_CHILDREN(BumpTexture)
-	//DEFINE_SHADER_NODE_TRAVERSE_CHILDREN(TextureTransform)
-	//DEFINE_SHADER_NODE_TRAVERSE_CHILDREN(NormalMix)
-	//DEFINE_SHADER_NODE_TRAVERSE_CHILDREN(GetChannel)
-
-	//DEFINE_SHADER_NODE_GET_CHILDREN(DiffuseReflection)
-	//DEFINE_SHADER_NODE_GET_CHILDREN(MaterialSurface)
-	//DEFINE_SHADER_NODE_GET_CHILDREN(Material)
-	//DEFINE_SHADER_NODE_GET_CHILDREN(ImportedNode)
-	//DEFINE_SHADER_NODE_GET_CHILDREN(PrincipledMaterial)
-	//DEFINE_SHADER_NODE_GET_CHILDREN(ColorTexture)
-	//DEFINE_SHADER_NODE_GET_CHILDREN(MonoTexture)
-	//DEFINE_SHADER_NODE_GET_CHILDREN(NormalTexture)
-	//DEFINE_SHADER_NODE_GET_CHILDREN(BumpTexture)
-	//DEFINE_SHADER_NODE_GET_CHILDREN(TextureTransform)
-	//DEFINE_SHADER_NODE_GET_CHILDREN(NormalMix)
-	//DEFINE_SHADER_NODE_GET_CHILDREN(GetChannel)
 
 	DEFINE_SHADER_NODE_ACCEPT(ShaderNode)
 	DEFINE_SHADER_NODE_ACCEPT(DiffuseReflection)
@@ -213,4 +174,25 @@ namespace vtx::graph::shader
 	DEFINE_SHADER_NODE_ACCEPT(TextureTransform)
 	DEFINE_SHADER_NODE_ACCEPT(NormalMix)
 	DEFINE_SHADER_NODE_ACCEPT(GetChannel)
+
+
+#define DEFINE_SHADER_NODE_DESTRUCTOR(NODE_NAME)\
+		NODE_NAME::~NODE_NAME()\
+	{\
+	SIM::get()->releaseTypeId<NODE_NAME>(typeID);\
+	}
+
+	DEFINE_SHADER_NODE_DESTRUCTOR(DiffuseReflection)
+	DEFINE_SHADER_NODE_DESTRUCTOR(MaterialSurface)
+	DEFINE_SHADER_NODE_DESTRUCTOR(Material)
+	DEFINE_SHADER_NODE_DESTRUCTOR(ImportedNode)
+	DEFINE_SHADER_NODE_DESTRUCTOR(PrincipledMaterial)
+	DEFINE_SHADER_NODE_DESTRUCTOR(ColorTexture)
+	DEFINE_SHADER_NODE_DESTRUCTOR(MonoTexture)
+	DEFINE_SHADER_NODE_DESTRUCTOR(NormalTexture)
+	DEFINE_SHADER_NODE_DESTRUCTOR(BumpTexture)
+	DEFINE_SHADER_NODE_DESTRUCTOR(TextureTransform)
+	DEFINE_SHADER_NODE_DESTRUCTOR(NormalMix)
+	DEFINE_SHADER_NODE_DESTRUCTOR(GetChannel)
+
 }

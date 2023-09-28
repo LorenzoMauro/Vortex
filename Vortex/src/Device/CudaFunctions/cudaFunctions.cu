@@ -183,13 +183,30 @@ namespace vtx::cuda{
 		});
 	}
 
+	__forceinline__ __device__ bool belongs(
+		const float x,
+		const float* values,
+		const int numValues
+	)
+	{
+		for (int i = 0; i < numValues; i++)
+		{
+			if (gdt::isEqual(x, values[i]))
+			{
+				return true;
+			}
+		}
+		return false;
+	}
+
 	__forceinline__ __device__ void selectionEdgeDevice(
 		const int id,
 		const int width,
 		const int height,
 		const float* data,
 		float* output,
-		const float value,
+		const float* values,
+		const int nValues,
 		const int thickness
 	)
 	{
@@ -200,7 +217,7 @@ namespace vtx::cuda{
 		int nonMatchCount = 0;   // Count of neighboring pixels not matching the target value.
 		int totalNeighbors = 0;  // Total neighboring pixels within the thickness.
 
-		if(gdt::isEqual(data[id], value))
+		if(belongs(data[id], values, nValues))
 		{
 			output[id] = 0.0f;
 		}
@@ -215,9 +232,9 @@ namespace vtx::cuda{
 				const int ny = y + dy;
 				if (nx >= 0 && nx < width && ny >= 0 && ny < height)
 				{
-					float neighborValue = data[ny * width + nx];
+					const float neighborValue = data[ny * width + nx];
 
-					if (gdt::isEqual(neighborValue, value))
+					if (belongs(neighborValue, values, nValues))
 					{
 						matchCount++;
 					}
@@ -243,57 +260,63 @@ namespace vtx::cuda{
 		}
 	}
 
-	float* selectionEdge(
-		float* d_data,
-		int    width,
-		int    height,
-		float  value,
-		int    thickness
-	)
-	{
-		const int  dataSize = width * height;
-		CUDABuffer cudaBuffer;
-		auto*      output = cudaBuffer.alloc<float>(dataSize);
-		gpuParallelFor("CustomEdge",
-					   dataSize,
-					   [output, width, height, d_data, value, thickness] __device__(const int id)
-					   {
-			selectionEdgeDevice(id, width, height, d_data, output, value, thickness);
-					   });
-		return output;
-	}
-
 	void overlaySelectionEdge(
 		float* gBuffer,
 		math::vec4f* outputImage,
 		int    width,
 		int    height,
-		float value,
+		std::vector<float> selectedIds,
 		const float curvature,
 		const float scale,
-		CUDABuffer* cudaBuffer = nullptr
+		CUDABuffer* edgeMapBuffer = nullptr,
+		CUDABuffer* valuesBuffer = nullptr
 	)
 	{
 		const int  dataSize = width * height;
-		float* edgeMap = nullptr;
-		bool deleteBuffer = false;
-		if (cudaBuffer == nullptr)
+
+		bool deleteEdgeMapBuffer = false;
+		bool deleteValuesBuffer = false;
+
+		// Create Buffers if not provided
 		{
-			cudaBuffer = new CUDABuffer();
-			deleteBuffer = true;
+			if (edgeMapBuffer == nullptr)
+			{
+				edgeMapBuffer = new CUDABuffer();
+				deleteEdgeMapBuffer = true;
+			}
+
+			if (valuesBuffer == nullptr)
+			{
+				valuesBuffer = new CUDABuffer();
+				deleteValuesBuffer = true;
+			}
 		}
-		edgeMap = cudaBuffer->alloc<float>(dataSize);
+
+		auto* edgeMap = edgeMapBuffer->alloc<float>(dataSize);
+		float* values = valuesBuffer->upload(selectedIds);
+		int nValues = selectedIds.size();
+
 		gpuParallelFor("Overlay Selection Edge",
 			dataSize,
-		[edgeMap, width, height, gBuffer, value, outputImage, curvature, scale] __device__(const int id)
+			[edgeMap, width, height, gBuffer, values, nValues, outputImage, curvature, scale] __device__(const int id)
+			{
+				selectionEdgeDevice(id, width, height, gBuffer, edgeMap, values, nValues, 1);
+				overlayEdgeKernel(id, width, edgeMap, outputImage, curvature, scale);
+			}
+		);
+
+		// Free Buffers if created
 		{
-			selectionEdgeDevice(id, width, height, gBuffer, edgeMap, value, 1);
-			overlayEdgeKernel(id, width, edgeMap, outputImage, curvature, scale);
-		});
-		if (deleteBuffer)
-		{
-			cudaBuffer->free();
-			delete cudaBuffer;
+			if (deleteEdgeMapBuffer)
+			{
+				edgeMapBuffer->free();
+				delete edgeMapBuffer;
+			}
+			if (deleteValuesBuffer)
+			{
+				valuesBuffer->free();
+				delete valuesBuffer;
+			}
 		}
 	}
 }

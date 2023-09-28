@@ -18,6 +18,15 @@ namespace vtx::graph
 
 	class SIM;
 
+	struct NodeState
+	{
+		bool isInitialized = false;
+		bool isChangedByGui = false;
+		bool updateOnDevice = false;
+		bool isShaderCodeUpdated = false;
+		bool isShaderArgBlockUpdated = false;
+	};
+
 	class Node : public std::enable_shared_from_this<Node> {
 	public:
 
@@ -27,7 +36,8 @@ namespace vtx::graph
 
 		NodeType getType() const;
 
-		vtxID getID() const;
+		vtxID getUID() const;
+		vtxID getTypeID() const;
 
 		void traverse(NodeVisitor& visitor);
 
@@ -41,25 +51,11 @@ namespace vtx::graph
 
 		virtual std::vector<std::shared_ptr<Node>> getChildren() const
 		{
-			//VTX_WARN("Node::getChildren() called on node that does not implement getChildren(): NODE TYPE: {}", nodeNames[getType()]);
 			return {};
 		}
 
-		bool isAnyChildUpdated()
-		{
-			for (const auto& child : getChildren())
-			{
-				if (child->isUpdated)
-				{
-					return true;
-				}
-			}
-		}
-
-		bool isInitialized = false;
-		bool isUpdated = true;
+		NodeState   state;
 		std::string name;
-		//NodeSocket outputSocket;
 
 		virtual void accept(NodeVisitor& visitor) = 0;
 	protected:
@@ -74,10 +70,8 @@ namespace vtx::graph
 
 		std::shared_ptr<SIM> sim;
 		NodeType type;
-		vtxID id;
-
-	private:
-		//NodeSockets inputSockets;
+		vtxID UID;
+		vtxID typeID = 0;
 	};
 
 	namespace shader {

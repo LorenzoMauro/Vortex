@@ -185,9 +185,9 @@ namespace vtx::graph
 
 	class Material : public Node {
 	public:
-		Material() : Node(NT_MATERIAL)
-		{
-		}
+		Material();
+
+		~Material() override;
 
 		void init() override;
 

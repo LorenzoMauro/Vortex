@@ -14,15 +14,14 @@ namespace vtx::gui
             ImGui::Indent();
             const float availableWidth = ImGui::GetContentRegionAvail().x;
             ImGui::PushItemWidth(availableWidth);
-            vtxImGui::halfSpaceWidget("Node Id", ImGui::Text, std::to_string(material->getID()).c_str());
+            vtxImGui::halfSpaceWidget("Node Id", ImGui::Text, std::to_string(material->getUID()).c_str());
             ImGui::Separator();
             changed |= drawEditGui(material->materialGraph);
         }
 
         if (changed)
         {
-            material->isUpdated = true;
-            ops::restartRender();
+            material->state.updateOnDevice = true;
         }
 
         return changed;

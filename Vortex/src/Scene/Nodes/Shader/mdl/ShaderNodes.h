@@ -14,7 +14,7 @@ namespace vtx::graph::shader
 	class ShaderNode : public Node
 	{
 	public:
-		~ShaderNode();
+		~ShaderNode() override;
 
 		ShaderNode(const NodeType       cNodeType,
 				   mdl::MdlFunctionInfo cFunctionInfo);
@@ -37,19 +37,21 @@ namespace vtx::graph::shader
 
 		void init() override;
 
-		void                               accept(NodeVisitor& visitor) override;
+		void accept(NodeVisitor& visitor) override;
+
+		void resetIsShaderArgBlockUpdated();
 
 		std::vector<std::shared_ptr<Node>> getChildren() const override
 		{
-			std::vector<std::shared_ptr<Node>> children; 
+			std::vector<std::shared_ptr<Node>> children;
 			for (auto& [_, socket] : sockets)
 			{
 				if (socket.node)
 				{
-					children.push_back(socket.node); 
+					children.push_back(socket.node);
 				}
 			}
-				return children; 
+			return children;
 		}
 
 		ShaderInputSockets                              sockets;
@@ -68,13 +70,12 @@ namespace vtx::graph::shader
 											 "mdl::df::diffuse_reflection_bsdf"
 										 })
 		{
+			typeID = SIM::get()->getTypeId<DiffuseReflection>();
 		}
 
+		~DiffuseReflection() override;
 	protected:
-		//std::vector<std::shared_ptr<Node>> getChildren() const override;
-		void                               accept(NodeVisitor& visitor) override;
-
-	public:
+		void accept(NodeVisitor& visitor) override;
 	};
 
 	class MaterialSurface : public ShaderNode
@@ -87,13 +88,12 @@ namespace vtx::graph::shader
 										   "mdl::material_surface(bsdf,material_emission)"
 									   })
 		{
+			typeID = SIM::get()->getTypeId<MaterialSurface>();
 		}
 
+		~MaterialSurface() override;
 	protected:
-		//std::vector<std::shared_ptr<Node>> getChildren() const override;
-		void                               accept(NodeVisitor& visitor) override;
-
-	public:
+		void accept(NodeVisitor& visitor) override;
 	};
 
 	class Material : public ShaderNode
@@ -106,13 +106,12 @@ namespace vtx::graph::shader
 									"mdl::material(bool,material_surface,material_surface,color,material_volume,material_geometry,hair_bsdf)"
 								})
 		{
+			typeID = SIM::get()->getTypeId<Material>();
 		}
 
+		~Material() override;
 	protected:
-		//std::vector<std::shared_ptr<Node>> getChildren() const override;
-		void                               accept(NodeVisitor& visitor) override;
-
-	public:
+		void accept(NodeVisitor& visitor) override;
 	};
 
 	class ImportedNode : public ShaderNode
@@ -121,13 +120,12 @@ namespace vtx::graph::shader
 		ImportedNode(std::string modulePath, std::string functionName, const bool isMdlPath = false) : ShaderNode(
 			NT_SHADER_IMPORTED, modulePath, functionName, isMdlPath)
 		{
+			typeID = SIM::get()->getTypeId<ImportedNode>();
 		}
 
+		~ImportedNode() override;
 	protected:
-		//std::vector<std::shared_ptr<Node>> getChildren() const override;
-		void                               accept(NodeVisitor& visitor) override;
-
-	public:
+		void accept(NodeVisitor& visitor) override;
 	};
 
 	class PrincipledMaterial : public ShaderNode
@@ -135,13 +133,12 @@ namespace vtx::graph::shader
 	public:
 		PrincipledMaterial() : ShaderNode(NT_SHADER_MATERIAL, VORTEX_PRINCIPLED_MODULE, VORTEX_PRINCIPLED_FUNCTION)
 		{
+			typeID = SIM::get()->getTypeId<PrincipledMaterial>();
 		}
 
+		~PrincipledMaterial() override;
 	protected:
-		//std::vector<std::shared_ptr<Node>> getChildren() const override;
-		void                               accept(NodeVisitor& visitor) override;
-
-	public:
+		void accept(NodeVisitor& visitor) override;
 	};
 
 	class ColorTexture : public ShaderNode
@@ -152,11 +149,12 @@ namespace vtx::graph::shader
 		{
 			texturePath = cTexturePath;
 			setSocketValue(VF_COLOR_TEXTURE_TEXTURE_SOCKET, mdl::createTextureConstant(texturePath));
+			typeID = SIM::get()->getTypeId<ColorTexture>();
 		}
 
+		~ColorTexture() override;
 	protected:
-		//std::vector<std::shared_ptr<Node>> getChildren() const override;
-		void                               accept(NodeVisitor& visitor) override;
+		void accept(NodeVisitor& visitor) override;
 
 	public:
 		std::string texturePath;
@@ -172,11 +170,12 @@ namespace vtx::graph::shader
 			setSocketValue(
 				VF_MONO_TEXTURE_TEXTURE_SOCKET,
 				mdl::createTextureConstant(texturePath, mi::neuraylib::IType_texture::TS_2D, 1.0f));
+			typeID = SIM::get()->getTypeId<MonoTexture>();
 		}
 
+		~MonoTexture() override;
 	protected:
-		//std::vector<std::shared_ptr<Node>> getChildren() const override;
-		void                               accept(NodeVisitor& visitor) override;
+		void accept(NodeVisitor& visitor) override;
 
 	public:
 		std::string texturePath;
@@ -192,11 +191,12 @@ namespace vtx::graph::shader
 			setSocketValue(
 				VF_NORMAL_TEXTURE_TEXTURE_SOCKET,
 				mdl::createTextureConstant(texturePath, mi::neuraylib::IType_texture::TS_2D, 1.0f));
+			typeID = SIM::get()->getTypeId<NormalTexture>();
 		}
 
+		~NormalTexture() override;
 	protected:
-		//std::vector<std::shared_ptr<Node>> getChildren() const override;
-		void                               accept(NodeVisitor& visitor) override;
+		void accept(NodeVisitor& visitor) override;
 
 	public:
 		std::string texturePath;
@@ -212,11 +212,12 @@ namespace vtx::graph::shader
 			setSocketValue(
 				VF_BUMP_TEXTURE_TEXTURE_SOCKET,
 				mdl::createTextureConstant(texturePath, mi::neuraylib::IType_texture::TS_2D, 1.0f));
+			typeID = SIM::get()->getTypeId<BumpTexture>();
 		}
 
+		~BumpTexture() override;
 	protected:
-		//std::vector<std::shared_ptr<Node>> getChildren() const override;
-		void                               accept(NodeVisitor& visitor) override;
+		void accept(NodeVisitor& visitor) override;
 
 	public:
 		std::string texturePath;
@@ -228,11 +229,12 @@ namespace vtx::graph::shader
 	public:
 		TextureTransform() : ShaderNode(NT_SHADER_COORDINATE, VORTEX_FUNCTIONS_MODULE, VF_TEXTURE_TRANSFORM)
 		{
+			typeID = SIM::get()->getTypeId<TextureTransform>();
 		}
 
+		~TextureTransform() override;
 	protected:
-		//std::vector<std::shared_ptr<Node>> getChildren() const override;
-		void                               accept(NodeVisitor& visitor) override;
+		void accept(NodeVisitor& visitor) override;
 
 	public:
 		std::string texturePath;
@@ -244,11 +246,12 @@ namespace vtx::graph::shader
 	public:
 		NormalMix() : ShaderNode(NT_SHADER_FLOAT3, VORTEX_FUNCTIONS_MODULE, VF_MIX_NORMAL)
 		{
+			typeID = SIM::get()->getTypeId<NormalMix>();
 		}
 
+		~NormalMix() override;
 	protected:
-		//std::vector<std::shared_ptr<Node>> getChildren() const override;
-		void                               accept(NodeVisitor& visitor) override;
+		void accept(NodeVisitor& visitor) override;
 
 	public:
 		std::string texturePath;
@@ -273,11 +276,12 @@ namespace vtx::graph::shader
 
 			channel = cChannel;
 			setSocketValue(VF_GET_COLOR_CHANNEL_CHANNEL_SOCKET, mdl::createConstantInt(channel));
+			typeID = SIM::get()->getTypeId<GetChannel>();
 		}
 
+		~GetChannel() override;
 	protected:
-		//std::vector<std::shared_ptr<Node>> getChildren() const override;
-		void                               accept(NodeVisitor& visitor) override;
+		void accept(NodeVisitor& visitor) override;
 
 	public:
 		int channel;

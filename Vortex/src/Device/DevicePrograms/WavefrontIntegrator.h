@@ -46,8 +46,8 @@ namespace vtx
 
 		void accumulateRays();
 
-		LaunchParams* hostParams;
-		LaunchParams* deviceParams;
+		const LaunchParams* hostParams;
+		const LaunchParams* deviceParams;
 		int           maxTraceQueueSize;
 		CUDABuffer    queueSizeRetrievalBuffer;
 		int*          queueSizeDevicePtr;

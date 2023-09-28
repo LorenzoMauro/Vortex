@@ -12,11 +12,11 @@ namespace vtx::graph
 	class ImageNode : public Node {
 	public:
 		ImageNode() : Node(NT_SHADER) {
-			name = "Image." + std::to_string(getID());
+			name = "Image." + std::to_string(getUID());
 		}
             
 		ImageNode(std::string _imagePath) : Node(NT_SHADER) {
-			name = "Image." + std::to_string(getID());
+			name = "Image." + std::to_string(getUID());
 			SetImageFile(_imagePath);
 		}
 
@@ -40,11 +40,11 @@ namespace vtx::graph
 	class TextureNode : public Node
 	{
 		TextureNode() : Node(NT_SHADER) {
-			name = "Texture." + std::to_string(getID());
+			name = "Texture." + std::to_string(getUID());
 		};
 
 		TextureNode(std::shared_ptr<ImageNode> _image) : Node(NT_SHADER) {
-			name = "Texture." + std::to_string(getID());
+			name = "Texture." + std::to_string(getUID());
 		};
 
 		void SetImageNode(std::shared_ptr<ImageNode> _image) {

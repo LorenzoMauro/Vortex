@@ -61,16 +61,6 @@ namespace vtx
         return &optixLaunchParams.frameBuffer;
     }
 
-    template<>
-    __forceinline__ __device__ const OnDeviceSettings* getData() {
-        if (optixLaunchParams.settings == nullptr)
-        {
-            CUDA_ERROR_PRINT("renderer Settings is not set!\n");
-            return nullptr;
-        }
-        return optixLaunchParams.settings;
-    }
-
     __forceinline__ __device__ int getFrameId()
     {
         if(optixLaunchParams.frameID == nullptr)

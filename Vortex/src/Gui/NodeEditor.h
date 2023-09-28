@@ -60,8 +60,10 @@ namespace vtx::gui
 		void arrangeNodes(LayoutDirection direction);
 
 		void removeUnvisitedNodes();
+		void updateNodeSelection();
 
-		bool draw();
+		bool               draw();
+		std::set<vtxID> getSelected();
 
 		bool styleEditor();
 
@@ -70,7 +72,6 @@ namespace vtx::gui
 		NodeEditorVisitor            visitor;
 		GuiVisitor                   guiVisitor;
 		std::map<vtxID, NodeInfo>    nodes;
-		std::vector<int>             selectedNodes     = {};
 		std::shared_ptr<graph::Node> rootNode          = nullptr;
 		ImNodesEditorContext*        sceneGraphContext = ImNodes::EditorContextCreate();
 		bool                         isFirstTime       = true;

@@ -6,13 +6,14 @@
 #include <cudaGL.h>
 #include "Device/OptixWrapper.h"
 #include "Device/UploadCode/UploadBuffers.h"
-#include "Device/UploadCode/UploadData.h"
+#include "Device/UploadCode/DeviceDataCoordinator.h"
 #include "Scene/Traversal.h"
 #include "device_launch_parameters.h"
 #include "cuda_runtime.h"
 #include "Device/CudaFunctions/cudaFunctions.h"
 #include "Device/DevicePrograms/CudaKernels.h"
 #include "Device/Wrappers/KernelTimings.h"
+#include "Scene/Scene.h"
 #include "Scene/Utility/Operations.h"
 
 namespace vtx::graph
@@ -25,7 +26,7 @@ namespace vtx::graph
 		settings(),
 		waveFrontIntegrator(&settings)
 	{
-
+		typeID = SIM::get()->getTypeId<Renderer>();
 		camera = ops::createNode<Camera>();
 		sceneRoot = ops::createNode<Group>();
 		settings = getOptions()->rendererSettings;
@@ -43,6 +44,11 @@ namespace vtx::graph
 
 	}
 
+	Renderer::~Renderer()
+	{
+		SIM::get()->releaseTypeId<Renderer>(getTypeID());
+	}
+
 	std::vector<std::shared_ptr<Node>> Renderer::getChildren() const
 	{
 		return { camera, sceneRoot };
@@ -55,14 +61,13 @@ namespace vtx::graph
 
 	vtxID Renderer::getInstanceIdOnClick(const int pixelID)
 	{
-		const gBufferHistory* gBufferPtr = GET_BUFFER(device::Buffers::FrameBufferBuffers, getID(), gBufferData).castedPointer<gBufferHistory>();
+		const gBufferHistory* gBufferPtr      = onDeviceData->frameBufferData.resourceBuffers.gBufferData.castedPointer<gBufferHistory>();
 		const gBufferHistory* pixelGBufferPtr = gBufferPtr + pixelID;
 		const auto* pixelDataPtr = reinterpret_cast<const vtxID*>(pixelGBufferPtr);
 
 		vtxID hostValue;
 		cudaMemcpy(&hostValue, pixelDataPtr, sizeof(vtxID), cudaMemcpyDeviceToHost);
-
-		return hostValue;
+		return SIM::get()->UIDfromTID(NT_INSTANCE,hostValue);
 	}
 
 	bool Renderer::isReady(const bool setBusy) {
@@ -81,7 +86,7 @@ namespace vtx::graph
 
 	void Renderer::threadedRender()
 	{
-		if(isReady(true))
+		if (isReady(true))
 		{
 			std::unique_lock<std::mutex> lock(threadData.renderMutex);
 			threadData.renderThreadBusy = true;
@@ -93,15 +98,15 @@ namespace vtx::graph
 	void Renderer::render()
 	{
 
-		const LaunchParams& launchParams = UPLOAD_DATA->launchParams;
-		const CUDABuffer& launchParamsBuffer = UPLOAD_BUFFERS->launchParamsBuffer;
-
+		const LaunchParams& launchParams = onDeviceData->launchParamsData.getHostImage();
+		const LaunchParams* launchParamsDevice = onDeviceData->launchParamsData.getDeviceImage();
+		const size_t launchParamsSize = onDeviceData->launchParamsData.imageBuffer.bytesSize();
 
 		if (launchParams.frameBuffer.frameSize.x == 0 || launchParams.frameBuffer.frameSize.y == 0)
 		{
 			return;
 		}
-		if(!settings.accumulate)
+		if (!settings.accumulate)
 		{
 			settings.iteration = 0;
 		}
@@ -118,11 +123,11 @@ namespace vtx::graph
 			cudaEventRecord(events.first);
 
 			if (
-				settings.adaptiveSamplingSettings.active && 
+				settings.adaptiveSamplingSettings.active &&
 				settings.adaptiveSamplingSettings.minAdaptiveSamples <= settings.iteration
 				)
 			{
-				noiseComputation(launchParamsBuffer.castedPointer<LaunchParams>(), getID());
+				noiseComputation(launchParamsDevice, getUID());
 			}
 			cudaEventRecord(events.second);
 
@@ -132,7 +137,7 @@ namespace vtx::graph
 			const std::pair<cudaEvent_t, cudaEvent_t> events = GetProfilerEvents(eventNames[R_TRACE]);
 			cudaEventRecord(events.first);
 
-			if(waveFrontIntegrator.settings.active)
+			if (waveFrontIntegrator.settings.active)
 			{
 				waveFrontIntegrator.render();
 			}
@@ -145,8 +150,8 @@ namespace vtx::graph
 				const auto result = optixLaunch(/*! pipeline we're launching launch: */
 					pipeline, state.stream,
 					/*! parameters and SBT */
-					launchParamsBuffer.dPointer(),
-					launchParamsBuffer.bytesSize(),
+					(CUdeviceptr)launchParamsDevice,
+					launchParamsSize,
 					&sbt,
 					/*! dimensions of the launch: */
 					launchParams.frameBuffer.frameSize.x,
@@ -163,32 +168,40 @@ namespace vtx::graph
 			const std::pair<cudaEvent_t, cudaEvent_t> events = GetProfilerEvents(eventNames[R_POSTPROCESSING]);
 			cudaEventRecord(events.first);
 
-			toneMapRadianceKernel(launchParamsBuffer.castedPointer<LaunchParams>(), width, height, eventNames[R_TONE_MAP_RADIANCE]);
+			toneMapRadianceKernel(launchParamsDevice, width, height, eventNames[R_TONE_MAP_RADIANCE]);
 			math::vec3f* beauty = nullptr;
 			if (settings.fireflySettings.active)
 			{
-				removeFireflies(launchParamsBuffer.castedPointer<LaunchParams>(), settings.fireflySettings.kernelSize, settings.fireflySettings.threshold, width, height);
-				beauty = GET_BUFFER(device::Buffers::FrameBufferBuffers, getID(), fireflyRemoval).castedPointer<math::vec3f>();
+				removeFireflies(launchParamsDevice, settings.fireflySettings.kernelSize, settings.fireflySettings.threshold, width, height);
+				beauty = onDeviceData->frameBufferData.resourceBuffers.fireflyRemoval.castedPointer<math::vec3f>();
 			}
 
-			if(settings.denoiserSettings.active && settings.iteration>settings.denoiserSettings.denoiserStart)
+			if (settings.denoiserSettings.active && settings.iteration > settings.denoiserSettings.denoiserStart)
 			{
-				CUDABuffer& denoiserRadianceInput = settings.fireflySettings.active ? GET_BUFFER(device::Buffers::FrameBufferBuffers, getID(), fireflyRemoval) : GET_BUFFER(device::Buffers::FrameBufferBuffers, getID(), hdriRadiance);
-				CUDABuffer& albedoBuffer = GET_BUFFER(device::Buffers::FrameBufferBuffers, getID(), albedoNormalized);
-				CUDABuffer& normalBuffer = GET_BUFFER(device::Buffers::FrameBufferBuffers, getID(), normalNormalized);
+				CUDABuffer& denoiserRadianceInput = settings.fireflySettings.active ? onDeviceData->frameBufferData.resourceBuffers.fireflyRemoval : onDeviceData->frameBufferData.resourceBuffers.hdriRadiance;
+				CUDABuffer& albedoBuffer = onDeviceData->frameBufferData.resourceBuffers.albedoNormalized;
+				CUDABuffer& normalBuffer = onDeviceData->frameBufferData.resourceBuffers.normalNormalized;
 				optix::getState()->denoiser.setInputs(denoiserRadianceInput, albedoBuffer, normalBuffer);
 				beauty = optix::getState()->denoiser.denoise(settings.denoiserSettings.denoiserBlend);
 			}
-			switchOutput(launchParamsBuffer.castedPointer<LaunchParams>(), width, height, beauty);
+			switchOutput(launchParamsDevice, width, height, beauty);
 
 			// Selection edge
 			{
-				if (selectedId != 0)
+				const std::set<vtxID> uidSelectedInstances = Scene::getScene()->getSelectedInstancesIds();
+				if (!uidSelectedInstances.empty())
 				{
-					auto* gBuffer = GET_BUFFER(device::Buffers::FrameBufferBuffers, getID(), gBuffer).castedPointer<float>();
-					auto* outputBuffer = GET_BUFFER(device::Buffers::FrameBufferBuffers, getID(), cudaOutputBuffer).castedPointer<math::vec4f>();
-					CUDABuffer edgeMapBuffer = GET_BUFFER(device::Buffers::FrameBufferBuffers, getID(), edgeMapBuffer);
-					cuda::overlaySelectionEdge(gBuffer, outputBuffer, width, height, (float)selectedId, 0.2f, 1.35f, &edgeMapBuffer);
+					auto*                    gBuffer              = onDeviceData->frameBufferData.resourceBuffers.gBuffer.castedPointer<float>();
+					auto*                    outputBuffer         = onDeviceData->frameBufferData.resourceBuffers.cudaOutputBuffer.castedPointer<math::vec4f>();
+					CUDABuffer               edgeMapBuffer        = onDeviceData->frameBufferData.resourceBuffers.edgeMapBuffer;
+					CUDABuffer               selectedIdsBuffer    = onDeviceData->frameBufferData.resourceBuffers.selectedIdsBuffer;
+					std::vector<float>       typeIds;
+					typeIds.reserve(uidSelectedInstances.size());
+					for (const vtxID uid : uidSelectedInstances)
+					{
+						typeIds.push_back((float)SIM::get()->TIDfromUID(uid));
+					}
+					cuda::overlaySelectionEdge(gBuffer, outputBuffer, width, height, typeIds, 0.2f, 1.35f, &edgeMapBuffer, &selectedIdsBuffer);
 				}
 			}
 			cudaEventRecord(events.second);
@@ -227,7 +240,7 @@ namespace vtx::graph
 		// Update the GL buffer here
 		//CUDA_SYNC_CHECK();
 		const optix::State& state = *(optix::getState());
-		const LaunchParams& launchParams = UPLOAD_DATA->launchParams;
+		const LaunchParams& launchParams = onDeviceData->launchParamsData.getHostImage();
 
 		if(resizeGlBuffer)
 		{

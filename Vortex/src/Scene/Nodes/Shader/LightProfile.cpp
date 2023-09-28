@@ -1,8 +1,24 @@
 ﻿#include "LightProfile.h"
 #include "Scene/Traversal.h"
 #include "MDL/MdlWrapper.h"
+#include "Scene/SIM.h"
 
 namespace vtx::graph {
+	LightProfile::LightProfile() :
+		Node(NT_MDL_LIGHTPROFILE)
+	{
+		typeID = SIM::get()->getTypeId<LightProfile>();
+	}
+	LightProfile::LightProfile(char const* _databaseName) :
+		Node(NT_MDL_LIGHTPROFILE),
+		databaseName(_databaseName)
+	{
+		typeID = SIM::get()->getTypeId<LightProfile>();
+	}
+	LightProfile::~LightProfile()
+	{
+		SIM::get()->releaseTypeId<LightProfile>(typeID);
+	}
 	void LightProfile::init()
 	{
 		lightProfileData = mdl::fetchLightProfileData(databaseName);

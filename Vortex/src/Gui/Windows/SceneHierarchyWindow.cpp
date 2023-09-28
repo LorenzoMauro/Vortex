@@ -18,6 +18,8 @@ namespace vtx
         // Check if the node is null
         if (!node) return;
 
+        std::set<vtxID> selected = graph::Scene::getScene()->getSelected();
+        bool isSelected = selected.find(node->getUID()) != selected.end();
         // Flags for TreeNodeEx
         ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_SpanFullWidth | ImGuiTreeNodeFlags_OpenOnArrow;
         int node_clicked = -1;
@@ -29,26 +31,26 @@ namespace vtx
         }
 
         // Check if the node is selected
-        if (selection_mask == node->getID()) {
+        if (isSelected) {
             ImGui::PushStyleColor(ImGuiCol_Header, ImGui::GetStyleColorVec4(ImGuiCol_HeaderActive));
             flags |= ImGuiTreeNodeFlags_Selected;
         }
 
         // Draw the node using TreeNodeEx. If it returns true, it means the node is expanded.
-        const bool nodeOpen = ImGui::TreeNodeEx(reinterpret_cast<void*>(node->getID()), flags, "%s", node->name.c_str());
-        if (selection_mask == node->getID())
+        const bool nodeOpen = ImGui::TreeNodeEx(reinterpret_cast<void*>(node->getUID()), flags, "%s", node->name.c_str());
+        if (isSelected)
         {
 			ImGui::PopStyleColor();
         }
 
         if (ImGui::IsItemClicked() && !ImGui::IsItemToggledOpen()) {
-            if (selection_mask == node->getID())
+            if (isSelected)
             {
-                selection_mask = -1;
+                graph::Scene::getScene()->removeNodesToSelection({node->getUID()});
             }
             else
             {
-				node_clicked = node->getID();
+                graph::Scene::getScene()->addNodesToSelection({node->getUID()});
             }
         }
 
@@ -60,29 +62,11 @@ namespace vtx
             ImGui::TreePop();
         }
 
-        if (node_clicked != -1) {
-            if (ImGui::GetIO().KeyCtrl) {
-                // CTRL+click to toggle (deselect if it's already selected)
-                selection_mask = (selection_mask == node_clicked) ? -1 : node_clicked;
-            }
-            else {
-                selection_mask = node_clicked; // Click to single-select
-            }
-        }
-
     }
 
 	void SceneHierarchyWindow::mainContent()
 	{
         // Now proceed with your node rendering as usual.
         displayNode(renderer);
-        if(selection_mask == -1)
-        {
-	        windowManager->selectedNodes["SceneHierarchyWindow"] = {};
-		}
-        else
-        {
-	        windowManager->selectedNodes["SceneHierarchyWindow"] = {(vtxID)selection_mask};
-        }
 	}
 }

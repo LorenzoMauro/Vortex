@@ -20,7 +20,7 @@ namespace vtx
 
 	private:
 		std::shared_ptr<graph::Renderer> renderer;
-		int selection_mask = - 1;
+		//int selection_mask = - 1;
 
 	};
 

@@ -1,7 +1,6 @@
 #pragma once
 #include <cstdint>
 #include "Device/glFrameBuffer.h"
-#include "Device/DeviceVisitor.h"
 #include "Scene/Node.h"
 #include "Camera.h"
 #include "Group.h"
@@ -18,6 +17,8 @@ namespace vtx::graph
 	public:
 
 		Renderer();
+
+		~Renderer() override;
 
 		void resize(int width, int height);
 
@@ -53,8 +54,6 @@ namespace vtx::graph
 		bool											isSizeLocked = false;
 		RendererSettings								settings;
 		bool											resized = true;
-		vtxID         selectedId = 0;
-
 		vtx::Timer timer;
 
 		float overallTime;

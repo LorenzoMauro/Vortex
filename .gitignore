@@ -12,6 +12,8 @@ Vortex/x64/*
 ext/vcpkg
 scripts/__pycache__
 dist/
+CudaDebug/
+cudaDebugging/
 
 # Ignore object files and libraries
 *.o
@@ -44,3 +46,4 @@ scripts/vortex_38018.ico
 install.spec
 VortexIconSketchpsd copy.jpg
 VortexIconSketchpsd.psd
+scripts/Untitled-3.py

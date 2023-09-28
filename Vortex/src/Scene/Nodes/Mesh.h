@@ -14,12 +14,11 @@ namespace vtx::graph
 
 	class Mesh : public Node {
 	public:
-		Mesh() : Node(NT_MESH) {}
+		Mesh();
 
-		std::vector<std::shared_ptr<Node>> getChildren() const override
-		{
-			return {};
-		};
+		~Mesh();
+
+		std::vector<std::shared_ptr<Node>> getChildren() const override;;
 	protected:
 		void accept(NodeVisitor& visitor) override;
 	public:

@@ -5,16 +5,21 @@
 
 namespace vtx
 {
+	namespace device
+	{
+		struct ReplayBufferBuffers;
+	}
+
 	struct NetworkInput;
 
 	struct ReplayBuffer
 	{
-		static ReplayBuffer* upload(const int& maxReplayBufferSize);
+		static ReplayBuffer* upload(device::ReplayBufferBuffers& buffers, const int& maxReplayBufferSize);
 
-		static ReplayBuffer* getPreviouslyUploaded();
+		static ReplayBuffer* getPreviouslyUploaded(const device::ReplayBufferBuffers& buffers);
 
 	private:
-		ReplayBuffer(const int& maxReplayBufferSize);
+		ReplayBuffer(device::ReplayBufferBuffers& buffers, const int& maxReplayBufferSize);
 	public:
 
 		NetworkInput* state;

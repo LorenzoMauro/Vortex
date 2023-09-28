@@ -7,6 +7,7 @@
 #include "cuda.h"
 #include <mi/neuraylib/target_code_types.h>
 #include "NoiseData.h"
+#include "Device/Structs/GeometryData.h"
 #include "Device/Wrappers/WorkQueue.h"
 #include "NeuralNetworks/NetworkSettings.h"
 #include "Scene/DataStructs/VertexAttribute.h"
@@ -33,11 +34,6 @@ namespace vtx {
 		int envLightSample = -1;
 	};
 
-    enum PrimitiveType {
-        PT_TRIANGLES,
-
-        NUM_PT
-    };
     // Camera
     struct CameraData {
         math::vec3f  position;
@@ -46,17 +42,6 @@ namespace vtx {
         math::vec3f  direction;
     };
 
-    struct GeometryData {
-        PrimitiveType				type;
-        OptixTraversableHandle		traversable;
-        graph::VertexAttributes*	vertexAttributeData;
-        graph::FaceAttributes*      faceAttributeData;
-
-        vtxID*					    indicesData;
-        size_t						numVertices;
-        size_t						numIndices;
-        size_t                      numFaces;
-    };
 
 
     struct DeviceShaderConfiguration
@@ -210,7 +195,7 @@ namespace vtx {
     {
         LightType   type;
         CUdeviceptr attributes;
-
+        bool use = false;
     };
 
     struct InstanceData
@@ -389,6 +374,16 @@ namespace vtx {
         network::NetworkSettings neural;
     };
 
+    struct QueuesData
+    {
+        WorkQueueSOA<TraceWorkItem>* radianceTraceQueue;
+        WorkQueueSOA<RayWorkItem>* shadeQueue;
+        WorkQueueSOA<ShadowWorkItem>* shadowQueue;
+        WorkQueueSOA<EscapedWorkItem>* escapedQueue;
+        WorkQueueSOA<AccumulationWorkItem>* accumulationQueue;
+        Counters*                           queueCounters;
+    };
+
 	struct LaunchParams
     {
 		int*                    frameID;
@@ -396,22 +391,17 @@ namespace vtx {
 		FrameBufferData         frameBuffer;
 		CameraData              cameraData;
 		//SbtProgramIdx*          programs;
-		OptixTraversableHandle  topObject;
+		OptixTraversableHandle  topObject = 0;
 		InstanceData**          instances;
 		LightData*              envLight = nullptr;
 		LightData**             lights;
 		int                     numberOfLights;
-		Counters*               queueCounters;
 
-		WorkQueueSOA<TraceWorkItem>*        radianceTraceQueue;
-		WorkQueueSOA<RayWorkItem>*          shadeQueue;
-		WorkQueueSOA<ShadowWorkItem>*       shadowQueue;
-		WorkQueueSOA<EscapedWorkItem>*      escapedQueue;
-		WorkQueueSOA<AccumulationWorkItem>* accumulationQueue;
+        QueuesData              queues;
 
 		NetworkInterface* networkInterface;
 
-        OnDeviceSettings* settings;
+        OnDeviceSettings settings;
 	};
 
     enum TypeRay

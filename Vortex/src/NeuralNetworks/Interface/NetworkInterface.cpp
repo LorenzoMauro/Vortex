@@ -6,27 +6,27 @@
 #include "ReplayBuffer.h"
 #include "Device/DevicePrograms/randomNumberGenerator.h"
 #include "Device/UploadCode/UploadBuffers.h"
+#include "Device/UploadCode/DeviceDataCoordinator.h"
 
 namespace vtx
 {
-	NetworkInterface* NetworkInterface::upload(const int& numberOfPixels, const int& maxDatasetSize,
-											   const int& maxDepth, const int& frameId,
+	NetworkInterface* NetworkInterface::upload(const int&                      numberOfPixels, const int&  maxDatasetSize,
+											   const int&                      maxDepth, const int&        frameId,
 											   const network::DistributionType distributionType, const int mixtureSize,
-											   const ToneMapperSettings& _toneMapperSettings,
-											   const WhatChanged& changed)
+											   const ToneMapperSettings&       _toneMapperSettings,
+											   const WhatChanged&              changed, device::NetworkInterfaceBuffer& networkInterfaceBuffers)
 	{
 		const NetworkInterface networkInterface(numberOfPixels, maxDatasetSize, maxDepth, frameId, distributionType,
-												mixtureSize, _toneMapperSettings, changed);
-		return UPLOAD_BUFFERS->networkInterfaceBuffer.networkInterfaceBuffer.upload(networkInterface);
+												mixtureSize, _toneMapperSettings, changed, networkInterfaceBuffers);
+		return networkInterfaceBuffers.networkInterfaceBuffer.upload(networkInterface);
 	}
 
 	NetworkInterface::NetworkInterface(const int&  numberOfPixels, const int& maxDatasetSize, const int& maxDepth,
 									   const int&  frameId, const network::DistributionType distributionType,
 									   int         mixtureSize, const ToneMapperSettings& _toneMapperSettings,
-									   WhatChanged changed)
+									   WhatChanged changed, device::NetworkInterfaceBuffer& networkInterfaceBuffers)
 	{
 		//NetworkInterface networkInterface;
-		device::Buffers::NetworkInterfaceBuffer& networkInterfaceBuffers = UPLOAD_BUFFERS->networkInterfaceBuffer;
 
 		if (changed.maxDatasetSize)
 		{
@@ -39,35 +39,37 @@ namespace vtx
 				seeds[i] = seed;
 			}
 			lcgSeeds = networkInterfaceBuffers.seedsBuffer.upload(seeds);
-
-			replayBuffer    = ReplayBuffer::upload(maxDatasetSize);
-			npgTrainingData = NpgTrainingData::upload(maxDatasetSize);
+			VTX_INFO("Allocating ReplayBuffer and NpgTrainingData");
+			replayBuffer    = ReplayBuffer::upload(networkInterfaceBuffers.replayBufferBuffers, maxDatasetSize);
+			npgTrainingData = NpgTrainingData::upload(networkInterfaceBuffers.npgTrainingDataBuffers, maxDatasetSize);
 		}
 		else
 		{
 			lcgSeeds        = networkInterfaceBuffers.seedsBuffer.castedPointer<unsigned>();
-			replayBuffer    = ReplayBuffer::getPreviouslyUploaded();
-			npgTrainingData = NpgTrainingData::getPreviouslyUploaded();
+			replayBuffer    = ReplayBuffer::getPreviouslyUploaded(networkInterfaceBuffers.replayBufferBuffers);
+			npgTrainingData = NpgTrainingData::getPreviouslyUploaded(networkInterfaceBuffers.npgTrainingDataBuffers);
 		}
 
 
 		if (changed.distributionType || changed.numberOfPixels)
 		{
-			inferenceQueries = InferenceQueries::upload(numberOfPixels, distributionType, mixtureSize);
+			VTX_INFO("Allocating InferenceQueries");
+			inferenceQueries = InferenceQueries::upload(networkInterfaceBuffers.inferenceBuffers, numberOfPixels, distributionType, mixtureSize);
 		}
 		else
 		{
-			inferenceQueries = InferenceQueries::getPreviouslyUploaded();
+			inferenceQueries = InferenceQueries::getPreviouslyUploaded(networkInterfaceBuffers.inferenceBuffers);
 		}
 
 		if (changed.numberOfPixels || changed.maxDepth)
 		{
-			paths = Paths::upload(maxDepth, numberOfPixels);
+			VTX_INFO("Allocating Paths");
+			paths = Paths::upload(networkInterfaceBuffers.pathsBuffers, maxDepth, numberOfPixels);
 		}
 		else
 		{
 			//Paths::resetBounces(maxDepth, numberOfPixels);
-			paths = Paths::getPreviouslyUploaded();
+			paths = Paths::getPreviouslyUploaded(networkInterfaceBuffers.pathsBuffers);
 		}
 
 		if (changed.numberOfPixels)

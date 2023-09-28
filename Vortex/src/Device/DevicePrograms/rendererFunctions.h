@@ -43,13 +43,18 @@ namespace vtx
 
 #define NEURAL_SAMPLE_DIRECTION(idx) math::normalize(params.replayBuffer->inferenceInputs.action[idx])
 
+    __forceinline__ __device__ bool neuralNetworkActive(const LaunchParams* params)
+    {
+	    return params->settings.wavefront.active && params->settings.neural.active;
+    }
+
     __forceinline__ __device__ bool neuralSamplingActivated(const LaunchParams* params, const int& depth)
     {
         const bool doSampleNeural =
-            params->settings->neural.active
-			&& params->settings->neural.doInference
-            && params->settings->renderer.iteration >= params->settings->neural.inferenceIterationStart
-            && depth + 1 < params->settings->renderer.maxBounces;
+            neuralNetworkActive(params)
+			&& params->settings.neural.doInference
+            && params->settings.renderer.iteration >= params->settings.neural.inferenceIterationStart
+            && depth + 1 < params->settings.renderer.maxBounces;
 
         return doSampleNeural;
     }
@@ -84,7 +89,7 @@ namespace vtx
 
     __forceinline__ __device__ void addDebug(const math::vec3f& color, const int pixelId, const LaunchParams* params)
     {
-        if (params->settings->renderer.adaptiveSamplingSettings.active && params->settings->renderer.adaptiveSamplingSettings.minAdaptiveSamples <= params->settings->renderer.iteration)
+        if (params->settings.renderer.adaptiveSamplingSettings.active && params->settings.renderer.adaptiveSamplingSettings.minAdaptiveSamples <= params->settings.renderer.iteration)
         {
             nanCheckAddAtomic(color, params->frameBuffer.debugColor1[pixelId]);
         }
@@ -96,7 +101,7 @@ namespace vtx
 
     __forceinline__ __device__ void accumulateRay(const AccumulationWorkItem& awi, const LaunchParams* params)
     {
-        if (params->settings->renderer.adaptiveSamplingSettings.active && params->settings->renderer.adaptiveSamplingSettings.minAdaptiveSamples <= params->settings->renderer.iteration)
+        if (params->settings.renderer.adaptiveSamplingSettings.active && params->settings.renderer.adaptiveSamplingSettings.minAdaptiveSamples <= params->settings.renderer.iteration)
         {
             nanCheckAddAtomic(awi.radiance, params->frameBuffer.radianceAccumulator[awi.originPixel]);
         }
@@ -107,12 +112,12 @@ namespace vtx
     }
 
 
-	__forceinline__ __device__ void cleanFrameBuffer(const int id, LaunchParams* params)
+	__forceinline__ __device__ void cleanFrameBuffer(const int id,const LaunchParams* params)
     {
-        bool cleanOnInferenceStart = params->settings->renderer.iteration == params->settings->neural.inferenceIterationStart && params->settings->neural.clearOnInferenceStart && params->settings->neural.active && params->settings->neural.doInference;
-        if (params->settings->renderer.iteration <= 0 || !params->settings->renderer.accumulate || cleanOnInferenceStart)
+        const bool cleanOnInferenceStart = neuralNetworkActive(params) && params->settings.neural.doInference && params->settings.renderer.iteration == params->settings.neural.inferenceIterationStart && params->settings.neural.clearOnInferenceStart;
+        if (params->settings.renderer.iteration <= 0 || !params->settings.renderer.accumulate || cleanOnInferenceStart)
         {
-            FrameBufferData* frameBuffer = &params->frameBuffer;
+            const FrameBufferData* frameBuffer = &params->frameBuffer;
             frameBuffer->radianceAccumulator[id] = 0.0f;
             frameBuffer->albedoAccumulator[id] = 0.0f;
             frameBuffer->normalAccumulator[id] = 0.0f;
@@ -138,7 +143,7 @@ namespace vtx
         params->frameBuffer.debugColor1[id] = 0.0f;
     }
 
-    __forceinline__ __device__ void generateCameraRay(int id, LaunchParams* params, TraceWorkItem& twi) {
+    __forceinline__ __device__ void generateCameraRay(int id, const LaunchParams* params, TraceWorkItem& twi) {
 
         math::vec2f pixel = math::vec2f((float)(id % params->frameBuffer.frameSize.x), (float)(id / params->frameBuffer.frameSize.x));
         math::vec2f screen {(float)params->frameBuffer.frameSize.x, (float)params->frameBuffer.frameSize.y };
@@ -165,7 +170,7 @@ namespace vtx
         params->frameBuffer.samples[id] += 1;
     }
 
-    __forceinline__ __device__ math::vec3f missShader(EscapedWorkItem& ewi, LaunchParams* params)
+    __forceinline__ __device__ math::vec3f missShader(EscapedWorkItem& ewi, const LaunchParams* params)
     {
         math::vec3f emission = 0.0f;
         float misWeight = 1.0f;
@@ -200,7 +205,7 @@ namespace vtx
                 // to incorporate the point light selection probability
                 // If the last surface intersection was a diffuse event which was directly lit with multiple importance sampling,
                 // then calculate light emission with multiple importance sampling for this implicit light hit as well.
-                bool MiSCondition = (params->settings->renderer.samplingTechnique == S_MIS && (ewi.eventType & (mi::neuraylib::BSDF_EVENT_DIFFUSE | mi::neuraylib::BSDF_EVENT_GLOSSY)));
+                bool MiSCondition = (params->settings.renderer.samplingTechnique == S_MIS && (ewi.eventType & (mi::neuraylib::BSDF_EVENT_DIFFUSE | mi::neuraylib::BSDF_EVENT_GLOSSY)));
                 float envSamplePdf = attrib.aliasMap[y * texture->dimension.x + x].pdf;
                 if (ewi.pdf > 0.0f && MiSCondition)
                 {
@@ -215,11 +220,11 @@ namespace vtx
             }
         }
 
-        if (params->settings->neural.active && ewi.depth > 0)
+        if (neuralNetworkActive(params) && ewi.depth > 0)
         {
             params->networkInterface->paths->recordMissBounce(
                 ewi.originPixel, ewi.depth,
-                params->settings->renderer.maxClamp, emission, misWeight);
+                params->settings.renderer.maxClamp, emission, misWeight);
         }
 
         return emission;
@@ -348,7 +353,7 @@ namespace vtx
         math::vec3f dir{ x, y, z };
         // Now rotate that normalized object space direction into world space. 
         lightSample.direction = math::transformNormal3F(attrib.transformation, dir);
-        lightSample.distance = params.settings->renderer.maxClamp; // Environment light.
+        lightSample.distance = params.settings.renderer.maxClamp; // Environment light.
         lightSample.position = prd.hitProperties.position + lightSample.direction * lightSample.distance;
         lightSample.normal = -lightSample.direction;
         // Get the emission from the spherical environment texture.
@@ -373,6 +378,7 @@ namespace vtx
         {
             //Randomly Selecting a Light
             //TODO, I think here we can do some better selection by giving more importance to lights with greater power
+
             const int indexLight = (1 < numLights) ? gdt::clamp(static_cast<int>(floorf(rng(prd.seed) * numLights)), 0, numLights - 1) : 0;
 
             const LightData& light = *(params.lights[indexLight]);
@@ -422,7 +428,7 @@ namespace vtx
             {
                 const math::vec3f colorsBounceDiffuse = matEval.aux.albedo;
                 const math::vec3f colorsShadingNormal = 0.5f * (matEval.aux.normal + 1.0f);
-                if (params->settings->renderer.adaptiveSamplingSettings.active && params->settings->renderer.adaptiveSamplingSettings.minAdaptiveSamples <= params->settings->renderer.iteration)
+                if (params->settings.renderer.adaptiveSamplingSettings.active && params->settings.renderer.adaptiveSamplingSettings.minAdaptiveSamples <= params->settings.renderer.iteration)
                 {
                     nanCheckAddAtomic(colorsBounceDiffuse, params->frameBuffer.albedoAccumulator[prd.originPixel]);
                     nanCheckAddAtomic(colorsShadingNormal, params->frameBuffer.normalAccumulator[prd.originPixel]);
@@ -433,7 +439,7 @@ namespace vtx
                     nanCheckAdd(colorsShadingNormal, params->frameBuffer.normalAccumulator[prd.originPixel]);
                 }
             }
-            if (params->settings->renderer.adaptiveSamplingSettings.active && params->settings->renderer.adaptiveSamplingSettings.minAdaptiveSamples <= params->settings->renderer.iteration)
+            if (params->settings.renderer.adaptiveSamplingSettings.active && params->settings.renderer.adaptiveSamplingSettings.minAdaptiveSamples <= params->settings.renderer.iteration)
             {
                 nanCheckAddAtomic(colorsTrueNormal, params->frameBuffer.trueNormal[prd.originPixel]);
                 nanCheckAddAtomic(colorsTangent, params->frameBuffer.tangent[prd.originPixel]);
@@ -465,7 +471,7 @@ namespace vtx
         math::vec3f* debugBuffer = params->networkInterface->debugBuffer2;
         InferenceQueries* inferenceQueries = params->networkInterface->inferenceQueries;
 
-        switch (params->settings->renderer.displayBuffer)
+        switch (params->settings.renderer.displayBuffer)
         {
         case(FB_NETWORK_INFERENCE_STATE_POSITION):
         {
@@ -556,9 +562,9 @@ namespace vtx
     __forceinline__ __device__ float neuralSamplingFraction(const LaunchParams& params, const int& shadeQueueIndex)
     {
 	    float samplingFraction;
-		if(params.settings->neural.type == network::NT_SAC)
+		if(params.settings.neural.type == network::NT_SAC)
 		{
-			samplingFraction = params.settings->neural.sac.neuralSampleFraction;
+			samplingFraction = params.settings.neural.sac.neuralSampleFraction;
 		}
 		else
 		{
@@ -695,7 +701,7 @@ namespace vtx
         request.hitProperties = &prd.hitProperties;
         request.edf = prd.hitProperties.hasEdf;
 
-        SamplingTechnique& samplingTechnique = params.settings->renderer.samplingTechnique;
+        SamplingTechnique& samplingTechnique = params.settings.renderer.samplingTechnique;
         const bool doSampleLight = samplingTechnique == S_DIRECT_LIGHT || samplingTechnique == S_MIS;
         const bool doSampleBsdf = samplingTechnique == S_MIS || samplingTechnique == S_BSDF;
 
@@ -732,8 +738,10 @@ namespace vtx
                 }
             }
         }
-        
+
+        //params.settings.renderer.iteration == 15 ? printf("Launching MatEval [%d, %d, %d, %d, %d]\n", *params.frameID, params.settings.renderer.iteration, prd.originPixel, prd.depth, prd.hitProperties.programCall) : 0;
         evaluateMaterial(prd.hitProperties.programCall, &request, matEval);
+        //params.settings.renderer.iteration == 15 ? printf("Ending MatEval    [%d, %d, %d, %d, %d]\n", *params.frameID, params.settings.renderer.iteration, prd.originPixel, prd.depth, prd.hitProperties.programCall) : 0;
 
         assert(!(utl::isNan(matEval->bsdfSample.nextDirection) && matEval->bsdfSample.eventType != 0));
 
@@ -753,7 +761,7 @@ namespace vtx
 
     __forceinline__ __device__ ShadowWorkItem nextEventEstimation(const mdl::MaterialEvaluation& matEval, LightSample& lightSample, RayWorkItem& prd, LaunchParams& params)
     {
-        SamplingTechnique& samplingTechnique = params.settings->renderer.samplingTechnique;
+        SamplingTechnique& samplingTechnique = params.settings.renderer.samplingTechnique;
         ShadowWorkItem swi;
         swi.distance = -1; //invalid
 
@@ -780,12 +788,12 @@ namespace vtx
                 const math::vec3f throughputMultiplier = bxdf * (float)params.numberOfLights;
                 swi.radiance = prd.throughput * weightMis * throughputMultiplier * lightSample.radianceOverPdf;
                 swi.direction = lightSample.direction;
-                swi.distance = lightSample.distance - params.settings->renderer.minClamp;
+                swi.distance = lightSample.distance - params.settings.renderer.minClamp;
                 swi.depth = prd.depth + 1;
                 swi.originPixel = prd.originPixel;
                 swi.origin = prd.hitProperties.position;
 
-                if (params.settings->neural.active)
+                if (neuralNetworkActive(&params))
                 {
                     params.networkInterface->paths->recordLightRayExtension(
                         prd.originPixel, prd.depth,
@@ -800,7 +808,7 @@ namespace vtx
 
     __forceinline__ __device__ void evaluateEmission(mdl::MaterialEvaluation& matEval, RayWorkItem& prd, const LaunchParams& params)
     {
-        const SamplingTechnique& samplingTechnique = params.settings->renderer.samplingTechnique;
+        const SamplingTechnique& samplingTechnique = params.settings.renderer.samplingTechnique;
 
         math::vec3f emittedRadiance = 0.0f;
         if (matEval.edf.isValid)
@@ -830,7 +838,7 @@ namespace vtx
             const float factor = (matEval.edf.mode == 0) ? 1.0f : 1.0f / area;
             emittedRadiance = matEval.edf.intensity * matEval.edf.edf * factor;
             prd.radiance += prd.throughput * misWeight * emittedRadiance;
-            if (params.settings->neural.active)
+            if (neuralNetworkActive(&params))
             {
                 params.networkInterface->paths->recordBounceEmission(
                     prd.originPixel, prd.depth,
@@ -844,7 +852,7 @@ namespace vtx
     __forceinline__ __device__ bool russianRoulette(RayWorkItem& prd, const LaunchParams& params, float& continuationProbability)
     {
         continuationProbability = 1.0f;
-        if (params.settings->renderer.useRussianRoulette && 2 <= prd.depth) // Start termination after a minimum number of bounces.
+        if (params.settings.renderer.useRussianRoulette && 2 <= prd.depth) // Start termination after a minimum number of bounces.
         {
             const float probability = fmaxf(fmaxf(prd.throughput.x, prd.throughput.y), prd.throughput.z);
 
@@ -859,9 +867,9 @@ namespace vtx
 
     __forceinline__ __device__ bool bsdfSample(RayWorkItem& prd, const mdl::MaterialEvaluation& matEval, const LaunchParams& params, const float& continuationProbability)
     {
-		const SamplingTechnique& samplingTechnique = params.settings->renderer.samplingTechnique;
+		const SamplingTechnique& samplingTechnique = params.settings.renderer.samplingTechnique;
 
-        const bool doNextBounce = (samplingTechnique == S_MIS || samplingTechnique == S_BSDF) && prd.depth + 1 < params.settings->renderer.maxBounces;
+        const bool doNextBounce = (samplingTechnique == S_MIS || samplingTechnique == S_BSDF) && prd.depth + 1 < params.settings.renderer.maxBounces;
         if (doNextBounce && (matEval.bsdfSample.eventType != mi::neuraylib::BSDF_EVENT_ABSORB))
         {
             prd.direction = matEval.bsdfSample.nextDirection; // Continuation direction.
@@ -882,7 +890,7 @@ namespace vtx
                 }
             }
 
-            if(params.settings->neural.active)
+            if(neuralNetworkActive(&params))
             {
 	            params.networkInterface->paths->recordBsdfRayExtension(
                     prd.originPixel, prd.depth,
@@ -899,7 +907,7 @@ namespace vtx
     {
         if (twi.extendRay)
         {
-            params.radianceTraceQueue->Push(twi);
+            params.queues.radianceTraceQueue->Push(twi);
         }
         else
         {
@@ -907,11 +915,11 @@ namespace vtx
             awi.radiance = twi.radiance;
             awi.originPixel = twi.originPixel;
             awi.depth = twi.depth;
-            params.accumulationQueue->Push(awi);
+            params.queues.accumulationQueue->Push(awi);
         }
         if(swi.distance >0.0f)
         {
-        	params.shadowQueue->Push(swi);
+        	params.queues.shadowQueue->Push(swi);
 		}
     }
 
@@ -935,7 +943,7 @@ namespace vtx
     __forceinline__ __device__ void shade(LaunchParams* params, RayWorkItem& prd, ShadowWorkItem& swi, TraceWorkItem& twi, const int& shadeQueueIndex = 0)
     {
         prd.hitProperties.calculate(params, prd.direction);
-        if(params->settings->neural.active )
+        if(neuralNetworkActive(params))
         {
             params->networkInterface->paths->recordBounceHit(
                 prd.originPixel, prd.depth,
@@ -948,7 +956,6 @@ namespace vtx
         twi.extendRay = false;
         LightSample lightSample{};
         bool extend = false;
-
         if (prd.hitProperties.hasMaterial)
         {
             evaluateMaterialAndSampleLight(&matEval, &lightSample, *params, prd, shadeQueueIndex);
@@ -965,10 +972,11 @@ namespace vtx
             {
                 extend = bsdfSample(prd, matEval, *params, continuationProbability);
             }
-            if(!extend)
+            if(neuralNetworkActive(params) && !extend)
             {
                 params->networkInterface->paths->setBounceAsTerminal(prd.originPixel, prd.depth);
             }
+
         }
         setAuxiliaryRenderPassData(prd, matEval, params);
 
@@ -1022,9 +1030,9 @@ namespace vtx
     __forceinline__ __device__ int getAdaptiveSampleCount(const int& fbIndex, const LaunchParams* params)
     {
         int samplesPerLaunch = 1;
-        if (params->settings->renderer.adaptiveSamplingSettings.active)
+        if (params->settings.renderer.adaptiveSamplingSettings.active)
         {
-            if (params->settings->renderer.adaptiveSamplingSettings.minAdaptiveSamples <= params->settings->renderer.iteration)
+            if (params->settings.renderer.adaptiveSamplingSettings.minAdaptiveSamples <= params->settings.renderer.iteration)
             {
                 samplesPerLaunch = params->frameBuffer.noiseBuffer[fbIndex].adaptiveSamples;
                 if (samplesPerLaunch <= 0) //direct miss
@@ -1042,30 +1050,30 @@ namespace vtx
 
     __forceinline__ __device__ void resetQueues(const LaunchParams* params)
     {
-        params->radianceTraceQueue->Reset();
-        params->shadeQueue->Reset();
-        params->shadowQueue->Reset();
-        params->escapedQueue->Reset();
-        params->accumulationQueue->Reset();
+        params->queues.radianceTraceQueue->Reset();
+        params->queues.shadeQueue->Reset();
+        params->queues.shadowQueue->Reset();
+        params->queues.escapedQueue->Reset();
+        params->queues.accumulationQueue->Reset();
         params->networkInterface->inferenceQueries->reset();
     }
 
     __forceinline__ __device__ void fillCounters(const LaunchParams* params)
     {
-	    params->queueCounters->traceQueueCounter = params->radianceTraceQueue->getCounter();
-		params->queueCounters->shadeQueueCounter = params->shadeQueue->getCounter();
-		params->queueCounters->shadowQueueCounter = params->shadowQueue->getCounter();
-		params->queueCounters->escapedQueueCounter = params->escapedQueue->getCounter();
-		params->queueCounters->accumulationQueueCounter = params->accumulationQueue->getCounter();
+	    params->queues.queueCounters->traceQueueCounter = params->queues.radianceTraceQueue->getCounter();
+        params->queues.queueCounters->shadeQueueCounter = params->queues.shadeQueue->getCounter();
+        params->queues.queueCounters->shadowQueueCounter = params->queues.shadowQueue->getCounter();
+        params->queues.queueCounters->escapedQueueCounter = params->queues.escapedQueue->getCounter();
+        params->queues.queueCounters->accumulationQueueCounter = params->queues.accumulationQueue->getCounter();
     }
 
-	__forceinline__ __device__ void wfInitRayEntry(const int id, LaunchParams* params)
+	__forceinline__ __device__ void wfInitRayEntry(const int id, const LaunchParams* params)
     {
         if (id == 0)
         {
             resetQueues(params);
             params->networkInterface->paths->resetValidPixels();
-            if(params->settings->renderer.iteration <=0)
+            if(params->settings.renderer.iteration <=0)
             {
                 fillCounters(params);
             }
@@ -1078,15 +1086,15 @@ namespace vtx
         TraceWorkItem                twi;
         for (int i = 0; i < samplesPerLaunch; i++)
         {
-            if(params->settings->neural.active)
+            if(neuralNetworkActive(params))
             {
                 params->networkInterface->paths->resetPixel(id);
             }
             
-            twi.seed = tea<4>(id + i, params->settings->renderer.iteration + *params->frameID);
+            twi.seed = tea<4>(id + i, params->settings.renderer.iteration + *params->frameID);
             generateCameraRay(id, params, twi);
             
-            params->radianceTraceQueue->Push(twi);
+            params->queues.radianceTraceQueue->Push(twi);
         }
     }
 
@@ -1094,13 +1102,13 @@ namespace vtx
     {
         if (queueWorkId == 0)
         {
-            params.radianceTraceQueue->Reset();
+            params.queues.radianceTraceQueue->Reset();
         }
 
-        if (params.shadeQueue->Size() <= queueWorkId)
+        if (params.queues.shadeQueue->Size() <= queueWorkId)
             return;
 
-        RayWorkItem prd = (*params.shadeQueue)[queueWorkId];
+        RayWorkItem prd = (*params.queues.shadeQueue)[queueWorkId];
         ShadowWorkItem swi;
         TraceWorkItem twi;
         shade(&params, prd, swi, twi, queueWorkId);
@@ -1115,18 +1123,18 @@ namespace vtx
             params->shadowQueue->Reset();
             params->escapedQueue->Reset();
         }*/
-        if (queueWorkId >= params->accumulationQueue->Size())
+        if (queueWorkId >= params->queues.accumulationQueue->Size())
             return;
-        const AccumulationWorkItem             awi = (*params->accumulationQueue)[queueWorkId];
+        const AccumulationWorkItem             awi = (*params->queues.accumulationQueue)[queueWorkId];
         accumulateRay(awi, params);
     }
 
-    __forceinline__ __device__ void wfEscapedEntry(const int id, LaunchParams* params)
+    __forceinline__ __device__ void wfEscapedEntry(const int id, const LaunchParams* params)
     {
-        if (id >= params->escapedQueue->Size())
+        if (id >= params->queues.escapedQueue->Size())
             return;
 
-        EscapedWorkItem                ewi = (*params->escapedQueue)[id];
+        EscapedWorkItem                ewi = (*params->queues.escapedQueue)[id];
 
         const math::vec3f stepRadiance = missShader(ewi, params);
 
@@ -1134,7 +1142,7 @@ namespace vtx
         awi.originPixel = ewi.originPixel;
         awi.radiance = ewi.radiance;
         awi.depth = ewi.depth;
-        params->accumulationQueue->Push(awi);
+        params->queues.accumulationQueue->Push(awi);
 
         
     }
@@ -1161,7 +1169,7 @@ namespace vtx
         optixTrace(params.topObject,
             origin,
             direction, // origin, direction
-            params.settings->renderer.minClamp,
+            params.settings.renderer.minClamp,
             distance,
             0.0f, // tmin, tmax, time
             static_cast<OptixVisibilityMask>(0xFF),
@@ -1194,8 +1202,8 @@ namespace vtx
             }
             else
             {
-                params.accumulationQueue->Push(awi);
-                if (params.settings->neural.active)
+                params.queues.accumulationQueue->Push(awi);
+                if (neuralNetworkActive(&params))
                 {
                     params.networkInterface->paths->validateLightSample(swi.originPixel, swi.depth-1); // stored at previous depth, where it was sampled
                 }
@@ -1217,7 +1225,7 @@ namespace vtx
         prd.eventType = twi.eventType;
         prd.pdf = twi.pdf;
 
-        bool hit = trace(twi.origin, twi.direction, params.settings->renderer.maxClamp, &prd, 0, params, OPTIX_RAY_FLAG_DISABLE_ANYHIT);
+        bool hit = trace(twi.origin, twi.direction, params.settings.renderer.maxClamp, &prd, 0, params, OPTIX_RAY_FLAG_DISABLE_ANYHIT);
         
         if (architecture == A_FULL_OPTIX)
         {
@@ -1262,7 +1270,7 @@ namespace vtx
         {
             if (hit)
             {
-                int shadeQueueIndex = params.shadeQueue->Push(prd);
+                int shadeQueueIndex = params.queues.shadeQueue->Push(prd);
 
                 if(neuralSamplingActivated(&params, prd.depth))
                 {
@@ -1281,7 +1289,7 @@ namespace vtx
                 ewi.throughput = prd.throughput;
                 ewi.eventType = prd.eventType;
                 ewi.pdf = prd.pdf;
-                params.escapedQueue->Push(ewi);
+                params.queues.escapedQueue->Push(ewi);
             }
         }
     }
@@ -1290,25 +1298,25 @@ namespace vtx
     {
         if (queueWorkId == 0)
         {
-            params.shadeQueue->Reset();
+            params.queues.shadeQueue->Reset();
             params.networkInterface->inferenceQueries->reset();
         }
 
-        int radianceTraceQueueSize = params.radianceTraceQueue->Size();
+        int radianceTraceQueueSize = params.queues.radianceTraceQueue->Size();
         if (radianceTraceQueueSize <= queueWorkId)
             return;
 
-        TraceWorkItem twi = (*params.radianceTraceQueue)[queueWorkId];
+        TraceWorkItem twi = (*params.queues.radianceTraceQueue)[queueWorkId];
         // Shadow Trace
         const int maxTraceQueueSize = params.frameBuffer.frameSize.x * params.frameBuffer.frameSize.y;
-        const bool isLongPath = (float)radianceTraceQueueSize <= params.settings->wavefront.longPathPercentage * (float)maxTraceQueueSize;
-        if(!params.settings->wavefront.useLongPathKernel || !isLongPath)
+        const bool isLongPath = (float)radianceTraceQueueSize <= params.settings.wavefront.longPathPercentage * (float)maxTraceQueueSize;
+        if(!params.settings.wavefront.useLongPathKernel || !isLongPath)
         {
             elaborateRadianceTrace(twi, params);
         }
         else
         {
-            int remainingBounces = params.settings->renderer.maxBounces - twi.depth;
+            int remainingBounces = params.settings.renderer.maxBounces - twi.depth;
             for (int i = 0; i < remainingBounces; i++)
             {
                 elaborateRadianceTrace(twi, params, A_FULL_OPTIX);
@@ -1322,10 +1330,10 @@ namespace vtx
 
     __forceinline__ __device__ void wfTraceShadowEntry(const int queueWorkId, LaunchParams& params)
     {
-        if (params.shadowQueue->Size() <= queueWorkId)
+        if (params.queues.shadowQueue->Size() <= queueWorkId)
             return;
 
-        ShadowWorkItem swi = (*params.shadowQueue)[queueWorkId];
+        ShadowWorkItem swi = (*params.queues.shadowQueue)[queueWorkId];
         // Shadow Trace
 
         elaborateShadowTrace(swi, params);

@@ -2,6 +2,7 @@
 
 #include "imnodes_internal.h"
 #include "Core/CustomImGui/CustomImGui.h"
+#include "Scene/Scene.h"
 #include "Scene/Nodes/Shader/mdl/ShaderNodes.h"
 
 namespace vtx::gui
@@ -138,7 +139,7 @@ namespace vtx::gui
 
 	void NodeEditorVisitor::visit(const std::shared_ptr<graph::Node>& node)
 	{
-		auto [depth, width, overallWidth] = nodesDepthsAndWidths[node->getID()];
+		auto [depth, width, overallWidth] = nodesDepthsAndWidths[node->getUID()];
 		nodeEditor->submitNode(node, depth, width, overallWidth);
 	}
 
@@ -151,7 +152,7 @@ namespace vtx::gui
 	void NodeEditor::updateNodeLinks(const std::shared_ptr<graph::Node>& node)
 	{
 		// TODO Here we should check if the node has changed.
-		NodeInfo& nodeInfo = nodes[node->getID()];
+		NodeInfo& nodeInfo = nodes[node->getUID()];
 		const std::vector<std::shared_ptr<graph::Node>> children = node->getChildren();
 		const int                                       numberOfChildren = children.size();
 
@@ -167,7 +168,7 @@ namespace vtx::gui
 					LinkInfo linkInfo;
 					linkInfo.linkId = socket.linkId;
 					linkInfo.inputSocketId = socket.Id;
-					linkInfo.childOutputSocketId = socket.node->getID();
+					linkInfo.childOutputSocketId = socket.node->getUID();
 					linkInfo.childNodeType = socket.node->getType();
 					nodeInfo.links.push_back(linkInfo);
 				}
@@ -179,8 +180,8 @@ namespace vtx::gui
 			{
 				LinkInfo linkInfo;
 				linkInfo.inputSocketId = nodeInfo.id * 1000 + i;
-				linkInfo.linkId = nodeInfo.id * 1000 + children[i]->getID();
-				linkInfo.childOutputSocketId = children[i]->getID();
+				linkInfo.linkId = nodeInfo.id * 1000 + children[i]->getUID();
+				linkInfo.childOutputSocketId = children[i]->getUID();
 				linkInfo.childNodeType = children[i]->getType();
 				nodeInfo.links.push_back(linkInfo);
 			}
@@ -190,19 +191,19 @@ namespace vtx::gui
 
 	void NodeEditor::submitNode(const std::shared_ptr<graph::Node>& node, const int depth, const int width, const int overallWidth)
 	{
-		runVisitedNodes.insert(node->getID());
-		if (nodes.find(node->getID()) == nodes.end() || nodes[node->getID()].node.lock() == nullptr)
+		runVisitedNodes.insert(node->getUID());
+		if (nodes.find(node->getUID()) == nodes.end() || nodes[node->getUID()].node.lock() == nullptr)
 		{
 			NodeInfo nodeInfo;
 			nodeInfo.node = node;
 			nodeInfo.nodeType = node->getType();
 			nodeInfo.title = node->name;
-			nodeInfo.id = node->getID();
+			nodeInfo.id = node->getUID();
 			nodeInfo.depth = depth;
 			nodeInfo.width = width;
 			nodeInfo.overallWidth = overallWidth;
-			nodes[node->getID()] = nodeInfo;
-			depthFirstTraversal.push_back(node->getID());
+			nodes[node->getUID()] = nodeInfo;
+			depthFirstTraversal.push_back(node->getUID());
 		}
 
 
@@ -294,6 +295,7 @@ namespace vtx::gui
 
 
 		//{
+		ImGui::TextUnformatted((std::to_string(nodeInfo.node.lock()->getTypeID())).c_str());
 		//	ImGui::TextUnformatted((std::to_string(nodeInfo.depth)).c_str());
 		//	ImGui::TextUnformatted((std::to_string(nodeInfo.width)).c_str());
 		//	ImGui::TextUnformatted((std::to_string(nodeInfo.overallWidth)).c_str());
@@ -365,7 +367,7 @@ namespace vtx::gui
 	{
 		bool changed = false;
 		std::shared_ptr<graph::Node> node = nodeInfo.node.lock();
-		const int id = node->getID();
+		const int id = node->getUID();
 
 		ImNodes::BeginNode(id);
 
@@ -527,6 +529,20 @@ namespace vtx::gui
 		}
 	}
 
+	void NodeEditor::updateNodeSelection()
+	{
+		std::set<vtxID> selectedNodes = graph::Scene::getScene()->getSelected();
+		ImNodes::ClearNodeSelection();
+		for (const vtxID id: selectedNodes)
+		{
+			const bool doesExists = (ImNodes::ObjectPoolFind(ImNodes::EditorContextGet().Nodes, (int)id) >= 0);
+			if(doesExists && !ImNodes::IsNodeSelected((int)id))
+			{
+				ImNodes::SelectNode((int)id);
+			}
+		}
+	}
+
 	bool NodeEditor::draw()
 	{
 		runVisitedNodes.clear();
@@ -536,6 +552,7 @@ namespace vtx::gui
 		ImNodes::EditorContextSet(sceneGraphContext);
 		ImNodes::BeginNodeEditor();
 		ImNodes::PushAttributeFlag(flags);
+
 		bool updated = false;
 		for (auto& [nodeId, node] : nodes)
 		{
@@ -559,22 +576,30 @@ namespace vtx::gui
 			isFirstTime = false;
 		}
 
-
+		updateNodeSelection();
 		ImNodes::EndNodeEditor();
 		ImNodes::PopAttributeFlag();
 
-		const int numberOfSelectedNodes = ImNodes::NumSelectedNodes();
-		if (numberOfSelectedNodes != 0)
+		
+		return updated;
+	}
+
+	std::set<vtxID> NodeEditor::getSelected()
+	{
+		if (const int numberOfSelectedNodes = ImNodes::NumSelectedNodes(); numberOfSelectedNodes != 0)
 		{
-			selectedNodes.resize(numberOfSelectedNodes);
-			ImNodes::GetSelectedNodes(selectedNodes.data());
-		}
-		else
-		{
-			selectedNodes.clear();
+			std::vector<int> selectedImNodesId;
+			std::set<vtxID> selectedVtxID;
+			selectedImNodesId.resize(numberOfSelectedNodes);
+			ImNodes::GetSelectedNodes(selectedImNodesId.data());
+			for (int i = 0; i < numberOfSelectedNodes; ++i)
+			{
+				selectedVtxID.insert((vtxID)selectedImNodesId[i]);
+			}
+			return selectedVtxID;
 		}
 
-		return updated;
+		return {};
 	}
 
 	bool NodeEditor::styleEditor()

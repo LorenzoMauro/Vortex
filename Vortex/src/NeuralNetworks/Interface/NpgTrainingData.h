@@ -5,17 +5,22 @@
 
 namespace vtx
 {
+	namespace device
+	{
+		struct NpgTrainingDataBuffers;
+	}
+
 	struct NetworkInput;
 
 	struct NpgTrainingData
 	{
 
-		static NpgTrainingData* upload(const int& maxDatasetSize);
+		static NpgTrainingData* upload(device::NpgTrainingDataBuffers& buffers, const int& maxDatasetSize);
 
-		static NpgTrainingData* getPreviouslyUploaded();
+		static NpgTrainingData* getPreviouslyUploaded(const device::NpgTrainingDataBuffers& buffers);
 
 	private:
-		NpgTrainingData(const int& maxDatasetSize);
+		NpgTrainingData(device::NpgTrainingDataBuffers& buffers, const int& maxDatasetSize);
 	public:
 
 		NetworkInput* inputs;

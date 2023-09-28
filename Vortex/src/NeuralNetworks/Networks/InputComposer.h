@@ -19,7 +19,7 @@ namespace vtx::network
 
 		void setFromDevice(float* positionPtr, float* woPtr, float* normalPtr, const int _inputCount);
 
-		void setFromBuffer(const device::Buffers::NetworkInputBuffers& inputBuffer, const int inputCount, const int startIdx);
+		void setFromBuffer(const device::NetworkInputBuffers& inputBuffer, const int inputCount, const int startIdx);
 
 		int dimension();
 	private:

@@ -5,13 +5,17 @@
 #include "NpgTrainingData.h"
 #include "Paths.h"
 #include "ReplayBuffer.h"
-#include "Device/DevicePrograms/randomNumberGenerator.h"
 #include "NeuralNetworks/NetworkSettings.h"
 #include "Scene/Nodes/RendererSettings.h"
 #include "Device/DevicePrograms/ToneMapper.h"
 
 namespace vtx
 {
+	namespace device
+	{
+		struct NetworkInterfaceBuffer;
+	}
+
 	struct InferenceQueries;
 	struct NpgTrainingData;
 	struct ReplayBuffer;
@@ -28,17 +32,27 @@ namespace vtx
 		};
 
 		static NetworkInterface* upload(
+			const int&                      numberOfPixels,
+			const int&                      maxDatasetSize,
+			const int&                      maxDepth,
+			const int&                      frameId,
+			const network::DistributionType distributionType,
+			const int                       mixtureSize,
+			const ToneMapperSettings&       _toneMapperSettings,
+			const WhatChanged&              changed,
+			device::NetworkInterfaceBuffer& networkInterfaceBuffers);
+
+	private:
+		NetworkInterface(
 			const int& numberOfPixels,
 			const int& maxDatasetSize,
 			const int& maxDepth,
 			const int& frameId,
 			const network::DistributionType distributionType,
-			const int mixtureSize,
+			int mixtureSize,
 			const ToneMapperSettings& _toneMapperSettings,
-			const WhatChanged& changed);
-
-	private:
-		NetworkInterface(const int& numberOfPixels, const int& maxDatasetSize, const int& maxDepth, const int& frameId, const network::DistributionType distributionType, int mixtureSize, const ToneMapperSettings& _toneMapperSettings, WhatChanged changed);
+			WhatChanged changed,
+			device::NetworkInterfaceBuffer& networkInterfaceBuffers);
 	public:
 
 		

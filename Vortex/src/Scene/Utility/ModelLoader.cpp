@@ -5,6 +5,14 @@
 
 namespace vtx::importer
 {
+
+    static aiMatrix4x4 sceneRotationToVTXFrame = aiMatrix4x4(
+		1.0f, 0.0f, 0.0f, 0.0f,
+		0.0f, 1.0f, 0.0f, 0.0f,
+		0.0f, 0.0f, 1.0f, 0.0f,
+		0.0f, 0.0f, 0.0f, 1.0f
+	);
+
     struct GetTextureInput
     {
     	aiTextureType type;
@@ -377,9 +385,22 @@ namespace vtx::importer
         return materials;
     }
 
-    void convertAssimpMeshToMeshNode(const aiMesh* aiMesh, std::shared_ptr<graph::Mesh> meshNode)
+    math::vec3f toVec3f(const aiVector3D& vec, SwapType st)
+    {
+        if (st == SwapType::yToZ)
+        {
+	        return math::vec3f(vec.x, vec.z, vec.y);
+	    }
+        else
+        {
+	        return math::vec3f(vec.x, vec.y, vec.z);
+        }
+	}
+
+	std::shared_ptr<graph::Mesh> convertAssimpMeshToMeshNode(const aiMesh* aiMesh, SwapType swap)
     {
         // Process vertices
+        const auto meshNode = ops::createNode<graph::Mesh>();
         meshNode->vertices.resize(aiMesh->mNumVertices);
         meshNode->status.hasNormals = false;
         meshNode->status.hasTangents = true;
@@ -388,12 +409,12 @@ namespace vtx::importer
         {
             auto& vertex = meshNode->vertices[i];
             // Positions
-            vertex.position = math::vec3f(aiMesh->mVertices[i].x, aiMesh->mVertices[i].y, aiMesh->mVertices[i].z);
+            vertex.position = toVec3f(aiMesh->mVertices[i], swap);
 
             // Normals
             if (aiMesh->HasNormals())
             {
-                vertex.normal = math::vec3f(aiMesh->mNormals[i].x, aiMesh->mNormals[i].y, aiMesh->mNormals[i].z);
+                vertex.normal = toVec3f(aiMesh->mNormals[i], swap);
             }
             else
             {
@@ -403,7 +424,7 @@ namespace vtx::importer
             // Tangents
             if (aiMesh->HasTangentsAndBitangents())
             {
-                vertex.tangent = math::vec3f(aiMesh->mTangents[i].x, aiMesh->mTangents[i].y, aiMesh->mTangents[i].z);
+                vertex.tangent = toVec3f(aiMesh->mTangents[i], swap);
             }
             else
             {
@@ -415,6 +436,19 @@ namespace vtx::importer
             if (aiMesh->HasTextureCoords(0))
             {
                 vertex.texCoord = math::vec3f(aiMesh->mTextureCoords[0][i].x, aiMesh->mTextureCoords[0][i].y, 0.0f);
+            }
+        }
+
+        // Handle the winding order if yToZ is true
+        if (swap == SwapType::yToZ)
+        {
+            for (unsigned int i = 0; i < aiMesh->mNumFaces; ++i)
+            {
+                const aiFace& face = aiMesh->mFaces[i];
+                if (face.mNumIndices == 3)
+                {
+                    std::swap(face.mIndices[1], face.mIndices[2]);
+                }
             }
         }
 
@@ -435,31 +469,58 @@ namespace vtx::importer
             faceAttr.materialSlotId = 0;
             meshNode->faceAttributes[i] = faceAttr;
         }
+
+        return meshNode;
     }
 
-    math::affine3f convertAssimpMatrix(const aiMatrix4x4& aiMatrix)
+    math::vec3f swapZY(const math::vec3f& vec)
+    {
+	    return math::vec3f(vec.x, vec.z, vec.y);
+    }
+
+    math::affine3f convertAssimpMatrix(const aiMatrix4x4& aiMatrix, SwapType swap)
     {
         math::affine3f matrix;
-        matrix.l = math::LinearSpace3f(aiMatrix.a1, aiMatrix.a2, aiMatrix.a3,
-                                       aiMatrix.b1, aiMatrix.b2, aiMatrix.b3,
-                                       aiMatrix.c1, aiMatrix.c2, aiMatrix.c3);
+        math::vec3f assimpX (aiMatrix.a1, aiMatrix.b1, aiMatrix.c1);
+        math::vec3f assimpY (aiMatrix.a2, aiMatrix.b2, aiMatrix.c2);
+        math::vec3f assimpZ (aiMatrix.a3, aiMatrix.b3, aiMatrix.c3);
+
+        matrix.l = math::LinearSpace3f(assimpX, assimpY, assimpZ);
         matrix.p = math::vec3f(aiMatrix.a4, aiMatrix.b4, aiMatrix.c4);
 
+        if (swap == SwapType::yToZ)
+        {
+            math::vec3f scale = {};
+            math::vec3f rotation = {};
+            math::vec3f translation = {};
+
+
+            math::VectorFromAffine(matrix, translation, scale, rotation);
+            if (swap == SwapType::yToZ)
+            {
+                translation = swapZY(translation);
+                rotation = swapZY(rotation);
+                scale = swapZY(scale);
+            }
+
+            matrix = math::affine3f::translate(translation) * math::AffineFromEuler<math::LinearSpace3f>(rotation) * math::affine3f::scale(scale);
+
+		}
+        
         return matrix;
     }
 
-    std::shared_ptr<graph::Instance> processAssimpNode(aiMesh* node, const unsigned assimpMeshId, std::map<unsigned, vtxID>& meshMap, const std::vector<std::shared_ptr<graph::Material>>& importedMaterials)
+    std::shared_ptr<graph::Instance> processAssimpNode(aiMesh* node, const unsigned assimpMeshId, std::map<unsigned, vtxID>& meshMap, const std::vector<std::shared_ptr<graph::Material>>& importedMaterials, SwapType swap)
     {
-        std::shared_ptr<graph::Mesh> meshNode;
+        std::shared_ptr<graph::Mesh> meshNode = nullptr;
         if (meshMap.find(assimpMeshId) != meshMap.end())
         {
             meshNode = graph::SIM::get()->getNode<graph::Mesh>(meshMap[assimpMeshId]);
         }
         else
         {
-            meshNode = ops::createNode<graph::Mesh>();
-            meshMap.insert({ assimpMeshId, meshNode->getID() });
-            convertAssimpMeshToMeshNode(node, meshNode);
+            meshNode = convertAssimpMeshToMeshNode(node, swap);
+            meshMap.insert({ assimpMeshId, meshNode->getUID() });
         }
 
         std::shared_ptr<graph::Instance> instanceNode = ops::createNode<graph::Instance>();
@@ -469,24 +530,36 @@ namespace vtx::importer
         return instanceNode;
     }
 
-    std::shared_ptr<graph::Group> processAssimpNode(const aiNode* node, const aiScene* scene, std::map<unsigned, vtxID>& meshMap, const std::vector<std::shared_ptr<graph::Material>>& importedMaterials) {
-        auto groupNode = ops::createNode<graph::Group>();
-
-        // Process node transformation
-        groupNode->transform->setAffine(convertAssimpMatrix(node->mTransformation));
+    std::shared_ptr<graph::Node> processAssimpNode(const aiNode* node, const aiScene* scene, std::map<unsigned, vtxID>& meshMap, const std::vector<std::shared_ptr<graph::Material>>& importedMaterials, SwapType swap) {
+        std::vector<std::shared_ptr<graph::Node>> children;
 
         // Process node children
         for (unsigned int i = 0; i < node->mNumChildren; ++i) {
-            groupNode->addChild(processAssimpNode(node->mChildren[i], scene, meshMap, importedMaterials));
+            children.push_back(processAssimpNode(node->mChildren[i], scene, meshMap, importedMaterials, swap));
         }
 
         // Process node meshes
         for (unsigned int i = 0; i < node->mNumMeshes; ++i) {
             aiMesh* aiMesh = scene->mMeshes[node->mMeshes[i]];
-            groupNode->addChild(processAssimpNode(aiMesh, node->mMeshes[i], meshMap, importedMaterials));
+            const std::shared_ptr<graph::Instance> instance = processAssimpNode(aiMesh, node->mMeshes[i], meshMap, importedMaterials, swap);
+            children.push_back(instance);
         }
 
-        return groupNode;
+        // If there's only one child and it's a mesh, return the mesh's instance directly.
+        if (children.size() == 1 && dynamic_cast<graph::Instance*>(children[0].get())) {
+            std::shared_ptr<graph::Instance> instance = children[0]->as<graph::Instance>();
+            instance->transform->setAffine(convertAssimpMatrix(node->mTransformation, swap));
+            return instance;
+        }
+        else {
+            auto groupNode = ops::createNode<graph::Group>();
+            // Process node transformation
+            groupNode->transform->setAffine(convertAssimpMatrix(node->mTransformation, swap));
+            for (auto& child : children) {
+                groupNode->addChild(child);
+            }
+            return groupNode;
+        }
     }
 
     void processMetadata(const aiScene* scene, const std::string& fileFormat) {
@@ -601,11 +674,15 @@ namespace vtx::importer
 								 upVec.x,        upVec.y,        upVec.z,        0.0f,
 								 0.0f,           0.0f,           0.0f,           1.0f);
 
-            scene->mRootNode->mTransformation = mat;
+           sceneRotationToVTXFrame = mat;
+			//applyTransformationToNode(scene->mRootNode, mat);
+            //applyTransformationToLeafNodes(scene->mRootNode, mat);
+
+            //scene->mRootNode->mTransformation = mat;
         }
     }
 
-    std::vector<std::shared_ptr<graph::Camera>> processCameras(const aiScene* scene)
+    std::vector<std::shared_ptr<graph::Camera>> processCameras(const aiScene* scene, SwapType swap)
     {
         std::vector<std::shared_ptr<graph::Camera>> cameras;
         for (unsigned int i = 0; i < scene->mNumCameras; ++i)
@@ -625,31 +702,32 @@ namespace vtx::importer
             aiNode* node = scene->mRootNode->FindNode(cam->mName);
 
             // Get the transformation of the node
-            math::affine3f transform = convertAssimpMatrix(node->mTransformation);
-            math::affine3f rootM = convertAssimpMatrix(scene->mRootNode->mTransformation);
-            math::affine3f finalTransform = rootM * transform;
+            math::affine3f transform = convertAssimpMatrix(node->mTransformation, SwapType::None);
+            //math::affine3f rootM = convertAssimpMatrix(scene->mRootNode->mTransformation);
+            //math::affine3f finalTransform = rootM * transform;
             // Transform the camera's local vectors into world space
-            aiVector3D posAssimp = cam->mPosition;
-            aiVector3D upAssimp = cam->mUp;
-            aiVector3D lookAssimp = cam->mLookAt;
-
-            math::vec3f pos (posAssimp.x, posAssimp.y, posAssimp.z);
-            math::vec3f up = math::normalize({ upAssimp.x, upAssimp.y, upAssimp.z });
-            math::vec3f lookAt = math::normalize({lookAssimp.x, lookAssimp.y, lookAssimp.z});
-            math::vec3f horizzontal = math::normalize(cross(lookAt, up));
-
-            math::vec3f wUp = math::transformVector3F(finalTransform, up);
-            math::vec3f wLookAt = math::transformVector3F(finalTransform, lookAt);
-            math::vec3f wHorizzontal = math::transformVector3F(finalTransform, horizzontal);
-        	math::vec3f wPos = math::transformPoint3F(rootM, pos);
+            //aiVector3D posAssimp = cam->mPosition;
+            //aiVector3D upAssimp = cam->mUp;
+            //aiVector3D lookAssimp = cam->mLookAt;
+            //
+            //math::vec3f pos (posAssimp.x, posAssimp.y, posAssimp.z);
+            //math::vec3f up = math::normalize({ upAssimp.x, upAssimp.y, upAssimp.z });
+            //math::vec3f lookAt = math::normalize({lookAssimp.x, lookAssimp.y, lookAssimp.z});
+            //math::vec3f horizzontal = math::normalize(cross(lookAt, up));
+            //
+            //math::vec3f wUp = math::transformVector3F(finalTransform, up);
+            //math::vec3f wLookAt = math::transformVector3F(finalTransform, lookAt);
+            //math::vec3f wHorizzontal = math::transformVector3F(finalTransform, horizzontal);
+        	//math::vec3f wPos = math::transformPoint3F(rootM, pos);
 
 
 			std::shared_ptr<graph::Camera> camera = ops::createNode<graph::Camera>();
 
-			math::affine3f cameraTransform(wHorizzontal, wUp, -wLookAt, wPos);
+			//math::affine3f cameraTransform(wHorizzontal, wUp, -wLookAt, wPos);
 
-            camera->transform->setAffine(cameraTransform);
+            camera->transform->setAffine(convertAssimpMatrix(node->mTransformation, swap));
             camera->fovY = fov*180.0f/M_PI;
+            //camera->aspect = aspect;
             camera->updateDirections();
 
             cameras.push_back(camera);
@@ -665,6 +743,7 @@ namespace vtx::importer
         Assimp::Importer importer;
         const aiScene* scene = importer.ReadFile(filePath,
                                                  aiProcess_Triangulate |
+                                                 //aiProcess_MakeLeftHanded |
                                                  aiProcess_JoinIdenticalVertices |
                                                  aiProcess_SortByPType |
                                                  aiProcess_GenSmoothNormals |
@@ -690,10 +769,23 @@ namespace vtx::importer
         std::map<unsigned, vtxID> meshMap;
         VTX_INFO("Creating Scene Graph");
 		const std::vector<std::shared_ptr<graph::Material>> importedMaterials = processMaterials(scene, utl::getFolder(filePath));
-		std::shared_ptr<graph::Group> sceneGraph = processAssimpNode(scene->mRootNode, scene, meshMap,importedMaterials);
-		std::vector<std::shared_ptr<graph::Camera>> cameras = processCameras(scene);
-        return { sceneGraph, cameras };
+        std::shared_ptr<graph::Group>                       sceneGraph        = nullptr;
+		const std::shared_ptr<graph::Node>                  root              = processAssimpNode(scene->mRootNode, scene, meshMap,importedMaterials, SwapType::yToZ);
+        if (root->as<graph::Instance>())
+        {
+	        // scene contains only one mesh, so we need to create a group to contain it
+            sceneGraph = ops::createNode<graph::Group>();
+            sceneGraph->addChild(root);
+        }
+        else
+        {
+	        sceneGraph = root->as<graph::Group>();
+        }
 
+        sceneGraph->name = "Scene Root Group";
+
+		std::vector<std::shared_ptr<graph::Camera>> cameras = processCameras(scene, SwapType::None);
+        return { sceneGraph, cameras };
     }
 
 
