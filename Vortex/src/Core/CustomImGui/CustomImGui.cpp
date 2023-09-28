@@ -12,22 +12,22 @@ namespace vtx::vtxImGui
 
     bool sliderFloat(const char* label, float* value, const float min, const float max, const char* format) {
         // Get the current style
-        ImGuiStyle& style = ImGui::GetStyle();
+		const ImGuiStyle& style = ImGui::GetStyle();
         ImGui::PushStyleColor(ImGuiCol_SliderGrab, IM_COL32(255, 255, 255, 0)); // Hide the slider grab
 
         // Set the format callback to our custom callback
-        bool value_changed = ImGui::SliderFloat(("##" + std::string(label)).c_str(), value, min, max, emptyFormatCallback());
+		const bool valueChanged = ImGui::SliderFloat(("##" + std::string(label)).c_str(), value, min, max, emptyFormatCallback());
 
         ImGui::PopStyleColor(); // Restore the slider grab color
 
         // Get the slider's rectangle
-        ImVec2 pos = ImGui::GetItemRectMin();
-        ImVec2 size = ImGui::GetItemRectSize();
+        ImVec2       pos  = ImGui::GetItemRectMin();
+		const ImVec2 size = ImGui::GetItemRectSize();
 
         // Draw a rectangle on the left part of the slider, filled with the desired color
         ImDrawList* draw_list = ImGui::GetWindowDrawList();
-        float x = pos.x + size.x * (*value - min) / (max - min);
-        ImU32 color = ImGui::GetColorU32(ImGuiCol_SliderGrabActive); // Change to the ImGui color variable you want
+		const float x         = pos.x + size.x * (*value - min) / (max - min);
+		const ImU32 color     = ImGui::GetColorU32(ImGuiCol_SliderGrabActive);                // Change to the ImGui color variable you want
         draw_list->AddRectFilled(pos, ImVec2(x, pos.y + size.y), color, style.FrameRounding); // Add rounding to match the ImGui style
 
         // Display the text and the value over the slider
@@ -37,12 +37,12 @@ namespace vtx::vtxImGui
         ImGui::SetCursorScreenPos({ pos.x + size.x - ImGui::CalcTextSize(std::to_string(*value).c_str()).x - 5, pos.y });
         ImGui::Text(format, *value);
 
-        return value_changed;
+        return valueChanged;
     }
 
     void fakeButton(const char* label, const ImVec2& size_arg = ImVec2(0,0))
     {
-        ImVec4 regularColor = ImGui::GetStyleColorVec4(ImGuiCol_Button);
+		const ImVec4 regularColor = ImGui::GetStyleColorVec4(ImGuiCol_Button);
 
         // Set the hovered and active colors to the regular color
         ImGui::PushStyleColor(ImGuiCol_ButtonHovered, regularColor);
@@ -55,7 +55,7 @@ namespace vtx::vtxImGui
 
     bool clippedText(const char* label)
     {
-        float totalItemWidth = ImGui::CalcItemWidth();
+		const float totalItemWidth = ImGui::CalcItemWidth();
 
         std::string labelStr = label;
         // Adjust the label to fit the halfItemWidth
@@ -103,16 +103,16 @@ namespace vtx::vtxImGui
 
     bool colorPicker(const char* label, float* col)
     {
-        std::string labelStr = label;
-        bool valueChanged = false;
-        float totalItemWidth = ImGui::CalcItemWidth();
+		const std::string labelStr       = label;
+        bool              valueChanged   = false;
+		const float       totalItemWidth = ImGui::CalcItemWidth();
 
-        ImVec4 color(col[0], col[1], col[2], 1.0f);
-        ImGui::PushStyleColor(ImGuiCol_Button, color); // Set the color for the button
-        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, color); // Set the hover color for the button
-        ImGui::PushStyleColor(ImGuiCol_ButtonActive, color); // Set the active color for the button
-        bool clicked = ImGui::Button((labelStr + "_ColorButton").c_str(), ImVec2(totalItemWidth, ImGui::GetFrameHeight())); // Draw the button in the second column
-        ImGui::PopStyleColor(3); // Restore the color
+		const ImVec4 color(col[0], col[1], col[2], 1.0f);
+        ImGui::PushStyleColor(ImGuiCol_Button, color);                                                                            // Set the color for the button
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, color);                                                                     // Set the hover color for the button
+        ImGui::PushStyleColor(ImGuiCol_ButtonActive, color);                                                                      // Set the active color for the button
+		const bool clicked = ImGui::Button((labelStr + "_ColorButton").c_str(), ImVec2(totalItemWidth, ImGui::GetFrameHeight())); // Draw the button in the second column
+        ImGui::PopStyleColor(3);                                                                                                  // Restore the color
 
         // Create a color picker when the button is clicked
         if (clicked) {
@@ -129,15 +129,15 @@ namespace vtx::vtxImGui
 
 	bool colorEdit3NoInputs(const char* label, float* col) {
 
-        bool valueChanged = false;
-        ImGuiStyle& style = ImGui::GetStyle();
+        bool              valueChanged = false;
+		const ImGuiStyle& style        = ImGui::GetStyle();
 
         // Start a new ImGui ID Scope
         ImGui::PushID(label);
 
         // Calculate the size of the text and button
-        float totalItemWidth = ImGui::CalcItemWidth();
-        float halfItemWidth = totalItemWidth * 0.5f; // Subtract the ItemInnerSpacing
+		const float totalItemWidth = ImGui::CalcItemWidth();
+		const float halfItemWidth  = totalItemWidth * 0.5f; // Subtract the ItemInnerSpacing
 
         ImGui::PushItemWidth(halfItemWidth - style.ItemSpacing.x); // Set the width of the next widget to 200
 
@@ -146,8 +146,8 @@ namespace vtx::vtxImGui
         ImGui::PopItemWidth(); // Restore the width
 
         // After rendering the clipped text
-        ImVec2 textSize = ImGui::GetItemRectSize();
-        float remainingWidth = totalItemWidth - textSize.x - style.ItemSpacing.x;
+		const ImVec2 textSize       = ImGui::GetItemRectSize();
+		const float  remainingWidth = totalItemWidth - textSize.x - style.ItemSpacing.x;
 
         ImGui::SameLine(); // Draw the button on the same line as the label
         ImGui::PushItemWidth(remainingWidth); // Set the width of the next widget to 200
@@ -174,7 +174,7 @@ namespace vtx::vtxImGui
 
     void affineGui(math::affine3f& affine)
     {
-        float availableWidth = ImGui::CalcItemWidth() - ImGui::GetStyle().ItemSpacing.x * 3;
+		const float availableWidth = ImGui::CalcItemWidth() - ImGui::GetStyle().ItemSpacing.x * 3;
         float elementWidth = availableWidth / 4.0f;//
         ImGui::BeginGroup();
         ImGui::PushItemWidth(elementWidth);
@@ -195,7 +195,7 @@ namespace vtx::vtxImGui
 
     bool customVectorInput(const char* label, float& value, const ImU32 labelColor, const bool disableEdit)
     {
-        float availableWidth = ImGui::CalcItemWidth();
+		const float availableWidth = ImGui::CalcItemWidth();
 
         // Start grouping to treat both the label and the input as a single item
         ImGui::BeginGroup();
@@ -207,7 +207,7 @@ namespace vtx::vtxImGui
         ImGui::PushStyleColor(ImGuiCol_Button, labelColor);
         ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(255, 255, 255, 255));
         fakeButton(label);
-        float buttonSize = ImGui::GetItemRectSize().x;
+		const float buttonSize = ImGui::GetItemRectSize().x;
         ImGui::PopStyleColor();
         ImGui::PopStyleColor();
 
@@ -286,18 +286,18 @@ namespace vtx::vtxImGui
     void DrawRowsBackground(const int row_count, const float line_height, const float x1, const float x2, const float y_offset, const ImU32 col_even, const ImU32 col_odd)
     {
         ImDrawList* draw_list = ImGui::GetWindowDrawList();
-        float y0 = ImGui::GetCursorScreenPos().y + (float)(int)y_offset;
+		const float y0        = ImGui::GetCursorScreenPos().y + (float)(int)y_offset;
 
         int row_display_start;
         int row_display_end;
         ImGui::CalcListClipping(row_count, line_height, &row_display_start, &row_display_end);
         for (int row_n = row_display_start; row_n < row_display_end; row_n++)
         {
-            ImU32 col = (row_n & 1) ? col_odd : col_even;
+			const ImU32 col = (row_n & 1) ? col_odd : col_even;
             if ((col & IM_COL32_A_MASK) == 0)
                 continue;
-            float y1 = y0 + (line_height * row_n);
-            float y2 = y1 + line_height;
+			const float y1 = y0 + (line_height * row_n);
+			const float y2 = y1 + line_height;
             draw_list->AddRectFilled(ImVec2(x1, y1), ImVec2(x2, y2), col);
         }
     }
@@ -322,5 +322,62 @@ namespace vtx::vtxImGui
             ImGui::ResetMouseDragDelta(0);
         }
     }
+
+    void drawOrigin(const math::vec2f& screenPosition)
+    {
+        ImDrawList*  drawList = ImGui::GetWindowDrawList();
+		const ImVec2 winPos   = ImGui::GetWindowPos(); // Top-left corner
+        // Draw the border first
+        drawList->AddCircle(ImVec2(winPos.x + screenPosition.x, winPos.y + screenPosition.y), 3, ImColor(0, 0, 0, 255), 12, 1.0f);
+        // Draw the filled circle with opacity
+        drawList->AddCircleFilled(ImVec2(winPos.x + screenPosition.x, winPos.y + screenPosition.y), 3, ImColor(255, 255/2, 0, 200));
+
+    }
+
+    void drawCornersAndCenter()
+    {
+        ImDrawList*  drawList = ImGui::GetWindowDrawList();
+		const ImVec2 winPos   = ImGui::GetWindowPos();  // Top-left corner
+		const ImVec2 winSize  = ImGui::GetWindowSize(); // Window dimensions
+
+        // Define the positions for the 5 circles
+		const ImVec2 topLeft     = winPos;
+		const ImVec2 topRight    = ImVec2(winPos.x + winSize.x, winPos.y);
+		const ImVec2 bottomLeft  = ImVec2(winPos.x, winPos.y + winSize.y);
+		const ImVec2 bottomRight = ImVec2(winPos.x + winSize.x, winPos.y + winSize.y);
+		const ImVec2 center      = ImVec2(winPos.x + winSize.x * 0.5f, winPos.y + winSize.y * 0.5f);
+
+        // Draw circles at these positions
+        drawList->AddCircle(topRight, 5, ImColor(255, 0, 0, 255), 12, 1.0f);
+        drawList->AddCircle(bottomLeft, 5, ImColor(0, 255, 0, 255), 12, 1.0f);
+        drawList->AddCircle(bottomRight, 5, ImColor(0, 0, 255, 255), 12, 1.0f);
+        drawList->AddCircle(topLeft, 5, ImColor(255, 255, 0, 255), 12, 1.0f);
+        drawList->AddCircle(center, 5, ImColor(255, 255, 255, 255), 12, 1.0f);
+    }
+
+    void drawDashedLine(const math::vec2f& point1, const math::vec2f& point2, const float dashLength, const float gapLength)
+    {
+        ImDrawList*  drawList = ImGui::GetWindowDrawList();
+		const ImVec2 winPos   = ImGui::GetWindowPos(); // Top-left corner of the window
+
+        // Convert local window-based coordinates to global screen-based coordinates
+		const ImVec2 globalPoint1(point1.x + winPos.x, point1.y + winPos.y);
+		const ImVec2 globalPoint2(point2.x + winPos.x, point2.y + winPos.y);
+
+		const ImVec2 delta       = ImVec2(globalPoint2.x - globalPoint1.x, globalPoint2.y - globalPoint1.y);
+		const float  fullLength  = sqrtf(delta.x * delta.x + delta.y * delta.y);
+		const int    numSegments = static_cast<int>(fullLength / (dashLength + gapLength));
+
+        for (int i = 0; i < numSegments; ++i) {
+			const float t0 = i * (dashLength + gapLength) / fullLength;
+			const float t1 = (i * (dashLength + gapLength) + dashLength) / fullLength;
+
+            ImVec2 p0 = ImVec2(globalPoint1.x + t0 * delta.x, globalPoint1.y + t0 * delta.y);
+            ImVec2 p1 = ImVec2(globalPoint1.x + t1 * delta.x, globalPoint1.y + t1 * delta.y);
+
+            drawList->AddLine(p0, p1, ImColor(0, 0, 0, 200), 1.0f);
+        }
+    }
+
 
 }

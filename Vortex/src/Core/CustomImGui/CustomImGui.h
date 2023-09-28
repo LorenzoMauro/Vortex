@@ -74,4 +74,11 @@ namespace vtx::vtxImGui
     void DrawRowsBackground(int row_count, float line_height, float x1, float x2, float y_offset, ImU32 col_even, ImU32 col_odd);
 
     void childWindowResizerButton(float& percentage, const float& resizerSize, bool isHorizontalSplit);
+
+    void drawOrigin(const math::vec2f& screenPosition);
+    void drawCornersAndCenter();
+
+    void drawDashedLine(const math::vec2f& point1, const math::vec2f& point2, float dashLength = 5.0f, float gapLength = 4.0f);
+
 }
+
