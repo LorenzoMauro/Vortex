@@ -15,7 +15,7 @@ file(GLOB OPTIXIR_COMPILE_FILES "${CMAKE_CURRENT_SOURCE_DIR}/Device/DeviceProgra
 file(GLOB CLANG_COMPILE_FILES "${CMAKE_CURRENT_SOURCE_DIR}/Device/DevicePrograms/Clang/*.cu")
 
 #Dependencies for the custom cuda compilation step with nvcc
-list(APPEND CU_DEPENDENCIES ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES} ${OPTIX_INCLUDE_DIR} ${MDL_SDK_INCLUDE_DIRS} ${SPDLOG_INCLUDE_DIRS})
+list(APPEND CU_DEPENDENCIES ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES} ${OPTIX_INCLUDE_DIR} ${MDL_SDK_INCLUDE_DIRS} ${SPDLOG_INCLUDE_DIRS} ${HEADERS})
 
 #Intermediate CUDA Compilation Flags
 list(APPEND CU_COMPILE_FLAGS "-gencode=arch=compute_70,code=\\\"sm_70,compute_70\\\"")
@@ -55,7 +55,7 @@ NVCUDA_COMPILE_MODULE(
 )
 
 # Clang Compilation of Cu files for MDL Inlining of functions
-list(APPEND CLANG_DEPENDENCIES ${CMAKE_CURRENT_SOURCE_DIR} "${CUDA_8_PATH}/include" ${OPTIX_INCLUDE_DIR} ${MDL_SDK_INCLUDE_DIRS} ${SPDLOG_INCLUDE_DIRS})
+list(APPEND CLANG_DEPENDENCIES ${CMAKE_CURRENT_SOURCE_DIR} "${CUDA_8_PATH}/include" ${OPTIX_INCLUDE_DIR} ${MDL_SDK_INCLUDE_DIRS} ${SPDLOG_INCLUDE_DIRS} ${HEADERS})
 list(APPEND CLANG_COMPILE_COMMAND "${CLANG_12_PATH}")
 list(APPEND CLANG_COMPILE_COMMAND "--cuda-path=${CUDA_8_PATH}")
 list(APPEND CLANG_COMPILE_COMMAND "-D_ALLOW_COMPILER_AND_STL_VERSION_MISMATCH")
@@ -231,7 +231,9 @@ foreach(idx RANGE ${len})
                      #COMMAND ${CMAKE_COMMAND} -E echo "Copying ${debug_dll} or ${release_dll}"
                      COMMAND ${CMAKE_COMMAND} -E copy_if_different
                      $<$<CONFIG:Debug>:${debug_dll}>$<$<OR:$<CONFIG:Release>,$<CONFIG:RelWithDebInfo>,$<CONFIG:MinSizeRel>>:${release_dll}>
-                     $<TARGET_FILE_DIR:Vortex>)
+                     $<TARGET_FILE_DIR:Vortex>
+                     COMMENT "Copying TORCH DLLS if newer..."
+                     )
 endforeach()
 
                    
@@ -244,19 +246,25 @@ set(MDL_DLLS
 add_custom_command(TARGET Vortex POST_BUILD
                    COMMAND ${CMAKE_COMMAND} -E copy_if_different
                    ${MDL_DLLS}
-                   $<TARGET_FILE_DIR:Vortex>)
+                   $<TARGET_FILE_DIR:Vortex>
+                   COMMENT "Copying MDL DLLS if newer..."
+                   )
 
 add_custom_command(TARGET Vortex POST_BUILD
                    COMMAND ${CMAKE_COMMAND} -E make_directory $<TARGET_FILE_DIR:Vortex>/assets/mdl
                    COMMAND ${CMAKE_COMMAND} -E copy_if_different
                    ${CMAKE_SOURCE_DIR}/assets/mdl/VortexFunctions.mdl
-                   $<TARGET_FILE_DIR:Vortex>/assets/mdl)
+                   $<TARGET_FILE_DIR:Vortex>/assets/mdl
+                   COMMENT "Copying Vortex Function mdl if newer..."
+                   )
 
 add_custom_command(TARGET Vortex POST_BUILD
                    COMMAND ${CMAKE_COMMAND} -E make_directory $<TARGET_FILE_DIR:Vortex>/assets/mdl
                    COMMAND ${CMAKE_COMMAND} -E copy_if_different
                    ${CMAKE_SOURCE_DIR}/assets/mdl/VortexPrincipledShader.mdl
-                   $<TARGET_FILE_DIR:Vortex>/assets/mdl)
+                   $<TARGET_FILE_DIR:Vortex>/assets/mdl
+                   COMMENT "Copying VortexPrincipledShader mdl if newer..."
+                   )
 
 add_custom_command(TARGET Vortex POST_BUILD
                    COMMAND xcopy /D /Y /F "\"${CMAKE_SOURCE_DIR}/assets/ImGui.ini\"" "\"$<TARGET_FILE_DIR:Vortex>/assets/\\\""
