@@ -116,6 +116,9 @@ namespace gdt {
     /*! return matrix for scaling */
     static inline AffineSpaceT scale(const VectorT& s) { return L::scale(s); }
 
+    /*! return matrix for scaling around arbitrary point */
+    static inline AffineSpaceT scale(const VectorT& p, const VectorT& s) { return translate(+p) * scale(s) * translate(-p); }
+
     /*! return matrix for translation */
     static inline AffineSpaceT translate(const VectorT& p) { return AffineSpaceT(one,p); }
 

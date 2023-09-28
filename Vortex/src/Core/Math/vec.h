@@ -324,6 +324,13 @@ namespace gdt {
 
     /*! vector cross product */
     template<typename T>
+    inline __both__ float cross(const vec_t<T, 2>& a, const vec_t<T, 2>& b)
+    {
+        return a.x * b.y - b.x * a.y;
+    }
+
+    /*! vector cross product */
+    template<typename T>
     inline __both__ vec_t<T, 3> cross(const vec_t<T, 3>& a, const vec_t<T, 3>& b)
     {
         return vec_t<T, 3>(a.y * b.z - b.y * a.z,

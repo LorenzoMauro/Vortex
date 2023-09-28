@@ -254,6 +254,7 @@ namespace gdt {
                           u.x*u.z*(1-c)-u.y*s,    u.y*u.z*(1-c)+u.x*s,    u.z*u.z+(1-u.z*u.z)*c);
     }
 
+
   public:
 
     /*! the column vectors of the matrix */

@@ -181,8 +181,8 @@ namespace vtx::math
 
 
 	///////////////////////////////////////////////////////////////////////////
-		///// Quaternion Definitions //////////////////////////////////////////////
-		///////////////////////////////////////////////////////////////////////////
+	///// Quaternion Definitions //////////////////////////////////////////////
+	///////////////////////////////////////////////////////////////////////////
 
 	template<typename T>
 	using QuaternionT = gdt::QuaternionT<T>;
@@ -192,8 +192,8 @@ namespace vtx::math
 	typedef QuaternionT<double> Quaternion3d;
 
 	///////////////////////////////////////////////////////////////////////////
-		///// Affine Space Definition	///////////////////////////////////////////
-		///////////////////////////////////////////////////////////////////////////
+	///// Affine Space Definition	///////////////////////////////////////////
+	///////////////////////////////////////////////////////////////////////////
 
 	/// NB : AffineSpace to float[12] assignment performed added in gdt/AffineSpace.h
 
@@ -209,23 +209,6 @@ namespace vtx::math
 	struct AffineSpaceT : public gdt::AffineSpaceT<T> {
 
 		using gdt::AffineSpaceT<T>::AffineSpaceT; // Inherit all constructors
-
-		///* Assign values to a transform matrix expressed as float[12] with a conversion operator*/
-		//inline __both__  operator Scalar_t* () const {
-		//	auto* m = (Scalar_t*)alloca(12 * sizeof(Scalar_t));
-		//	m[0] = (Scalar_t)l.vx.x; m[1] = (Scalar_t)l.vy.x; m[2] = (Scalar_t)l.vz.x; m[3] = (Scalar_t)p.x;
-		//	m[4] = (Scalar_t)l.vx.y; m[5] = (Scalar_t)l.vy.y; m[6] = (Scalar_t)l.vz.y; m[7] = (Scalar_t)p.y;
-		//	m[8] = (Scalar_t)l.vx.z; m[9] = (Scalar_t)l.vy.z; m[10] = (Scalar_t)l.vz.z; m[11] = (Scalar_t)p.z;
-		//	return m;
-		//}
-
-		//inline __both__ operator float4* () const {
-		//	auto* m = (float4*)alloca(3 * sizeof(float4));
-		//	m[0].x = (float)l.vx.x; m[0].y = (float)l.vx.y; m[0].z = (float)l.vx.z; m[0].w = 0.0f;
-		//	m[1].x = (float)l.vy.x; m[1].y = (float)l.vy.y; m[1].z = (float)l.vy.z; m[1].w = 0.0f;
-		//	m[2].x = (float)l.vz.x; m[2].y = (float)l.vz.y; m[2].z = (float)l.vz.z; m[2].w = 0.0f;
-		//	return m;
-		//}
 
 		inline __host__ __device__ void toFloat(float* out) const
 		{
@@ -247,7 +230,6 @@ namespace vtx::math
 			l.vx.y = rowMajor[4]; l.vy.y = rowMajor[5]; l.vz.y = rowMajor[6]; p.y = rowMajor[7];
 			l.vx.z = rowMajor[8]; l.vy.z = rowMajor[9]; l.vz.z = rowMajor[10]; p.z = rowMajor[11];
 		}
-//#ifdef __CUDACC__
 		//Constructor from float4 array in row major order
 		__both__  AffineSpaceT(const float4* rowMajor)
 		{
@@ -267,22 +249,42 @@ namespace vtx::math
 			p.y = rowMajor[1].w;
 			p.z = rowMajor[2].w;
 		}
-//#endif
 	};
 
 	template<typename T>
 	AffineSpaceT<T> AffineFromEuler(const vec_t<Scalar_t, 3>& euler) {
-		// Transform euler to quaternion
+		// Extract the individual Euler angles for clarity
+		Scalar_t yaw = euler.z;
+		Scalar_t pitch = euler.y;
+		Scalar_t roll = euler.x;
 
-		QuaternionT<Scalar_t> quat = QuaternionT<Scalar_t>(euler.z, euler.y, euler.z);
-		T L = T(quat);
-		auto Affine = AffineSpaceT<T>(L);
-		return Affine;
+		// Precompute cosines and sines
+		Scalar_t cy = cos(yaw);
+		Scalar_t sy = sin(yaw);
+		Scalar_t cp = cos(pitch);
+		Scalar_t sp = sin(pitch);
+		Scalar_t cr = cos(roll);
+		Scalar_t sr = sin(roll);
+
+		// Construct rotation matrix using the ZYX convention 
+		T L;
+		L.vx.x = cy * cp;
+		L.vx.y = cy * sp * sr - sy * cr;
+		L.vx.z = cy * sp * cr + sy * sr;
+
+		L.vy.x = sy * cp;
+		L.vy.y = sy * sp * sr + cy * cr;
+		L.vy.z = sy * sp * cr - cy * sr;
+
+		L.vz.x = -sp;
+		L.vz.y = cp * sr;
+		L.vz.z = cp * cr;
+
+		return AffineSpaceT<T>(L);
 	}
 
-
 	template<typename T>
-	void VectorFromAffine(AffineSpaceT<T> affine, vec_t<Scalar_t, 3>& translation, vec_t<Scalar_t, 3> scale, vec_t<Scalar_t, 3>& euler) {
+	void VectorFromAffine(AffineSpaceT<T> affine, vec_t<Scalar_t, 3>& translation, vec_t<Scalar_t, 3>& scale, vec_t<Scalar_t, 3>& euler) {
 		translation = affine.p;
 
 		scale.x = length(affine.l.vx);
@@ -294,35 +296,37 @@ namespace vtx::math
 		vec_t<Scalar_t, 3> rVy = affine.l.vy * reverseScale.y;
 		vec_t<Scalar_t, 3> rVz = affine.l.vz * reverseScale.z;
 
-		Scalar_t& m00 = affine.l.vx.x;
-		Scalar_t& m10 = affine.l.vx.y;
-		Scalar_t& m20 = affine.l.vx.z;
+		Scalar_t m00 = rVx.x;
+		Scalar_t m10 = rVx.y;
+		Scalar_t m20 = rVx.z;
 
-		Scalar_t& m01 = affine.l.vy.x;
-		Scalar_t& m11 = affine.l.vy.y;
-		Scalar_t& m21 = affine.l.vy.z;
+		Scalar_t m01 = rVy.x;
+		Scalar_t m11 = rVy.y;
+		Scalar_t m21 = rVy.z;
 
-		Scalar_t& m02 = affine.l.vz.x;
-		Scalar_t& m12 = affine.l.vz.y;
-		Scalar_t& m22 = affine.l.vz.z;
+		Scalar_t m02 = rVz.x;
+		Scalar_t m12 = rVz.y;
+		Scalar_t m22 = rVz.z;
 
-		if (m10 > 0.998f) { // singularity at north pole
-			euler.y = atan2(m02, m22);
-			euler.x = M_PI * 0.5f;
-			euler.z = 0;
+		constexpr float epsilon = 1e-6f; // Or choose another suitable small value
+
+		// New Method
+		{
+			// Yaw
+			if (fabsf(m20) < 1 - epsilon) {
+				euler.z = atan2(-m10, m00);
+				euler.x = atan2(-m21, m22);
+			}
+			else {
+				// Gimbal lock case
+				euler.z = atan2(m01, m11);
+				euler.x = 0;
+			}
+			// Pitch
+			euler.y = asin(m20);
 		}
-		else if (m10 < -0.998f) { // singularity at south pole
-			euler.y = atan2(m02, m22);
-			euler.x = M_PI * 0.5f;
-			euler.z = 0;
-		}
-		else {
-			euler.y = atan2(-m20, m00);
-			euler.z = atan2(-m12, m11);
-			euler.x = asin(m10);
-		}
-		return;
 	}
+
 #undef ScalarT
 
 	using AffineSpace2f = AffineSpaceT<LinearSpace2f>;
