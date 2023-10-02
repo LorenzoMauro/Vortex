@@ -1,24 +1,29 @@
 #include "Scene.h"
+#include "Utility/Operations.h"
+#include "Graph.h"
 
 namespace vtx::graph
 {
-	static std::shared_ptr<Scene> gScene;
-
-	std::shared_ptr<Scene> Scene::getScene()
+	Scene* Scene::get()
 	{
-		if (!gScene)
-		{
-			gScene = std::make_shared<Scene>();
-			gScene->sceneRoot = std::make_shared<Group>();
-			gScene->renderer = std::make_shared<Renderer>();
-			gScene->sceneRoot->addChild(gScene->renderer);
-		}
-		return gScene;
+		static Scene scene;
+		return &scene;
+	}
+
+	std::shared_ptr<SceneIndexManager> Scene::getSim() { return get()->sim; }
+
+	void Scene::init()
+	{
+		sceneRoot = std::make_shared<Group>();
+		sim->record(sceneRoot);
+		renderer = std::make_shared<Renderer>();
+		sim->record(renderer);
+		renderer->sceneRoot = sceneRoot;
 	}
 
 	std::set<vtxID> fetchInstances(vtxID id)
 	{
-		const std::shared_ptr<SIM> sim = SIM::get();
+		const std::shared_ptr<graph::SceneIndexManager> sim = Scene::getSim();
 		if (sim->nodeTypeFromUID(id) == NT_INSTANCE)
 		{
 			return { id };
@@ -59,11 +64,11 @@ namespace vtx::graph
 
 	std::set<std::shared_ptr<Instance>> Scene::getSelectedInstances() const
 	{
-		const std::set<vtxID> selectedInstanceIds = getSelectedInstancesIds();
-		std::set<std::shared_ptr<graph::Instance>> selectedInstances;
+		const std::set<vtxID>               selectedInstanceIds = getSelectedInstancesIds();
+		std::set<std::shared_ptr<Instance>> selectedInstances;
 		for (const vtxID& instanceID : selectedInstanceIds)
 		{
-			const std::shared_ptr<graph::Instance>& instance = graph::SIM::get()->getNode<graph::Instance>(instanceID);
+			const std::shared_ptr<Instance>& instance = sim->getNode<Instance>(instanceID);
 			selectedInstances.insert(instance);
 		}
 		return selectedInstances;
@@ -91,7 +96,7 @@ namespace vtx::graph
 		std::set<vtxID> newSelection;
 		for (const vtxID id: selectedIds)
 		{
-			if (SIM::get()->nodeTypeFromUID(id) != NT_INSTANCE)
+			if (sim->nodeTypeFromUID(id) != NT_INSTANCE)
 			{
 				newSelection.insert(id);
 			}
@@ -103,4 +108,8 @@ namespace vtx::graph
 		selectedIds = selected;
 	}
 	std::set<vtxID> Scene::getSelected() const { return selectedIds; }
+	Scene::Scene()
+	{
+		sim = std::make_shared<SceneIndexManager>();
+	}
 }

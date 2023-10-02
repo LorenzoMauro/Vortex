@@ -1,7 +1,6 @@
 #pragma once
 #include <map>
 #include <set>
-#include <typeindex>
 
 #include "Node.h"
 #include "Core/Log.h"
@@ -9,51 +8,21 @@
 
 namespace vtx::graph
 {
-	class SIM {
+	class SceneIndexManager {
 	public:
 
-		SIM();
-		static std::shared_ptr<SIM> get();
+		~SceneIndexManager()
+		{
+			VTX_WARN("SceneIndexManager destructor called!");
+		}
 
 		vtxID getUID();
 
+		vtxID getTypeId(NodeType type);
 
-		template<typename T>
-		vtxID getTypeId()
-		{
-			// No free indices for this type, create a new one
-			const auto typeIndex = std::type_index(typeid(T));
-			if (freeTID.find(typeIndex) == freeTID.end() || freeTID[std::type_index(typeid(T))].empty())
-			{
-				if (nextTID.find(typeIndex) == nextTID.end())
-				{
-					nextTID[typeIndex] = 1;
-				}
-				return nextTID[typeIndex]++;
-			}
+		void releaseUID(vtxID id, bool doRemoveNodeReference = true);
 
-			const auto it = freeTID[typeIndex].begin();
-			const vtxID idx = *it;
-			freeTID[typeIndex].erase(it);
-			return idx;
-		}
-
-		void releaseUID(vtxID id);
-
-		template<typename T>
-		void releaseTypeId(const vtxID id)
-		{
-
-			const auto typeIndex = std::type_index(typeid(T));
-			if (id + 1 == nextTID[typeIndex])
-			{
-				--nextTID[typeIndex];
-			}
-			else
-			{
-				freeTID[typeIndex].insert(id);
-			}
-		}
+		void releaseTypeId(const vtxID id, NodeType type);
 
 		void record(const std::shared_ptr<Node>& node);
 
@@ -67,12 +36,12 @@ namespace vtx::graph
 			std::shared_ptr<Node> node = it->second.lock();
 			if (!node) {
 				//VTX_WARN("The requested Node Id has been deleted, removing references!");
-				removeNodeReference(id);
+				removeNodeReference(node->getUID(), node->getTypeID(), node->getType(), true);
 			}
 			return node;
 		}
 
-		void removeNodeReference(vtxID id);
+		void removeNodeReference(const vtxID UID, const vtxID TID, NodeType type, bool addToDeleted = true);
 
 		// Template function to return the statically-casted shared_ptr based on NodeType
 		template<typename T>
@@ -127,6 +96,7 @@ namespace vtx::graph
 		vtxID TIDfromUID(const vtxID typeID);
 
 		NodeType nodeTypeFromUID(const vtxID id);
+		std::vector<std::shared_ptr<Node>>      getAllNodes();
 
 	private:
 		vtxID														nextUID = 1; // Index Zero is reserved for Invalid Index, maybe I can use invalid unsigned
@@ -137,8 +107,8 @@ namespace vtx::graph
 		std::map<vtxID, std::weak_ptr<Node>>						nodesByUID; 
 		std::map<NodeType, std::vector<vtxID>>						nodesByType;
 		std::map<vtxID, NodeType>									UIDtoNodeType;
-		std::map<std::type_index, std::set<vtxID>>					freeTID;
-		std::map<std::type_index, vtxID>							nextTID;
+		std::map<NodeType, std::set<vtxID>>							freeTID;
+		std::map<NodeType, vtxID>									nextTID;
 		std::map<NodeType, std::vector<math::vec2ui>>				deletedNodes;
 		std::map<vtxID,vtxID>										UIDtoTID;
 		std::map<NodeType, std::map<vtxID, vtxID>>					TIDtoUID;

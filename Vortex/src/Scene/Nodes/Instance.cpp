@@ -2,7 +2,8 @@
 #include "Scene/Traversal.h"
 #include "Mesh.h"
 #include "MeshLight.h"
-#include "Scene/SIM.h"
+#include "Scene/Scene.h"
+#include "Scene/SceneIndexManager.h"
 
 namespace vtx::graph
 {
@@ -10,12 +11,6 @@ namespace vtx::graph
 	{
 		transform = ops::createNode<Transform>();
 		child = nullptr;
-		typeID = SIM::get()->getTypeId<Instance>();
-	}
-
-	Instance::~Instance()
-	{
-		SIM::get()->releaseTypeId<Transform>(typeID);
 	}
 
 	void Instance::accept(NodeVisitor& visitor)
@@ -28,6 +23,11 @@ namespace vtx::graph
 	}
 
 	void Instance::setChild(const std::shared_ptr<Node>& _child) {
+		const NodeType newChildType = _child->getType();
+		if(!(newChildType == NT_GROUP || newChildType == NT_MESH || newChildType == NT_INSTANCE))
+		{
+			VTX_ERROR("Can't add child of type: {}", nodeNames[newChildType]);
+		}
 		if (child && childIsMesh) {
 			if (_child->getUID() != child->getUID()) {
 				clearMeshLights();
@@ -52,11 +52,20 @@ namespace vtx::graph
 	void Instance::addMaterial(const std::shared_ptr<Material>& _material, const int slot) {
 
 		MaterialSlot* materialSlot;
-		if(slot <= materialSlots.size() - 1 && slot != -1)
+		if(slot!=-1)
 		{
-			const vtxID matId = materialSlots[slot].material->getUID();
-			removeMaterial(matId);
-			materialSlot = &materialSlots[slot];
+			// resize materialSlots if needed
+			if (slot >= materialSlots.size())
+			{
+				materialSlots.resize(slot + 1);
+				materialSlot = &materialSlots[slot];
+			}
+			else
+			{
+				const vtxID matId = materialSlots[slot].material->getUID();
+				removeMaterial(matId);
+				materialSlot = &materialSlots[slot];
+			}
 		}
 		else
 		{
@@ -83,8 +92,8 @@ namespace vtx::graph
 			if (materialSlots[i].material->getUID() == matID)
 			{
 				materialSlots[i].material = nullptr;
-				SIM::get()->releaseUID(materialSlots[i].meshLight->getUID());
-				SIM::get()->releaseTypeId<MeshLight>(materialSlots[i].meshLight->getTypeID());
+				Scene::getSim()->releaseUID(materialSlots[i].meshLight->getUID());
+				Scene::getSim()->releaseTypeId(materialSlots[i].meshLight->getTypeID(), NT_MESH_LIGHT);
 				materialSlots[i].meshLight = nullptr;
 
 				materialSlots.erase(materialSlots.begin() + i);
@@ -106,8 +115,8 @@ namespace vtx::graph
 	{
 		for (auto it : materialSlots)
 		{
-			SIM::get()->releaseUID(it.meshLight->getUID());
-			SIM::get()->releaseTypeId<MeshLight>(it.meshLight->getTypeID());
+			Scene::getSim()->releaseUID(it.meshLight->getUID());
+			Scene::getSim()->releaseTypeId(it.meshLight->getTypeID(), NT_MESH_LIGHT);
 			it.meshLight = nullptr;
 		}
 	}
@@ -118,8 +127,8 @@ namespace vtx::graph
 		{
 			if(it.material->getUID() == matID)
 			{
-				SIM::get()->releaseUID(it.meshLight->getUID());
-				SIM::get()->releaseTypeId<MeshLight>(it.meshLight->getTypeID());
+				Scene::getSim()->releaseUID(it.meshLight->getUID());
+				Scene::getSim()->releaseTypeId(it.meshLight->getTypeID(), NT_MESH_LIGHT);
 				it.meshLight = nullptr;
 			}
 		}

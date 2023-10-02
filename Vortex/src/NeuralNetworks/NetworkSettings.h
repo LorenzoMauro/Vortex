@@ -1,6 +1,8 @@
 ﻿#pragma once
 #ifndef NETWORK_SETTINGS_H
 #define NETWORK_SETTINGS_H
+#include <map>
+#include <string>
 
 namespace vtx::network
 {
@@ -20,6 +22,14 @@ namespace vtx::network
 		"Pearson Divergence MC Estimation"
 	};
 
+	inline static std::map<std::string, LossType> lossNameToEnum =
+	{
+			{"KL Divergence", L_KL_DIV},
+			{"KL Divergence MC Estimation", L_KL_DIV_MC_ESTIMATION},
+			{"Pearson Divergence", L_PEARSON_DIV},
+			{"Pearson Divergence MC Estimation", L_PEARSON_DIV_MC_ESTIMATION}
+		};
+
 	enum NetworkType
 	{
 		NT_SAC,
@@ -31,6 +41,12 @@ namespace vtx::network
 	inline static const char* networkNames[] = {
 		"Soft Actor Critic",
 		"Neural Path Guiding"
+	};
+
+	inline static std::map<std::string, NetworkType> networkNameToEnum =
+	{
+		{"Soft Actor Critic", NT_SAC},
+		{"Neural Path Guiding", NT_NGP}
 	};
 
 	enum SamplingStrategy
@@ -48,12 +64,19 @@ namespace vtx::network
 		"Light Samples"
 	};
 
+	inline static std::map<std::string, SamplingStrategy> samplingStrategyNameToEnum =
+	{
+		{"All", SS_ALL},
+		{"Paths with Contribution", SS_PATHS_WITH_CONTRIBUTION},
+		{"Light Samples", SS_LIGHT_SAMPLES}
+	};
+
 	struct TrainingBatchGenerationSettings
 	{
 		SamplingStrategy strategy;
 		bool             weightByMis;
 		float            lightSamplingProb;
-		bool              isUpdated;
+		bool              isUpdated = true;
 	};
 
 	enum EncodingType
@@ -66,6 +89,12 @@ namespace vtx::network
 
 	inline static const char* encodingNames[] = {
 		"None", "Triangle Wave"
+	};
+
+	inline static std::map<std::string, EncodingType> encodingNameToEnum =
+	{
+		{"None", E_NONE},
+		{"Triangle Wave", E_TRIANGLE_WAVE}
 	};
 
 	enum DistributionType
@@ -83,6 +112,14 @@ namespace vtx::network
 			"NASG Trigonometric",
 			"NASG Angle",
 			"NASG Axis Angle"
+	};
+
+	inline static std::map<std::string, DistributionType> distributionNameToEnum =
+	{
+			{"Spherical Gaussian", D_SPHERICAL_GAUSSIAN},
+			{"NASG Trigonometric", D_NASG_TRIG},
+			{"NASG Angle", D_NASG_ANGLE},
+			{"NASG Axis Angle", D_NASG_AXIS_ANGLE}
 	};
 
 	struct EncodingSettings

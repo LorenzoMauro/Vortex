@@ -10,6 +10,7 @@
 
 #include "RendererSettings.h"
 #include "Device/DevicePrograms/WavefrontIntegrator.h"
+
 namespace vtx::graph
 {
 	class Renderer : public Node
@@ -17,8 +18,6 @@ namespace vtx::graph
 	public:
 
 		Renderer();
-
-		~Renderer() override;
 
 		void resize(int width, int height);
 
@@ -48,6 +47,7 @@ namespace vtx::graph
 
 		std::shared_ptr<Camera>							camera;
 		std::shared_ptr<Group>							sceneRoot;
+		std::shared_ptr<EnvironmentLight>				environmentLight;
 
 		uint32_t										width;
 		uint32_t										height;

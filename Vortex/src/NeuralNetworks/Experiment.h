@@ -87,10 +87,11 @@ namespace vtx
 
 		void saveGroundTruth(const std::string& filePath)
 		{
-			const math::vec3f* hostImage = new math::vec3f[width * height];
-			groundTruthBuffer.download(hostImage);
+			std::vector<math::vec3f> hostImage(width * height);
+			math::vec3f* hostImagePtr = hostImage.data();
+			groundTruthBuffer.download(hostImagePtr);
 			Image image;
-			image.load((float*)hostImage, width, height, 3);
+			image.load((float*)hostImagePtr, width, height, 3);
 			image.save(filePath);
 		}
 

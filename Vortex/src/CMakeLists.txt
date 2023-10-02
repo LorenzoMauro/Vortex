@@ -193,7 +193,7 @@ target_include_directories(Vortex PRIVATE
   ${OPTIX_INCLUDE_DIR}
   ${MDL_SDK_INCLUDE_DIRS}
   ${EXTERNAL}/imnodes
-  #${EXTERNAL}/ImGuiFileDialog
+  ${EXTERNAL}/cereal/include
   ${EXTERNAL}/stbImage
   ${TORCH_INSTALL_PREFIX_DEBUG}/include
   ${TORCH_INSTALL_PREFIX_DEBUG}/include/torch/csrc/api/include

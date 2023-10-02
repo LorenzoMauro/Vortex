@@ -18,9 +18,9 @@ namespace vtx
 		if (ImGui::IsKeyPressed(key)) {
 			if (transformType == TT_NONE) {
 				mouseStartPos     = frameMousePosition();
-				selectedInstances = graph::Scene::getScene()->getSelectedInstances();
+				selectedInstances = graph::Scene::get()->getSelectedInstances();
 				pivotWorld        = getPivotWorldPosition();
-				pivotScreen       = camera->project(pivotWorld);
+				pivotScreen       = camera.lock()->project(pivotWorld);
 				for(const auto& instance : selectedInstances)
 				{
 					initialTransforms[instance->getUID()] = instance->transform->affineTransform;
@@ -75,7 +75,7 @@ namespace vtx
 		const ImVec2 windowPos = ImGui::GetWindowPos();
 
 		const float mouseXRelativeToWindow =(mousePos.x - windowPos.x);
-		const float mouseYRelativeToWindow = (float)(camera->resolution.y) -(mousePos.y - windowPos.y);
+		const float mouseYRelativeToWindow = (float)(camera.lock()->resolution.y) - (mousePos.y - windowPos.y);
 
 		return { mouseXRelativeToWindow , mouseYRelativeToWindow };
 	}
@@ -186,7 +186,7 @@ namespace vtx
 				return math::Identity;
 			}
 			math::vec3f rotationAxis = axisFromType(ta);
-			if(dot(rotationAxis, -camera->direction) < 0.0f)
+			if(dot(rotationAxis, -camera.lock()->direction) < 0.0f)
 			{
 				rotationAxis = -rotationAxis;
 			}
@@ -248,17 +248,17 @@ namespace vtx
 
 	math::vec3f gui::TransformUI::projectPixelOnCameraPlaneThroughPivot(const math::vec2f pixel)
 	{
-		const math::vec2f screen {(float)camera->resolution.x, (float)camera->resolution.y};
+		const math::vec2f screen {(float)camera.lock()->resolution.x, (float)camera.lock()->resolution.y};
 		const math::vec2f fragment = pixel;                    // Jitter the sub-pixel location
 		const math::vec2f ndc = (fragment / screen) * 2.0f - 1.0f;      // Normalized device coordinates in range [-1, 1].
-		const math::vec3f rayOrigin = camera->position;
-		const math::vec3f rayDirection = math::normalize(camera->horizontal * ndc.x + camera->vertical * ndc.y + camera->direction);
-		const math::vec3f& planeNormal = -camera->direction;
+		const math::vec3f rayOrigin = camera.lock()->position;
+		const math::vec3f rayDirection = math::normalize(camera.lock()->horizontal * ndc.x + camera.lock()->vertical * ndc.y + camera.lock()->direction);
+		const math::vec3f& planeNormal = -camera.lock()->direction;
 
 		const math::vec3f pixelWorld = rayOrigin + dot(planeNormal, (pivotWorld-rayOrigin))/ dot(planeNormal, rayDirection) * rayDirection;
 
 
-		math::vec2f onScreenPivot = camera->project(pixelWorld, true);
+		math::vec2f onScreenPivot = camera.lock()->project(pixelWorld, true);
 		// add circle
 		vtxImGui::drawOrigin(onScreenPivot);
 
@@ -269,8 +269,8 @@ namespace vtx
 		const math::vec2f startPixel = mouseStartPos;
 		const math::vec2f endPixel = mouseStartPos + mouseDelta;
 
-		const math::vec3f startWorldProjection = camera->projectPixelAtPointDepth(startPixel, pivotWorld);
-		const math::vec3f endWorldProjection = camera->projectPixelAtPointDepth(endPixel, pivotWorld);
+		const math::vec3f startWorldProjection = camera.lock()->projectPixelAtPointDepth(startPixel, pivotWorld);
+		const math::vec3f endWorldProjection = camera.lock()->projectPixelAtPointDepth(endPixel, pivotWorld);
 		const math::vec3f pivotToStart = startWorldProjection - pivotWorld;
 		const math::vec3f pivotToEnd = endWorldProjection - pivotWorld;
 
@@ -302,7 +302,7 @@ namespace vtx
 		case TA_Z:
 			return math::zAxis;
 		case TA_NONE:
-			return camera->direction;
+			return camera.lock()->direction;
 		}
 		return 0.0f;
 	}
@@ -311,7 +311,7 @@ namespace vtx
 	{
 		const math::vec2f endPosition = pivotScreen + mouseDelta;
 
-		const math::vec3f projectedEndPosition = camera->projectPixelAtPointDepth(endPosition, pivotWorld);
+		const math::vec3f projectedEndPosition = camera.lock()->projectPixelAtPointDepth(endPosition, pivotWorld);
 
 		math::vec3f deltaTranslation = projectedEndPosition - pivotWorld;
 
@@ -340,8 +340,8 @@ namespace vtx
 
 	math::vec2f gui::TransformUI::getPivotScreenPosition() const
 	{
-		const math::vec3f centerToCamera = camera->position - pivotWorld;
-		return  math::vec2f(dot(camera->horizontal, centerToCamera), dot(camera->vertical, centerToCamera));
+		const math::vec3f centerToCamera = camera.lock()->position - pivotWorld;
+		return  math::vec2f(dot(camera.lock()->horizontal, centerToCamera), dot(camera.lock()->vertical, centerToCamera));
 	}
 
 	

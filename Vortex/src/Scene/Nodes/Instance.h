@@ -30,8 +30,6 @@ namespace vtx::graph
 	public:
 		Instance();
 
-		~Instance() override;
-
 		std::shared_ptr<Node> getChild();
 
 		void setChild(const std::shared_ptr<Node>& _child);
@@ -53,6 +51,7 @@ namespace vtx::graph
 		std::vector<MaterialSlot>& getMaterialSlots();
 
 		std::vector<std::shared_ptr<Node>> getChildren() const override;
+
 	protected:
 		void accept(NodeVisitor& visitor) override;
 	public:
@@ -62,5 +61,6 @@ namespace vtx::graph
 		std::vector<MaterialSlot>		materialSlots;
 		std::shared_ptr<Node>			child;
 		bool                      childIsMesh = false;
+
 	};
 }

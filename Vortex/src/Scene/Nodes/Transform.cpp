@@ -1,17 +1,15 @@
 #include "Transform.h"
-#include "Scene/SIM.h"
+#include "Scene/SceneIndexManager.h"
 #include "Scene/Traversal.h"
 
 namespace vtx::graph
 {
 	Transform::Transform() : Node(NT_TRANSFORM)
 	{
-		typeID = SIM::get()->getTypeId<Transform>();
 	}
 
 	Transform::~Transform()
 	{
-		SIM::get()->releaseTypeId<Transform>(typeID);
 	}
 
 	math::vec3f Transform::transformVector(const math::vec3f& vector) {

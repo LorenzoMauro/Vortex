@@ -4,6 +4,7 @@
 #include "Scene/Traversal.h"
 #include "MDL/MdlWrapper.h"
 #include "MDL/ShaderVisitor.h"
+#include "Scene/Scene.h"
 #include "Scene/Nodes/Shader/mdl/ShaderNodes.h"
 #include "Shader/BsdfMeasurement.h"
 #include "Shader/LightProfile.h"
@@ -13,11 +14,9 @@ namespace vtx::graph
 {
 	Material::Material() : Node(NT_MATERIAL)
 	{
-		typeID = SIM::get()->getTypeId<Material>();
 	}
 	Material::~Material()
 	{
-		SIM::get()->releaseTypeId<Material>(typeID);
 	}
 	void Material::init()
 	{
@@ -33,7 +32,8 @@ namespace vtx::graph
 		bsdfMeasurements = mdl::createBsdfMeasurementResources(targetCode);
 		lightProfiles = mdl::createLightProfileResources(targetCode);
 
-		dispatchParameters(mdl::getArgumentBlockData(getMaterialDbName(), materialGraph->functionInfo.signature, targetCode, argBlock, mapEnumTypes));
+		const std::vector<graph::shader::ParameterInfo> parameterInfo = mdl::getArgumentBlockData(getMaterialDbName(), materialGraph->functionInfo.signature, targetCode, argBlock, mapEnumTypes);
+		dispatchParameters(parameterInfo);
 
 		state.updateOnDevice = true;
 		state.isInitialized = true;
@@ -453,7 +453,7 @@ namespace vtx::graph
 
 	void computeMaterialsMultiThreadCode()
 	{
-		std::vector<std::shared_ptr<Material>> materials = SIM::get()->getAllNodeOfType<graph::Material>(NT_MATERIAL);
+		std::vector<std::shared_ptr<Material>> materials = graph::Scene::getSim()->getAllNodeOfType<graph::Material>(NT_MATERIAL);
 
 		std::vector<std::thread> threads;
 

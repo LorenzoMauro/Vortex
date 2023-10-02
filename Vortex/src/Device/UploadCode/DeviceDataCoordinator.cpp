@@ -17,47 +17,48 @@ namespace vtx::device
 	{
 		cleanDeletedNodes();
 
-		const std::vector<std::shared_ptr<graph::Mesh>>             meshes            = graph::SIM::get()->getAllNodeOfType<graph::Mesh>(graph::NT_MESH);
+		std::shared_ptr<graph::SceneIndexManager> sim = graph::Scene::getSim();
+		const std::vector<std::shared_ptr<graph::Mesh>>             meshes            = sim->getAllNodeOfType<graph::Mesh>(graph::NT_MESH);
 		for (const std::shared_ptr<graph::Mesh>& mesh : meshes)
 		{
 			syncNode(mesh);
 		}
-		const std::vector<std::shared_ptr<graph::Texture>>          textures          = graph::SIM::get()->getAllNodeOfType<graph::Texture>(graph::NT_MDL_TEXTURE);
+		const std::vector<std::shared_ptr<graph::Texture>>          textures = sim->getAllNodeOfType<graph::Texture>(graph::NT_MDL_TEXTURE);
 		for (const std::shared_ptr<graph::Texture>& texture : textures)
 		{
 			syncNode(texture);
 		}
-		const std::vector<std::shared_ptr<graph::BsdfMeasurement>>  bsdfMeasurements  = graph::SIM::get()->getAllNodeOfType<graph::BsdfMeasurement>(graph::NT_MDL_BSDF);
+		const std::vector<std::shared_ptr<graph::BsdfMeasurement>>  bsdfMeasurements = sim->getAllNodeOfType<graph::BsdfMeasurement>(graph::NT_MDL_BSDF);
 		for (const std::shared_ptr<graph::BsdfMeasurement>& bsdfMeasurement : bsdfMeasurements)
 		{
 			syncNode(bsdfMeasurement);
 		}
-		const std::vector<std::shared_ptr<graph::LightProfile>>     lightProfiles     = graph::SIM::get()->getAllNodeOfType<graph::LightProfile>(graph::NT_MDL_LIGHTPROFILE);
+		const std::vector<std::shared_ptr<graph::LightProfile>>     lightProfiles = sim->getAllNodeOfType<graph::LightProfile>(graph::NT_MDL_LIGHTPROFILE);
 		for (const std::shared_ptr<graph::LightProfile>& lightProfile : lightProfiles)
 		{
 			syncNode(lightProfile);
 		}
-		const std::vector<std::shared_ptr<graph::Material>>         materials         = graph::SIM::get()->getAllNodeOfType<graph::Material>(graph::NT_MATERIAL);
+		const std::vector<std::shared_ptr<graph::Material>>         materials = sim->getAllNodeOfType<graph::Material>(graph::NT_MATERIAL);
 		for (const std::shared_ptr<graph::Material>& material : materials)
 		{
 			syncNode(material);
 		}
-		const std::vector<std::shared_ptr<graph::MeshLight>>        meshLights        = graph::SIM::get()->getAllNodeOfType<graph::MeshLight>(graph::NT_MESH_LIGHT);
+		const std::vector<std::shared_ptr<graph::MeshLight>>        meshLights = sim->getAllNodeOfType<graph::MeshLight>(graph::NT_MESH_LIGHT);
 		for (const std::shared_ptr<graph::MeshLight>& meshLight : meshLights)
 		{
 			syncNode(meshLight);
 		}
-		const std::vector<std::shared_ptr<graph::Instance>>         instances         = graph::SIM::get()->getAllNodeOfType<graph::Instance>(graph::NT_INSTANCE);
+		const std::vector<std::shared_ptr<graph::Instance>>         instances = sim->getAllNodeOfType<graph::Instance>(graph::NT_INSTANCE);
 		for (const std::shared_ptr<graph::Instance>& instance : instances)
 		{
 			syncNode(instance);
 		}
-		const std::vector<std::shared_ptr<graph::EnvironmentLight>> environmentLights = graph::SIM::get()->getAllNodeOfType<graph::EnvironmentLight>(graph::NT_ENV_LIGHT);
+		const std::vector<std::shared_ptr<graph::EnvironmentLight>> environmentLights = sim->getAllNodeOfType<graph::EnvironmentLight>(graph::NT_ENV_LIGHT);
 		for (const std::shared_ptr<graph::EnvironmentLight>& environmentLight : environmentLights)
 		{
 			syncNode(environmentLight);
 		}
-		const std::shared_ptr<graph::Renderer> renderer = graph::Scene::getScene()->renderer;
+		const std::shared_ptr<graph::Renderer> renderer = graph::Scene::get()->renderer;
 		const std::shared_ptr<graph::Camera>   camera   = renderer->camera;
 		syncNode(camera);
 		syncNode(renderer);

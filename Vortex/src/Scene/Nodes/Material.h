@@ -209,7 +209,6 @@ namespace vtx::graph
 	public:
 		std::shared_ptr<graph::shader::ShaderNode>                   materialGraph;
 		mi::base::Handle<mi::neuraylib::ITarget_argument_block>      argBlock;
-		//std::map<std::string, std::vector<graph::ParamInfo>>         params;
 		std::map<std::string, std::shared_ptr<shader::EnumTypeInfo>> mapEnumTypes;
 		bool                                                         useAsLight    = false;
 
@@ -230,7 +229,6 @@ namespace vtx::graph
 		bool											useOpacity();
 		bool                                            isThinWalled();
 
-		std::string                                                         name;			// example : "bsdf_diffuse_reflection"
 		std::string                                                         materialDbName;	// example : "bsdf_diffuse_reflection"
 		std::string                                                         path;			// example : "mdl\\bsdf_diffuse_reflection.mdl"
 		std::string															materialCallName;
@@ -244,8 +242,6 @@ namespace vtx::graph
 		std::vector<std::shared_ptr<graph::LightProfile>>					lightProfiles;
 		std::vector<std::shared_ptr<graph::BsdfMeasurement>>                bsdfMeasurements;
 
-		mi::base::Handle<mi::neuraylib::ITarget_value_layout const>   argLayout;
-		mi::base::Handle<mi::neuraylib::ITarget_argument_block const> argumentBlock;
 		FunctionNames fNames;
 	};
 

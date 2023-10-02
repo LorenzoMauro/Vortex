@@ -1,7 +1,8 @@
 #pragma once
 #include <memory>
-#include "Scene/SIM.h"
+#include "Scene/SceneIndexManager.h"
 #include "Core/Math.h"
+#include "Scene/Scene.h"
 
 namespace vtx::graph
 {
@@ -27,7 +28,16 @@ namespace vtx::ops {
     std::shared_ptr<T> createNode(Ts... optionalArgs) {
         static_assert(std::is_base_of_v<graph::Node, T>, "Pushed type is not subclass of Node!");
         std::shared_ptr<T> node = std::make_shared<T>(optionalArgs...);
-        graph::SIM::get()->record(node);
+        graph::Scene::getSim()->record(node);
+        return node;
+    }
+
+    template<typename T, typename... Ts>
+    std::shared_ptr<T> createNodeAndRemoveSIMReferences(Ts... optionalArgs) {
+        static_assert(std::is_base_of_v<graph::Node, T>, "Pushed type is not subclass of Node!");
+        std::shared_ptr<T> node = std::make_shared<T>(optionalArgs...);
+        graph::Scene::getSim()->record(node);
+        graph::Scene::getSim()->removeNodeReference(node->getUID(), node->getTypeID(), node->getType(), false);
         return node;
     }
 
@@ -64,6 +74,4 @@ namespace vtx::ops {
     std::shared_ptr<graph::Group> simpleScene01();
 
     std::tuple<std::shared_ptr<graph::Group>, std::shared_ptr<graph::Camera>> importedScene();
-
-    void startUpOperations();
 }

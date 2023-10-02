@@ -18,26 +18,26 @@ namespace vtx::gui
         // Choose proper edit control depending on the parameter kind
         switch (param.kind)
         {
-        case graph::shader::ParameterInfo::PK_FLOAT:
+        case graph::shader::PK_FLOAT:
 
             changed |= vtxImGui::halfSpaceWidget(param.annotation.displayName.c_str(), ImGui::SliderFloat, HiddenIdentifier.c_str(), &param.data<float>(), param.annotation.range[0], param.annotation.range[1], "%.3f", 0);
             break;
-        case graph::shader::ParameterInfo::PK_FLOAT2:
+        case graph::shader::PK_FLOAT2:
             changed |= ImGui::SliderFloat2(param.annotation.displayName.c_str(), &param.data<float>(), param.annotation.range[0], param.annotation.range[1]);
             break;
-        case graph::shader::ParameterInfo::PK_FLOAT3:
+        case graph::shader::PK_FLOAT3:
             changed |= ImGui::SliderFloat3(param.annotation.displayName.c_str(), &param.data<float>(), param.annotation.range[0], param.annotation.range[1]);
             break;
-        case graph::shader::ParameterInfo::PK_COLOR:
+        case graph::shader::PK_COLOR:
             changed |= vtx::vtxImGui::halfSpaceWidget(param.annotation.displayName.c_str(), vtxImGui::colorPicker, HiddenIdentifier.c_str(), &param.data<float>());
             break;
-        case graph::shader::ParameterInfo::PK_BOOL:
+        case graph::shader::PK_BOOL:
             changed |= vtxImGui::halfSpaceWidget(param.annotation.displayName.c_str(), ImGui::Checkbox, HiddenIdentifier.c_str(), &param.data<bool>());
             break;
-        case graph::shader::ParameterInfo::PK_INT:
+        case graph::shader::PK_INT:
             changed |= vtxImGui::halfSpaceWidget(param.annotation.displayName.c_str(), ImGui::SliderInt, HiddenIdentifier.c_str(), &param.data<int>(), int(param.annotation.range[0]), int(param.annotation.range[1]), "%d", 0);
             break;
-        case graph::shader::ParameterInfo::PK_ARRAY:
+        case graph::shader::PK_ARRAY:
         {
             ImGui::Text("%s", param.annotation.displayName.c_str());
             ImGui::Indent(16.0f);
@@ -50,22 +50,22 @@ namespace vtx::gui
 
                 switch (param.arrayElemKind)
                 {
-                case graph::shader::ParameterInfo::PK_FLOAT:
+                case graph::shader::PK_FLOAT:
                     changed |= ImGui::SliderFloat(idxStr.c_str(), reinterpret_cast<float*>(ptr), param.annotation.range[0], param.annotation.range[1]);
                     break;
-                case graph::shader::ParameterInfo::PK_FLOAT2:
+                case graph::shader::PK_FLOAT2:
                     changed |= ImGui::SliderFloat2(idxStr.c_str(), reinterpret_cast<float*>(ptr), param.annotation.range[0], param.annotation.range[1]);
                     break;
-                case graph::shader::ParameterInfo::PK_FLOAT3:
+                case graph::shader::PK_FLOAT3:
                     changed |= ImGui::SliderFloat3(idxStr.c_str(), reinterpret_cast<float*>(ptr), param.annotation.range[0], param.annotation.range[1]);
                     break;
-                case graph::shader::ParameterInfo::PK_COLOR:
+                case graph::shader::PK_COLOR:
                     changed |= ImGui::ColorEdit3(idxStr.c_str(), reinterpret_cast<float*>(ptr));
                     break;
-                case graph::shader::ParameterInfo::PK_BOOL:
+                case graph::shader::PK_BOOL:
                     changed |= vtxImGui::halfSpaceWidget(param.annotation.displayName.c_str(), ImGui::Checkbox, HiddenIdentifier.c_str(), reinterpret_cast<bool*>(ptr));
                     break;
-                case graph::shader::ParameterInfo::PK_INT:
+                case graph::shader::PK_INT:
                     changed |= ImGui::SliderInt(param.annotation.displayName.c_str(), reinterpret_cast<int*>(ptr), int(param.annotation.range[0]), int(param.annotation.range[1]));
                     break;
                 default:
@@ -76,7 +76,7 @@ namespace vtx::gui
             ImGui::Unindent(16.0f);
         }
         break;
-        case graph::shader::ParameterInfo::PK_ENUM:
+        case graph::shader::PK_ENUM:
         {
             const int value = param.data<int>();
             std::string currentValue;
@@ -113,8 +113,8 @@ namespace vtx::gui
             }
         }
         break;
-        case graph::shader::ParameterInfo::PK_STRING:
-        case graph::shader::ParameterInfo::PK_TEXTURE:
+        case graph::shader::PK_STRING:
+        case graph::shader::PK_TEXTURE:
         {
             std::string inputText = mdl::getTexturePathFromExpr(socket.directExpression);
 
@@ -131,8 +131,8 @@ namespace vtx::gui
                 vtxImGui::halfSpaceWidget("Texture:", vtxImGui::clippedText, inputText.c_str());
             }
         }
-        case graph::shader::ParameterInfo::PK_LIGHT_PROFILE:
-        case graph::shader::ParameterInfo::PK_BSDF_MEASUREMENT:
+        case graph::shader::PK_LIGHT_PROFILE:
+        case graph::shader::PK_BSDF_MEASUREMENT:
             // Currently not supported by this example
             break;
         default:

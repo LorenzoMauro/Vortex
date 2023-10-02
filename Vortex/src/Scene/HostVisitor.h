@@ -7,6 +7,7 @@ namespace vtx
 	public:
 		HostVisitor(){
 			collectTransforms = true;
+			collectWidthsAndDepths = true;
 		};
 		void visit(const std::shared_ptr<graph::Instance>& instance) override;
 		void visit(const std::shared_ptr<graph::Transform>& transform) override;

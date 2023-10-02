@@ -515,7 +515,7 @@ namespace vtx::importer
         std::shared_ptr<graph::Mesh> meshNode = nullptr;
         if (meshMap.find(assimpMeshId) != meshMap.end())
         {
-            meshNode = graph::SIM::get()->getNode<graph::Mesh>(meshMap[assimpMeshId]);
+            meshNode = graph::Scene::getSim()->getNode<graph::Mesh>(meshMap[assimpMeshId]);
         }
         else
         {

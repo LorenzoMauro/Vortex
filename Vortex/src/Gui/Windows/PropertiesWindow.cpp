@@ -1,5 +1,6 @@
 ﻿#include "PropertiesWindow.h"
 #include "Scene/Scene.h"
+#include "Scene/Nodes/Renderer.h"
 
 namespace vtx
 {
@@ -8,13 +9,12 @@ namespace vtx
 	{
 		name = "Properties";
 		useToolbar = false;
-		renderer = graph::Scene::getScene()->renderer;
 	}
 
 	void PropertiesWindow::mainContent()
 	{
 		bool                     areNodesSelected = false;
-		if(const std::set<vtxID> selected = graph::Scene::getScene()->getSelected(); !selected.empty())
+		if(const std::set<vtxID> selected = graph::Scene::get()->getSelected(); !selected.empty())
 		{
 			areNodesSelected = true;
 			for (const vtxID idx : selected)
@@ -23,7 +23,7 @@ namespace vtx
 				{
 					areNodesSelected = true;
 					const vtxID nodeId = idx;
-					if (const std::shared_ptr<graph::Node>& node = graph::SIM::get()->getNode<graph::Node>(nodeId))
+					if (const std::shared_ptr<graph::Node>& node = graph::Scene::getSim()->getNode<graph::Node>(nodeId))
 					{
 						ImGui::SetNextItemOpen(true, ImGuiCond_Once);
 						guiVisitor.changed = false;
@@ -35,7 +35,7 @@ namespace vtx
 		if (!areNodesSelected)
 		{
 			ImGui::SetNextItemOpen(true, ImGuiCond_Once);
-			renderer->accept(guiVisitor);
+			graph::Scene::get()->renderer->accept(guiVisitor);
 		}
 		
 	}

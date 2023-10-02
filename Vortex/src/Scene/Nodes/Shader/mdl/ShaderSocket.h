@@ -49,27 +49,61 @@ namespace vtx::graph::shader
 
 	};
 
+	enum ParamKind
+	{
+		PK_UNKNOWN,
+		PK_FLOAT,
+		PK_FLOAT2,
+		PK_FLOAT3,
+		PK_COLOR,
+		PK_ARRAY,
+		PK_BOOL,
+		PK_INT,
+		PK_ENUM,
+		PK_STRING,
+		PK_TEXTURE,
+		PK_LIGHT_PROFILE,
+		PK_BSDF_MEASUREMENT
+	};
+
+	inline std::map<ParamKind, std::string> paramKindNames =
+	{
+			{ PK_UNKNOWN, "Unknown" },
+			{ PK_FLOAT, "Float" },
+			{ PK_FLOAT2, "Float2" },
+			{ PK_FLOAT3, "Float3" },
+			{ PK_COLOR, "Color" },
+			{ PK_ARRAY, "Array" },
+			{ PK_BOOL, "Bool" },
+			{ PK_INT, "Int" },
+			{ PK_ENUM, "Enum" },
+			{ PK_STRING, "String" },
+			{ PK_TEXTURE, "Texture" },
+			{ PK_LIGHT_PROFILE, "Light Profile" },
+			{ PK_BSDF_MEASUREMENT, "BSDF Measurement" }
+		};
+
+	inline std::map<std::string, ParamKind> paramKindNamesToEnum
+	{
+		{ "Unknown", PK_UNKNOWN },
+		{ "Float", PK_FLOAT },
+		{ "Float2", PK_FLOAT2 },
+		{ "Float3", PK_FLOAT3 },
+		{ "Color", PK_COLOR },
+		{ "Array", PK_ARRAY },
+		{ "Bool", PK_BOOL },
+		{ "Int", PK_INT },
+		{ "Enum", PK_ENUM },
+		{ "String", PK_STRING },
+		{ "Texture", PK_TEXTURE },
+		{ "Light Profile", PK_LIGHT_PROFILE },
+		{ "BSDF Measurement", PK_BSDF_MEASUREMENT }
+	};
+
 	// Material parameter information structure.
 	class ParameterInfo
 	{
 	public:
-
-		enum ParamKind
-		{
-			PK_UNKNOWN,
-			PK_FLOAT,
-			PK_FLOAT2,
-			PK_FLOAT3,
-			PK_COLOR,
-			PK_ARRAY,
-			PK_BOOL,
-			PK_INT,
-			PK_ENUM,
-			PK_STRING,
-			PK_TEXTURE,
-			PK_LIGHT_PROFILE,
-			PK_BSDF_MEASUREMENT
-		};
 
 		ParameterInfo() :
 			index(-1),

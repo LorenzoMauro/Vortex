@@ -73,7 +73,7 @@ namespace vtx::gui
 		constexpr int numRenderingNodes = 2;  // Adjust this to the correct number of nodes for the rendering group
 		constexpr int numMeshNodes = 4;       // Similarly, adjust for the mesh group
 		constexpr int numLightNodes = 3;      // Adjust for the light group
-		constexpr int numMaterialNodes = 14;   // Adjust for the material group
+		constexpr int numMaterialNodes = 15;   // Adjust for the material group
 
 		// Calculate hue increments for each group
 		constexpr float hueIncrementRendering = (hueRendering.second - hueRendering.first) / numRenderingNodes;
@@ -82,36 +82,38 @@ namespace vtx::gui
 		constexpr float hueIncrementMaterials = (hueMaterials.second - hueMaterials.first) / numMaterialNodes;
 
 		float hue = 0.0f;  // Default hue
-
 		switch (type)
 		{
 			//Geometry
-		case graph::NT_GROUP:              hue = hueMeshes.first; break;
-		case graph::NT_INSTANCE:          hue = hueMeshes.first + hueIncrementMeshes; break;
-		case graph::NT_MESH:              hue = hueMeshes.first + 2 * hueIncrementMeshes; break;
-		case graph::NT_TRANSFORM:         hue = hueMeshes.first + 3 * hueIncrementMeshes; break;
+		case graph::NT_GROUP:				hue = hueMeshes.first + 0 * hueIncrementMeshes; break;
+		case graph::NT_INSTANCE:			hue = hueMeshes.first + 1 * hueIncrementMeshes; break;
+		case graph::NT_MESH:				hue = hueMeshes.first + 2 * hueIncrementMeshes; break;
+		case graph::NT_TRANSFORM:			hue = hueMeshes.first + 3 * hueIncrementMeshes; break;
 			//Lights
-		case graph::NT_LIGHT:             hue = hueLights.first; break;
-		case graph::NT_MESH_LIGHT:        hue = hueLights.first + hueIncrementLights; break;
-		case graph::NT_ENV_LIGHT:         hue = hueLights.first + 2 * hueIncrementLights; break;
+		case graph::NT_LIGHT:				hue = hueLights.first + 0 * hueIncrementLights; break;
+		case graph::NT_MESH_LIGHT:			hue = hueLights.first + 1 * hueIncrementLights; break;
+		case graph::NT_ENV_LIGHT:			hue = hueLights.first + 2 * hueIncrementLights; break;
 			//Rendering
-		case graph::NT_CAMERA:            hue = hueRendering.first; break;
-		case graph::NT_RENDERER:          hue = hueRendering.first+ hueIncrementRendering; break;
+		case graph::NT_CAMERA:				hue = hueRendering.first + 0 * hueIncrementRendering; break;
+		case graph::NT_RENDERER:			hue = hueRendering.first + 1 * hueIncrementRendering; break;
 			//Shaders
-		case graph::NT_MATERIAL:          hue = hueMaterials.first; break;
-		case graph::NT_MDL_SHADER:        hue = hueMaterials.first + hueIncrementMaterials; break;
-		case graph::NT_MDL_TEXTURE:       hue = hueMaterials.first + 2 * hueIncrementMaterials; break;
-		case graph::NT_MDL_BSDF:          hue = hueMaterials.first + 3 * hueIncrementMaterials; break;
-		case graph::NT_MDL_LIGHTPROFILE:  hue = hueMaterials.first + 4 * hueIncrementMaterials; break;
-		case graph::NT_SHADER_TEXTURE:    hue = hueMaterials.first + 5 * hueIncrementMaterials; break;
-		case graph::NT_SHADER_DF:         hue = hueMaterials.first + 6 * hueIncrementMaterials; break;
-		case graph::NT_SHADER_MATERIAL:   hue = hueMaterials.first + 7 * hueIncrementMaterials; break;
-		case graph::NT_SHADER_SURFACE:    hue = hueMaterials.first + 8 * hueIncrementMaterials; break;
-		case graph::NT_SHADER_IMPORTED:   hue = hueMaterials.first + 9 * hueIncrementMaterials; break;
-		case graph::NT_SHADER_COLOR:      hue = hueMaterials.first + 10 * hueIncrementMaterials; break;
-		case graph::NT_SHADER_FLOAT3:     hue = hueMaterials.first + 11 * hueIncrementMaterials; break;
-		case graph::NT_SHADER_FLOAT:      hue = hueMaterials.first + 12 * hueIncrementMaterials; break;
-		case graph::NT_SHADER_COORDINATE: hue = hueMaterials.first + 13 * hueIncrementMaterials; break;
+		case graph::NT_MATERIAL:				hue = hueMaterials.first + 0 * hueIncrementMaterials; break;
+		case graph::NT_MDL_TEXTURE:				hue = hueMaterials.first + 1 * hueIncrementMaterials; break;
+		case graph::NT_MDL_BSDF:				hue = hueMaterials.first + 2 * hueIncrementMaterials; break;
+		case graph::NT_MDL_LIGHTPROFILE:		hue = hueMaterials.first + 3 * hueIncrementMaterials; break;
+		case graph::NT_SHADER_DF:				hue = hueMaterials.first + 4 * hueIncrementMaterials; break;
+		case graph::NT_PRINCIPLED_MATERIAL:
+		case graph::NT_SHADER_MATERIAL:			hue = hueMaterials.first + 5 * hueIncrementMaterials; break;
+		case graph::NT_SHADER_SURFACE:			hue = hueMaterials.first + 6 * hueIncrementMaterials; break;
+		case graph::NT_SHADER_IMPORTED:			hue = hueMaterials.first + 7 * hueIncrementMaterials; break;
+		case graph::NT_GET_CHANNEL:				hue = hueMaterials.first + 8 * hueIncrementMaterials; break;
+		case graph::NT_NORMAL_MIX:				hue = hueMaterials.first + 9 * hueIncrementMaterials; break;
+		case graph::NT_SHADER_COORDINATE:		hue = hueMaterials.first + 10 * hueIncrementMaterials; break;
+		case graph::NT_SHADER_NORMAL_TEXTURE:	hue = hueMaterials.first + 11 * hueIncrementMaterials; break;
+		case graph::NT_SHADER_MONO_TEXTURE:		hue = hueMaterials.first + 12 * hueIncrementMaterials; break;
+		case graph::NT_SHADER_COLOR_TEXTURE:	hue = hueMaterials.first + 13 * hueIncrementMaterials; break;
+		case graph::NT_SHADER_BUMP_TEXTURE:		hue = hueMaterials.first + 14 * hueIncrementMaterials; break;
+
 		case graph::NT_NUM_NODE_TYPES:    hue = 0.69f; break;  // This might be an enum limit, so be cautious if it's used in logic.
 		default:
 		{
@@ -139,8 +141,7 @@ namespace vtx::gui
 
 	void NodeEditorVisitor::visit(const std::shared_ptr<graph::Node>& node)
 	{
-		auto [depth, width, overallWidth] = nodesDepthsAndWidths[node->getUID()];
-		nodeEditor->submitNode(node, depth, width, overallWidth);
+		nodeEditor->submitNode(node);
 	}
 
 	NodeEditor::NodeEditor()
@@ -179,8 +180,8 @@ namespace vtx::gui
 			for (int i = 0; i < numberOfChildren; i++)
 			{
 				LinkInfo linkInfo;
-				linkInfo.inputSocketId = nodeInfo.id * 1000 + i;
-				linkInfo.linkId = nodeInfo.id * 1000 + children[i]->getUID();
+				linkInfo.inputSocketId = node->getUID() * 1000 + i;
+				linkInfo.linkId = node->getUID() * 1000 + children[i]->getUID();
 				linkInfo.childOutputSocketId = children[i]->getUID();
 				linkInfo.childNodeType = children[i]->getType();
 				nodeInfo.links.push_back(linkInfo);
@@ -189,21 +190,20 @@ namespace vtx::gui
 
 	}
 
-	void NodeEditor::submitNode(const std::shared_ptr<graph::Node>& node, const int depth, const int width, const int overallWidth)
+	void NodeEditor::submitNode(const std::shared_ptr<graph::Node>& node)
 	{
 		runVisitedNodes.insert(node->getUID());
 		if (nodes.find(node->getUID()) == nodes.end() || nodes[node->getUID()].node.lock() == nullptr)
 		{
 			NodeInfo nodeInfo;
 			nodeInfo.node = node;
-			nodeInfo.nodeType = node->getType();
+			//nodeInfo.nodeType = node->getType();
 			nodeInfo.title = node->name;
-			nodeInfo.id = node->getUID();
-			nodeInfo.depth = depth;
-			nodeInfo.width = width;
-			nodeInfo.overallWidth = overallWidth;
+			//nodeInfo.id = node->getUID();
+			//nodeInfo.depth = node->treePosition.depth;
+			//nodeInfo.width = node->treePosition.width;
+			//nodeInfo.overallWidth = node->treePosition.overallWidth;
 			nodes[node->getUID()] = nodeInfo;
-			depthFirstTraversal.push_back(node->getUID());
 		}
 
 
@@ -214,6 +214,14 @@ namespace vtx::gui
 	{
 		if (rootNode == nullptr)
 		{
+			if (flags & ImNodesStyleFlags_VerticalLayout)
+			{
+				const std::vector <std::shared_ptr< graph::Node >> allNodes = graph::Scene::getSim()->getAllNodes();
+				for (const auto& node : allNodes)
+				{
+					submitNode(node);
+				}
+			}
 			return;
 		}
 		rootNode->traverse(visitor);
@@ -279,9 +287,13 @@ namespace vtx::gui
 		const float localSpacing = nodeWidth / std::max(numberOfInputSockets, 1);
 		const float leftTitlePad = (nodeWidth - titleWidth) / 2;
 
-		nodesWithColor ? pushNodeColorByNodeType(nodeInfo.nodeType) : 0;
+		const std::shared_ptr<graph::Node>& node         = nodeInfo.node.lock();
+		const vtxID                        id           = node->getUID();
+		const graph::NodeType              nodeType     = node->getType();
 
-		ImNodes::BeginNode(nodeInfo.id);
+		nodesWithColor ? pushNodeColorByNodeType(nodeType) : 0;
+
+		ImNodes::BeginNode(id);
 
 		ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0, 0));
 		nodeInfo.size.x = std::max(nodeInfo.size.x, getOptions()->nodeWidth); // Enforce a minimum size
@@ -295,16 +307,21 @@ namespace vtx::gui
 
 
 		//{
-		ImGui::TextUnformatted((std::to_string(nodeInfo.node.lock()->getTypeID())).c_str());
-		//	ImGui::TextUnformatted((std::to_string(nodeInfo.depth)).c_str());
-		//	ImGui::TextUnformatted((std::to_string(nodeInfo.width)).c_str());
-		//	ImGui::TextUnformatted((std::to_string(nodeInfo.overallWidth)).c_str());
+		//const int                          depth = node->treePosition.depth;
+		//const int                          width = node->treePosition.width;
+		//const int                          overallWidth = node->treePosition.overallWidth;
+		//ImGui::Text("UID: %d", (int)node->getUID());
+		//ImGui::Text("TID: %d", (int)node->getTypeID());
+		//ImGui::Text("Use Count %d", (int)node.use_count());
+		//ImGui::Text("Depth: %d", depth);
+		//ImGui::Text("Width: %d", width);
+		//ImGui::Text("Overall Width %d", overallWidth);
 		//	ImGui::Text("Position x: %d, y: %d", (int)ImNodes::GetNodeEditorSpacePos(nodeInfo.id).x, (int)ImNodes::GetNodeEditorSpacePos(nodeInfo.id).y);
 		//
 		//}
 
-		nodesWithColor ? pushPinColorByChildrenNodeType(nodeInfo.nodeType) : 0;
-		ImNodes::BeginOutputAttribute(nodeInfo.id);
+		nodesWithColor ? pushPinColorByChildrenNodeType(nodeType) : 0;
+		ImNodes::BeginOutputAttribute(id);
 		ImGui::Dummy(ImVec2(nodeWidth, 0)); // Placeholder for input
 		ImNodes::EndOutputAttribute();
 		nodesWithColor ? popPinColorByChildrenNodeType() : 0;
@@ -366,7 +383,7 @@ namespace vtx::gui
 	bool NodeEditor::horizontalArrangementDrawNode(NodeInfo& nodeInfo)
 	{
 		bool changed = false;
-		std::shared_ptr<graph::Node> node = nodeInfo.node.lock();
+		const std::shared_ptr<graph::Node>& node = nodeInfo.node.lock();
 		const int id = node->getUID();
 
 		ImNodes::BeginNode(id);
@@ -423,8 +440,9 @@ namespace vtx::gui
 		// Collect nodes per depth and calculate bounding box
 		for (auto& [nodeId, nodeInfo] : nodes)
 		{
-			int depth = nodeInfo.depth;
-			const int overallWidth = nodeInfo.overallWidth;
+			const std::shared_ptr<graph::Node>& node = nodeInfo.node.lock();
+			int depth = node->treePosition.depth;
+			const int overallWidth = node->treePosition.overallWidth;
 			if (depthToNodes.find(depth) == depthToNodes.end())
 			{
 				depthToNodes[depth] = std::vector<vtxID>();
@@ -448,7 +466,7 @@ namespace vtx::gui
 			}
 		}
 
-		ImNodesContext* nodesContext = ImNodes::GetCurrentContext();
+		const ImNodesContext* nodesContext = ImNodes::GetCurrentContext();
 		const ImRect availableSpace = nodesContext->CanvasRectScreenSpace;
 		const ImVec2 contentRegionAvailable = availableSpace.GetSize();
 		//const ImVec2 contentRegionAvailable = ImGui::GetWindowSize();
@@ -464,10 +482,10 @@ namespace vtx::gui
 				// Centering nodes
 				float currentX = (windowWidth - boundingBox.x) / 2.0f;
 
-				for (unsigned int nodeId : depthToNodes[depth])
+				for (const unsigned int nodeId : depthToNodes[depth])
 				{
 					if(nodeId == 0) continue; // Skip dummy node //TODO this shouldn't happen
-					ImVec2 nodeDim = ImNodes::GetNodeDimensions(nodeId);
+					const ImVec2 nodeDim = ImNodes::GetNodeDimensions(nodeId);
 					ImVec2       currentPos = { currentX, currentY };
 					ImNodes::SetNodeEditorSpacePos(nodeId, currentPos);
 
@@ -487,9 +505,9 @@ namespace vtx::gui
 				// Centering nodes
 				//float currentY = (windowHeight - depthToBoundingBox[depth].y * depthToNodes[depth].size() - padding * (depthToNodes[depth].size() - 1)) / 2.0f;
 				float currentY = treeWidthPadding;
-				for (unsigned int nodeId : depthToNodes[depth])
+				for (const unsigned int nodeId : depthToNodes[depth])
 				{
-					ImVec2 nodeDim = ImNodes::GetNodeDimensions(nodeId);
+					const ImVec2 nodeDim = ImNodes::GetNodeDimensions(nodeId);
 					ImVec2       currentPos = { currentX, currentY };
 					ImNodes::SetNodeEditorSpacePos(nodeId, currentPos);
 
@@ -502,7 +520,7 @@ namespace vtx::gui
 
 	void NodeEditor::removeUnvisitedNodes()
 	{
-		std::vector<decltype(nodes)::key_type> nodesToRemove; // Collecting IDs to remove
+		std::vector<vtxID> nodesToRemove; // Collecting IDs to remove
 
 		// Identify nodes to remove
 		for (const auto& [id, _] : nodes)
@@ -518,20 +536,11 @@ namespace vtx::gui
 		{
 			nodes.erase(id);
 		}
-
-		// Remove unvisited nodes from depthFirstTraversal
-		for (vtxID& id : depthFirstTraversal)
-		{
-			if (runVisitedNodes.find(id) == runVisitedNodes.end())
-			{
-				depthFirstTraversal.erase(std::remove(depthFirstTraversal.begin(), depthFirstTraversal.end(), id), depthFirstTraversal.end());
-			}
-		}
 	}
 
 	void NodeEditor::updateNodeSelection()
 	{
-		std::set<vtxID> selectedNodes = graph::Scene::getScene()->getSelected();
+		std::set<vtxID> selectedNodes = graph::Scene::get()->getSelected();
 		ImNodes::ClearNodeSelection();
 		for (const vtxID id: selectedNodes)
 		{

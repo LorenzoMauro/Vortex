@@ -79,7 +79,7 @@ namespace vtx::gui
 		TransformAxis prevTransformAxis = TA_NONE;
 		TransformAxis transformAxis = TA_NONE;
 
-		std::shared_ptr<graph::Camera>             camera;
+		std::weak_ptr<graph::Camera>			   camera;
 		std::set<std::shared_ptr<graph::Instance>> selectedInstances;
 		math::vec3f                                pivotWorld;
 		math::vec2f                                pivotScreen;

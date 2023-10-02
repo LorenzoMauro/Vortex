@@ -6,7 +6,7 @@
 #include "MDL/MdlTypesName.h"
 #include "MDL/MdlWrapper.h"
 #include "Scene/Node.h"
-#include "Scene/SIM.h"
+#include "Scene/SceneIndexManager.h"
 #include "Scene/Nodes/Shader/mdl/ShaderSocket.h"
 
 namespace vtx::graph::shader
@@ -70,7 +70,6 @@ namespace vtx::graph::shader
 											 "mdl::df::diffuse_reflection_bsdf"
 										 })
 		{
-			typeID = SIM::get()->getTypeId<DiffuseReflection>();
 		}
 
 		~DiffuseReflection() override;
@@ -88,7 +87,6 @@ namespace vtx::graph::shader
 										   "mdl::material_surface(bsdf,material_emission)"
 									   })
 		{
-			typeID = SIM::get()->getTypeId<MaterialSurface>();
 		}
 
 		~MaterialSurface() override;
@@ -106,7 +104,6 @@ namespace vtx::graph::shader
 									"mdl::material(bool,material_surface,material_surface,color,material_volume,material_geometry,hair_bsdf)"
 								})
 		{
-			typeID = SIM::get()->getTypeId<Material>();
 		}
 
 		~Material() override;
@@ -117,10 +114,16 @@ namespace vtx::graph::shader
 	class ImportedNode : public ShaderNode
 	{
 	public:
-		ImportedNode(std::string modulePath, std::string functionName, const bool isMdlPath = false) : ShaderNode(
-			NT_SHADER_IMPORTED, modulePath, functionName, isMdlPath)
+		ImportedNode(std::string modulePath, std::string functionName, const bool isMdlPath = false)
+		:
+		ShaderNode(NT_SHADER_IMPORTED, modulePath, functionName, isMdlPath)
 		{
-			typeID = SIM::get()->getTypeId<ImportedNode>();
+		}
+
+		ImportedNode(mdl::MdlFunctionInfo functionInfo)
+			:
+			ShaderNode(NT_SHADER_IMPORTED, functionInfo)
+		{
 		}
 
 		~ImportedNode() override;
@@ -131,9 +134,8 @@ namespace vtx::graph::shader
 	class PrincipledMaterial : public ShaderNode
 	{
 	public:
-		PrincipledMaterial() : ShaderNode(NT_SHADER_MATERIAL, VORTEX_PRINCIPLED_MODULE, VORTEX_PRINCIPLED_FUNCTION)
+		PrincipledMaterial() : ShaderNode(NT_PRINCIPLED_MATERIAL, VORTEX_PRINCIPLED_MODULE, VORTEX_PRINCIPLED_FUNCTION)
 		{
-			typeID = SIM::get()->getTypeId<PrincipledMaterial>();
 		}
 
 		~PrincipledMaterial() override;
@@ -144,12 +146,11 @@ namespace vtx::graph::shader
 	class ColorTexture : public ShaderNode
 	{
 	public:
-		ColorTexture(const std::string& cTexturePath) : ShaderNode(NT_SHADER_COLOR, VORTEX_FUNCTIONS_MODULE,
+		ColorTexture(const std::string& cTexturePath) : ShaderNode(NT_SHADER_COLOR_TEXTURE, VORTEX_FUNCTIONS_MODULE,
 																   VF_COLOR_TEXTURE)
 		{
 			texturePath = cTexturePath;
 			setSocketValue(VF_COLOR_TEXTURE_TEXTURE_SOCKET, mdl::createTextureConstant(texturePath));
-			typeID = SIM::get()->getTypeId<ColorTexture>();
 		}
 
 		~ColorTexture() override;
@@ -163,14 +164,13 @@ namespace vtx::graph::shader
 	class MonoTexture : public ShaderNode
 	{
 	public:
-		MonoTexture(const std::string& cTexturePath) : ShaderNode(NT_SHADER_FLOAT, VORTEX_FUNCTIONS_MODULE,
+		MonoTexture(const std::string& cTexturePath) : ShaderNode(NT_SHADER_MONO_TEXTURE, VORTEX_FUNCTIONS_MODULE,
 																  VF_MONO_TEXTURE)
 		{
 			texturePath = cTexturePath;
 			setSocketValue(
 				VF_MONO_TEXTURE_TEXTURE_SOCKET,
 				mdl::createTextureConstant(texturePath, mi::neuraylib::IType_texture::TS_2D, 1.0f));
-			typeID = SIM::get()->getTypeId<MonoTexture>();
 		}
 
 		~MonoTexture() override;
@@ -184,14 +184,13 @@ namespace vtx::graph::shader
 	class NormalTexture : public ShaderNode
 	{
 	public:
-		NormalTexture(const std::string& cTexturePath) : ShaderNode(NT_SHADER_FLOAT3, VORTEX_FUNCTIONS_MODULE,
+		NormalTexture(const std::string& cTexturePath) : ShaderNode(NT_SHADER_NORMAL_TEXTURE, VORTEX_FUNCTIONS_MODULE,
 																	VF_NORMAL_TEXTURE)
 		{
 			texturePath = cTexturePath;
 			setSocketValue(
 				VF_NORMAL_TEXTURE_TEXTURE_SOCKET,
 				mdl::createTextureConstant(texturePath, mi::neuraylib::IType_texture::TS_2D, 1.0f));
-			typeID = SIM::get()->getTypeId<NormalTexture>();
 		}
 
 		~NormalTexture() override;
@@ -205,14 +204,13 @@ namespace vtx::graph::shader
 	class BumpTexture : public ShaderNode
 	{
 	public:
-		BumpTexture(const std::string& cTexturePath) : ShaderNode(NT_SHADER_FLOAT3, VORTEX_FUNCTIONS_MODULE,
+		BumpTexture(const std::string& cTexturePath) : ShaderNode(NT_SHADER_BUMP_TEXTURE, VORTEX_FUNCTIONS_MODULE,
 																  VF_BUMP_TEXTURE)
 		{
 			texturePath = cTexturePath;
 			setSocketValue(
 				VF_BUMP_TEXTURE_TEXTURE_SOCKET,
 				mdl::createTextureConstant(texturePath, mi::neuraylib::IType_texture::TS_2D, 1.0f));
-			typeID = SIM::get()->getTypeId<BumpTexture>();
 		}
 
 		~BumpTexture() override;
@@ -229,39 +227,31 @@ namespace vtx::graph::shader
 	public:
 		TextureTransform() : ShaderNode(NT_SHADER_COORDINATE, VORTEX_FUNCTIONS_MODULE, VF_TEXTURE_TRANSFORM)
 		{
-			typeID = SIM::get()->getTypeId<TextureTransform>();
 		}
 
 		~TextureTransform() override;
 	protected:
 		void accept(NodeVisitor& visitor) override;
-
-	public:
-		std::string texturePath;
 	};
 
 
 	class NormalMix : public ShaderNode
 	{
 	public:
-		NormalMix() : ShaderNode(NT_SHADER_FLOAT3, VORTEX_FUNCTIONS_MODULE, VF_MIX_NORMAL)
+		NormalMix() : ShaderNode(NT_NORMAL_MIX, VORTEX_FUNCTIONS_MODULE, VF_MIX_NORMAL)
 		{
-			typeID = SIM::get()->getTypeId<NormalMix>();
 		}
 
 		~NormalMix() override;
 	protected:
 		void accept(NodeVisitor& visitor) override;
-
-	public:
-		std::string texturePath;
 	};
 
 
 	class GetChannel : public ShaderNode
 	{
 	public:
-		GetChannel(int cChannel) : ShaderNode(NT_SHADER_FLOAT, VORTEX_FUNCTIONS_MODULE, VF_GET_COLOR_CHANNEL)
+		GetChannel(int cChannel) : ShaderNode(NT_GET_CHANNEL, VORTEX_FUNCTIONS_MODULE, VF_GET_COLOR_CHANNEL)
 		{
 			if (cChannel > 2)
 			{
@@ -276,7 +266,6 @@ namespace vtx::graph::shader
 
 			channel = cChannel;
 			setSocketValue(VF_GET_COLOR_CHANNEL_CHANNEL_SOCKET, mdl::createConstantInt(channel));
-			typeID = SIM::get()->getTypeId<GetChannel>();
 		}
 
 		~GetChannel() override;

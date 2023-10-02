@@ -9,12 +9,10 @@ namespace vtx::graph
 
 	MeshLight::MeshLight() : Node(NT_MESH_LIGHT)
 	{
-		typeID = SIM::get()->getTypeId<MeshLight>();
 	}
 
 	MeshLight::~MeshLight()
 	{
-		SIM::get()->releaseTypeId<MeshLight>(typeID);
 	}
 
 	void MeshLight::init()

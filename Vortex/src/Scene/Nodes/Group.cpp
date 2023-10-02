@@ -8,12 +8,10 @@ namespace vtx::graph
 	Group::Group() : Node(NT_GROUP)
 	{
 		transform = ops::createNode<Transform>();
-		typeID = SIM::get()->getTypeId<Group>();
 	}
 
 	Group::~Group()
 	{
-		SIM::get()->releaseTypeId<Group>(typeID);
 	}
 
 	std::vector<std::shared_ptr<Node>> Group::getChildren() const
@@ -25,7 +23,15 @@ namespace vtx::graph
 	}
 
 	void Group::addChild(const std::shared_ptr<Node>& child) {
-		children.push_back(child);
+		const NodeType newChildType = child->getType();
+		if(newChildType == NT_GROUP || newChildType == NT_INSTANCE || newChildType == NT_TRANSFORM)
+		{
+			children.push_back(child);
+		}
+		else
+		{
+			VTX_ERROR("Cannot add node of type {} to group", nodeNames[child->getType()]);
+		}
 	}
 
 	void Group::accept(NodeVisitor& visitor)

@@ -5,13 +5,17 @@
 #include "LoadingSaving.h"
 #include "Device/OptixWrapper.h"
 #include "Device/PipelineConfiguration.h"
+#include "Device/UploadCode/DeviceDataCoordinator.h"
 #include "Gui/Windows/AppWindow.h"
+#include "Gui/Windows/EnvironmentWindow.h"
 #include "Gui/Windows/ShaderGraphWindow.h"
 #include "Gui/Windows/ViewportWindow.h"
 #include "Gui/Windows/ExperimentsWindow.h"
 #include "Gui/Windows/SceneHierarchyWindow.h"
 #include "Gui/Windows/GraphWindow.h"
 #include "Gui/Windows/PropertiesWindow.h"
+#include "MDL/MdlWrapper.h"
+#include "Scene/Nodes/Material.h"
 
 namespace vtx
 {
@@ -32,19 +36,19 @@ namespace vtx
 		optix::init();
 		pipelineConfiguration();
 		mdl::init();
+
+		graph::Scene::get()->init();
+
 		windowManager = std::make_shared<WindowManager>();
 		windowManager->createWindow<AppWindow>();
-
-		//ops::startUpOperations();
-		const std::shared_ptr<graph::Scene> scene = graph::Scene::getScene();
-		scene->renderer = ops::createNode<graph::Renderer>();
-		graph::Scene::getScene()->renderer->setWindow(glfwWindow);
 		windowManager->createWindow<SceneHierarchyWindow>();
 		windowManager->createWindow<ViewportWindow>();
 		windowManager->createWindow<PropertiesWindow>();
-		windowManager->createWindow<GraphWindow>();
-		windowManager->createWindow<ShaderGraphWindow>();
 		windowManager->createWindow<ExperimentsWindow>();
+		windowManager->createWindow<EnvironmentWindow>();
+		windowManager->createWindow<ShaderGraphWindow>();
+		windowManager->createWindow<GraphWindow>();
+
 	}
 
 	void Application::shutDown() {
@@ -106,8 +110,44 @@ namespace vtx
 		//glfwSetFramebufferSizeCallback(m_Window, FramebufferResizeCallback);
 	}
 
+	static HostVisitor hostVisitor;
+
+	void Application::dataLoop()
+	{
+		graph::Scene* scene = graph::Scene::get();
+		const std::shared_ptr<graph::Renderer>& renderer = scene->renderer;
+		renderer->camera->onUpdate(timeStep);
+		if (renderer->settings.runOnSeparateThread)
+		{
+			if (renderer->isReady() && renderer->settings.iteration <= renderer->settings.maxSamples)
+			{
+				renderer->settings.iteration++;
+				renderer->settings.isUpdated = true;
+
+				//This step speed up the material computation, but is not really coherent with the rest of the code
+				
+				renderer->threadedRender();
+			}
+		}
+		else
+		{
+			if (renderer->settings.iteration <= renderer->settings.maxSamples)
+			{
+				renderer->settings.iteration++;
+				renderer->settings.isUpdated = true;
+				//This step speed up the material computation, but is not really coherent with the rest of the code
+				graph::computeMaterialsMultiThreadCode();
+				renderer->traverse(hostVisitor);
+				onDeviceData->sync();
+				onDeviceData->incrementFrameIteration();
+				renderer->render();
+			}
+		}
+	}
+
 	void Application::run() {
 		glfwPollEvents();
+		dataLoop();
 		windowManager->updateWindows(timeStep);
 
 		if(!isWindowMinimized(glfwWindow))
@@ -128,6 +168,7 @@ namespace vtx
 		lastFrameTime = time;
 		iteration += 1;
 	}
+
 	void Application::setStartUpFile(const std::string& filePath)
 	{
 		LoadingSaving::get().setManualLoad(filePath);

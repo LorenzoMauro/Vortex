@@ -2,7 +2,6 @@
 #include "Core/VortexID.h"
 #include <vector>
 #include <memory>
-
 #include "NodeTypes.h"
 
 #define ACCEPT(derived, visitor) \
@@ -16,7 +15,7 @@ namespace vtx
 namespace vtx::graph
 {
 
-	class SIM;
+	class SceneIndexManager;
 
 	struct NodeState
 	{
@@ -25,6 +24,13 @@ namespace vtx::graph
 		bool updateOnDevice = false;
 		bool isShaderCodeUpdated = false;
 		bool isShaderArgBlockUpdated = false;
+	};
+
+	struct NodeTreePosition
+	{
+		int depth = 0;
+		int width= 0;
+		int overallWidth = 0;
 	};
 
 	class Node : public std::enable_shared_from_this<Node> {
@@ -38,6 +44,9 @@ namespace vtx::graph
 
 		vtxID getUID() const;
 		vtxID getTypeID() const;
+
+		void Node::setUID(vtxID id);
+		void setTID(vtxID id);
 
 		void traverse(NodeVisitor& visitor);
 
@@ -56,6 +65,7 @@ namespace vtx::graph
 
 		NodeState   state;
 		std::string name;
+		NodeTreePosition treePosition;
 
 		virtual void accept(NodeVisitor& visitor) = 0;
 	protected:
@@ -68,10 +78,10 @@ namespace vtx::graph
 			return std::static_pointer_cast<Derived>(shared_from_this());
 		}
 
-		std::shared_ptr<SIM> sim;
 		NodeType type;
 		vtxID UID;
 		vtxID typeID = 0;
+		std::shared_ptr<SceneIndexManager> sim;
 	};
 
 	namespace shader {
@@ -93,7 +103,6 @@ namespace vtx::graph
 
 		struct EnumValue;
 		struct EnumTypeInfo;
-		enum ParamKind;
 		struct Annotation;
 		class ParameterInfo;
 		struct ShaderNodeSocket;

@@ -47,27 +47,30 @@ namespace vtx::device
 		{
 			InstanceData::SlotIds slotIds{nullptr, nullptr};
 
-			if (vtxID materialId = materialSlot.material->getUID(); materialDataMap.contains(materialId))
+			if(materialSlot.material)
 			{
-				slotIds.material = materialDataMap[materialId].getDeviceImage();
-
-				if (vtxID lightId = materialSlot.meshLight->getUID(); lightDataMap.contains(lightId)) {
-					instanceData.hasEmission = std::dynamic_pointer_cast<graph::Material>(materialSlot.material)->useAsLight;
-					slotIds.meshLight = lightDataMap[lightId].getDeviceImage();
-				}
-
-				if (!instanceData.hasOpacity)
+				if (vtxID materialId = materialSlot.material->getUID(); materialDataMap.contains(materialId))
 				{
-					const std::shared_ptr<graph::Material>& materialNode = graph::SIM::get()->getNode<graph::Material>(materialId);
-					if (materialNode->useOpacity())
+					slotIds.material = materialDataMap[materialId].getDeviceImage();
+
+					if (vtxID lightId = materialSlot.meshLight->getUID(); lightDataMap.contains(lightId)) {
+						instanceData.hasEmission = std::dynamic_pointer_cast<graph::Material>(materialSlot.material)->useAsLight;
+						slotIds.meshLight = lightDataMap[lightId].getDeviceImage();
+					}
+
+					if (!instanceData.hasOpacity)
 					{
-						instanceData.hasOpacity = true;
+						const std::shared_ptr<graph::Material>& materialNode = graph::Scene::getSim()->getNode<graph::Material>(materialId);
+						if (materialNode->useOpacity())
+						{
+							instanceData.hasOpacity = true;
+						}
 					}
 				}
-			}
-			else
-			{
-				VTX_ERROR("Requesting Material device Data of Material Node {} but not found!", materialId);
+				else
+				{
+					VTX_ERROR("Requesting Material device Data of Material Node {} but not found!", materialId);
+				}
 			}
 
 			materialSlots.push_back(slotIds);

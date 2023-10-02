@@ -17,7 +17,7 @@ namespace vtx::graph
 
 		Texture(const char* _databaseName, const ITarget_code::Texture_shape _shape);
 
-		Texture(std::string filePath);
+		Texture(const std::string& _filePath);
 
 		~Texture() override;
 

@@ -1,7 +1,7 @@
 ﻿#include "BsdfMeasurement.h"
 #include "Scene/Traversal.h"
 #include "MDL/mdlWrapper.h"
-#include "Scene/SIM.h"
+#include "Scene/SceneIndexManager.h"
 
 namespace vtx::graph {
 
@@ -28,19 +28,16 @@ namespace vtx::graph {
 	BsdfMeasurement::BsdfMeasurement() :
 		Node(NT_MDL_BSDF)
 	{
-		typeID = SIM::get()->getTypeId<BsdfMeasurement>();
 	}
 
 	BsdfMeasurement::BsdfMeasurement(char const* _databaseName) :
 		Node(NT_MDL_BSDF),
 		databaseName(_databaseName)
 	{
-		typeID = SIM::get()->getTypeId<BsdfMeasurement>();
 	}
 
 	BsdfMeasurement::~BsdfMeasurement()
 	{
-		SIM::get()->releaseTypeId<BsdfMeasurement>(typeID);
 	}
 
 	void BsdfMeasurement::prepareSampling(BsdfPartData bsdfData)

@@ -14,7 +14,6 @@ namespace vtx {
 
         void mainContent() override;
 
-        std::shared_ptr<graph::Renderer> renderer;
         gui::GuiVisitor                  guiVisitor;
     };
 }

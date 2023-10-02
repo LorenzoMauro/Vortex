@@ -36,6 +36,11 @@ namespace vtx
 			}
 			//VTX_INFO("Node ID: {} Name: {} \t\t Depth: {} Width: {} Overall Width: {}", node->getUID(), node->name, depth, width, overallWidth);
 			nodesDepthsAndWidths[node->getUID()] = { depth, width, depthWidth[depth] };// , currentWidth + parent
+
+			node->treePosition.depth = depth;
+			node->treePosition.width = width;
+			node->treePosition.overallWidth = depthWidth[depth];
+
 			if (!widthStack.empty())
 			{
 				int& currentWidth = widthStack.top();
@@ -53,6 +58,10 @@ namespace vtx
 			bool foundTransform = false;
 			for (const std::shared_ptr<graph::Node> child : node->getChildren())
 			{
+				if(!child)
+				{
+					continue;
+				}
 				if (std::shared_ptr<graph::Transform> transform = child->as<graph::Transform>(); transform != nullptr)
 				{
 					tmpTransforms.push(currentTransform);

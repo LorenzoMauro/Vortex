@@ -3,11 +3,12 @@
 #include "Core/CustomImGui/CustomImGui.h"
 #include "Device/UploadCode/DeviceDataCoordinator.h"
 #include "Scene/Scene.h"
+#include "Scene/Nodes/Instance.h"
+#include "Scene/Nodes/Material.h"
 
 namespace vtx {
-    ViewportWindow::ViewportWindow()
+    ViewportWindow::ViewportWindow() : renderer(graph::Scene::get()->renderer)
     {
-        renderer      = graph::Scene::getScene()->renderer;
         name          = "Viewport";
         useToolbar = false;
         isBorderLess = true;
@@ -15,37 +16,6 @@ namespace vtx {
 
     void ViewportWindow::OnUpdate(const float ts)
     {
-        renderer->camera->onUpdate(ts);
-        if(renderer->settings.runOnSeparateThread)
-        {
-            if (renderer->isReady() && renderer->settings.iteration <= renderer->settings.maxSamples)
-            {
-                renderer->settings.iteration++;
-                renderer->settings.isUpdated = true;
-
-                //This step speed up the material computation, but is not really coherent with the rest of the code
-                graph::computeMaterialsMultiThreadCode();
-                renderer->traverse(hostVisitor);
-                onDeviceData->sync();
-                onDeviceData->incrementFrameIteration();
-                renderer->threadedRender();
-            }
-        }
-        else
-        {
-	        if (renderer->settings.iteration <= renderer->settings.maxSamples)
-	        {
-	        	renderer->settings.iteration++;
-				renderer->settings.isUpdated = true;
-                //This step speed up the material computation, but is not really coherent with the rest of the code
-				graph::computeMaterialsMultiThreadCode();
-                renderer->traverse(hostVisitor);
-                onDeviceData->sync();
-                onDeviceData->incrementFrameIteration();
-				renderer->render();
-			}
-        }
-
     }
 
     void ViewportWindow::mainContent()
@@ -72,7 +42,7 @@ namespace vtx {
                     if (ImGui::GetIO().KeyCtrl)
                     {
                         //We remove all selected instances
-                        graph::Scene::getScene()->removeInstancesFromSelection();
+                        graph::Scene::get()->removeInstancesFromSelection();
                     }
                     else
                     {
@@ -87,11 +57,11 @@ namespace vtx {
 
                         if (ImGui::GetIO().KeyShift)
                         {
-                            graph::Scene::getScene()->addNodesToSelection({ selected });
+                            graph::Scene::get()->addNodesToSelection({ selected });
                         }
                         else
                         {
-                            graph::Scene::getScene()->setSelected({ selected });
+                            graph::Scene::get()->setSelected({ selected });
 
                         }
                     }
@@ -100,7 +70,7 @@ namespace vtx {
         }
 
         // Draw pivots and transform line
-        const std::set<std::shared_ptr<graph::Instance>>& instances = graph::Scene::getScene()->getSelectedInstances();
+        const std::set<std::shared_ptr<graph::Instance>>& instances = graph::Scene::get()->getSelectedInstances();
         if (!instances.empty())
         {
             math::vec3f meanPivot = 0.0f;

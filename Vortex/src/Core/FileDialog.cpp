@@ -30,7 +30,7 @@ namespace vtx
 
     std::string FileDialogs::saveFileDialog(const std::vector<std::string>& extensions, const FileDialogType type) {
         if (type == FileDialogType::Modern) {
-            return fileDialog(true, extensions);
+            return fileDialog(false, extensions);
         }
         else {
             return saveFile(convertExtensions(extensions).c_str());
@@ -135,7 +135,7 @@ namespace vtx
             ofn.lpstrInitialDir = currentDir;
         ofn.lpstrFilter = filter;
         ofn.nFilterIndex = 1;
-        ofn.Flags = OFN_PATHMUSTEXIST | OFN_OVERWRITEPROMPT | OFN_NOCHANGEDIR;
+        ofn.Flags = OFN_OVERWRITEPROMPT | OFN_NOCHANGEDIR; //OFN_PATHMUSTEXIST | ;
 
         // Sets the default extension by extracting it from the filter
         ofn.lpstrDefExt = strchr(filter, '\0') + 1;

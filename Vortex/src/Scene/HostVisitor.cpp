@@ -1,5 +1,5 @@
 ﻿#include "HostVisitor.h"
-#include "SIM.h"
+#include "SceneIndexManager.h"
 #include "MDL//mdlWrapper.h"
 #include "Nodes/Instance.h"
 #include "Nodes/Mesh.h"

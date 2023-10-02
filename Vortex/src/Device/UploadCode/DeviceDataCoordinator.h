@@ -5,7 +5,8 @@
 #include "Device/DevicePrograms/LaunchParams.h"
 #include "Device/UploadCode/UploadBuffers.h"
 #include "Scene/NodeTypes.h"
-#include "Scene/SIM.h"
+#include "Scene/Scene.h"
+#include "Scene/SceneIndexManager.h"
 #define onDeviceData vtx::device::DeviceDataCoordinator::getInstance()
 
 namespace vtx
@@ -59,7 +60,7 @@ namespace vtx::device
 		template <typename T, typename B>
 		void cleanDeletedNodeOfType(DeviceDataMap<T, B>& dataMap, graph::NodeType type)
 		{
-			std::vector<math::vec2ui> deletedIds = graph::SIM::get()->getDeletedNodesByType(type);
+			std::vector<math::vec2ui> deletedIds = graph::Scene::getSim()->getDeletedNodesByType(type);
 			for (math::vec2ui& ids : deletedIds)
 			{
 				vtxID id = ids.x;
@@ -79,7 +80,7 @@ namespace vtx::device
 					launchParamsData.editableHostImage().envLight = nullptr;
 				}
 			}
-			graph::SIM::get()->cleanDeletedNodesByType(type);
+			graph::Scene::getSim()->cleanDeletedNodesByType(type);
 		}
 
 		void cleanDeletedNodes();

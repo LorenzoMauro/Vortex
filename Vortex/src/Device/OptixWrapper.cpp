@@ -7,8 +7,10 @@
 #include "CUDAChecks.h"
 #include "Core/Options.h"
 #include "Core/Utils.h"
+#include "UploadCode/CUDAMap.h"
 #include "UploadCode/UploadBuffers.h"
 #include "UploadCode/DeviceDataCoordinator.h"
+#include <optix_function_table_definition.h>
 
 namespace vtx::optix
 {

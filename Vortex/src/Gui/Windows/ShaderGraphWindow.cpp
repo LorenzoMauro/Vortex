@@ -35,7 +35,7 @@ namespace vtx {
 				editorContextByMaterial[materialOpened] = nodeEditor.sceneGraphContext;
                 rearrangeNodes = true;
 			}
-            const std::shared_ptr<graph::Material> material = graph::SIM::get()->getNode<graph::Material>(materialOpened);
+            const std::shared_ptr<graph::Material> material = graph::Scene::getSim()->getNode<graph::Material>(materialOpened);
             const std::shared_ptr<graph::Node> node = std::reinterpret_pointer_cast<graph::Node>(material->materialGraph);
             nodeEditor.rootNode = node;
             materialOpenedChanged = false;
@@ -45,15 +45,15 @@ namespace vtx {
         {
 	        nodeEditor.arrangeNodes(gui::NodeEditor::LayoutDirection::Horizontal);
 		}
-        graph::Scene::getScene()->setSelected(nodeEditor.getSelected());
+        graph::Scene::get()->setSelected(nodeEditor.getSelected());
     }
     void ShaderGraphWindow::materialSelector()
     {
-        const std::vector<vtxID> materialIds = graph::SIM::get()->getAllNodeIdByType<graph::Material>(graph::NT_MATERIAL);
+        const std::vector<vtxID> materialIds = graph::Scene::getSim()->getAllNodeIdByType<graph::Material>(graph::NT_MATERIAL);
         if(materialOpened == 0 && !materialIds.empty())
         {
 	        materialOpened = materialIds[0];
-            const std::shared_ptr<graph::Material>& selectedMaterial = graph::SIM::get()->getNode<graph::Material>(materialOpened);
+            const std::shared_ptr<graph::Material>& selectedMaterial = graph::Scene::getSim()->getNode<graph::Material>(materialOpened);
             openedMaterialName = selectedMaterial->name;
             materialOpenedChanged = true;
         }
@@ -61,7 +61,7 @@ namespace vtx {
         {
 	        for (const vtxID materialId : materialIds)
 			{
-		        const std::shared_ptr<graph::Material>& material = graph::SIM::get()->getNode<graph::Material>(
+		        const std::shared_ptr<graph::Material>& material = graph::Scene::getSim()->getNode<graph::Material>(
 					materialId);
 				const bool isSelected = material->getUID() == materialOpened;
 				if (ImGui::Selectable(material->name.c_str(), isSelected))

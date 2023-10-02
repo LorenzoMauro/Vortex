@@ -4,3 +4,6 @@
 [submodule "ext/MDL-SDK"]
 	path = ext/MDL-SDK
 	url = https://github.com/NVIDIA/MDL-SDK.git
+[submodule "ext/cereal"]
+	path = ext/cereal
+	url = https://github.com/USCiLab/cereal.git

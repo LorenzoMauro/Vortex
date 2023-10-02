@@ -1,10 +1,11 @@
 ﻿#include "LoadingSaving.h"
-
 #include "Application.h"
 #include "FileDialog.h"
 #include "Gui/Windows/LoadingSavingWindow.h"
 #include "Scene/Scene.h"
+#include "Scene/Nodes/Renderer.h"
 #include "Scene/Utility/ModelLoader.h"
+#include "Scene/Utility/Operations.h"
 #include "Serialization/Serializer.h"
 
 namespace vtx
@@ -55,12 +56,12 @@ namespace vtx
 		}
 		if (!filePath.empty())
 		{
-			const std::string fileExtension = utl::getFileExtension(filePath);
-			const std::shared_ptr<graph::Scene>& scene = graph::Scene::getScene();
+			const std::string   fileExtension = utl::getFileExtension(filePath);
+			graph::Scene* scene         = graph::Scene::get();
 			// switch on file extension
-			if (fileExtension == "yaml" || fileExtension == "vtx")
+			if (fileExtension == "vtx" || fileExtension == "xml" || fileExtension == "json")
 			{
-				serializer::deserialize(filePath, scene);
+				serializer::deserialize(filePath);
 			}
 			else if (fileExtension == "obj" || fileExtension == "fbx" || fileExtension == "gltf")
 			{
@@ -109,12 +110,12 @@ namespace vtx
 
 	std::vector<std::string> LoadingSaving::getSupportedLoadingFileExtensions()
 	{
-		return {"*.yaml", "*.vtx", "*.obj", "*.fbx", "*.gltf"};
+		return {"*.vtx", "*.xml", "*.json", "*.obj", "*.fbx", "*.gltf"};
 	}
 
 	std::vector<std::string> LoadingSaving::getSupportedSavingFileExtensions()
 	{
-		return {"*.yaml", "*.vtx"};
+		return {"*.vtx", "*.xml", "*.json"};
 	}
 
 	bool LoadingSaving::isLoadFileRequested()

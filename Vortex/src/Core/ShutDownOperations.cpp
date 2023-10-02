@@ -4,7 +4,7 @@
 #include "Device/UploadCode/UploadBuffers.h"
 #include "Device/UploadCode/DeviceDataCoordinator.h"
 #include "MDL/MdlWrapper.h"
-#include "Scene/SIM.h"
+#include "Scene/SceneIndexManager.h"
 #include "Scene/Nodes/Renderer.h"
 
 
@@ -12,7 +12,7 @@ void vtx::shutDownOperations()
 {
 	// Wait for all rendering threads to finish
 	VTX_INFO("ShutDown: Waiting For Render Threads");
-	const std::vector<std::shared_ptr<graph::Renderer>> rendererNodes = graph::SIM::get()->getAllNodeOfType<graph::Renderer>(graph::NT_RENDERER);
+	const std::vector<std::shared_ptr<graph::Renderer>> rendererNodes = graph::Scene::getSim()->getAllNodeOfType<graph::Renderer>(graph::NT_RENDERER);
 
 	bool renderingConcluded = true;
 

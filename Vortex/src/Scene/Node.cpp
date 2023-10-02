@@ -1,5 +1,5 @@
-#include "SIM.h"
 #include "Node.h"
+#include "Scene.h"
 #include "Traversal.h"
 
 namespace vtx::graph
@@ -7,14 +7,15 @@ namespace vtx::graph
 
 	Node::Node(const NodeType _type) : type(_type)
 	{
-		sim = SIM::get();
+		sim = Scene::getSim();
 		UID  = sim->getUID();
-		name = nodeNames[type] + "_" + std::to_string(UID);
+		typeID = sim->getTypeId(type);
+		name = nodeNames[type] + "." + std::to_string(typeID);
 	}
 
 	Node::~Node()
 	{
-		sim->releaseUID(UID);
+		sim->removeNodeReference(UID, typeID, type);
 		VTX_WARN("Node ID: {} Name: {} destroyed", UID, name);
 	}
         
@@ -29,6 +30,16 @@ namespace vtx::graph
 	vtxID Node::getTypeID() const
 	{
 		return typeID;
+	}
+
+	void Node::setUID(vtxID id)
+	{
+		UID = id;
+	}
+
+	void Node::setTID(vtxID id)
+	{
+		typeID = id;
 	}
 
 	void Node::traverse(NodeVisitor& visitor)
@@ -59,7 +70,10 @@ namespace vtx::graph
 	{
 		for(const std::shared_ptr<Node> node : getChildren())
 		{
-			node->traverse(visitor);
+			if(node)
+			{
+				node->traverse(visitor);
+			}
 		}
 
 	}

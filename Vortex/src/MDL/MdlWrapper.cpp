@@ -4,6 +4,7 @@
 #include "ShaderVisitor.h"
 #include "mdlTraversal.h"
 #include "Device/OptixWrapper.h"
+#include "Scene/Scene.h"
 #include "Scene/Nodes/Material.h"
 #include "Scene/Nodes/Shader/Texture.h"
 #include "Scene/Nodes/Shader/mdl/ShaderNodes.h"
@@ -699,7 +700,7 @@ namespace vtx::mdl
 			// These are all expressions required for a materials which does everything supported in this renderer. 
 			// The Target_function_description only stores the C-pointers to the base names!
 			// Make sure these are not destroyed as long as the descs vector is used.
-			fNames = graph::SIM::get()->getNode<graph::Material>(shaderIndex)->getFunctionNames();
+			fNames = graph::Scene::getSim()->getNode<graph::Material>(shaderIndex)->getFunctionNames();
 
 			// Centralize the init functions in a single material init().
 			// This will only save time when there would have been multiple init functions inside the shader.
@@ -1039,8 +1040,8 @@ namespace vtx::mdl
 
 		Handle argument = make_handle<IValue const>(compiledMat->get_argument(index));
 		const IValue::Kind kind = argument->get_kind();
-		auto paramKind = ParameterInfo::PK_UNKNOWN;
-		auto paramArrayElemKind = ParameterInfo::PK_UNKNOWN;
+		auto paramKind = vtx::graph::shader::PK_UNKNOWN;
+		auto paramArrayElemKind = vtx::graph::shader::PK_UNKNOWN;
 		Size paramArraySize = 0;
 		Size paramArrayPitch = 0;
 		const EnumTypeInfo* enumType = nullptr;
@@ -1048,16 +1049,16 @@ namespace vtx::mdl
 		switch (kind)
 		{
 			case IValue::VK_FLOAT:
-				paramKind = ParameterInfo::PK_FLOAT;
+				paramKind = vtx::graph::shader::PK_FLOAT;
 				break;
 			case IValue::VK_COLOR:
-				paramKind = ParameterInfo::PK_COLOR;
+				paramKind = vtx::graph::shader::PK_COLOR;
 				break;
 			case IValue::VK_BOOL:
-				paramKind = ParameterInfo::PK_BOOL;
+				paramKind = vtx::graph::shader::PK_BOOL;
 				break;
 			case IValue::VK_INT:
-				paramKind = ParameterInfo::PK_INT;
+				paramKind = vtx::graph::shader::PK_INT;
 				break;
 			case IValue::VK_VECTOR:
 			{
@@ -1069,10 +1070,10 @@ namespace vtx::mdl
 					switch (valType->get_size())
 					{
 						case 2:
-							paramKind = ParameterInfo::PK_FLOAT2;
+							paramKind = vtx::graph::shader::PK_FLOAT2;
 							break;
 						case 3:
-							paramKind = ParameterInfo::PK_FLOAT3;
+							paramKind = vtx::graph::shader::PK_FLOAT3;
 							break;
 					}
 				}
@@ -1087,16 +1088,16 @@ namespace vtx::mdl
 				switch (const Handle elemType = make_handle<const IType>(valType->get_element_type()); elemType->get_kind())
 				{
 					case IType::TK_FLOAT:
-						paramArrayElemKind = ParameterInfo::PK_FLOAT;
+						paramArrayElemKind = vtx::graph::shader::PK_FLOAT;
 						break;
 					case IType::TK_COLOR:
-						paramArrayElemKind = ParameterInfo::PK_COLOR;
+						paramArrayElemKind = vtx::graph::shader::PK_COLOR;
 						break;
 					case IType::TK_BOOL:
-						paramArrayElemKind = ParameterInfo::PK_BOOL;
+						paramArrayElemKind = vtx::graph::shader::PK_BOOL;
 						break;
 					case IType::TK_INT:
-						paramArrayElemKind = ParameterInfo::PK_INT;
+						paramArrayElemKind = vtx::graph::shader::PK_INT;
 						break;
 					case IType::TK_VECTOR:
 					{
@@ -1107,10 +1108,10 @@ namespace vtx::mdl
 							switch (valType->get_size())
 							{
 								case 2:
-									paramArrayElemKind = ParameterInfo::PK_FLOAT2;
+									paramArrayElemKind = vtx::graph::shader::PK_FLOAT2;
 									break;
 								case 3:
-									paramArrayElemKind = ParameterInfo::PK_FLOAT3;
+									paramArrayElemKind = vtx::graph::shader::PK_FLOAT3;
 									break;
 							}
 						}
@@ -1119,9 +1120,9 @@ namespace vtx::mdl
 					default:
 						break;
 				}
-				if (paramArrayElemKind != ParameterInfo::PK_UNKNOWN)
+				if (paramArrayElemKind != vtx::graph::shader::PK_UNKNOWN)
 				{
-					paramKind = ParameterInfo::PK_ARRAY;
+					paramKind = vtx::graph::shader::PK_ARRAY;
 					paramArraySize = valType->get_size();
 
 					// determine pitch of array if there are at least two elements
@@ -1165,20 +1166,20 @@ namespace vtx::mdl
 					info = enumTypeInfo.get();
 				}
 				enumType = info;
-				paramKind = ParameterInfo::PK_ENUM;
+				paramKind = vtx::graph::shader::PK_ENUM;
 			}
 			break;
 			case IValue::VK_STRING:
-				paramKind = ParameterInfo::PK_STRING;
+				paramKind = vtx::graph::shader::PK_STRING;
 				break;
 			case IValue::VK_TEXTURE:
-				paramKind = ParameterInfo::PK_TEXTURE;
+				paramKind = vtx::graph::shader::PK_TEXTURE;
 				break;
 			case IValue::VK_LIGHT_PROFILE:
-				paramKind = ParameterInfo::PK_LIGHT_PROFILE;
+				paramKind = vtx::graph::shader::PK_LIGHT_PROFILE;
 				break;
 			case IValue::VK_BSDF_MEASUREMENT:
-				paramKind = ParameterInfo::PK_BSDF_MEASUREMENT;
+				paramKind = vtx::graph::shader::PK_BSDF_MEASUREMENT;
 				break;
 			default:
 				// Unsupported? -> skip
@@ -1889,22 +1890,37 @@ namespace vtx::mdl
 
 	Handle<IExpression> createTextureConstant(const std::string& texturePath, const IType_texture::Shape shape, const float gamma)
 	{
-		MdlState* state = getState();
-		const TransactionInterfaces* tI = state->getTransactionInterfaces();
+		try
+		{
+			MdlState* state = getState();
+			const TransactionInterfaces* tI = state->getTransactionInterfaces();
 
-		const std::string textureFolder = utl::getFolder(texturePath);
-		const std::string textureName = "/" + utl::getFile(texturePath);
-		addSearchPath(textureFolder);
+			const std::string textureFolder = utl::getFolder(texturePath);
+			const std::string textureName = "/" + utl::getFile(texturePath);
+			addSearchPath(textureFolder);
 
-		const Handle<IMdl_factory>& factory = state->factory;
-		const Handle<IExpression_factory>& ef = tI->expressionFactory;
+			const Handle<IMdl_factory>& factory = state->factory;
+			const Handle<IExpression_factory>& ef = tI->expressionFactory;
 
-		const Handle<IValue_texture>   argValue(factory->create_texture(tI->transaction.get(), textureName.c_str(), shape, gamma, nullptr, true, nullptr));
-		VTX_INFO("Texture {} loaded with gamma : {} ", textureName, argValue->get_gamma());
-		const Handle<IExpression>      argExpr(ef->create_constant(argValue.get()));
+			const Handle<IValue_texture>   argValue(factory->create_texture(tI->transaction.get(), textureName.c_str(), shape, gamma, nullptr, true, nullptr));
+			VTX_INFO("Texture {} loaded with gamma : {} ", textureName, argValue->get_gamma());
+			const Handle<IExpression>      argExpr(ef->create_constant(argValue.get()));
 
-		return argExpr;
+			return argExpr;
+		}
+		catch (const std::exception& e)
+		{
+			VTX_WARN("createTextureConstant : {}", e.what());
+			return Handle<IExpression>();
+		}
+		catch (...)
+		{
+			VTX_WARN("createTextureConstant : unknown exception");
+			return Handle<IExpression>();
+		}
+		
 	};
+
 
 	std::string getTexturePathFromExpr(const Handle<IExpression>& expr)
 	{

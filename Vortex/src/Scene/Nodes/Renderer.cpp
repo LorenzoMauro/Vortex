@@ -1,8 +1,6 @@
 #include "Renderer.h"
-#include <optix_function_table_definition.h>
 #include "Device/CUDAChecks.h"
 #include "Core/Options.h"
-#include "Core/Utils.h"
 #include <cudaGL.h>
 #include "Device/OptixWrapper.h"
 #include "Device/UploadCode/UploadBuffers.h"
@@ -10,11 +8,14 @@
 #include "Scene/Traversal.h"
 #include "device_launch_parameters.h"
 #include "cuda_runtime.h"
+#include "Core/Application.h"
 #include "Device/CudaFunctions/cudaFunctions.h"
 #include "Device/DevicePrograms/CudaKernels.h"
 #include "Device/Wrappers/KernelTimings.h"
 #include "Scene/Scene.h"
 #include "Scene/Utility/Operations.h"
+#include "Scene/Graph.h"
+#include "Scene/HostVisitor.h"
 
 namespace vtx::graph
 {
@@ -26,10 +27,10 @@ namespace vtx::graph
 		settings(),
 		waveFrontIntegrator(&settings)
 	{
-		typeID = SIM::get()->getTypeId<Renderer>();
-		camera = ops::createNode<Camera>();
+		camera = ops::standardCamera();
 		sceneRoot = ops::createNode<Group>();
 		settings = getOptions()->rendererSettings;
+
 		drawFrameBuffer.setSize(width, height);
 		drawFrameBuffer.bind();
 		glClearColor(0.2f, 0.2f, 0.2f, 1.0f);
@@ -42,16 +43,17 @@ namespace vtx::graph
 		glClear(GL_COLOR_BUFFER_BIT);
 		displayFrameBuffer.unbind();
 
+		setWindow(Application::get()->glfwWindow);
 	}
 
-	Renderer::~Renderer()
-	{
-		SIM::get()->releaseTypeId<Renderer>(getTypeID());
-	}
 
 	std::vector<std::shared_ptr<Node>> Renderer::getChildren() const
 	{
-		return { camera, sceneRoot };
+		std::vector<std::shared_ptr<Node>> children;
+		camera? children.push_back(camera) : void();
+		sceneRoot? children.push_back(sceneRoot) : void();
+		environmentLight? children.push_back(environmentLight) : void();
+		return children;
 	}
 
 	void Renderer::accept(NodeVisitor& visitor)
@@ -67,7 +69,7 @@ namespace vtx::graph
 
 		vtxID hostValue;
 		cudaMemcpy(&hostValue, pixelDataPtr, sizeof(vtxID), cudaMemcpyDeviceToHost);
-		return SIM::get()->UIDfromTID(NT_INSTANCE,hostValue);
+		return graph::Scene::getSim()->UIDfromTID(NT_INSTANCE,hostValue);
 	}
 
 	bool Renderer::isReady(const bool setBusy) {
@@ -88,6 +90,11 @@ namespace vtx::graph
 	{
 		if (isReady(true))
 		{
+			graph::computeMaterialsMultiThreadCode();
+			HostVisitor visitor;
+			this->traverse(visitor);
+			onDeviceData->sync();
+			onDeviceData->incrementFrameIteration();
 			std::unique_lock<std::mutex> lock(threadData.renderMutex);
 			threadData.renderThreadBusy = true;
 			threadData.renderCondition.notify_one();
@@ -188,7 +195,7 @@ namespace vtx::graph
 
 			// Selection edge
 			{
-				const std::set<vtxID> uidSelectedInstances = Scene::getScene()->getSelectedInstancesIds();
+				const std::set<vtxID> uidSelectedInstances = Scene::get()->getSelectedInstancesIds();
 				if (!uidSelectedInstances.empty())
 				{
 					auto*                    gBuffer              = onDeviceData->frameBufferData.resourceBuffers.gBuffer.castedPointer<float>();
@@ -199,7 +206,7 @@ namespace vtx::graph
 					typeIds.reserve(uidSelectedInstances.size());
 					for (const vtxID uid : uidSelectedInstances)
 					{
-						typeIds.push_back((float)SIM::get()->TIDfromUID(uid));
+						typeIds.push_back((float)graph::Scene::getSim()->TIDfromUID(uid));
 					}
 					cuda::overlaySelectionEdge(gBuffer, outputBuffer, width, height, typeIds, 0.2f, 1.35f, &edgeMapBuffer, &selectedIdsBuffer);
 				}

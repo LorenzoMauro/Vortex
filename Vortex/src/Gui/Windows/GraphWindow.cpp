@@ -1,5 +1,6 @@
 ﻿#include "GraphWindow.h"
 #include "Scene/Scene.h"
+#include "Scene/Graph.h"
 
 namespace vtx
 {
@@ -8,17 +9,15 @@ namespace vtx
 		name = "Node Graph";
 		useToolbar = false;
 		renderCustomMenuBar = true;
-		renderer = graph::Scene::getScene()->renderer;
 		isBorderLess = true;
 		nodeEditor.flags = ImNodesStyleFlags_VerticalLayout;
-		nodeEditor.rootNode = renderer;
 		nodeEditor.nodesWithColor = true;
 	}
 
 	void GraphWindow::mainContent()
 	{
 		nodeEditor.draw();
-		graph::Scene::getScene()->setSelected(nodeEditor.getSelected());
+		graph::Scene::get()->setSelected(nodeEditor.getSelected());
 	}
 	void GraphWindow::menuBarContent()
 	{

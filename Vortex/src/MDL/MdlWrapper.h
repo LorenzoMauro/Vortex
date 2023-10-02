@@ -197,6 +197,7 @@ namespace vtx::mdl
 
 	struct MdlFunctionInfo
 	{
+		std::string                             fullModulePath = "";
 		std::string                             module;
 		std::string                             name;
 		std::string                             signature;

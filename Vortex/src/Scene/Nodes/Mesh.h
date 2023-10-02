@@ -18,7 +18,7 @@ namespace vtx::graph
 
 		~Mesh();
 
-		std::vector<std::shared_ptr<Node>> getChildren() const override;;
+		std::vector<std::shared_ptr<Node>> getChildren() const override;
 	protected:
 		void accept(NodeVisitor& visitor) override;
 	public:

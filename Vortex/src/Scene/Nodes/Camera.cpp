@@ -22,12 +22,10 @@ namespace vtx::graph
 	{
 		transform = ops::createNode<Transform>();
 		state.updateOnDevice= true;
-		typeID = SIM::get()->getTypeId<Camera>();
 	}
 
 	Camera::~Camera()
 	{
-		SIM::get()->releaseTypeId<Camera>(typeID);
 	}
 
 	void Camera::updateDirections() {

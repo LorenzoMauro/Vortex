@@ -11,7 +11,6 @@ namespace vtx {
 
         void menuBarContent() override;
 
-        std::shared_ptr<graph::Renderer> renderer;
 		gui::NodeEditor                 nodeEditor;
 
     };

@@ -1,7 +1,4 @@
 ﻿#include "SceneHierarchyWindow.h"
-
-#include <imgui_internal.h>
-
 #include "Scene/Graph.h"
 #include "Scene/Scene.h"
 
@@ -11,14 +8,13 @@ namespace vtx
 	{
 		name = "Scene Hierarchy";
 		useToolbar = false;
-		renderer = graph::Scene::getScene()->renderer;
         useStripedBackground = true;
 	}
     void SceneHierarchyWindow::displayNode(const std::shared_ptr<graph::Node>& node) {
         // Check if the node is null
         if (!node) return;
 
-        std::set<vtxID> selected = graph::Scene::getScene()->getSelected();
+        std::set<vtxID> selected = graph::Scene::get()->getSelected();
         bool isSelected = selected.find(node->getUID()) != selected.end();
         // Flags for TreeNodeEx
         ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_SpanFullWidth | ImGuiTreeNodeFlags_OpenOnArrow;
@@ -46,11 +42,11 @@ namespace vtx
         if (ImGui::IsItemClicked() && !ImGui::IsItemToggledOpen()) {
             if (isSelected)
             {
-                graph::Scene::getScene()->removeNodesToSelection({node->getUID()});
+                graph::Scene::get()->removeNodesToSelection({node->getUID()});
             }
             else
             {
-                graph::Scene::getScene()->addNodesToSelection({node->getUID()});
+                graph::Scene::get()->addNodesToSelection({node->getUID()});
             }
         }
 
@@ -67,6 +63,6 @@ namespace vtx
 	void SceneHierarchyWindow::mainContent()
 	{
         // Now proceed with your node rendering as usual.
-        displayNode(renderer);
+        displayNode(graph::Scene::get()->renderer);
 	}
 }

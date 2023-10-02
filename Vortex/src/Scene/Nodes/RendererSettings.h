@@ -139,6 +139,38 @@ namespace vtx
 			"Network Replay Buffer Reward",
 			"Network Replay Buffer Samples",
 			"Network Debug Paths",
+			"Count"
+	};
+
+	inline static std::map<std::string, DisplayBuffer> displayBufferNameToEnum =
+	{
+		{"Beauty", FB_BEAUTY},
+		{"Noisy", FB_NOISY},
+		{"Diffuse", FB_DIFFUSE},
+		{"Orientation", FB_ORIENTATION},
+		{"True Normal", FB_TRUE_NORMAL},
+		{"Shading Normal",FB_SHADING_NORMAL },
+		{"Tangent", FB_TANGENT},
+		{"Uv", FB_UV},
+		{"Noise", FB_NOISE},
+		{"GBuffer", FB_GBUFFER},
+		{"Samples", FB_SAMPLES},
+		{"Debug1",FB_DEBUG_1},
+		{"Network Inference State Position", FB_NETWORK_INFERENCE_STATE_POSITION},
+		{"Network Inference State Normal", FB_NETWORK_INFERENCE_STATE_NORMAL},
+		{"Network Inference Outgoing Direction",FB_NETWORK_INFERENCE_OUTGOING_DIRECTION },
+		{"Network Inference Concentration",FB_NETWORK_INFERENCE_CONCENTRATION },
+		{"Network Inference Anisotropy",FB_NETWORK_INFERENCE_ANISOTROPY },
+		{"Network Inference Mean", FB_NETWORK_INFERENCE_MEAN},
+		{"Network Inference Sample", FB_NETWORK_INFERENCE_SAMPLE},
+		{"Network Inference Sample Debug",FB_NETWORK_INFERENCE_SAMPLE_DEBUG },
+		{"Network Inference Pdf", FB_NETWORK_INFERENCE_PDF},
+		{"Network Inference Is Front Face", FB_NETWORK_INFERENCE_IS_FRONT_FACE},
+		{"Network Inference Sampling Fraction", FB_NETWORK_INFERENCE_SAMPLING_FRACTION},
+		{"Network Replay Buffer Reward", FB_NETWORK_REPLAY_BUFFER_REWARD},
+		{"Network Replay Buffer Samples", FB_NETWORK_REPLAY_BUFFER_SAMPLES},
+		{"Network Debug Paths", FB_NETWORK_DEBUG_PATHS},
+		{"Count", FB_COUNT}
 	};
 
 	enum SamplingTechnique
@@ -155,6 +187,13 @@ namespace vtx
 				"Light Sampling",
 				"Multiple Importance Sampling",
 	};
+
+	inline static std::map<std::string, SamplingTechnique> samplingTechniqueNameToEnum =
+	{
+			{"Bsdf Sampling", S_BSDF},
+			{"Light Sampling", S_DIRECT_LIGHT},
+			{"Multiple Importance Sampling", S_MIS}
+		};
 
 	struct RendererSettings
 	{

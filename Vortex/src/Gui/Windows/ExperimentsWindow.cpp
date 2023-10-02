@@ -12,18 +12,18 @@
 
 namespace vtx
 {
-	ExperimentsWindow::ExperimentsWindow()
+#define em renderer->waveFrontIntegrator.network.experimentManager
+#define net renderer->waveFrontIntegrator.network
+
+	ExperimentsWindow::ExperimentsWindow() : renderer(graph::Scene::get()->renderer)
 	{
-		std::shared_ptr<graph::Scene> scene = graph::Scene::getScene();
-		renderer = scene->renderer;
-		network = &renderer->waveFrontIntegrator.network;
-		em = &network->experimentManager;
 		name = "Neural Path Guiding Experiments";
 	}
 
 	void ExperimentsWindow::OnUpdate(float ts)
 	{
-		switch (em->stage)
+
+		switch (em.stage)
 		{
 		case STAGE_REFERENCE_GENERATION:
 		{
@@ -46,7 +46,7 @@ namespace vtx
 		MapePlot.xLabel = "samples";
 		MapePlot.yLabel = "Mape";
 
-		for (auto& experiment : em->experiments)
+		for (auto& experiment : em.experiments)
 		{
 			if (experiment.rendererSettings.samplingTechnique == S_MIS && !toggleMisExperiment)
 			{
@@ -96,25 +96,25 @@ namespace vtx
 
 	void ExperimentsWindow::toolBarContent()
 	{
-		auto stageName = experimentStageNames[em->stage];
+		auto stageName = experimentStageNames[em.stage];
 		vtxImGui::halfSpaceWidget("Stage", vtxImGui::booleanText, "%s", stageName.c_str());
 
-		vtxImGui::halfSpaceWidget("Current Step", vtxImGui::booleanText, "%d", em->currentExperimentStep);
+		vtxImGui::halfSpaceWidget("Current Step", vtxImGui::booleanText, "%d", em.currentExperimentStep);
 
 
-		vtxImGui::halfSpaceWidget("Max Samples", ImGui::DragInt, (hiddenLabel + "_Max Samples").c_str(), &(em->maxSamples), 1, 0, 10000, "%d", 0);
-		vtxImGui::halfSpaceWidget("Width", ImGui::DragInt, (hiddenLabel + "_Max Samples").c_str(), &(em->width), 1, 0, 4000, "%d", 0);
-		vtxImGui::halfSpaceWidget("Height", ImGui::DragInt, (hiddenLabel + "_Max Samples").c_str(), &(em->height), 1, 0, 4000, "%d", 0);
+		vtxImGui::halfSpaceWidget("Max Samples", ImGui::DragInt, (hiddenLabel + "_Max Samples").c_str(), &(em.maxSamples), 1, 0, 10000, "%d", 0);
+		vtxImGui::halfSpaceWidget("Width", ImGui::DragInt, (hiddenLabel + "_Max Samples").c_str(), &(em.width), 1, 0, 4000, "%d", 0);
+		vtxImGui::halfSpaceWidget("Height", ImGui::DragInt, (hiddenLabel + "_Max Samples").c_str(), &(em.height), 1, 0, 4000, "%d", 0);
 
 		const float halfItemWidth = ImGui::CalcItemWidth() * 0.5f;
 		ImVec2 buttonSize = ImVec2(halfItemWidth, 0);
 
 		if (ImGui::Button("Generate Ground Truth", buttonSize))
 		{
-			em->stage = STAGE_REFERENCE_GENERATION;
+			em.stage = STAGE_REFERENCE_GENERATION;
 		}
 
-		if (em->isGroundTruthReady)
+		if (em.isGroundTruthReady)
 		{
 			//ImGui::PushItemWidth(halfItemWidth);
 			if (ImGui::Button("Run Current Settings", buttonSize))
@@ -133,8 +133,7 @@ namespace vtx
 			}
 		}
 
-
-		if (ImGui::Button("Save Experiments", buttonSize))
+		/*if (ImGui::Button("Save Experiments", buttonSize))
 		{
 			std::string filepath = FileDialogs::saveFileDialog({"*.yaml"});
 			if (!filepath.empty())
@@ -151,7 +150,7 @@ namespace vtx
 			{
 				*em = serializer::deserializeExperimentManager(filepath);
 			}
-		}
+		}*/
 
 #ifdef DEBUG_UI
 		if (ImGui::Button("Store Ground Truth"))
@@ -162,7 +161,7 @@ namespace vtx
 			auto [result, filePathName, filePath] = vtxImGui::fileDialog("saveGT");
 			if (result)
 			{
-				em->saveGroundTruth(filePathName);
+				em.saveGroundTruth(filePathName);
 			}
 		}
 
@@ -174,7 +173,7 @@ namespace vtx
 			auto [result, filePathName, filePath] = vtxImGui::fileDialog("loadGT");
 			if (result)
 			{
-				em->loadGroundTruth(filePathName);
+				em.loadGroundTruth(filePathName);
 			}
 		}
 #endif
@@ -193,7 +192,7 @@ namespace vtx
 
 		std::vector<int> toRemove;
 		int i = -1;
-		for (auto& experiment : em->experiments)
+		for (auto& experiment : em.experiments)
 		{
 			i++;
 			if (experiment.rendererSettings.samplingTechnique == S_MIS && !toggleMisExperiment)
@@ -228,8 +227,8 @@ namespace vtx
 
 		for (auto& i : toRemove)
 		{
-			em->experiments.erase(em->experiments.begin() + i);
-			em->currentExperiment = std::min(0, em->currentExperiment - 1);
+			em.experiments.erase(em.experiments.begin() + i);
+			em.currentExperiment = std::min(0, em.currentExperiment - 1);
 		}
 	}
 
@@ -237,28 +236,28 @@ namespace vtx
 	{
 		renderer->settings.samplingTechnique = technique;
 		renderer->settings.iteration = -1;
-		renderer->settings.maxSamples = em->maxSamples;
+		renderer->settings.maxSamples = em.maxSamples;
 		renderer->waveFrontIntegrator.settings.active = true;
 		renderer->settings.isUpdated = true;
 
 		renderer->isSizeLocked = false;
-		renderer->resize(em->width, em->height);
+		renderer->resize(em.width, em.height);
 		renderer->isSizeLocked = true;
 
 		renderer->camera->lockCamera = false;
-		renderer->camera->resize(em->width, em->height);
+		renderer->camera->resize(em.width, em.height);
 		renderer->camera->lockCamera = true;
 
 	}
 
 	void ExperimentsWindow::mapeComputation()
 	{
-		if (em->currentExperiment >= em->experiments.size())
+		if (em.currentExperiment >= em.experiments.size())
 		{
 			return;
 		}
-		Experiment& experiment = em->experiments[em->currentExperiment];
-		if (em->currentExperimentStep == 0)
+		Experiment& experiment = em.experiments[em.currentExperiment];
+		if (em.currentExperimentStep == 0)
 		{
 			startNewRender(experiment.rendererSettings.samplingTechnique);
 
@@ -268,24 +267,24 @@ namespace vtx
 				renderer->waveFrontIntegrator.network.settings.active= true;
 
 				bool initNetwork = false;
-				if (network->settings.type != experiment.networkSettings.type)
+				if (net.settings.type != experiment.networkSettings.type)
 				{
-					network->settings.type = experiment.networkSettings.type;
+					net.settings.type = experiment.networkSettings.type;
 					initNetwork = true;
 				}
-				if (network->isInitialized == false)
+				if (net.isInitialized == false)
 				{
 					initNetwork = true;
 				}
 				if (initNetwork)
 				{
-					network->initNetworks();
+					net.initNetworks();
 				}
 				else
 				{
-					network->reset();
+					net.reset();
 				}
-				network::NetworkSettings& networkSettings = network->getNeuralNetSettings();
+				network::NetworkSettings& networkSettings = net.getNeuralNetSettings();
 				networkSettings.inferenceIterationStart = experiment.networkSettings.inferenceIterationStart;
 				networkSettings.doInference = true;
 				networkSettings.clearOnInferenceStart = false;
@@ -294,24 +293,24 @@ namespace vtx
 			{
 				renderer->waveFrontIntegrator.network.settings.active = false;
 			}
-			em->currentExperimentStep++;
+			em.currentExperimentStep++;
 			return;
 		}
 
-		const float mape = cuda::computeMape(em->groundTruth, onDeviceData->launchParamsData.getHostImage().frameBuffer.tmRadiance, em->width, em->height);
+		const float mape = cuda::computeMape(em.groundTruth, onDeviceData->launchParamsData.getHostImage().frameBuffer.tmRadiance, em.width, em.height);
 		experiment.mape.push_back(mape);
 
-		if (renderer->settings.iteration == em->maxSamples)
+		if (renderer->settings.iteration == em.maxSamples)
 		{
-			em->currentExperiment += 1;
-			em->currentExperimentStep = 0;
+			em.currentExperiment += 1;
+			em.currentExperimentStep = 0;
 			return;
 		}
-		em->currentExperimentStep++;
+		em.currentExperimentStep++;
 	}
 	void ExperimentsWindow::generateGroundTruth()
 	{
-		if (em->currentExperimentStep == 0)
+		if (em.currentExperimentStep == 0)
 		{
 			startNewRender(S_MIS);
 			renderer->waveFrontIntegrator.network.settings.active = false;
@@ -319,55 +318,55 @@ namespace vtx
 			renderer->waveFrontIntegrator.network.settings.isUpdated = true;
 		}
 
-		if (renderer->settings.iteration == em->maxSamples)
+		if (renderer->settings.iteration == em.maxSamples)
 		{
 			storeGroundTruth();
-			em->stage = STAGE_NONE;
-			em->currentExperimentStep = 0;
+			em.stage = STAGE_NONE;
+			em.currentExperimentStep = 0;
 			return;
 		}
-		em->currentExperimentStep++;
+		em.currentExperimentStep++;
 	}
 	void ExperimentsWindow::runCurrentSettingsExperiment()
 	{
-		em->experiments.emplace_back();
+		em.experiments.emplace_back();
 
-		Experiment& mapeExperiment = em->experiments.back();
+		Experiment& mapeExperiment = em.experiments.back();
 		mapeExperiment.rendererSettings = renderer->settings;
-		mapeExperiment.networkSettings = network->settings;
+		mapeExperiment.networkSettings = net.settings;
 		mapeExperiment.wavefrontSettings = renderer->waveFrontIntegrator.settings;
 		mapeExperiment.storeExperiment = true;
-		em->currentExperiment = em->experiments.size() - 1;
-		mapeExperiment.constructName(em->currentExperiment);
-		em->currentExperimentStep = 0;
-		em->stage = STAGE_MAPE_COMPUTATION;
+		em.currentExperiment = em.experiments.size() - 1;
+		mapeExperiment.constructName(em.currentExperiment);
+		em.currentExperimentStep = 0;
+		em.stage = STAGE_MAPE_COMPUTATION;
 	}
 
 	void ExperimentsWindow::stopExperiment()
 	{
 		// HACK
-		if (em->stage == STAGE_REFERENCE_GENERATION)
+		if (em.stage == STAGE_REFERENCE_GENERATION)
 		{
 			storeGroundTruth();
 		}
-		em->stage = STAGE_NONE;
-		em->currentExperimentStep = 0;
+		em.stage = STAGE_NONE;
+		em.currentExperimentStep = 0;
 		renderer->isSizeLocked = false;
 		renderer->camera->lockCamera = false;
 	}
 
 	void ExperimentsWindow::storeGroundTruth()
 	{
-		const size_t imageSize = (size_t)em->width * (size_t)em->height * sizeof(math::vec3f);
+		const size_t imageSize = (size_t)em.width * (size_t)em.height * sizeof(math::vec3f);
 
-		em->groundTruthBuffer.resize(imageSize);
-		em->groundTruth = em->groundTruthBuffer.castedPointer<math::vec3f>();
+		em.groundTruthBuffer.resize(imageSize);
+		em.groundTruth = em.groundTruthBuffer.castedPointer<math::vec3f>();
 		const void* groundTruthRendered = onDeviceData->launchParamsData.getHostImage().frameBuffer.tmRadiance;
 
-		cudaError_t        error = cudaMemcpy((void*)em->groundTruth, groundTruthRendered, imageSize, cudaMemcpyDeviceToDevice);
-		em->isGroundTruthReady = true;
+		cudaError_t        error = cudaMemcpy((void*)em.groundTruth, groundTruthRendered, imageSize, cudaMemcpyDeviceToDevice);
+		em.isGroundTruthReady = true;
 
-		em->currentExperimentStep = 0;
+		em.currentExperimentStep = 0;
 	}
 }
 

@@ -19,17 +19,17 @@ namespace vtx::gui
     struct NodeInfo
     {
         std::weak_ptr<graph::Node> node;
-        graph::NodeType nodeType;
+        //graph::NodeType nodeType;
         math::vec2f size{0, 0};
         math::vec2f pos{ 0, 0 };
-        int width = -1;
-        int depth = -1;
-        int         overallWidth;
-        bool widthRemapped = false;
+        //int width = -1;
+        //int depth = -1;
+        //int         overallWidth;
+        //bool widthRemapped = false;
         std::vector<LinkInfo> links;
-        bool verticalLayout = false;
+        //bool verticalLayout = false;
 
         std::string title;
-        vtxID       id;
+        //vtxID       id;
     };
 }

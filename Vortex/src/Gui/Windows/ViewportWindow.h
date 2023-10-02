@@ -19,7 +19,7 @@ namespace vtx {
         virtual void preRender() override;
 
     public:
-        std::shared_ptr<graph::Renderer> renderer;
+        const std::shared_ptr<graph::Renderer>& renderer;
         uint32_t                         m_width     = getOptions()->width;
         uint32_t                         m_height    = getOptions()->height;
         math::vec2i                      forcedSize  = math::vec2i(0, 0);

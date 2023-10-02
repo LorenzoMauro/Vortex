@@ -26,12 +26,11 @@ namespace vtx::gui
 	{
 	public:
 
-
 		NodeEditor();
 
 		void updateNodeLinks(const std::shared_ptr<graph::Node>& node);
 
-		void submitNode(const std::shared_ptr<graph::Node>& node, const int depth, const int width, const int overallWidth);
+		void submitNode(const std::shared_ptr<graph::Node>& node);
 
 		void        traverseAndGetNodeInfos();
 		static void pushNodeColorByNodeType(const graph::NodeType& nodeType);
@@ -78,7 +77,6 @@ namespace vtx::gui
 		int                          spacing           = 40;
 		ImNodesStyleFlags_           flags             = (ImNodesStyleFlags_)0;
 		std::set<vtxID>              runVisitedNodes   = {};
-		std::vector<vtxID>           depthFirstTraversal;
 		float                        treeWidthPadding = 10.0f;
 		float                        treeDepthPadding = 30.0f;
 		bool                          nodesWithColor = false;

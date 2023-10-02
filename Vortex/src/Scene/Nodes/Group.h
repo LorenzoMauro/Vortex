@@ -14,8 +14,8 @@ namespace vtx::graph
 		void addChild(const std::shared_ptr<Node>& child);
 
 		std::shared_ptr<Transform> transform;
-		std::vector<std::shared_ptr<Node>> children;
 	protected:
 		void accept(NodeVisitor& visitor) override;
+		std::vector<std::shared_ptr<Node>> children;
 	};
 }

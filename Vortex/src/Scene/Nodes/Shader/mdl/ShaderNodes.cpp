@@ -1,6 +1,7 @@
 #include "ShaderNodes.h"
 
 #include "MDL/MdlTypesName.h"
+#include "Scene/Scene.h"
 #include "Scene/Traversal.h"
 
 namespace vtx::graph::shader
@@ -9,7 +10,7 @@ namespace vtx::graph::shader
 	{
 		for (auto& [name, socket] : sockets)
 		{
-			SIM::get()->releaseUID(socket.Id);
+			graph::Scene::getSim()->releaseUID(socket.Id);
 		}
 	}
 
@@ -17,6 +18,10 @@ namespace vtx::graph::shader
 		Node(cNodeType),
 		functionInfo(std::move(cFunctionInfo))
 	{
+		if(!cFunctionInfo.fullModulePath.empty())
+		{
+			mdl::addSearchPath(utl::getFolder(cFunctionInfo.fullModulePath));
+		}
 		mdl::getFunctionSignature(&functionInfo);
 		generateOutputSocket();
 		defineName();
@@ -31,6 +36,7 @@ namespace vtx::graph::shader
 		functionInfo = mdl::MdlFunctionInfo{};
 		if (!isMdlPath)
 		{
+			functionInfo.fullModulePath = modulePath;
 			mdl::addSearchPath(utl::getFolder(modulePath));
 			modulePath = "/" + utl::getFile(modulePath);
 		}
@@ -44,7 +50,7 @@ namespace vtx::graph::shader
 
 	void ShaderNode::generateOutputSocket()
 	{
-		outputSocket.Id = SIM::get()->getUID();
+		outputSocket.Id = graph::Scene::getSim()->getUID();
 		outputSocket.parameterInfo.expressionKind = functionInfo.returnType->skip_all_type_aliases()->get_kind();
 		outputSocket.parameterInfo.annotation.displayName = mdl::ITypeToString[outputSocket.parameterInfo.
 			expressionKind];
@@ -56,7 +62,7 @@ namespace vtx::graph::shader
 		vtxID socketId = 1;
 		for(auto& parameter : parameters)
 		{
-			sockets[parameter.argumentName] = ShaderNodeSocket{nullptr, parameter, SIM::get()->getUID(), {} };
+			sockets[parameter.argumentName] = ShaderNodeSocket{nullptr, parameter, graph::Scene::getSim()->getUID(), {} };
 			socketId++;
 			if (socketsGroupedByGroup.count(parameter.annotation.groupName) > 0)
 			{
@@ -83,13 +89,18 @@ namespace vtx::graph::shader
 			if (isSameType)
 			{
 				sockets[socketName].node = inputNode;
-				sockets[socketName].linkId = SIM::get()->getUID();
+				sockets[socketName].linkId = graph::Scene::getSim()->getUID();
 			}
 		}
 	}
 
 	void ShaderNode::setSocketValue(std::string socketName, const mi::base::Handle<mi::neuraylib::IExpression>& defaultExpression)
 	{
+		if(!defaultExpression.is_valid_interface())
+		{
+			VTX_WARN("Trying to set a nullptr expression to socket {}!", socketName);
+			return;
+		}
 		const bool doSocketExists = sockets.find(socketName) != sockets.end();
 		VTX_ASSERT_CONTINUE(doSocketExists, "Trying to connect Shader Node to a not existing input socket {}!", socketName);
 
@@ -179,7 +190,6 @@ namespace vtx::graph::shader
 #define DEFINE_SHADER_NODE_DESTRUCTOR(NODE_NAME)\
 		NODE_NAME::~NODE_NAME()\
 	{\
-	SIM::get()->releaseTypeId<NODE_NAME>(typeID);\
 	}
 
 	DEFINE_SHADER_NODE_DESTRUCTOR(DiffuseReflection)

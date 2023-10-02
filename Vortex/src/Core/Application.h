@@ -19,7 +19,8 @@ namespace vtx {
 		void shutDown();
 
 		void initWindow();
-		
+		void dataLoop();
+
 		void run();
 
 		static void  setStartUpFile(const std::string& filePath);

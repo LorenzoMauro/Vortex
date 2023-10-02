@@ -32,13 +32,8 @@ namespace vtx {
         void storeGroundTruth();
 
     public:
-        ExperimentsManager* em;
-
         CUDABuffer mapeBuffer;
-
-        std::shared_ptr<graph::Renderer> renderer;
-        network::Network* network = nullptr;
-
+        const std::shared_ptr<graph::Renderer>& renderer;
         bool toggleMisExperiment = true;
         bool toggleBsdfExperiment = true;
         float lossesContentPercentage = 0.75f;

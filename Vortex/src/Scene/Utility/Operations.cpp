@@ -14,7 +14,7 @@ namespace vtx::ops
 
 	void restartRender()
 	{
-		const std::vector<std::shared_ptr<graph::Renderer>>& renderers = graph::SIM::get()->getAllNodeOfType<graph::Renderer>(graph::NT_RENDERER);
+		const std::vector<std::shared_ptr<graph::Renderer>>& renderers = graph::Scene::getSim()->getAllNodeOfType<graph::Renderer>(graph::NT_RENDERER);
 
 		for (const std::shared_ptr<graph::Renderer>& renderer : renderers)
 		{
@@ -846,7 +846,7 @@ namespace vtx::ops
 			case IMPORTED_MATERIALS: break;
 			case CREATED_PRINCIPLED:
 			{
-				const std::vector<std::shared_ptr<Instance>> instances     = SIM::get()->getAllNodeOfType<graph::Instance>(NT_INSTANCE);
+				const std::vector<std::shared_ptr<Instance>> instances     = graph::Scene::getSim()->getAllNodeOfType<graph::Instance>(NT_INSTANCE);
 
 				const std::shared_ptr<Material>          pBsdfMaterial1 = ops::createNode<Material>();
 				auto principledGraph1 = ops::createNode<graph::shader::PrincipledMaterial>();
@@ -863,7 +863,7 @@ namespace vtx::ops
 			break;
 			case IMPORTED_MDL:
 			{
-				const std::vector<std::shared_ptr<Instance>> instances = SIM::get()->getAllNodeOfType<graph::Instance>(NT_INSTANCE);
+				const std::vector<std::shared_ptr<Instance>> instances = graph::Scene::getSim()->getAllNodeOfType<graph::Instance>(NT_INSTANCE);
 				const std::shared_ptr<Material> importedMdlMaterial = ops::createNode<Material>();
 
 				std::string materialName;
@@ -916,7 +916,7 @@ namespace vtx::ops
 				const auto materialGraph = ops::createNode<shader::Material>();
 				materialGraph->connectInput("surface", surfaceNode);
 
-				const std::vector<std::shared_ptr<Instance>> instances = SIM::get()->getAllNodeOfType<graph::Instance>(NT_INSTANCE);
+				const std::vector<std::shared_ptr<Instance>> instances = graph::Scene::getSim()->getAllNodeOfType<graph::Instance>(NT_INSTANCE);
 				const std::shared_ptr<Material> createdMaterial = ops::createNode<Material>();
 				createdMaterial->materialGraph = materialGraph;
 
@@ -947,14 +947,5 @@ namespace vtx::ops
 		}
 
 		return {sceneRoot, camera};
-	}
-
-	void startUpOperations()
-	{
-		std::shared_ptr<Scene> scene = Scene::getScene();
-
-		std::string yamlPath = "E:/Dev/VortexOptix/data/Yaml/test01.yaml";
-		
-		serializer::deserialize(yamlPath, scene);
 	}
 }
