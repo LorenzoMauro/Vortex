@@ -128,7 +128,8 @@ namespace vtx {
             if (newSize == 0)
             {
                 VTX_ERROR("CudaBuffer: trying to upload a zero size Data?");
-                waitAndClose();
+                return;
+                //waitAndClose();
             }
             if (d_ptr == nullptr)
             {

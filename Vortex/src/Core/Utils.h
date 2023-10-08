@@ -15,6 +15,7 @@ namespace utl{
 	std::vector<std::string> splitString(const std::string& input, const std::string separator);
 
 	std::string absolutePath(const std::string& relativePath, const std::string& folderPath = "");
+	std::string replacePercent20WithSpace(const std::string& inputPath);
 
 	std::string getFileName(const std::string& path);
 
@@ -32,9 +33,12 @@ namespace utl{
 
 	bool binaryDump(void* data, const size_t& size, const std::string& filePath);
 
+	void createDirectory(const std::string& path);
 
 	std::string getExecutablePath();
-	
+
+	void copyFileToDestination(const std::string& source, const std::string& destination);
+
 	template<typename T>
 	std::vector<T> binaryLoad(const int& count, const std::string & filePath)
 	{

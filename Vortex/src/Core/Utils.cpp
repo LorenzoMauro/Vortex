@@ -1,6 +1,6 @@
 #include "Utils.h"
 #include <windows.h>
-
+#include <filesystem>
 
 namespace utl{
 
@@ -51,6 +51,18 @@ namespace utl{
 			absPath = std::filesystem::absolute(path);
 		}
 		return absPath.string();
+	}
+
+	std::string replacePercent20WithSpace(const std::string& inputPath) {
+		std::string newPath = inputPath;
+		size_t index = 0;
+		while (true) {
+			index = newPath.find("%20", index);
+			if (index == std::string::npos) break;
+			newPath.replace(index, 3, " ");
+			index += 1;
+		}
+		return newPath;
 	}
 
 	std::string getFolder(const std::string& path)
@@ -162,12 +174,32 @@ namespace utl{
 		return true;
 	}
 
+	void createDirectory(const std::string& path)
+	{
+		std::string dir = getFolder(path);
+		if (!std::filesystem::exists(dir)) {
+			std::filesystem::create_directories(dir);
+		}
+	}
+
 	std::string getExecutablePath()
 	{
 		char buffer[MAX_PATH];
 		GetModuleFileName(NULL, buffer, MAX_PATH);
 		std::string::size_type pos = std::string(buffer).find_last_of("\\/");
 		return std::string(buffer).substr(0, pos);
+	}
+
+	void copyFileToDestination(const std::string& source, const std::string& destination)
+	{
+		createDirectory(getFolder(source));
+		try {
+			std::filesystem::copy(source, destination, std::filesystem::copy_options::overwrite_existing);
+			std::cout << "File copied successfully.\n";
+		}
+		catch (std::filesystem::filesystem_error& e) {
+			std::cout << "Failed to copy file: " << e.what() << '\n';
+		}
 	}
 
 

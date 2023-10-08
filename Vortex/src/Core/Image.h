@@ -31,13 +31,13 @@ namespace vtx
 		float* getData();
 
 	private:
-		void saveJpeg(const std::string& path);
+		bool saveJpeg(const std::string& path);
 
-		void saveBmp(const std::string& path);
+		bool saveBmp(const std::string& path);
 
-		void savePng(const std::string& path);
+		bool savePng(const std::string& path);
 
-		void saveHdr(const std::string& path);
+		bool saveHdr(const std::string& path);
 
 		static void convertToUint8(const std::vector<float>& image, std::vector<uint8_t>& uiData);
 

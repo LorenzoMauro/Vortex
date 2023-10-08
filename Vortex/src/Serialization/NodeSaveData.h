@@ -4,6 +4,18 @@
 
 namespace vtx::serializer
 {
+	static inline std::string moveImageToSaveLocation(const std::string& saveLocation, const std::string& imagePath)
+	{
+		const std::string savePath = utl::getFolder(saveLocation) + "/textures/" + utl::getFile(imagePath);
+		utl::copyFileToDestination(imagePath, savePath);
+		return "textures/" + utl::getFile(imagePath);
+	}
+
+	static inline std::string restoreActualImagePath(const std::string& saveLocation, const std::string& imagePath)
+	{
+			return utl::getFolder(saveLocation) + "/" + imagePath;
+	}
+
 	struct BaseNodeSaveData
 	{
 		BaseNodeSaveData() = default;
@@ -24,7 +36,7 @@ namespace vtx::serializer
 	struct MeshNodeSaveData
 	{
 		MeshNodeSaveData() = default;
-		MeshNodeSaveData(const std::shared_ptr<graph::Mesh>& node)
+		MeshNodeSaveData(const std::shared_ptr<graph::Mesh>& node, const std::string& filePath)
 			: base(node)
 			, vertices(node->vertices)
 			, indices(node->indices)
@@ -32,7 +44,7 @@ namespace vtx::serializer
 			, status(node->status)
 		{}
 
-		void restore(std::map<vtxID, vtxID>& oldToNewUIDMap)
+		void restore(std::map<vtxID, vtxID>& oldToNewUIDMap, const std::string& filePath)
 		{
 			restoredNode = ops::createNode<graph::Mesh>();
 			oldToNewUIDMap[base.UID] = restoredNode->getUID();
@@ -55,12 +67,12 @@ namespace vtx::serializer
 	struct TransformNodeSaveData
 	{
 		TransformNodeSaveData() = default;
-		TransformNodeSaveData(const std::shared_ptr<graph::Transform>& node)
+		TransformNodeSaveData(const std::shared_ptr<graph::Transform>& node, const std::string& filePath)
 			: base(node)
 			, affineTransform(node->affineTransform)
 		{}
 
-		void restore(std::map<vtxID, vtxID>& oldToNewUIDMap)
+		void restore(std::map<vtxID, vtxID>& oldToNewUIDMap, const std::string& filePath)
 		{
 			restoredNode = ops::createNode<graph::Transform>();
 			oldToNewUIDMap[base.UID] = restoredNode->getUID();
@@ -77,16 +89,16 @@ namespace vtx::serializer
 	struct MaterialNodeSaveData
 	{
 		MaterialNodeSaveData() = default;
-		MaterialNodeSaveData(const std::shared_ptr<graph::Material>& node)
+		MaterialNodeSaveData(const std::shared_ptr<graph::Material>& node, const std::string& filePath)
 			: base(node),
 			materialGraphUID(node->materialGraph->getUID()),
 			materialDbName(node->materialDbName),
 			path(node->path),
-			materialCallName(node->materialCallName),
-			useAsLight(node->useAsLight)
+			materialCallName(node->materialCallName)//,
+			//useAsLight(node->useAsLight)
 		{}
 
-		void restore(std::map<vtxID, vtxID>& oldToNewUIDMap)
+		void restore(std::map<vtxID, vtxID>& oldToNewUIDMap, const std::string& filePath)
 		{
 			restoredNode = ops::createNode<graph::Material>();
 			oldToNewUIDMap[base.UID] = restoredNode->getUID();
@@ -94,7 +106,7 @@ namespace vtx::serializer
 			restoredNode->materialDbName = materialDbName;
 			restoredNode->path = path;
 			restoredNode->materialCallName = materialCallName;
-			restoredNode->useAsLight = useAsLight;
+			//restoredNode->useAsLight = useAsLight;
 		}
 
 		void link(std::map<vtxID, vtxID>& oldToNewUIDMap)
@@ -107,7 +119,7 @@ namespace vtx::serializer
 		std::string      materialDbName;
 		std::string      path;
 		std::string      materialCallName;
-		bool             useAsLight;
+		//bool             useAsLight;
 
 		std::shared_ptr<graph::Material> restoredNode = nullptr;
 	};
@@ -128,7 +140,7 @@ namespace vtx::serializer
 	struct InstanceNodeSaveData
 	{
 		InstanceNodeSaveData() = default;
-		InstanceNodeSaveData(const std::shared_ptr<graph::Instance>& node)
+		InstanceNodeSaveData(const std::shared_ptr<graph::Instance>& node, const std::string& filePath)
 			: base(node),
 			transformUID(node->transform->getUID()),
 			childUID(node->getChild()->getUID())
@@ -139,7 +151,7 @@ namespace vtx::serializer
 			}
 		}
 
-		void restore(std::map<vtxID, vtxID>& oldToNewUIDMap)
+		void restore(std::map<vtxID, vtxID>& oldToNewUIDMap, const std::string& filePath)
 		{
 			restoreNode = ops::createNode<graph::Instance>();
 			oldToNewUIDMap[base.UID] = restoreNode->getUID();
@@ -168,7 +180,7 @@ namespace vtx::serializer
 	{
 		GroupNodeSaveData() = default;
 
-		GroupNodeSaveData(const std::shared_ptr<graph::Group>& node)
+		GroupNodeSaveData(const std::shared_ptr<graph::Group>& node, const std::string& filePath)
 			: base(node),
 			transformUID(node->transform->getUID())
 		{
@@ -178,7 +190,7 @@ namespace vtx::serializer
 			}
 		}
 
-		void restore(std::map<vtxID, vtxID>& oldToNewUIDMap)
+		void restore(std::map<vtxID, vtxID>& oldToNewUIDMap, const std::string& filePath)
 		{
 			restoreNode = ops::createNode<graph::Group>();
 			oldToNewUIDMap[base.UID] = restoreNode->getUID();
@@ -204,18 +216,19 @@ namespace vtx::serializer
 	struct EnvironmentLightNodeSaveData
 	{
 		EnvironmentLightNodeSaveData() = default;
-		EnvironmentLightNodeSaveData(const std::shared_ptr<graph::EnvironmentLight>& node)
+		EnvironmentLightNodeSaveData(const std::shared_ptr<graph::EnvironmentLight>& node, const std::string& filePath)
 			: base(node),
-			transformUID(node->transform->getUID()),
-			texturePath(node->envTexture->filePath)
-		{}
+			transformUID(node->transform->getUID())
+		{
+			texturePath = moveImageToSaveLocation(filePath, node->envTexture->filePath);
+		}
 
-		void restore(std::map<vtxID, vtxID>& oldToNewUIDMap)
+		void restore(std::map<vtxID, vtxID>& oldToNewUIDMap, const std::string& filePath)
 		{
 			restoreNode = ops::createNode<graph::EnvironmentLight>();
 			oldToNewUIDMap[base.UID] = restoreNode->getUID();
 			restoreNode->name = base.name;
-
+			texturePath = restoreActualImagePath(filePath, texturePath);
 			restoreNode->envTexture = ops::createNode<graph::Texture>(texturePath);
 		}
 
@@ -235,13 +248,13 @@ namespace vtx::serializer
 	struct CameraNodeSaveData
 	{
 		CameraNodeSaveData() = default;
-		CameraNodeSaveData(const std::shared_ptr<graph::Camera>& node)
+		CameraNodeSaveData(const std::shared_ptr<graph::Camera>& node, const std::string& filePath)
 			: base(node),
 			transformUID(node->transform->getUID()),
 			fov(node->fovY)
 		{}
 
-		void restore(std::map<vtxID, vtxID>& oldToNewUIDMap)
+		void restore(std::map<vtxID, vtxID>& oldToNewUIDMap, const std::string& filePath)
 		{
 			restoreNode = ops::createNode<graph::Camera>();
 			oldToNewUIDMap[base.UID] = restoreNode->getUID();
@@ -264,7 +277,7 @@ namespace vtx::serializer
 	struct ExperimentSaveData
 	{
 		ExperimentSaveData() = default;
-		ExperimentSaveData(const Experiment& experiment)
+		ExperimentSaveData(const Experiment& experiment, const std::string& filePath)
 			: name(experiment.name)
 			, mape(experiment.mape)
 			, rendererSettings(experiment.rendererSettings)
@@ -293,7 +306,7 @@ namespace vtx::serializer
 	struct ExperimentManagerSaveData
 	{
 		ExperimentManagerSaveData() = default;
-		ExperimentManagerSaveData(ExperimentsManager& experimentManager)
+		ExperimentManagerSaveData(ExperimentsManager& experimentManager, const std::string& filePath)
 			: currentExperiment(experimentManager.currentExperiment)
 			, currentExperimentStep(experimentManager.currentExperimentStep)
 			, width(experimentManager.width)
@@ -303,7 +316,7 @@ namespace vtx::serializer
 		{
 			for (const Experiment& experiment : experimentManager.experiments)
 			{
-				experiments.emplace_back(experiment);
+				experiments.emplace_back(experiment, filePath);
 			}
 			if(experimentManager.isGroundTruthReady)
 			{
@@ -349,7 +362,7 @@ namespace vtx::serializer
 	struct RendererNodeSaveData
 	{
 		RendererNodeSaveData() = default;
-		RendererNodeSaveData(const std::shared_ptr<graph::Renderer>& node)
+		RendererNodeSaveData(const std::shared_ptr<graph::Renderer>& node, const std::string& filePath)
 			: base(node),
 			rendererSettings(node->settings),
 			wavefrontSettings(node->waveFrontIntegrator.settings),
@@ -357,7 +370,7 @@ namespace vtx::serializer
 			cameraUID(node->camera->getUID()),
 			sceneRootUID(node->sceneRoot->getUID()),
 			environmentLightUID(0),
-			experimentManagerSaveData(node->waveFrontIntegrator.network.experimentManager)
+			experimentManagerSaveData(node->waveFrontIntegrator.network.experimentManager, filePath)
 		{
 			if(node->environmentLight)
 			{
@@ -365,7 +378,7 @@ namespace vtx::serializer
 			}
 		}
 
-		void restore(std::map<vtxID, vtxID>& oldToNewUIDMap)
+		void restore(std::map<vtxID, vtxID>& oldToNewUIDMap, const std::string& filePath)
 		{
 			restoredNode = ops::createNode<graph::Renderer>();
 			oldToNewUIDMap[base.UID] = restoredNode->getUID();
@@ -541,11 +554,15 @@ namespace vtx::serializer
 				const int data = *reinterpret_cast<int*>(dataBuffer.data());
 				return mdl::createConstantInt(data);
 			}
+			case graph::shader::PK_BOOL:
+			{
+				const bool data = *reinterpret_cast<bool*>(dataBuffer.data());
+				return mdl::createConstantBool(data);
+			}
 			case graph::shader::PK_UNKNOWN:
 			case graph::shader::PK_FLOAT2:
 			case graph::shader::PK_FLOAT3:
 			case graph::shader::PK_ARRAY:
-			case graph::shader::PK_BOOL:
 			case graph::shader::PK_ENUM:
 			case graph::shader::PK_STRING:
 			case graph::shader::PK_TEXTURE:
@@ -587,7 +604,7 @@ namespace vtx::serializer
 	struct BaseShaderNodeSaveData
 	{
 		BaseShaderNodeSaveData() = default;
-		BaseShaderNodeSaveData(const std::shared_ptr<graph::shader::ShaderNode>& node)
+		BaseShaderNodeSaveData(const std::shared_ptr<graph::shader::ShaderNode>& node, const std::string& filePath)
 			: base(node),
 			functionInfo(node->functionInfo)
 		{
@@ -617,10 +634,19 @@ namespace vtx::serializer
 			{
 				channel = node->as<graph::shader::GetChannel>()->channel;
 			}
+
+			if(!texturePath.empty())
+			{
+				texturePath = moveImageToSaveLocation(filePath, texturePath);
+			}
 		}
 
-		void restore(std::map<vtxID, vtxID>& oldToNewUIDMap)
+		void restore(std::map<vtxID, vtxID>& oldToNewUIDMap, const std::string& filePath)
 		{
+			if(!texturePath.empty())
+			{
+				texturePath = restoreActualImagePath(filePath, texturePath);
+			}
 			switch(base.type)
 			{
 			case graph::NT_SHADER_DF: 
@@ -743,29 +769,29 @@ namespace vtx::serializer
 	{
 		GraphSaveData() = default;
 
-		void prepareSaveData()
+		void prepareSaveData(std::string filePath)
 		{
 			VTX_INFO("Constructing GraphSaveData");
-			prepareSaveDataByNodeType<graph::Transform>(graph::NT_TRANSFORM, transforms);
-			prepareSaveDataByNodeType<graph::Mesh>(graph::NT_MESH, meshes);
-			prepareSaveDataByNodeType<graph::Material>(graph::NT_MATERIAL, materials);
-			prepareSaveDataByNodeType<graph::Instance>(graph::NT_INSTANCE, instances);
-			prepareSaveDataByNodeType<graph::Group>(graph::NT_GROUP, groups);
-			prepareSaveDataByNodeType<graph::EnvironmentLight>(graph::NT_ENV_LIGHT, environmentLights);
-			prepareSaveDataByNodeType<graph::Camera>(graph::NT_CAMERA, cameras);
-			prepareSaveDataByNodeType<graph::Renderer>(graph::NT_RENDERER, renderers);
-			prepareSaveDataByNodeType<graph::shader::DiffuseReflection>(graph::NT_SHADER_DF, shaderNodes);
-			prepareSaveDataByNodeType<graph::shader::MaterialSurface>(graph::NT_SHADER_SURFACE, shaderNodes);
-			prepareSaveDataByNodeType<graph::shader::Material>(graph::NT_SHADER_MATERIAL, shaderNodes);
-			prepareSaveDataByNodeType<graph::shader::ImportedNode>(graph::NT_SHADER_IMPORTED, shaderNodes);
-			prepareSaveDataByNodeType<graph::shader::PrincipledMaterial>(graph::NT_PRINCIPLED_MATERIAL, shaderNodes);
-			prepareSaveDataByNodeType<graph::shader::ColorTexture>(graph::NT_SHADER_COLOR_TEXTURE, shaderNodes);
-			prepareSaveDataByNodeType<graph::shader::MonoTexture>(graph::NT_SHADER_MONO_TEXTURE, shaderNodes);
-			prepareSaveDataByNodeType<graph::shader::NormalTexture>(graph::NT_SHADER_NORMAL_TEXTURE, shaderNodes);
-			prepareSaveDataByNodeType<graph::shader::BumpTexture>(graph::NT_SHADER_BUMP_TEXTURE, shaderNodes);
-			prepareSaveDataByNodeType<graph::shader::TextureTransform>(graph::NT_SHADER_COORDINATE, shaderNodes);
-			prepareSaveDataByNodeType<graph::shader::NormalMix>(graph::NT_NORMAL_MIX, shaderNodes);
-			prepareSaveDataByNodeType<graph::shader::GetChannel>(graph::NT_GET_CHANNEL, shaderNodes);
+			prepareSaveDataByNodeType<graph::Transform>(graph::NT_TRANSFORM, transforms, filePath);
+			prepareSaveDataByNodeType<graph::Mesh>(graph::NT_MESH, meshes, filePath);
+			prepareSaveDataByNodeType<graph::Material>(graph::NT_MATERIAL, materials, filePath);
+			prepareSaveDataByNodeType<graph::Instance>(graph::NT_INSTANCE, instances, filePath);
+			prepareSaveDataByNodeType<graph::Group>(graph::NT_GROUP, groups, filePath);
+			prepareSaveDataByNodeType<graph::EnvironmentLight>(graph::NT_ENV_LIGHT, environmentLights, filePath);
+			prepareSaveDataByNodeType<graph::Camera>(graph::NT_CAMERA, cameras, filePath);
+			prepareSaveDataByNodeType<graph::Renderer>(graph::NT_RENDERER, renderers, filePath);
+			prepareSaveDataByNodeType<graph::shader::DiffuseReflection>(graph::NT_SHADER_DF, shaderNodes, filePath);
+			prepareSaveDataByNodeType<graph::shader::MaterialSurface>(graph::NT_SHADER_SURFACE, shaderNodes, filePath);
+			prepareSaveDataByNodeType<graph::shader::Material>(graph::NT_SHADER_MATERIAL, shaderNodes, filePath);
+			prepareSaveDataByNodeType<graph::shader::ImportedNode>(graph::NT_SHADER_IMPORTED, shaderNodes, filePath);
+			prepareSaveDataByNodeType<graph::shader::PrincipledMaterial>(graph::NT_PRINCIPLED_MATERIAL, shaderNodes, filePath);
+			prepareSaveDataByNodeType<graph::shader::ColorTexture>(graph::NT_SHADER_COLOR_TEXTURE, shaderNodes, filePath);
+			prepareSaveDataByNodeType<graph::shader::MonoTexture>(graph::NT_SHADER_MONO_TEXTURE, shaderNodes, filePath);
+			prepareSaveDataByNodeType<graph::shader::NormalTexture>(graph::NT_SHADER_NORMAL_TEXTURE, shaderNodes, filePath);
+			prepareSaveDataByNodeType<graph::shader::BumpTexture>(graph::NT_SHADER_BUMP_TEXTURE, shaderNodes, filePath);
+			prepareSaveDataByNodeType<graph::shader::TextureTransform>(graph::NT_SHADER_COORDINATE, shaderNodes, filePath);
+			prepareSaveDataByNodeType<graph::shader::NormalMix>(graph::NT_NORMAL_MIX, shaderNodes, filePath);
+			prepareSaveDataByNodeType<graph::shader::GetChannel>(graph::NT_GET_CHANNEL, shaderNodes, filePath);
 
 			const graph::Scene* scene = graph::Scene::get();
 			activeRendererUID = scene->renderer->getUID();
@@ -775,23 +801,23 @@ namespace vtx::serializer
 		}
 
 		template<typename NodeType, typename SaveDataStruct>
-		void prepareSaveDataByNodeType(graph::NodeType type, std::vector<SaveDataStruct>& saveDataStructs)
+		void prepareSaveDataByNodeType(graph::NodeType type, std::vector<SaveDataStruct>& saveDataStructs, const std::string& filePath)
 		{
 			const std::vector<std::shared_ptr<NodeType>> allNodes = graph::Scene::getSim()->getAllNodeOfType<NodeType>(type);
 			saveDataStructs.reserve(allNodes.size());
 			for (const auto& node : allNodes)
 			{
-				SaveDataStruct saveData(node);
+				SaveDataStruct saveData(node, filePath);
 				saveDataStructs.push_back(saveData);
 			}
 		}
 
 		template<typename SaveDataStruct>
-		void restoreSaveData(std::vector<SaveDataStruct>& saveDataStructs, std::map<vtxID, vtxID>& oldToNewUIDMap)
+		void restoreSaveData(std::vector<SaveDataStruct>& saveDataStructs, std::map<vtxID, vtxID>& oldToNewUIDMap, const std::string& filePath)
 		{
 			for (SaveDataStruct& saveData : saveDataStructs)
 			{
-				saveData.restore(oldToNewUIDMap);
+				saveData.restore(oldToNewUIDMap, filePath);
 			}
 		}
 		template<typename SaveDataStruct>
@@ -803,19 +829,19 @@ namespace vtx::serializer
 			}
 		}
 
-		std::tuple<std::shared_ptr<graph::Renderer>, std::shared_ptr<graph::Group>> restoreShaderGraph()
+		std::tuple<std::shared_ptr<graph::Renderer>, std::shared_ptr<graph::Group>> restoreShaderGraph(const std::string& filePath)
 		{
 			VTX_INFO("Restoring shader graph");
 			std::map<vtxID, vtxID> oldToNewUIDMap;
-			restoreSaveData(transforms, oldToNewUIDMap);
-			restoreSaveData(meshes, oldToNewUIDMap);
-			restoreSaveData(materials, oldToNewUIDMap);
-			restoreSaveData(instances, oldToNewUIDMap);
-			restoreSaveData(groups, oldToNewUIDMap);
-			restoreSaveData(environmentLights, oldToNewUIDMap);
-			restoreSaveData(cameras, oldToNewUIDMap);
-			restoreSaveData(renderers, oldToNewUIDMap);
-			restoreSaveData(shaderNodes, oldToNewUIDMap);
+			restoreSaveData(transforms, oldToNewUIDMap, filePath);
+			restoreSaveData(meshes, oldToNewUIDMap, filePath);
+			restoreSaveData(materials, oldToNewUIDMap, filePath);
+			restoreSaveData(instances, oldToNewUIDMap, filePath);
+			restoreSaveData(groups, oldToNewUIDMap, filePath);
+			restoreSaveData(environmentLights, oldToNewUIDMap, filePath);
+			restoreSaveData(cameras, oldToNewUIDMap, filePath);
+			restoreSaveData(renderers, oldToNewUIDMap, filePath);
+			restoreSaveData(shaderNodes, oldToNewUIDMap, filePath);
 			VTX_INFO("Linking shader graph");
 			//linkNodes(transforms, oldToNewUIDMap);
 			//linkNodes(meshes, oldToNewUIDMap);

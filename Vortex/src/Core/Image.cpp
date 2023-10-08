@@ -34,16 +34,34 @@ namespace vtx
 
 	void Image::save(const std::string& path)
 	{
+		bool isSaved = false;
 		if (const std::string extension = utl::getFileExtension(path); extension == "jpg")
-			saveJpeg(path);
+		{
+			utl::createDirectory(path);
+			isSaved =saveJpeg(path);
+		}
 		else if (extension == "bmp")
-			saveBmp(path);
+		{
+			utl::createDirectory(path);
+			isSaved =saveBmp(path);
+		}
 		else if (extension == "png")
-			savePng(path);
+		{
+			utl::createDirectory(path);
+			isSaved =savePng(path);
+		}
 		else if (extension == "hdr")
-			saveHdr(path);
+		{
+			utl::createDirectory(path);
+			isSaved =saveHdr(path);
+		}
 		else
 			VTX_ERROR("Image::save: Unknown extension: " + extension);
+
+		if(!isSaved)
+		{
+			VTX_INFO("Some error occured saving image: {}", path);
+		}
 		return;
 	}
 	int Image::getWidth() const
@@ -72,31 +90,34 @@ namespace vtx
 		return nullptr;
 	}
 
-	void Image::saveJpeg(const std::string& path)
+	bool Image::saveJpeg(const std::string& path)
 	{
 		const std::vector<float> flippedImage = flipImageVertically();
 		std::vector<uint8_t> uiData;
 		convertToUint8(flippedImage, uiData);
-		stbi_write_jpg(path.c_str(), width, height, channels, uiData.data(), 100);
+		return (bool)stbi_write_jpg(path.c_str(), width, height, channels, uiData.data(), 100);
 	}
-	void Image::saveBmp(const std::string& path)
+
+	bool Image::saveBmp(const std::string& path)
 	{
 		const std::vector<float> flippedImage = flipImageVertically();
 		std::vector<uint8_t> uiData;
 		convertToUint8(flippedImage, uiData);
-		stbi_write_bmp(path.c_str(), width, height, channels, uiData.data());
+		return (bool)stbi_write_bmp(path.c_str(), width, height, channels, uiData.data());
 	}
-	void Image::savePng(const std::string& path)
+
+	bool Image::savePng(const std::string& path)
 	{
 		const std::vector<float> flippedImage = flipImageVertically();
 		std::vector<uint8_t> uiData;
 		convertToUint8(flippedImage, uiData);
-		stbi_write_png(path.c_str(), width, height, channels, uiData.data(), width * channels);
+		return (bool)stbi_write_png(path.c_str(), width, height, channels, uiData.data(), width * channels);
 	}
-	void Image::saveHdr(const std::string& path)
+
+	bool Image::saveHdr(const std::string& path)
 	{
 		const std::vector<float> flippedImage = flipImageVertically();
-		stbi_write_hdr(path.c_str(), width, height, channels, flippedImage.data());
+		return (bool)stbi_write_hdr(path.c_str(), width, height, channels, flippedImage.data());
 	}
 	void Image::convertToUint8(const std::vector<float>& image, std::vector<uint8_t>& uiData)
 	{

@@ -4,13 +4,12 @@
 #include "Scene/Scene.h"
 #include "Scene/Nodes/EnvironmentLight.h"
 #include "Scene/Nodes/Renderer.h"
-#include "Scene/Utility/ModelLoader.h"
 #include "Scene/Utility/Operations.h"
 
 #include "ArchiveFunctions.h"
 #include <cereal/cereal.hpp>
 #include <cereal/archives/xml.hpp>
-#include <cereal/archives/json.hpp>
+//#include <cereal/archives/json.hpp>
 #include <cereal/archives/binary.hpp>
 
 namespace vtx::serializer
@@ -44,8 +43,8 @@ namespace vtx::serializer
             GraphSaveData graphSaveData;
             if (fileExtension == "json")
             {
-                cereal::JSONInputArchive archiveIn(file);
-                archiveIn(graphSaveData);
+                //cereal::JSONInputArchive archiveIn(file);
+                //archiveIn(graphSaveData);
             }
             else if (fileExtension == "xml")
             {
@@ -62,7 +61,7 @@ namespace vtx::serializer
                 VTX_ERROR("Unsupported file extension: {0}", fileExtension);
                 return false;
             }
-            const auto [_renderer, _sceneRoot] = graphSaveData.restoreShaderGraph();
+            const auto [_renderer, _sceneRoot] = graphSaveData.restoreShaderGraph(filePath);
             rendererNode = _renderer;
             sceneRootNode = _sceneRoot;
 
@@ -133,12 +132,12 @@ namespace vtx::serializer
             }
 
             GraphSaveData graphSaveData;
-            graphSaveData.prepareSaveData();
+            graphSaveData.prepareSaveData(filePath);
 
             if (fileExtension == "json")
             {
-                cereal::JSONOutputArchive archiveOut(file);
-                archiveOut(graphSaveData);
+                //cereal::JSONOutputArchive archiveOut(file);
+                //archiveOut(graphSaveData);
             }
             else if (fileExtension == "xml")
             {
