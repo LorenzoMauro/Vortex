@@ -539,7 +539,7 @@ namespace vtx::mdl
 			{
 				config.isThinWalled = thinWalledEval.value;
 			}
-
+			//SLOT_SURFACE_SCATTERING
 			ExprEvaluation<void*> surfaceEval = analyzeExpression<void*>(compiledMaterial, "surface.scattering");
 			config.isSurfaceBsdfValid = surfaceEval.isValid;
 
@@ -1874,6 +1874,18 @@ namespace vtx::mdl
 		const Handle<IValue>               floatValue(vf->create_float(value));
 		const Handle<IExpression>          floatExpr(ef->create_constant(floatValue.get()));
 		return floatExpr;
+	}
+
+	Handle<IExpression> createConstantBool(const bool value)
+	{
+		MdlState* state = getState();
+		const TransactionInterfaces* tI = state->getTransactionInterfaces();
+		const Handle<IValue_factory>& vf = tI->valueFactory;
+		const Handle<IExpression_factory>& ef = tI->expressionFactory;
+		const Handle<IValue>				boolValue(vf->create_bool(value));
+		const Handle<IExpression>			boolExpr(ef->create_constant(boolValue.get()));
+
+		return boolExpr;
 	}
 
 	Handle<IExpression> createConstantInt(const int value)

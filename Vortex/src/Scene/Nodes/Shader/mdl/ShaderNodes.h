@@ -139,6 +139,26 @@ namespace vtx::graph::shader
 		}
 
 		~PrincipledMaterial() override;
+
+
+		bool emissionActive()
+		{
+			if (const bool enableEmission = sockets[ENABLE_EMISSION_SOCKET].parameterInfo.data<bool>(); !enableEmission)
+			{
+				return false;
+			}
+			return true;
+		}
+
+		bool opacityActive()
+		{
+			if (const bool enableOpacity = sockets[ENABLE_OPACITY_SOCKET].parameterInfo.data<bool>(); !enableOpacity)
+			{
+				return false;
+			}
+			return true;
+		}
+
 	protected:
 		void accept(NodeVisitor& visitor) override;
 	};
@@ -256,12 +276,12 @@ namespace vtx::graph::shader
 			if (cChannel > 2)
 			{
 				cChannel = 2;
-				VTX_WARN("Setting Color Channel to Invalid Channel {}, cChannel");
+				VTX_WARN("Setting Color Channel to Invalid Channel {}", cChannel);
 			}
 			else if (cChannel < 0)
 			{
 				cChannel = 0;
-				VTX_WARN("Setting Color Channel to Invalid Channel {}, cChannel");
+				VTX_WARN("Setting Color Channel to Invalid Channel {}", cChannel);
 			}
 
 			channel = cChannel;

@@ -2,6 +2,7 @@
 
 #include "Scene/Nodes/Shader/mdl/ShaderNodes.h"
 #include "Scene/Graph.h"
+#include "assimp/GltfMaterial.h"
 
 namespace vtx::importer
 {
@@ -27,6 +28,7 @@ namespace vtx::importer
 		    if(material->GetTexture(potential.type, potential.index, &path) == AI_SUCCESS)
 		    {
                 returnPath = utl::absolutePath(path.C_Str(), scenePath);
+                returnPath = utl::replacePercent20WithSpace(returnPath);
 		    	return;
 		    }
 	    }
@@ -65,7 +67,7 @@ namespace vtx::importer
         }
     }
 
-    std::shared_ptr<graph::shader::PrincipledMaterial> createPrincipledMaterial(const AssimpMaterialProperties& properties, bool* isEmissive)
+    std::shared_ptr<graph::shader::PrincipledMaterial> createPrincipledMaterial(const AssimpMaterialProperties& properties)
     {
         auto principled = ops::createNode<graph::shader::PrincipledMaterial>();
 
@@ -85,13 +87,32 @@ namespace vtx::importer
         
 
         // Diffuse
+        std::shared_ptr<graph::shader::ColorTexture> diffuse = nullptr;
         if(!properties.diffuse.path.empty())
         {
-            principled->connectInput(ALBEDO_SOCKET, ops::createNode<graph::shader::ColorTexture>(properties.diffuse.path));
+            diffuse = ops::createNode<graph::shader::ColorTexture>(properties.diffuse.path);
+            principled->connectInput(ALBEDO_SOCKET, diffuse);
         }
         else if(properties.diffuse.value != math::vec3f(-1.0f))
         {
             principled->setSocketValue(ALBEDO_SOCKET, mdl::createConstantColor(properties.diffuse.value));
+        }
+
+        // Diffuse
+        if (!properties.opacity.path.empty())
+        {
+
+            const auto alphaChannel= ops::createNode<graph::shader::MonoTexture>(properties.opacity.path);
+            alphaChannel->setSocketValue(VF_MONO_TEXTURE_ALPHA_SOCKET, mdl::createConstantBool(true));
+            principled->connectInput(OPACITY_SOCKET, alphaChannel);
+            principled->setSocketValue(ENABLE_OPACITY_SOCKET, mdl::createConstantBool(true));
+            principled->setSocketValue(THIN_WALLED_SOCKET, mdl::createConstantBool(true));
+        }
+        else if (properties.opacity.value >= 0.0f && properties.opacity.value < 1.0f)
+        {
+            principled->setSocketValue(ENABLE_OPACITY_SOCKET, mdl::createConstantBool(true));
+            principled->setSocketValue(OPACITY_SOCKET, mdl::createConstantFloat(properties.opacity.value));
+            principled->setSocketValue(THIN_WALLED_SOCKET, mdl::createConstantBool(true));
         }
 
         if(!properties.ORM.path.empty())
@@ -173,25 +194,25 @@ namespace vtx::importer
 
         if (!properties.emissionIntensity.path.empty())
         {
-            *isEmissive = true;
+            principled->setSocketValue(ENABLE_EMISSION_SOCKET, mdl::createConstantBool(true));
             principled->connectInput(EMISSION_INTENSITY_SOCKET, ops::createNode<graph::shader::ColorTexture>(properties.emissionIntensity.path));
         }
         else if (properties.emissionIntensity.value >= 1.0f)
         {
-            *isEmissive = true;
+            principled->setSocketValue(ENABLE_EMISSION_SOCKET, mdl::createConstantBool(true));
             principled->setSocketValue(EMISSION_INTENSITY_SOCKET, mdl::createConstantFloat(properties.emissionIntensity.value));
         }
-        if(!properties.emissionColor.path.empty())
+        if (!properties.emissionColor.path.empty())
         {
-            *isEmissive = true;
+            principled->setSocketValue(ENABLE_EMISSION_SOCKET, mdl::createConstantBool(true));
             principled->connectInput(EMISSION_COLOR_SOCKET, ops::createNode<graph::shader::ColorTexture>(properties.emissionColor.path));
-		}
-		else if(properties.emissionColor.value != math::vec3f(-1.0f))
-		{
+        }
+        else if (properties.emissionColor.value != math::vec3f(-1.0f))
+        {
             principled->setSocketValue(EMISSION_COLOR_SOCKET, mdl::createConstantColor(properties.emissionColor.value));
             if (properties.emissionColor.value != math::vec3f(0.0f))
             {
-                *isEmissive = true;
+                principled->setSocketValue(ENABLE_EMISSION_SOCKET, mdl::createConstantBool(true));
                 //HACK this is a hack to compensate for lack of blender to gltf intensity eport
                 principled->setSocketValue(EMISSION_INTENSITY_SOCKET, mdl::createConstantFloat(100.0f));
             }
@@ -250,6 +271,25 @@ namespace vtx::importer
             // Since there's no separate texture or value for anisotropy rotation, you may need to set a default value or use a value based on some condition.
         }
 
+
+        // Opacity
+        if (!properties.sheenColor.path.empty()) {
+            principled->setSocketValue(SHEEN_AMOUNT_SOCKET, mdl::createConstantFloat(0.5f));
+            principled->connectInput(SHEEN_TINT_SOCKET, ops::createNode<graph::shader::ColorTexture>(properties.sheenColor.path));
+        }
+        else if (properties.sheenColor.value != math::vec3f(-1.0f)) {
+            principled->setSocketValue(SHEEN_AMOUNT_SOCKET, mdl::createConstantFloat(0.5f));
+            principled->setSocketValue(SHEEN_TINT_SOCKET, mdl::createConstantColor(properties.sheenColor.value));
+        }
+
+        if (!properties.sheenRoughness.path.empty()) {
+            principled->setSocketValue(SHEEN_AMOUNT_SOCKET, mdl::createConstantFloat(0.5f));
+            principled->connectInput(SHEEN_ROUGHNESS_SOCKET, ops::createNode<graph::shader::MonoTexture>(properties.sheenRoughness.path));
+        }
+        else if (properties.sheenRoughness.value >= 0.0f) {
+            principled->setSocketValue(SHEEN_AMOUNT_SOCKET, mdl::createConstantFloat(0.5f));
+            principled->setSocketValue(SHEEN_ROUGHNESS_SOCKET, mdl::createConstantFloat(properties.sheenRoughness.value));
+        }
 
         return principled;
     }
@@ -335,24 +375,16 @@ namespace vtx::importer
         //Anisotropy
         getFloatValue(material, { { AI_MATKEY_ANISOTROPY_FACTOR} }, anisotropy.value);
 
-        //float glossinessFactor = -1.0f;
-        //getFloatValue(material, { { AI_MATKEY_GLOSSINESS_FACTOR} }, glossinessFactor);
-        //
-        //math::vec3f shininessColor = -1.0f;
-        //getColorValue(material, { { AI_MATKEY_COLOR_SPECULAR} }, shininessColor);
-        //float specularFactor = -1.0f;
-        //getFloatValue(material, { { AI_MATKEY_SPECULAR_FACTOR} }, specularFactor);
-        //float reflectivity = -1.0f;
-        //getFloatValue(material, { { AI_MATKEY_REFLECTIVITY} }, reflectivity);
-        //float roughnessfactor = -1.0f;
-        //getFloatValue(material, { { AI_MATKEY_ROUGHNESS_FACTOR} }, roughnessfactor);
-        //float metallicFactor = -1.0f;
-        //getFloatValue(material, { { AI_MATKEY_METALLIC_FACTOR} }, metallicFactor);
+        getFloatValue(material, { { AI_MATKEY_OPACITY} }, opacity.value);
+        getTexturePath(material, { {aiTextureType_OPACITY ,0} }, opacity.path, scenePath);
 
-        //float shininessStrenght = -1.0f;
-        //getFloatValue(material, { { AI_MATKEY_SHININESS_STRENGTH} }, shininessStrenght);
-        //float shininess = -1.0f;
-        //getFloatValue(material, { { AI_MATKEY_SHININESS} }, shininess);
+        aiString alphaMode;
+        float opacityValue = 1.0;
+        if ((material->Get(AI_MATKEY_GLTF_ALPHAMODE, alphaMode) == AI_SUCCESS && alphaMode == aiString("BLEND"))
+            || (material->Get(AI_MATKEY_OPACITY, opacityValue) == AI_SUCCESS && opacityValue < 1.0))
+        {
+            opacity.path = opacity.path.empty() ? diffuse.path : opacity.path;
+        }
 
     }
     // Process materials in the aiScene
@@ -371,14 +403,10 @@ namespace vtx::importer
 
             AssimpMaterialProperties properties;
             properties.determineProperties(aiMat, scenePath);
-            bool isEmissive = false;
-			std::shared_ptr<graph::shader::PrincipledMaterial> principled = createPrincipledMaterial(properties, &isEmissive);
+			std::shared_ptr<graph::shader::PrincipledMaterial> principled = createPrincipledMaterial(properties);
             // You can now use the extracted variables within the function
             material->materialGraph = principled;
-            if(isEmissive)
-            {
-                material->useAsLight = true;
-            }
+            
             materials.push_back(material);
         }
 
@@ -402,9 +430,15 @@ namespace vtx::importer
         // Process vertices
         const auto meshNode = ops::createNode<graph::Mesh>();
         meshNode->vertices.resize(aiMesh->mNumVertices);
-        meshNode->status.hasNormals = false;
-        meshNode->status.hasTangents = true;
-        meshNode->status.hasFaceAttributes = true;
+        meshNode->status.hasNormals = aiMesh->HasNormals();
+        meshNode->status.hasTangents = aiMesh->HasTangentsAndBitangents();
+        meshNode->status.hasFaceAttributes = aiMesh->HasTangentsAndBitangents();
+        VTX_INFO("Mesh {} has normals: {}, has tangents: {}"
+            ,
+            meshNode->name,
+            meshNode->status.hasNormals,
+            meshNode->status.hasTangents
+        );
         for (unsigned int i = 0; i < aiMesh->mNumVertices; ++i)
         {
             auto& vertex = meshNode->vertices[i];
@@ -412,25 +446,17 @@ namespace vtx::importer
             vertex.position = toVec3f(aiMesh->mVertices[i], swap);
 
             // Normals
-            if (aiMesh->HasNormals())
+            if (meshNode->status.hasNormals)
             {
                 vertex.normal = toVec3f(aiMesh->mNormals[i], swap);
             }
-            else
-            {
-                meshNode->status.hasNormals = false;
-            }
 
             // Tangents
-            if (aiMesh->HasTangentsAndBitangents())
+            if (meshNode->status.hasTangents)
             {
                 vertex.tangent = toVec3f(aiMesh->mTangents[i], swap);
+                vertex.bitangent = toVec3f(aiMesh->mBitangents[i], swap);
             }
-            else
-            {
-	            meshNode->status.hasTangents = false;
-            }
-
 
             // Texture coordinates
             if (aiMesh->HasTextureCoords(0))
@@ -459,15 +485,24 @@ namespace vtx::importer
             const aiFace& face = aiMesh->mFaces[i];
 
             // Store indices for the face
-            for (unsigned int j = 0; j < face.mNumIndices; ++j)
+            if(face.mNumIndices != 3)
             {
-                meshNode->indices.push_back(face.mIndices[j]);
-            }
+	            std::cout << "Warning: face with " << face.mNumIndices << " indices found. Only triangles are supported." << std::endl;
+			}
+            else
+            {
+                for (unsigned int j = 0; j < face.mNumIndices; ++j)
+                {
+                    meshNode->indices.push_back(face.mIndices[j]);
+                }
 
-            // Set face attributes (you can update it later based on the material, if needed)
-            graph::FaceAttributes faceAttr;
-            faceAttr.materialSlotId = 0;
-            meshNode->faceAttributes[i] = faceAttr;
+                // Set face attributes (you can update it later based on the material, if needed)
+                graph::FaceAttributes faceAttr;
+                faceAttr.materialSlotId = 0;
+                meshNode->faceAttributes[i] = faceAttr;
+	            
+            }
+            
         }
 
         return meshNode;
@@ -735,18 +770,22 @@ namespace vtx::importer
         return cameras;
     }
 
+#pragma optimize("", off)
     std::tuple<std::shared_ptr<graph::Group>, std::vector<std::shared_ptr<graph::Camera>>> importSceneFile(std::string filePath)
     {
         filePath                     = utl::absolutePath(filePath);
 		const std::string fileFormat = utl::getFileExtension(filePath);
         VTX_INFO("Loading scene file: {}", filePath);
         Assimp::Importer importer;
+        importer.SetPropertyFloat("PP_GSN_MAX_SMOOTHING_ANGLE", 30);
         const aiScene* scene = importer.ReadFile(filePath,
                                                  aiProcess_Triangulate |
                                                  //aiProcess_MakeLeftHanded |
-                                                 aiProcess_JoinIdenticalVertices |
+                                                 //aiProcess_JoinIdenticalVertices |
                                                  aiProcess_SortByPType |
+												 //aiProcess_GenNormals |
                                                  aiProcess_GenSmoothNormals |
+												 aiProcess_CalcTangentSpace |
                                                  //aiProcess_CalcTangentSpace |
                                                  //aiProcess_RemoveComponent (remove colors) |
                                                  //aiProcess_LimitBoneWeights |
@@ -756,12 +795,12 @@ namespace vtx::importer
                                                  aiProcess_FindDegenerates |
                                                  aiProcess_FindInvalidData |
                                                  aiProcess_FindInstances |
+												 aiTextureFlags_UseAlpha |
                                                  //aiProcess_ValidateDataStructure |
-                                                 aiProcess_OptimizeMeshes |
+                                                 //aiProcess_OptimizeMeshes |
                                                  //aiProcess_OptimizeGraph |
                                                  //aiProcess_Debone |
                                                  0);
-
         const bool successCondition = (scene && !(scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE) && scene->mRootNode);
         VTX_ASSERT_CONTINUE(successCondition, "Assimp Importer Errror: {}", importer.GetErrorString());
 
@@ -787,6 +826,7 @@ namespace vtx::importer
 		std::vector<std::shared_ptr<graph::Camera>> cameras = processCameras(scene, SwapType::None);
         return { sceneGraph, cameras };
     }
+#pragma optimize("", on)
 
 
 }

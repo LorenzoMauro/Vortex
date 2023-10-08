@@ -82,6 +82,12 @@ export material principledVortex(
 	  anno::hard_range(0.0, 2000),
 	  anno::in_group("Coating")]],
 
+
+    uniform bool EnableEmission = false [[
+		anno::display_name("Enable Emission"),
+		anno::description("Enables the use of Emission"),
+		anno::in_group("Emission")
+	]],
 	  float EmissionIntensity = 0.0
 	[[anno::display_name("Emission Intensity"),
 	  anno::hard_range(0.0, 100000.0),
@@ -108,7 +114,30 @@ export material principledVortex(
       anno::in_group("Base Layer")]],
     float3 ClearcoatNormal = state::normal()
     [[anno::display_name("Clearcoat Normal"),
-      anno::in_group("Coating")]]
+      anno::in_group("Coating")]],
+
+	  
+    //  Geometry Opacity  //
+	
+    uniform bool enableOpacity = false [[
+		anno::display_name("Enable Opacity"),
+		anno::description("Enables the use of cutout opacity"),
+		anno::in_group("Opacity")
+	]],
+	float geometryOpacity = float(1.0) [[
+		anno::display_name("Opacity Amount"),    
+		anno::description("Opacity value between 0 and 1, when Opacity Map is not valid"),
+		anno::in_group("Opacity"),
+		anno::hard_range(float(0.0), float(1.0))
+	]],
+	uniform float geometryOpacityThreshold = 0.f
+	[[
+		anno::hard_range(0.0, 1.0),
+		anno::display_name("Opacity Threshold"),
+		anno::description("If 0, use fractional opacity values 'as is'; if > 0, remap opacity values to 1 when >= threshold and to 0 otherwise"),
+		anno::in_group("Opacity")
+	]]
+
 ) = let{
     
     VortexFunctions::AnisotropicRoughness aniRough = VortexFunctions::computeRoughnessAnisotropy(Roughness, Anisotropy, Anisotropy_rotation);
@@ -232,17 +261,26 @@ export material principledVortex(
 
     material_emission emission = material_emission(
                                     df::diffuse_edf(),
-                                    intensity: emission_value 
+                                    intensity: EnableEmission ? emission_value : color(0.0) 
                                     );
 
 	material_surface finalSurface = material_surface(
 		scattering : finalBsdf,
 		emission : emission);
 
+		
+	float opacity_value = geometryOpacity;
+    float cutout_opacity = enableOpacity ? ((geometryOpacityThreshold == 0.0) ? opacity_value : ((opacity_value >= geometryOpacityThreshold) ? 1.0 : 0)) : 1.0;
+ 
+    material_geometry geometry = material_geometry(
+                                    //normal: enable_coat ? state::normal(): geometry_normal,
+                                    cutout_opacity: cutout_opacity
+                                    );
+
 } in material(
     ior: color(Ior),
 	thin_walled: isThinWalled,
-	surface: finalSurface//,
+	surface: finalSurface,
+	geometry: geometry//,
 	//volume: local_volume
-
 );

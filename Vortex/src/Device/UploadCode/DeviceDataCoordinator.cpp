@@ -193,7 +193,7 @@ namespace vtx::device
 			LightData lightData = createMeshLightData(meshLight);
 			// We keep a list on the device of all potential mesh lights but only the mesh lights associated with a material
 			// markes as light will be sampled in the mis.
-			if (meshLight->material->useAsLight)
+			if (meshLight->material->useEmission())
 			{
 				lightData.use = true;
 				lightDataMap.insert(lightId, lightData);
@@ -269,8 +269,14 @@ namespace vtx::device
 					lightData.push_back(light);
 				}
 			}
-			;
-			launchParamsData.editableHostImage().lights = launchParamsData.resourceBuffers.lightsDataBuffer.upload(lightData);
+			if(!lightData.empty())
+			{
+				launchParamsData.editableHostImage().lights = launchParamsData.resourceBuffers.lightsDataBuffer.upload(lightData);
+			}
+			else
+			{
+				launchParamsData.editableHostImage().lights = nullptr;
+			}
 			launchParamsData.editableHostImage().numberOfLights = lightData.size();
 			lightDataMap.isMapChanged = false;
 		}

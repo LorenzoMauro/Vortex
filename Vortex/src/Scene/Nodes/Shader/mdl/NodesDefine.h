@@ -30,6 +30,7 @@
 #define FILM_IOR_SOCKET "FilmIor"
 #define FILM_THICKNESS_SOCKET "FilmThickness"
 
+#define ENABLE_EMISSION_SOCKET "EnableEmission"
 #define EMISSION_INTENSITY_SOCKET "EmissionIntensity"
 #define EMISSION_COLOR_SOCKET "EmissionColor"
 
@@ -37,13 +38,16 @@
 #define SHEEN_TINT_SOCKET "SheenTint"
 #define SHEEN_ROUGHNESS_SOCKET "SheenRoghness"
 
+#define ENABLE_OPACITY_SOCKET "enableOpacity"
+#define OPACITY_SOCKET "geometryOpacity"
+#define OPACITY_THRESHOLD "geometryOpacityThreshold"
 
 ////////////////////////////////////////////////////////////////////////////////////////////////
 //////////////////// VORTEX CUSTOM FUNCTIONS  //////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////
 
-#define VORTEX_FUNCTIONS_MODULE "VortexFunctions.mdl"
 
+#define VORTEX_FUNCTIONS_MODULE "VortexFunctions.mdl"
 #define VF_COLOR_TEXTURE "ColorTexture"
 #define VF_COLOR_TEXTURE_TEXTURE_SOCKET "texture"
 #define VF_COLOR_TEXTURE_COORDINATES_SOCKET "coordinate"
@@ -51,6 +55,7 @@
 #define VF_MONO_TEXTURE "MonoTexture"
 #define VF_MONO_TEXTURE_TEXTURE_SOCKET "texture"
 #define VF_MONO_TEXTURE_COORDINATES_SOCKET "coordinate"
+#define VF_MONO_TEXTURE_ALPHA_SOCKET "alphaChannel"
 
 #define VF_BUMP_TEXTURE "BumpTexture"
 #define VF_BUMP_TEXTURE_TEXTURE_SOCKET "texture"

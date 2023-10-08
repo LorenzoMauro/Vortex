@@ -42,7 +42,7 @@ namespace vtx::mdl {
             data.ior2 = surroundingIor;
         }
 
-        if (mdlData->isFrontFace || !mdlData->isThinWalled)
+        if (mdlData->isFrontFace || !mdlData->isThinWalled || true)
         {
             frontBsdf_sample(&data, &mdlData->state, &mdlData->resourceData, nullptr, mdlData->argBlock);
         }
@@ -156,7 +156,7 @@ namespace vtx::mdl {
             evalData.ior2 = surroundingIor; // From surrounding medium ior
         }
 
-        if(mdlData->isFrontFace || !mdlData->isThinWalled)
+        if(mdlData->isFrontFace || !mdlData->isThinWalled ||true)
         {
             frontBsdf_evaluate(&evalData, &mdlData->state, &mdlData->resourceData, nullptr, mdlData->argBlock);
         }

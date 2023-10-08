@@ -213,7 +213,7 @@ namespace cereal
     template<class Archive>
     void serialize(Archive& archive, vtx::serializer::MaterialNodeSaveData& data)
     {
-	    archive(nvp(data,base), nvp(data,materialGraphUID), nvp(data,materialDbName), nvp(data,path), nvp(data,materialCallName), nvp(data,useAsLight));
+        archive(nvp(data, base), nvp(data, materialGraphUID), nvp(data, materialDbName), nvp(data, path), nvp(data, materialCallName));// , nvp(data, useAsLight));
     }
 
     // Serialization for MaterialSlotSaveData
@@ -287,7 +287,7 @@ namespace cereal
         archive(
             nvp(data, active),
             nvp(data, kernelSize),
-            //nvp(data, isUpdated),
+            nvp(data, start),
             nvp(data, threshold)
         );
     }

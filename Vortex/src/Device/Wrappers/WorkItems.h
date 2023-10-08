@@ -22,6 +22,8 @@ namespace vtx
         int originPixel;
         math::vec3f radiance;
         int depth;
+        math::vec3f mediumIor;
+        unsigned seed;
     };
 
     struct RayWorkItem

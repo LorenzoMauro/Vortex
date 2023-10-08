@@ -36,32 +36,55 @@ namespace vtx
 	//////////////////////////////////////////// SHADOW TRACE //////////////////////////////////////////////////////////////
 	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-	extern "C" __global__ void __anyhit__shadowHit()
-	{
-		//RayWorkItem* prd = reinterpret_cast<RayWorkItem*>(mergePointer(optixGetPayload_0(), optixGetPayload_1()));
-		//optixHitProperties(prd);
-		//bool isHit = transparentAnyHit(prd, &optixLaunchParams);
-		//if (!isHit)
-		//{
-		//	optixSetPayload_0(0);
-		//}
-	}
 
-	extern "C" __global__ void __miss__shadowMiss()
+	extern "C" __global__ void __miss__radianceAndShadow()
 	{
 		optixSetPayload_0(0);
 	}
-	
+
+	extern "C" __global__ void __anyhit__shadow()
+	{
+		auto* prd = reinterpret_cast<ShadowWorkItem*>(mergePointer(optixGetPayload_0(), optixGetPayload_1()));
+		bool hasOpacity = optixLaunchParams.instances[optixGetInstanceId()]->hasOpacity;
+		
+		if(hasOpacity)
+		{
+			prd->distance = optixGetRayTmax();
+			HitProperties hitProperties;
+			hitProperties.position = prd->origin;
+			const float2 baricenter2D = optixGetTriangleBarycentrics();
+			const auto baricenter = math::vec3f(1.0f - baricenter2D.x - baricenter2D.y, baricenter2D.x, baricenter2D.y);
+			const math::vec3f position = hitProperties.position + prd->direction * prd->distance;
+			hitProperties.init(optixGetInstanceId(), optixGetPrimitiveIndex(), baricenter, position);
+
+			transparentAnyHit(
+				hitProperties,
+				prd->direction,
+				prd->mediumIor,
+				prd->seed,
+				&optixLaunchParams
+			);
+		}
+	}
+
+	extern "C" __global__ void __anyhit__radianceHit()
+	{
+		auto* prd = reinterpret_cast<RayWorkItem*>(mergePointer(optixGetPayload_0(), optixGetPayload_1()));
+		RayWorkItem prdCopy = *prd;
+		bool hasOpacity = optixLaunchParams.instances[optixGetInstanceId()]->hasOpacity;
+		if (hasOpacity)
+		{
+			optixHitProperties(&prdCopy);
+			transparentAnyHit(&prdCopy, &optixLaunchParams);
+		}
+	}
+
 	extern "C" __global__ void __closesthit__radiance()
 	{
-		RayWorkItem* prd = reinterpret_cast<RayWorkItem*>(mergePointer(optixGetPayload_0(), optixGetPayload_1()));
+		auto* prd = reinterpret_cast<RayWorkItem*>(mergePointer(optixGetPayload_0(), optixGetPayload_1()));
 		optixHitProperties(prd);
 	}
 
-	extern "C" __global__ void __miss__radiance()
-	{
-		optixSetPayload_0(0);
-	}
 
 	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	//////////////////////////////////////////// FULL OPTIX RAYGEN /////////////////////////////////////////////////////////

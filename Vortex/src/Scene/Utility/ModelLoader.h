@@ -56,6 +56,7 @@ namespace vtx::importer
 		TextureAndValue<float>       anisotropy{ "", -1 };
 		std::string                  name;
 		TextureAndValue<math::vec3f> ORM{ "", {-1.f, -1.f, -1.f,} };
+		TextureAndValue<float>       opacity{ "", -1 };
 
 		void determineProperties(const aiMaterial* material, std::string scenePath);
     };

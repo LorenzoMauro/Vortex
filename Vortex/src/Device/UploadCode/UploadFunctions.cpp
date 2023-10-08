@@ -54,7 +54,7 @@ namespace vtx::device
 					slotIds.material = materialDataMap[materialId].getDeviceImage();
 
 					if (vtxID lightId = materialSlot.meshLight->getUID(); lightDataMap.contains(lightId)) {
-						instanceData.hasEmission = std::dynamic_pointer_cast<graph::Material>(materialSlot.material)->useAsLight;
+						instanceData.hasEmission = std::dynamic_pointer_cast<graph::Material>(materialSlot.material)->useEmission();
 						slotIds.meshLight = lightDataMap[lightId].getDeviceImage();
 					}
 
@@ -106,13 +106,17 @@ namespace vtx::device
 		GeometryData* geometryData = onDeviceData->geometryDataMap[meshId].getDeviceImage();
 		MaterialData* materialData = onDeviceData->materialDataMap[materialId].getDeviceImage();
 
-		meshLightData.instanceId = meshLight->parentInstanceId;
-		meshLightData.geometryData = geometryData;
-		meshLightData.materialId = materialData;
-		meshLightData.cdfArea = areaCdfBuffer.castedPointer<float>();
-		meshLightData.actualTriangleIndices = actualTriangleIndices.castedPointer<uint32_t>();
-		meshLightData.size = meshLight->cdfAreas.size();
-		meshLightData.totalArea = meshLight->area;
+		meshLightData.instanceId                        = meshLight->parentInstanceId;
+		meshLightData.geometryData                      = geometryData;
+		meshLightData.materialId                        = materialData;
+		meshLightData.cdfArea                           = areaCdfBuffer.castedPointer<float>();
+		meshLightData.actualTriangleIndices             = actualTriangleIndices.castedPointer<uint32_t>();
+		//std::shared_ptr<graph::Instance> parentInstance = graph::Scene::getSim()->getNode<graph::Instance>(meshLight->parentInstanceId);
+		//std::shared_ptr<graph::Transform> transform     = parentInstance->transform;
+		//math::vec3f translation, scaleVector, eulerAngles;
+		//math::VectorFromAffine<math::LinearSpace3f>(transform->globalTransform, translation, scaleVector, eulerAngles);
+		meshLightData.size                              = meshLight->cdfAreas.size();
+		meshLightData.totalArea                         = meshLight->area;
 
 		CUDABuffer& attributeBuffer = onDeviceData->lightDataMap.getResourceBuffers(meshLight->getUID()).attributeBuffer;
 		attributeBuffer.upload(meshLightData);

@@ -274,6 +274,7 @@ export color ColorTexture(
 
 }
 
+
 export float MonoTexture(
     uniform texture_2d texture
     [[
@@ -285,12 +286,17 @@ export float MonoTexture(
     [[
         anno::display_name("Texture Coordinate"),
         anno::description("Texture coordinate"),
-        anno::in_group("Mono Map")]]
+        anno::in_group("Mono Map")]],
+    uniform bool alphaChannel = false [[
+		anno::display_name("Extract Alpha channel"),
+		anno::description("Extract Alpha channel"),
+		anno::in_group("Mono Map")
+	]]
 ) {
     return tex::texture_isvalid(texture) ?
                     base::file_texture(
                             texture: texture,
-                        mono_source: base::mono_average,
+                        mono_source: alphaChannel? base::mono_alpha : base::mono_average,
                                 uvw: coordinate,
                                 clip: false        
                         ).mono : 0.0f;

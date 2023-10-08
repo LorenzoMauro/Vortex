@@ -379,6 +379,8 @@ namespace vtx
             radiance = SOA<math::vec3f>(n);
             direction = SOA<math::vec3f>(n);
             origin = SOA<math::vec3f>(n);
+            mediumIor = SOA<math::vec3f>(n);
+            seed = CUDABufferManager::allocate<unsigned>(n);
         }
 
         SOA& operator=(const SOA& s) {
@@ -391,6 +393,8 @@ namespace vtx
             this->direction = s.direction;
             this->origin = s.origin;
 
+            this->seed = s.seed;
+            this->mediumIor = s.mediumIor;
             return *this;
         }
 
@@ -403,6 +407,8 @@ namespace vtx
                 r.radiance = soa->radiance[i];
                 r.depth = soa->depth[i];
                 r.distance = soa->distance[i];
+                r.mediumIor = soa->mediumIor[i];
+                r.seed = soa->seed[i];
 
 
 
@@ -416,6 +422,8 @@ namespace vtx
                 soa->radiance[i] = a.radiance;
                 soa->depth[i] = a.depth;
                 soa->distance[i] = a.distance;
+                soa->seed[i] = a.seed;
+                soa->mediumIor[i] = a.mediumIor;
             }
 
             SOA* soa;
@@ -434,6 +442,8 @@ namespace vtx
             r.radiance = this->radiance[i];
             r.depth = this->depth[i];
             r.distance = this->distance[i];
+            r.seed = this->seed[i];
+            r.mediumIor = this->mediumIor[i];
 
             return r;
         }
@@ -446,6 +456,8 @@ namespace vtx
         SOA<math::vec3f>               radiance;
         SOA<math::vec3f>               origin;
         SOA<math::vec3f>               direction;
+        unsigned* __restrict           seed;
+        SOA<math::vec3f>               mediumIor;
     };
 
     template <>
@@ -496,13 +508,13 @@ namespace vtx
             __forceinline__ __device__ operator RayWorkItem() const {
                 RayWorkItem r{};
                 r.originPixel = soa->originPixel[i];
-                r.seed = soa->seed[i];
                 r.direction = soa->direction[i];
                 r.depth = soa->depth[i];
                 r.pdf = soa->pdf[i];
                 r.radiance = soa->radiance[i];
                 r.throughput = soa->throughput[i];
                 r.mediumIor = soa->mediumIor[i];
+                r.seed = soa->seed[i];
                 r.eventType = soa->eventType[i];
                 r.hitDistance = soa->hitDistance[i];
 
@@ -514,12 +526,12 @@ namespace vtx
             __forceinline__ __device__ void operator=(const RayWorkItem& a) {
 
                 soa->originPixel[i] = a.originPixel;
-                soa->seed[i] = a.seed;
                 soa->direction[i] = a.direction;
                 soa->depth[i] = a.depth;
                 soa->pdf[i] = a.pdf;
                 soa->radiance[i] = a.radiance;
                 soa->throughput[i] = a.throughput;
+                soa->seed[i] = a.seed;
                 soa->mediumIor[i] = a.mediumIor;
                 soa->eventType[i] = a.eventType;
 
@@ -543,12 +555,12 @@ namespace vtx
             RayWorkItem r;
 
             r.originPixel = this->originPixel[i];
-            r.seed = this->seed[i];
             r.direction = this->direction[i];
             r.depth = this->depth[i];
             r.pdf = this->pdf[i];
             r.radiance = this->radiance[i];
             r.throughput = this->throughput[i];
+            r.seed = this->seed[i];
             r.mediumIor = this->mediumIor[i];
             r.eventType = this->eventType[i];
 

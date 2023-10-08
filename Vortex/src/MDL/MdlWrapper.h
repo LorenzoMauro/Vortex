@@ -223,6 +223,7 @@ namespace vtx::mdl
 
 	mi::base::Handle<mi::neuraylib::IExpression> createConstantFloat(const float value);
 
+	mi::base::Handle<mi::neuraylib::IExpression> createConstantBool(const bool value);
 	mi::base::Handle<mi::neuraylib::IExpression> createConstantInt(const int value);
 
 	mi::base::Handle<mi::neuraylib::IExpression> createTextureConstant(const std::string& texturePath, const mi::neuraylib::IType_texture::Shape shape = mi::neuraylib::IType_texture::TS_2D, const float gamma = 2.2f);

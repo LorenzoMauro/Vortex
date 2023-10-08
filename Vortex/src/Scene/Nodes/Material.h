@@ -210,7 +210,7 @@ namespace vtx::graph
 		std::shared_ptr<graph::shader::ShaderNode>                   materialGraph;
 		mi::base::Handle<mi::neuraylib::ITarget_argument_block>      argBlock;
 		std::map<std::string, std::shared_ptr<shader::EnumTypeInfo>> mapEnumTypes;
-		bool                                                         useAsLight    = false;
+		//bool                                                         useAsLight    = false;
 
 
 		//////////////////////////////////////////////////////////////////////////////////////////
@@ -225,9 +225,11 @@ namespace vtx::graph
 		std::vector<std::shared_ptr<graph::BsdfMeasurement>> getBsdfs();
 		std::vector<std::shared_ptr<graph::LightProfile>>    getLightProfiles();
 
-		bool											useEmission();
-		bool											useOpacity();
-		bool                                            isThinWalled();
+		bool useEmission();
+		bool configHasOpacity();
+		bool useOpacity();
+		bool isThinWalled();
+		bool configUseEmission();
 
 		std::string                                                         materialDbName;	// example : "bsdf_diffuse_reflection"
 		std::string                                                         path;			// example : "mdl\\bsdf_diffuse_reflection.mdl"

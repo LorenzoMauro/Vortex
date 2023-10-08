@@ -741,6 +741,7 @@ namespace vtx
 
         //params.settings.renderer.iteration == 15 ? printf("Launching MatEval [%d, %d, %d, %d, %d]\n", *params.frameID, params.settings.renderer.iteration, prd.originPixel, prd.depth, prd.hitProperties.programCall) : 0;
         evaluateMaterial(prd.hitProperties.programCall, &request, matEval);
+
         //params.settings.renderer.iteration == 15 ? printf("Ending MatEval    [%d, %d, %d, %d, %d]\n", *params.frameID, params.settings.renderer.iteration, prd.originPixel, prd.depth, prd.hitProperties.programCall) : 0;
 
         assert(!(utl::isNan(matEval->bsdfSample.nextDirection) && matEval->bsdfSample.eventType != 0));
@@ -775,6 +776,10 @@ namespace vtx
                 float weightMis = 1.0f;
                 if ((lightSample.typeLight == L_MESH || lightSample.typeLight == L_ENV) && samplingTechnique == S_MIS)
                 {
+                    /*printf(
+                        " NEE: LightSample prob: %f, bsdfEval prob: %f\n",
+                        lightSample.pdf, matEval.bsdfEvaluation.pdf
+                    );*/
                     weightMis = utl::heuristic(lightSample.pdf, matEval.bsdfEvaluation.pdf);
                 }
 
@@ -792,6 +797,8 @@ namespace vtx
                 swi.depth = prd.depth + 1;
                 swi.originPixel = prd.originPixel;
                 swi.origin = prd.hitProperties.position;
+                swi.seed = prd.seed;
+                swi.mediumIor = prd.mediumIor;
 
                 if (neuralNetworkActive(&params))
                 {
@@ -821,6 +828,21 @@ namespace vtx
             if (samplingTechnique == S_MIS && prd.eventType & (mi::neuraylib::BSDF_EVENT_DIFFUSE | mi::neuraylib::BSDF_EVENT_GLOSSY))
             {
                 misWeight = utl::heuristic(prd.pdf, matEval.edf.pdf);
+                /*printf(
+                    "Implict Light Hit:"
+                    "Hit Distance %f\n"
+                    "Area %f\n"
+                    "Cos %f\n"
+                    "Num Lights %d\n\n"
+                    "LightSample prob: %f\n"
+                    "bsdfEval prob: %f\n"
+                    "Mis weight: %f\n\n"
+                    ,
+                    prd.hitDistance, area, matEval.edf.cos, params.numberOfLights,
+                    matEval.edf.pdf, matEval.bsdfEvaluation.pdf,
+                    misWeight
+                );*/
+
                 //printf(
 				//	"Mis weight: %f\n"
                 //    "Light pdf: %f\n"
@@ -994,30 +1016,36 @@ namespace vtx
         twi.depth = prd.depth+1;
     }
 
-    __forceinline__ __device__ bool transparentAnyHit(RayWorkItem* prd, const LaunchParams* params)
+    __forceinline__ __device__ bool transparentAnyHit(
+        HitProperties& hitProperties,
+        const math::vec3f& direction,
+        const math::vec3f& mediumIor,
+        unsigned seed,
+        const LaunchParams* params
+    )
     {
-        prd->hitProperties.calculate(params, prd->direction);
+        hitProperties.calculate(params, direction);
         mdl::MdlRequest request;
-        if (prd->hitProperties.hasOpacity)
+        if (hitProperties.hasOpacity)
         {
             mdl::MaterialEvaluation matEval;
-            if (prd->hitProperties.argBlock == nullptr)
+            if (hitProperties.argBlock == nullptr)
             {
                 optixIgnoreIntersection();
                 return false;
             }
             request.edf = false;
-            request.outgoingDirection = -prd->direction;
-            request.surroundingIor = prd->mediumIor;
+            request.outgoingDirection = -direction;
+            request.surroundingIor = mediumIor;
             request.opacity = true;
-            request.seed = &prd->seed;
-            request.hitProperties = &prd->hitProperties;
+            request.seed = &seed;
+            request.hitProperties = &hitProperties;
 
-            evaluateMaterial(prd->hitProperties.programCall, &request, &matEval);
+            evaluateMaterial(hitProperties.programCall, &request, &matEval);
 
             // Stochastic alpha test to get an alpha blend effect.
             // No need to calculate an expensive random number if the test is going to fail anyway.
-            if (matEval.opacity < 1.0f && matEval.opacity <= rng(prd->seed))
+            if (matEval.opacity < 1.0f && matEval.opacity <= rng(seed))
             {
                 optixIgnoreIntersection();
                 return false;
@@ -1025,6 +1053,17 @@ namespace vtx
             return true;
         }
         return false;
+    }
+
+    __forceinline__ __device__ bool transparentAnyHit(RayWorkItem* prd, const LaunchParams* params)
+    {
+        return transparentAnyHit(
+            prd->hitProperties,
+            prd->direction,
+            prd->mediumIor,
+            prd->seed,
+            params
+        );
     }
 
     __forceinline__ __device__ int getAdaptiveSampleCount(const int& fbIndex, const LaunchParams* params)
@@ -1166,7 +1205,8 @@ namespace vtx
     {
         math::vec2ui payload = splitPointer(rd);
 
-        optixTrace(params.topObject,
+        optixTrace(
+            params.topObject,
             origin,
             direction, // origin, direction
             params.settings.renderer.minClamp,
@@ -1176,7 +1216,7 @@ namespace vtx
             flags,    //OPTIX_RAY_FLAG_NONE,
             sbtIndex,  //SBT Offset
             0,                                // SBT stride
-            sbtIndex, // missSBTIndex
+            0, // missSBTIndex
             payload.x,
             payload.y);
 
@@ -1225,7 +1265,7 @@ namespace vtx
         prd.eventType = twi.eventType;
         prd.pdf = twi.pdf;
 
-        bool hit = trace(twi.origin, twi.direction, params.settings.renderer.maxClamp, &prd, 0, params, OPTIX_RAY_FLAG_DISABLE_ANYHIT);
+        bool hit = trace(twi.origin, twi.direction, params.settings.renderer.maxClamp, &prd, 0, params);
         
         if (architecture == A_FULL_OPTIX)
         {
@@ -1310,7 +1350,7 @@ namespace vtx
         // Shadow Trace
         const int maxTraceQueueSize = params.frameBuffer.frameSize.x * params.frameBuffer.frameSize.y;
         const bool isLongPath = (float)radianceTraceQueueSize <= params.settings.wavefront.longPathPercentage * (float)maxTraceQueueSize;
-        if(!params.settings.wavefront.useLongPathKernel || !isLongPath)
+        if(!(params.settings.wavefront.useLongPathKernel && isLongPath))
         {
             elaborateRadianceTrace(twi, params);
         }

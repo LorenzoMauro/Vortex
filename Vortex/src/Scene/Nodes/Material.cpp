@@ -307,7 +307,7 @@ namespace vtx::graph
 		}
 		else if(getOptions()->mdlCallType== MDL_INLINE || getOptions()->mdlCallType == MDL_CUDA)
 		{
-			devicePrograms.pgEvaluateMaterial = optix::createDcProgram(module, "__direct_callable__EvaluateMaterial", getUID(), {"Default", "wfShade", "wfRadianceTrace"});
+			devicePrograms.pgEvaluateMaterial = optix::createDcProgram(module, "__direct_callable__EvaluateMaterial", getUID(), {"Default", "wfShade", "wfRadianceTrace", "wfShadowTrace"});
 			mdl::getMdlCudaLinker().submitTargetCode(targetCode, name);
 		}
 	}
@@ -367,12 +367,8 @@ namespace vtx::graph
 		return false;
 	}
 
-	bool Material::useEmission()
+	bool Material::configUseEmission()
 	{
-		if (!state.isInitialized)
-		{
-			init();
-		}
 		const bool thinWalled = isThinWalled();
 
 		bool isSurfaceEmissive = false;
@@ -385,7 +381,6 @@ namespace vtx::graph
 			}
 		}
 
-
 		bool isBackfaceEmissive = false;
 		if (config.isBackfaceEdfValid) {
 			if (!config.isBackfaceIntensityConstant) {
@@ -395,7 +390,7 @@ namespace vtx::graph
 				isBackfaceEmissive = true;
 			}
 		}
-		isBackfaceEmissive    = (thinWalled && isBackfaceEmissive);
+		isBackfaceEmissive = (thinWalled && isBackfaceEmissive);
 		const bool isEmissive = isSurfaceEmissive || isBackfaceEmissive; // To be emissive on the backface it needs to be isThinWalled
 
 		if (config.emissivityToggle) //The material has a enable emission option
@@ -409,12 +404,25 @@ namespace vtx::graph
 		return isEmissive;
 	}
 
-	bool Material::useOpacity()
+
+	bool Material::useEmission()
 	{
 		if (!state.isInitialized)
 		{
 			init();
 		}
+		if(materialGraph->getType() == NT_PRINCIPLED_MATERIAL)
+		{
+			return materialGraph->as<graph::shader::PrincipledMaterial>()->emissionActive();
+		}
+		else
+		{
+			return configUseEmission();
+		}
+	}
+
+	bool Material::configHasOpacity()
+	{
 		if (config.opacityToggle) //The material has a enable emission option
 		{
 			if (*(config.opacityToggle))
@@ -424,6 +432,22 @@ namespace vtx::graph
 			return false;
 		}
 		return config.useCutoutOpacity;
+	}
+
+	bool Material::useOpacity()
+	{
+		if (!state.isInitialized)
+		{
+			init();
+		}
+		if (materialGraph->getType() == NT_PRINCIPLED_MATERIAL)
+		{
+			return materialGraph->as<graph::shader::PrincipledMaterial>()->opacityActive();
+		}
+		else
+		{
+			return configHasOpacity();
+		}
 	};
 
 	void processMaterial(std::shared_ptr<Material>& material)
