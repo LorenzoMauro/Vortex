@@ -1,4 +1,5 @@
 ﻿#pragma once
+#include <map>
 
 namespace vtx
 {
@@ -19,6 +20,7 @@ namespace vtx
 		bool  active;
 		int   kernelSize;
 		float threshold;
+		int   start;
 		bool  isUpdated = true;
 	};
 

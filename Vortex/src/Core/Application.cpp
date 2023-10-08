@@ -117,21 +117,23 @@ namespace vtx
 		graph::Scene* scene = graph::Scene::get();
 		const std::shared_ptr<graph::Renderer>& renderer = scene->renderer;
 		renderer->camera->onUpdate(timeStep);
-		if (renderer->settings.runOnSeparateThread)
+		if (renderer->settings.iteration <= renderer->settings.maxSamples)
 		{
-			if (renderer->isReady() && renderer->settings.iteration <= renderer->settings.maxSamples)
+			if (renderer->settings.runOnSeparateThread)
 			{
-				renderer->settings.iteration++;
-				renderer->settings.isUpdated = true;
-
-				//This step speed up the material computation, but is not really coherent with the rest of the code
-				
-				renderer->threadedRender();
+				if (renderer->isReady())
+				{
+					renderer->settings.iteration++;
+					renderer->settings.isUpdated = true;
+					//This step speed up the material computation, but is not really coherent with the rest of the code
+					graph::computeMaterialsMultiThreadCode();
+					renderer->traverse(hostVisitor);
+					onDeviceData->sync();
+					onDeviceData->incrementFrameIteration();
+					renderer->threadedRender();
+				}
 			}
-		}
-		else
-		{
-			if (renderer->settings.iteration <= renderer->settings.maxSamples)
+			else
 			{
 				renderer->settings.iteration++;
 				renderer->settings.isUpdated = true;
@@ -143,6 +145,7 @@ namespace vtx
 				renderer->render();
 			}
 		}
+		
 	}
 
 	void Application::run() {

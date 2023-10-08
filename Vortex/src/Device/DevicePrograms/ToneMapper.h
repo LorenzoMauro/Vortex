@@ -5,6 +5,8 @@
 #include <cuda_runtime.h>
 #include "Core/Math.h"
 #include "Utils.h"
+#include "Scene/Nodes/RendererSettings.h"
+
 namespace vtx
 {
     __forceinline__ __device__ math::vec3f floatToScientificRGB(const float value) {

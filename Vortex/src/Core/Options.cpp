@@ -51,11 +51,12 @@ namespace vtx {
 
 		options.rendererSettings.fireflySettings.kernelSize = 3;
 		options.rendererSettings.fireflySettings.threshold = 2.0f;
-		options.rendererSettings.fireflySettings.active = false;
+		options.rendererSettings.fireflySettings.active = true;
+		options.rendererSettings.fireflySettings.start = 200;
 		options.rendererSettings.fireflySettings.isUpdated = false;
 
-		options.rendererSettings.denoiserSettings.active = false;
-		options.rendererSettings.denoiserSettings.denoiserStart = 10;
+		options.rendererSettings.denoiserSettings.active = true;
+		options.rendererSettings.denoiserSettings.denoiserStart = -5;
 		options.rendererSettings.denoiserSettings.denoiserBlend = 0.1f;
 		options.rendererSettings.denoiserSettings.isUpdated = false;
 

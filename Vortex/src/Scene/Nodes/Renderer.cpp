@@ -90,11 +90,6 @@ namespace vtx::graph
 	{
 		if (isReady(true))
 		{
-			graph::computeMaterialsMultiThreadCode();
-			HostVisitor visitor;
-			this->traverse(visitor);
-			onDeviceData->sync();
-			onDeviceData->incrementFrameIteration();
 			std::unique_lock<std::mutex> lock(threadData.renderMutex);
 			threadData.renderThreadBusy = true;
 			threadData.renderCondition.notify_one();
@@ -176,8 +171,9 @@ namespace vtx::graph
 			cudaEventRecord(events.first);
 
 			toneMapRadianceKernel(launchParamsDevice, width, height, eventNames[R_TONE_MAP_RADIANCE]);
-			math::vec3f* beauty = nullptr;
-			if (settings.fireflySettings.active)
+			math::vec3f* beauty                 = nullptr;
+			const bool   isFireflyRemovalActive = settings.fireflySettings.active && settings.iteration > settings.fireflySettings.start;
+			if (isFireflyRemovalActive)
 			{
 				removeFireflies(launchParamsDevice, settings.fireflySettings.kernelSize, settings.fireflySettings.threshold, width, height);
 				beauty = onDeviceData->frameBufferData.resourceBuffers.fireflyRemoval.castedPointer<math::vec3f>();
@@ -185,7 +181,7 @@ namespace vtx::graph
 
 			if (settings.denoiserSettings.active && settings.iteration > settings.denoiserSettings.denoiserStart)
 			{
-				CUDABuffer& denoiserRadianceInput = settings.fireflySettings.active ? onDeviceData->frameBufferData.resourceBuffers.fireflyRemoval : onDeviceData->frameBufferData.resourceBuffers.hdriRadiance;
+				CUDABuffer& denoiserRadianceInput = isFireflyRemovalActive ? onDeviceData->frameBufferData.resourceBuffers.fireflyRemoval : onDeviceData->frameBufferData.resourceBuffers.hdriRadiance;
 				CUDABuffer& albedoBuffer = onDeviceData->frameBufferData.resourceBuffers.albedoNormalized;
 				CUDABuffer& normalBuffer = onDeviceData->frameBufferData.resourceBuffers.normalNormalized;
 				optix::getState()->denoiser.setInputs(denoiserRadianceInput, albedoBuffer, normalBuffer);
