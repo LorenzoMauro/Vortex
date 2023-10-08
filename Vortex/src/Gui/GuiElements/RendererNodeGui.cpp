@@ -18,11 +18,15 @@ namespace vtx::gui
 			{
 				settings.isUpdated = true;
 			}
-			if (vtxImGui::halfSpaceWidget("FireFly Kernel Size", ImGui::DragInt, (hiddenLabel + "FireFly Kernel Size").c_str(), &settings.kernelSize, 1.0f, 1, 30, "%d", 0))
+			if (vtxImGui::halfSpaceWidget("Iteration Start", ImGui::DragInt, (hiddenLabel + "Iteration Start").c_str(), &settings.start, 1.0f, -2, 30, "%d", 0))
 			{
 				settings.isUpdated = true;
 			}
-			if (vtxImGui::halfSpaceWidget("FireFly Threshold", ImGui::DragFloat, (hiddenLabel + "FireFly Threshold").c_str(), &settings.threshold, 0.01f, 1.0f, 5.0f, "%.3f", 0))
+			if (vtxImGui::halfSpaceWidget("Kernel Size", ImGui::DragInt, (hiddenLabel + "FireFly Kernel Size").c_str(), &settings.kernelSize, 1.0f, 1, 30, "%d", 0))
+			{
+				settings.isUpdated = true;
+			}
+			if (vtxImGui::halfSpaceWidget("Threshold", ImGui::DragFloat, (hiddenLabel + "FireFly Threshold").c_str(), &settings.threshold, 0.01f, 1.0f, 5.0f, "%.3f", 0))
 			{
 				settings.isUpdated = true;
 			}
@@ -195,6 +199,7 @@ namespace vtx::gui
 			vtxImGui::halfSpaceWidget("WaveFront Generate Ray		", vtxImGui::booleanText, "%.2f ms", factor * cuTimes.genCameraRay);
 			vtxImGui::halfSpaceWidget("WaveFront Trace				", vtxImGui::booleanText, "%.2f ms", factor * cuTimes.traceRadianceRay);
 			vtxImGui::halfSpaceWidget("WaveFront Shade				", vtxImGui::booleanText, "%.2f ms", factor * cuTimes.shadeRay);
+			vtxImGui::halfSpaceWidget("WaveFront Shadow				", vtxImGui::booleanText, "%.2f ms", factor * cuTimes.shadowRay);
 			vtxImGui::halfSpaceWidget("WaveFront Escaped			", vtxImGui::booleanText, "%.2f ms", factor * cuTimes.handleEscapedRay);
 			vtxImGui::halfSpaceWidget("WaveFront Accumulate			", vtxImGui::booleanText, "%.2f ms", factor * cuTimes.accumulateRay);
 			vtxImGui::halfSpaceWidget("WaveFront Reset				", vtxImGui::booleanText, "%.2f ms", factor * cuTimes.reset);

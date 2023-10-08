@@ -1,6 +1,7 @@
 ﻿#ifndef HIT_PROPERTIES_H
 #define HIT_PROPERTIES_H
 #pragma once
+#include "CudaDebugHelper.h"
 #include "LaunchParams.h"
 #include "Utils.h"
 #include "Core/Math.h"
@@ -100,8 +101,6 @@ namespace vtx
             vertices[0] = &(geometry->vertexAttributeData[triVerticesIndices.x]);
             vertices[1] = &(geometry->vertexAttributeData[triVerticesIndices.y]);
             vertices[2] = &(geometry->vertexAttributeData[triVerticesIndices.z]);
-
-
 
             math::vec3f ngO = math::normalize(cross(vertices[1]->position - vertices[0]->position, vertices[2]->position - vertices[0]->position));
             const math::vec3f nsO = math::normalize(vertices[0]->normal * baricenter.x + vertices[1]->normal * baricenter.y + vertices[2]->normal * baricenter.z);

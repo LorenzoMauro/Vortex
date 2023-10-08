@@ -16,7 +16,7 @@ namespace vtx::graph
 	Node::~Node()
 	{
 		sim->removeNodeReference(UID, typeID, type);
-		VTX_WARN("Node ID: {} Name: {} destroyed", UID, name);
+		VTX_WARN("Node {} ID: {} Name: {} destroyed", nodeNames[getType()], UID, name);
 	}
         
 	NodeType Node::getType() const {

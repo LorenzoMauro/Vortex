@@ -13,6 +13,7 @@ namespace vtx
 		K_TRACE_RADIANCE_RAY,
 		K_SHADE_RAY,
 		K_HANDLE_ESCAPED_RAY,
+		K_SHADOW_RAY,
 		K_ACCUMULATE_RAY,
 		K_RETRIEVE_QUEUE_SIZE,
 		K_RESET,
@@ -43,6 +44,7 @@ namespace vtx
 		"traceRadianceRay",
 		"shadeRay",
 		"handleEscapedRay",
+		"shadowRay",
 		"accumulateRay",
 		"retrieveQueueSize",
 		"reset",
@@ -65,22 +67,23 @@ namespace vtx
 
 	struct CudaEventTimes
 	{
-		float genCameraRay = 0.0f;
+		float genCameraRay     = 0.0f;
 		float traceRadianceRay = 0.0f;
-		float reset = 0.0f;
-		float shadeRay = 0.0f;
+		float reset            = 0.0f;
+		float shadeRay         = 0.0f;
 		float handleEscapedRay = 0.0f;
-		float accumulateRay = 0.0f;
-		float fetchQueueSize = 0.0f;
+		float accumulateRay    = 0.0f;
+		float fetchQueueSize   = 0.0f;
 		float setQueueCounters = 0.0f;
 		float noiseComputation = 0.0f;
-		float trace = 0.0f;
-		float postProcessing = 0.0f;
-		float display = 0.0f;
-		float toneMapRadiance = 0.0f;
+		float trace            = 0.0f;
+		float postProcessing   = 0.0f;
+		float display          = 0.0f;
+		float toneMapRadiance  = 0.0f;
 		float nnShuffleDataset = 0.0f;
-		float nnTrain = 0.0f;
-		float nnInfer = 0.0f;
+		float nnTrain          = 0.0f;
+		float nnInfer          = 0.0f;
+		float   shadowRay = 0.0f;
 	};
 
 	CudaEventTimes getCudaEventTimes();

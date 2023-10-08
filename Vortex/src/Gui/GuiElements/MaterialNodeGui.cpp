@@ -2,14 +2,20 @@
 #include "imgui.h"
 #include "Core/CustomImGui/CustomImGui.h"
 #include "Scene/Nodes/Material.h"
+#include "Scene/Nodes/Shader/mdl/ShaderNodes.h"
 
 namespace vtx::gui
 {
 	bool GuiProvider::drawEditGui(const std::shared_ptr<graph::Material>& material)
 	{
         bool changed = false;
-
-        if (ImGui::CollapsingHeader("Material"))
+        ImGui::PushID(material->getUID());
+        std::string name = material->name;
+        if(material->materialGraph)
+        {
+	        name = material->materialGraph->name;
+        }
+        if (ImGui::CollapsingHeader(name.c_str()))
         {
             ImGui::Indent();
             const float availableWidth = ImGui::GetContentRegionAvail().x;
@@ -23,7 +29,7 @@ namespace vtx::gui
         {
             material->state.updateOnDevice = true;
         }
-
+        ImGui::PopID();
         return changed;
 	}
 }

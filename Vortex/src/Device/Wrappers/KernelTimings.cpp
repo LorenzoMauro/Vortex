@@ -31,6 +31,9 @@ namespace vtx
             CUDA_CHECK(cudaEventSynchronize(start));
             CUDA_CHECK(cudaEventSynchronize(stop));
 
+            //bool startCompleted = cudaEventQuery(start) == cudaSuccess;
+            //bool endCompleted = cudaEventQuery(stop) == cudaSuccess;
+
             float       ms = 0;
             cudaError_t err = cudaEventElapsedTime(&ms, start, stop);
             if (err != cudaSuccess)
@@ -74,6 +77,7 @@ namespace vtx
         times.traceRadianceRay = GetKernelTimeMS(eventNames[K_TRACE_RADIANCE_RAY]);
         times.reset = GetKernelTimeMS(eventNames[K_RESET]);
         times.shadeRay = GetKernelTimeMS(eventNames[K_SHADE_RAY]);
+        times.shadowRay = GetKernelTimeMS(eventNames[K_SHADOW_RAY]);
         times.handleEscapedRay = GetKernelTimeMS(eventNames[K_HANDLE_ESCAPED_RAY]);
         times.accumulateRay = GetKernelTimeMS(eventNames[K_ACCUMULATE_RAY]);
         times.fetchQueueSize = GetKernelTimeMS(eventNames[K_RETRIEVE_QUEUE_SIZE]);

@@ -9,7 +9,7 @@ namespace vtx::gui
 	{
 		bool updated = false;
 		ImGui::PushID(transformNode->getUID());
-		if(ImGui::CollapsingHeader("Transform"))
+		if(ImGui::CollapsingHeader(transformNode->name.c_str()))
 		{
 			ImGui::Indent();
 			const float availableWidth = ImGui::GetContentRegionAvail().x;

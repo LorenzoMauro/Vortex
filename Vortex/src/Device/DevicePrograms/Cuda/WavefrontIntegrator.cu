@@ -134,14 +134,14 @@ namespace vtx
 		{
 			return;
 		}
-		downloadQueueSize(deviceCountersPointers.shadeQueueCounter, queueSizes.shadowQueueCounter, maxTraceQueueSize * (rendererSettings->maxBounces + 1));
+		downloadQueueSize(deviceCountersPointers.shadowQueueCounter, queueSizes.shadowQueueCounter, maxTraceQueueSize * (rendererSettings->maxBounces + 1));
 		if (queueSizes.shadowQueueCounter == 0)
 		{
 			VTX_INFO("NO Shadow Queue");
 			return;
 		}
 
-		const std::pair<cudaEvent_t, cudaEvent_t> events = GetProfilerEvents(eventNames[Q_SHADOW_TRACE]);
+		const std::pair<cudaEvent_t, cudaEvent_t> events = GetProfilerEvents(eventNames[K_SHADOW_RAY]);
 		cudaEventRecord(events.first, nullptr);
 
 		optix::PipelineOptix::launchOptixKernel(math::vec2i(queueSizes.shadowQueueCounter, 1), "wfShadowTrace");
@@ -172,7 +172,6 @@ namespace vtx
 		{
 			return;
 		}
-
 		auto deviceParamsCopy = deviceParams;
 		gpuParallelFor(eventNames[K_ACCUMULATE_RAY],
 			queueSizes.accumulationQueueCounter,

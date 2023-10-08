@@ -28,27 +28,26 @@ namespace vtx::gui
 	}
 	void GuiVisitor::visit(const std::shared_ptr<graph::Instance>& node)
 	{
-		callOnChildren(node);
+		changed |= GuiProvider::drawEditGui(node);
+		//callOnChildren(node);
 	}
 
 	void GuiVisitor::visit(const std::shared_ptr<graph::Transform>& node)
 	{
 		changed |= GuiProvider::drawEditGui(node);
-		callOnChildren(node);
+		//callOnChildren(node);
 	}
 
 	void GuiVisitor::visit(const std::shared_ptr<graph::Group>& node)
 	{
-
-
-		callOnChildren(node);
+		changed |= GuiProvider::drawEditGui(node);
 	}
 
 	void GuiVisitor::visit(const std::shared_ptr<graph::Mesh>& node)
 	{
 
-
-		callOnChildren(node);
+		changed |= GuiProvider::drawEditGui(node);
+		//callOnChildren(node);
 	}
 
 	void GuiVisitor::visit(const std::shared_ptr<graph::Material>& node)
@@ -80,7 +79,6 @@ namespace vtx::gui
 	{
 
 		changed |= GuiProvider::drawEditGui(node);
-		callOnChildren(node);
 	}
 
 	void GuiVisitor::visit(const std::shared_ptr<graph::Renderer>& node)
@@ -91,35 +89,22 @@ namespace vtx::gui
 
 	void GuiVisitor::visit(const std::shared_ptr<graph::Texture>& node)
 	{
-
-
-		callOnChildren(node);
 	}
 
 	void GuiVisitor::visit(const std::shared_ptr<graph::BsdfMeasurement>& node)
 	{
-
-
-		callOnChildren(node);
 	}
 
 	void GuiVisitor::visit(const std::shared_ptr<graph::LightProfile>& node)
 	{
-
-
-		callOnChildren(node);
 	}
 
 	void GuiVisitor::visit(const std::shared_ptr<graph::EnvironmentLight>& node)
 	{
-
-		callOnChildren(node);
 	}
 
 	void GuiVisitor::visit(const std::shared_ptr<graph::MeshLight>& node)
 	{
-
-		callOnChildren(node);
 	}
 
 

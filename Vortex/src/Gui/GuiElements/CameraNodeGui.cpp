@@ -37,6 +37,7 @@ namespace vtx::gui {
 
 			ImGui::PopItemWidth();
 			ImGui::Unindent();
+			drawEditGui(camera->transform);
 		}
 		ImGui::PopID();
 

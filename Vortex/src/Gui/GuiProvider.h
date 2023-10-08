@@ -33,6 +33,9 @@ namespace vtx
 		class Transform;
 		class Camera;
 		class Renderer;
+		class Instance;
+		class Group;
+		class Mesh;
 	}
 }
 
@@ -45,6 +48,10 @@ namespace vtx::gui
 		static bool drawEditGui(const std::shared_ptr<graph::Camera>& camera);
 		static bool drawEditGui(const std::shared_ptr<graph::Transform>& transform);
 		static bool drawEditGui(const std::shared_ptr<graph::Material>& material);
+		static bool drawEditGui(const std::shared_ptr<graph::Instance>& instance);
+		static bool drawEditGui(const std::shared_ptr<graph::Group>& group);
+		static bool drawEditGui(const std::shared_ptr<graph::Mesh>& mesh);
+
 		static bool drawEditGui(const std::shared_ptr<graph::shader::ShaderNode>& shaderNode, const bool isNodeEditor = false);
 		static bool drawEditGui(const graph::shader::ShaderNodeSocket& socket);
 		static bool drawEditGui(network::EncodingSettings& settings, const std::string& encodedFeatureName);

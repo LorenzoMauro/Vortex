@@ -3,10 +3,8 @@
 #ifndef PER_RAY_DATA_H
 #define PER_RAY_DATA_H
 
-#include <vector_types.h>
 #include "Core/Math.h"
 #include <mi/neuraylib/target_code_types.h>
-#include "LaunchParams.h"
 
 namespace vtx {
 
