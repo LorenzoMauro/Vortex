@@ -24,6 +24,7 @@ namespace vtx
 		LoadingSaving(LoadingSaving const&) = delete; // Don't allow copy
 		void operator=(LoadingSaving const&) = delete; // Don't allow assignment
 
+		void                            manuallySetOpenFile(const std::string& path);
 		void                            loadFileDialog(std::vector<std::string> fileExtensions = {});
 		void                            saveFileDialog(std::vector<std::string> fileExtensions = {});
 		void                            loadFile(std::string filePath = "");

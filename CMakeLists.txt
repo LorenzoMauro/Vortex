@@ -65,12 +65,14 @@ find_package(spdlog CONFIG REQUIRED)
 get_target_property(SPDLOG_INCLUDE_DIRS spdlog::spdlog_header_only INTERFACE_INCLUDE_DIRECTORIES)
 find_package(glfw3 CONFIG REQUIRED)
 find_package(implot CONFIG REQUIRED)
-find_package(yaml-cpp CONFIG REQUIRED)
+#find_package(yaml-cpp CONFIG REQUIRED)
 find_package(assimp CONFIG REQUIRED)
 
 add_subdirectory(${EXTERNAL}/glad)
 add_subdirectory(${EXTERNAL}/imnodes)
 #add_subdirectory(${EXTERNAL}/ImGuiFileDialog)
+
+configure_file(${CMAKE_SOURCE_DIR}/assets/VortexIco.rc.in ${CMAKE_SOURCE_DIR}/assets/VortexIco.rc @ONLY)
 
 add_subdirectory(Vortex/src)
 
@@ -80,4 +82,4 @@ set_property(TARGET Glad PROPERTY FOLDER "Dependencies")
 #set_property(TARGET ImGuiFileDialog PROPERTY FOLDER "Dependencies")
 set_property(TARGET imnodes PROPERTY FOLDER "Dependencies")
 
-configure_file(${CMAKE_SOURCE_DIR}/scripts/VortexInstaller.nsi.in ${CMAKE_BINARY_DIR}/VortexInstaller.nsi @ONLY)
+configure_file(${CMAKE_SOURCE_DIR}/scripts/VortexInstaller.nsi.in ${CMAKE_SOURCE_DIR}/scripts/VortexInstaller.nsi @ONLY)

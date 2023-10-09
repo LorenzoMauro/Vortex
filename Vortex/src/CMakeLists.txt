@@ -115,6 +115,9 @@ set_target_properties(Vortex PROPERTIES
     VS_DEBUGGER_WORKING_DIRECTORY "$<TARGET_FILE_DIR:Vortex>"
 )
 
+# Adding resource file
+target_sources(Vortex PRIVATE ${CMAKE_SOURCE_DIR}/assets/VortexIco.rc)
+
 #Compile Options for Standard CUDA files
 target_compile_options(Vortex PRIVATE
   $<$<COMPILE_LANGUAGE:CUDA>:
@@ -167,7 +170,7 @@ target_link_libraries(Vortex PRIVATE
   glfw
   implot::implot
   Glad
-  yaml-cpp
+  #yaml-cpp
   imnodes
   #ImGuiFileDialog
   assimp::assimp
@@ -265,6 +268,14 @@ add_custom_command(TARGET Vortex POST_BUILD
                    $<TARGET_FILE_DIR:Vortex>/assets/mdl
                    COMMENT "Copying VortexPrincipledShader mdl if newer..."
                    )
+
+add_custom_command(TARGET Vortex POST_BUILD
+                    COMMAND ${CMAKE_COMMAND} -E make_directory $<TARGET_FILE_DIR:Vortex>/assets/model
+                    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                    ${CMAKE_SOURCE_DIR}/assets/model/DemoSpaceship.vtx
+                    $<TARGET_FILE_DIR:Vortex>/assets/model
+                    COMMENT "Copying DemoSpaceship.vtx if newer..."
+                    )
 
 add_custom_command(TARGET Vortex POST_BUILD
                    COMMAND xcopy /D /Y /F "\"${CMAKE_SOURCE_DIR}/assets/ImGui.ini\"" "\"$<TARGET_FILE_DIR:Vortex>/assets/\\\""

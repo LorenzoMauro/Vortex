@@ -16,6 +16,16 @@ namespace vtx
 		return instance;
 	}
 
+	void LoadingSaving::manuallySetOpenFile(const std::string& path)
+	{
+		// Check if file exists
+		if (const std::string fullPath = utl::absolutePath(path); std::filesystem::exists(fullPath))
+		{
+			filePathToLoad = fullPath;
+			doLoadFile = true;
+		}
+	}
+
 	void LoadingSaving::loadFileDialog(std::vector<std::string> fileExtensions)
 	{
 		if (fileExtensions.empty())

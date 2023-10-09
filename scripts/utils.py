@@ -33,7 +33,10 @@ class Setup():
     def __init__(self, root, logfile):
         self.root = root
         self.logFile = logfile
-    
+
+    def showMessage(self, message):
+        messagebox.showinfo("Info", message)
+
     def askOptions(self, message, options):
         d = OptionDialog(self.root, "Query", message, options)
         return d.selection
@@ -165,7 +168,7 @@ class Setup():
                 ['vcpkg', 'install', 'openimageio', '--triplet=x64-windows-static'],
                 ['vcpkg', 'install', 'imgui[docking-experimental,opengl3-binding,glfw-binding,win32-binding]', '--triplet=x64-windows-static-md', '--recurse'],
                 ['vcpkg', 'install', 'spdlog', '--triplet=x64-windows-static-md'],
-                ['vcpkg', 'install', 'yaml-cpp', '--triplet=x64-windows-static-md'],
+                #['vcpkg', 'install', 'yaml-cpp', '--triplet=x64-windows-static-md'],
                 ['vcpkg', 'install', 'assimp', '--triplet=x64-windows-static-md'],
                 ['vcpkg', 'install', 'glfw3', '--triplet=x64-windows-static-md'],
                 ['vcpkg', 'install', 'implot', '--triplet=x64-windows-static-md']
@@ -247,7 +250,7 @@ class Setup():
         subprocess.run(cmake_cmd)
         self.echoGreen("Cmake Configuration Completed!")
 
-    def buildOrOpenVortex(self):
+    def buildOrOpenVortex(self, repoRoot):
         message = "Set up completed! Do you want to build Vortex or open Visual Studio or Exit?"
         options = ["Build Vortex", "Open Visual Studio", "Exit"]
 
@@ -261,7 +264,8 @@ class Setup():
             os.startfile('Vortex.exe')  # This will launch the exe
         elif choice == "Open Visual Studio":
             self.echoGreen("Opening Visual Studio solution.")
-            os.startfile('.build/Vortex.sln')
+            os.chdir(os.path.join(repoRoot, 'build'))
+            os.startfile('Vortex.sln')
         elif choice == "Exit":
             self.echoGreen("Exiting.")
         else:

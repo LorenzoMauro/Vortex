@@ -25,8 +25,6 @@ namespace vtx
 	{
 		class Network;
 	}
-
-	class ViewportLayer;
 }
 
 

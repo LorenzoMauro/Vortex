@@ -474,7 +474,6 @@ namespace vtx::serializer
 			break;
 			case graph::shader::PK_ARRAY:
 			{
-				YAML::Node arrayNode;
 				const char* ptr = &paramInfo.data<char>();
 				const uint64_t arrayPitch = paramInfo.arrayPitch;
 

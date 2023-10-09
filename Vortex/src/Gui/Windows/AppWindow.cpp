@@ -4,9 +4,13 @@
 #include <imgui_impl_glfw.h>
 #include <imgui_impl_opengl3.h>
 
+#include "EnvironmentWindow.h"
 #include "ExperimentsWindow.h"
 #include "GraphWindow.h"
+#include "PropertiesWindow.h"
+#include "SceneHierarchyWindow.h"
 #include "ShaderGraphWindow.h"
+#include "ViewportWindow.h"
 #include "Core/Application.h"
 #include "Core/FileDialog.h"
 #include "Core/LoadingSaving.h"
@@ -79,17 +83,18 @@ namespace vtx {
         {
             if (ImGui::BeginMenu("File"))
             {
-                if (ImGui::MenuItem("New")) { /* Do something on New */ }
-                if (ImGui::MenuItem("Open", "Ctrl+O"))
+                if (ImGui::MenuItem("Open Demo"))
+                {
+                    LoadingSaving::get().manuallySetOpenFile("./assets/model/DemoSpaceship.vtx");
+                }
+                if (ImGui::MenuItem("Open"))
                 {
                     LoadingSaving::get().loadFileDialog();
                 }
-
-                if (ImGui::MenuItem("Save", "Ctrl+S"))
+                if (ImGui::MenuItem("Save"))
                 {
 					LoadingSaving::get().saveFileDialog();
                 }
-                if (ImGui::MenuItem("Exit")) { /* Exit or close your app */ }
                 ImGui::EndMenu();
             }
             if (ImGui::BeginMenu("Window"))
@@ -106,9 +111,24 @@ namespace vtx {
                 {
                     windowManager->createWindow<ShaderGraphWindow>();
                 }
+                if (ImGui::MenuItem("Viewport"))
+                {
+                    windowManager->createWindow<ViewportWindow>();
+                }
+                if (ImGui::MenuItem("Environment Light"))
+                {
+                    windowManager->createWindow<EnvironmentWindow>();
+                }
+                if (ImGui::MenuItem("Properties"))
+                {
+                    windowManager->createWindow<PropertiesWindow>();
+                }
+                if (ImGui::MenuItem("Scene Hierarchy"))
+                {
+                    windowManager->createWindow<SceneHierarchyWindow>();
+                }
                 ImGui::EndMenu();
             }
-
             ImGui::EndMainMenuBar();
         }
         ImGui::PopStyleVar();
