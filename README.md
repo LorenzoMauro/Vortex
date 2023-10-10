@@ -1,5 +1,6 @@
-# Vortex
-
+#  Vortex ![Icon](./assets/readme/V2-16.png)
+![Screenshot](./assets/readme/thumb.jpg)
+### [Demo Video: Check out Vortex in Action](https://www.youtube.com/watch?v=fQn29vja1NI)
 [Hello there](https://media.giphy.com/media/xTiIzJSKB4l7xTouE8/giphy.gif)!
 I'm [Lorenzo Mauro](https://www.linkedin.com/in/lorenzo-mauro-4082a088/), currently diving deep into the finishing stages of a Computer Graphics/Computer Science PhD at the [University of Rome](https://phd.uniroma1.it/web/LORENZO-MAURO_nP1529128_EN.aspx). In the past I've also dipped my toes in concept art at [OnePixelBrush](https://onepixelbrush.com/). If you want to take a walk down memory lane, here's my [portfolio](https://www.artstation.com/lomar).
 
@@ -15,11 +16,11 @@ If you have feedback, find bugs, or are intrigued by any part of this project, p
 
 Happy rendering!
 
-![Screenshot](./assets/readme/Screenshot.jpeg)
 
 ## Table of Contents
 
 - [Introduction](#vortex)
+- [Demo Video](#demo-video-check-out-vortex-in-action)
 - [Intaller](#installer)
 - [Technical Details](#technical-details)
   - [Tech Stack & Dependencies](#tech-stack--dependencies)
@@ -46,6 +47,7 @@ If you're up for giving Vortex a try, I've got an installer ready for you to dow
 
 Keep in mind, I'm still in the trenches with my PhD work, so some optimizations and features are on hold. But feel free to download and let me know how it works on your setup.
 
+![Screenshot](./assets/readme/Screenshot.jpeg)
 ## Technical Details
 
 ### Tech Stack & Dependencies
