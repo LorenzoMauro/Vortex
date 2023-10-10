@@ -1,15 +1,13 @@
 # Vortex
 
-# A Journey from Concept to Reality
-
 [Hello there](https://media.giphy.com/media/xTiIzJSKB4l7xTouE8/giphy.gif)!
-I'm [Lorenzo Mauro](https://www.linkedin.com/in/lorenzo-mauro-4082a088/), currently diving deep into the finishing stages of a Computer Graphics/Computer Science PhD at the [University of Rome](https://phd.uniroma1.it/web/LORENZO-MAURO_nP1529128_EN.aspx). In the past I've also dipped my toes in concept art at [OnePixelBrush](https://onepixelbrush.com/). Wanna take a walk down memory lane? Here's my [previous portfolio](https://www.artstation.com/lomar).
+I'm [Lorenzo Mauro](https://www.linkedin.com/in/lorenzo-mauro-4082a088/), currently diving deep into the finishing stages of a Computer Graphics/Computer Science PhD at the [University of Rome](https://phd.uniroma1.it/web/LORENZO-MAURO_nP1529128_EN.aspx). In the past I've also dipped my toes in concept art at [OnePixelBrush](https://onepixelbrush.com/). If you want to take a walk down memory lane, here's my [portfolio](https://www.artstation.com/lomar).
 
 Vortex is a labor of love, built from the ground up with two primary objectives in mind:
 
-1. **Practical Skill Development**: As someone passionate about computer graphics and eager to make a mark in the industry, I wanted to do more than just work within the confines of existing frameworks to achieve my phd thesis. Diving deep into the nitty-gritty of renderer development provided invaluable insights and hands-on experience beyond the regular PhD curriculum.
+1. **Practical Skill Development**: As someone passionate about computer graphics, I wanted to do more than just work within the confines of existing frameworks to achieve my Phd thesis. Diving deep into the nitty-gritty of renderer development provided invaluable insights and hands-on experience beyond the regular PhD curriculum.
 
-2. **Research Endeavor**: Most importantly, Vortex isn't merely a fancy toy-renderer; it's a playground for my academic adventure. This sandbox enabled me to intertwine Path Guiding techniques with the power of neural networks.
+2. **Research Endeavor**: Most importantly, Vortex isn't merely a toy-renderer; it's a playground for my academic research. With it, I have been able to intertwine Path Guiding techniques with the power of neural networks.
 
 While Vortex is a comprehensive project, it's essential to note that its current version is a reflection of focused objectives under tight timelines. I've been the solo developer, so the prioritization was crucial. A few features like dynamic scenes and volumetrics are on my radar for future iterations but at present, the emphasis remains on optimizing and refining the neural network components due to the demands of my PhD work, which is a beast on its own.
 
@@ -17,9 +15,12 @@ If you have feedback, find bugs, or are intrigued by any part of this project, p
 
 Happy rendering!
 
+![Screenshot](./assets/readme/Screenshot.jpeg)
+
 ## Table of Contents
 
-- [Introduction](#a-journey-from-concept-to-reality)
+- [Introduction](#vortex)
+- [Intaller](#installer)
 - [Technical Details](#technical-details)
   - [Tech Stack & Dependencies](#tech-stack--dependencies)
   - [Architecture](#architecture)
@@ -36,6 +37,15 @@ Happy rendering!
     - [Building MDL](#building-mdl)
     - [Configuring Vortex](#configuring-vortex)
 
+## Installer
+If you're up for giving Vortex a try, I've got an installer ready for you to download. Just a couple of things to know:
+
+- The installer comes with a demo scene you can load, just click on the File button in the main menu bar and then "Open Demo".
+- I've mainly tested this on a machine with an NVIDIA RTX 3090 and 24GB of RAM. Some features like the wavefront architecture and neural networks can be pretty memory-hungry.
+- In this regard, I managed to run it on a GTX 1060 Ti with 4GB, and it is able to run the provided demo scene without using the wavefront architecture or the neural network features.
+
+Keep in mind, I'm still in the trenches with my PhD work, so some optimizations and features are on hold. But feel free to download and let me know how it works on your setup.
+
 ## Technical Details
 
 ### Tech Stack & Dependencies
@@ -49,10 +59,10 @@ The Renderer has two modes:
 1. A mode reliant on Optix shader binding tables and functions for the architectural framework.
 2. A wavefront architecture mode that combines Optix functions for ray tracing with CUDA kernels for shading tasks, and SOA data structures to minimize divergence. 
 
-This wavefront architecture was indispensable for the integration of neural networks within the rendering loop. With this setup, it's feasible to employ a neural network, currently crafted with [LibTorch](https://pytorch.org/cppdocs/), for both training and inference during rendering. An eventual transition to [tiny-cuda](https://github.com/NVlabs/tiny-cuda-nn) is on the horizon, though immediate constraints make libTorch a more practical choice.
+The wavefront architecture has been crucial to employ a neural network for path guiding and use it for training and inference during rendering. Currently the network is developed with [LibTorch](https://pytorch.org/cppdocs/). An eventual transition to [tiny-cuda](https://github.com/NVlabs/tiny-cuda-nn) is on the horizon, though immediate constraints make libTorch a more practical choice.
 
 ### Features & Capabilities
-Vortex support for instancing and, thanks to the integration of the mdl-sdk, is compatible with a broad range of materials. An in-house "uber-shader" has also been crafted, drawing inspiration from the Disney principled shader and Blender's equivalent. Futhermore Vortex also implements adaptive sampling, firefly removale, tone mapping and denoising with the Optix Denoiser.
+Vortex support instancing and, thanks to the integration of the mdl-sdk, is compatible with a broad range of materials. An in-house "uber-shader" has also been developed, drawing inspiration from the Disney principled shader and Blender's equivalent. Futhermore Vortex also implements adaptive sampling, firefly removal, tone mapping and denoising with the Optix Denoiser.
 
 ### Neural Network Path Guiding
 The highlight of Vortex is its use of neural networks for path guiding. In the wavefront architecture, bounce information is retained. During training, a neural network is fine-tuned to generate a distribution from which ray extension samples are derived. This training minimizes the KL divergence between the sample's distribution value and the light transport equation's returned value. This lets Vortex produce samples that simultaneously consider light distribution and material properties, greatly speeding up variance reduction in challenging scenes.
@@ -126,7 +136,7 @@ In case you’re a fan of hands-on work, (or the scripts fails, ops!) follow the
      ./vcpkg install boost-any boost-uuid --triplet=x64-windows-static
      ./vcpkg install openimageio --triplet=x64-windows-static
      ./vcpkg install imgui[docking-experimental,opengl3-binding,glfw-binding,win32-binding] --triplet=x64-windows-static-md --recurse
-     ./vcpkg install spdlog yaml-cpp assimp glfw3 implot --triplet=x64-windows-static-md
+     ./vcpkg install spdlog assimp glfw3 implot --triplet=x64-windows-static-md
      ```
 
 2. **Building MDL**:
