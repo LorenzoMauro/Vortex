@@ -1,4 +1,5 @@
 !include MUI2.nsh
+name "Vortex"
 
 ; Set modern UI options and themes
 !define MUI_ICON "E:/Dev/Vortex/assets/Vortex.ico"  ; You can replace 'pathToYourIcon.ico' with the path to your icon file

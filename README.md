@@ -1,16 +1,16 @@
-#  Vortex ![Icon](./assets/readme/V2-16.png)
+# Vortex ![Icon](./assets/readme/V2-16.png)
 ![Screenshot](./assets/readme/thumb.jpg)
 ### [Demo Video: Check out Vortex in Action](https://www.youtube.com/watch?v=fQn29vja1NI)
 [Hello there](https://media.giphy.com/media/xTiIzJSKB4l7xTouE8/giphy.gif)!
-I'm [Lorenzo Mauro](https://www.linkedin.com/in/lorenzo-mauro-4082a088/), currently diving deep into the finishing stages of a Computer Graphics/Computer Science PhD at the [University of Rome](https://phd.uniroma1.it/web/LORENZO-MAURO_nP1529128_EN.aspx). In the past I've also dipped my toes in concept art at [OnePixelBrush](https://onepixelbrush.com/). If you want to take a walk down memory lane, here's my [portfolio](https://www.artstation.com/lomar).
+I'm [Lorenzo Mauro](https://www.linkedin.com/in/lorenzo-mauro-4082a088/), currently diving deep into the finishing stages of a Computer Graphics/Computer Science PhD at the [University of Rome](https://phd.uniroma1.it/web/LORENZO-MAURO_nP1529128_EN.aspx). In the past, I've also dipped my toes in concept art at [OnePixelBrush](https://onepixelbrush.com/). If you want to take a walk down memory lane, here's my [portfolio](https://www.artstation.com/lomar).
 
 Vortex is a labor of love, built from the ground up with two primary objectives in mind:
 
-1. **Practical Skill Development**: As someone passionate about computer graphics, I wanted to do more than just work within the confines of existing frameworks to achieve my Phd thesis. Diving deep into the nitty-gritty of renderer development provided invaluable insights and hands-on experience beyond the regular PhD curriculum.
+1. **Practical Skill Development**: As someone passionate about computer graphics, I wanted to do more than work within the confines of existing frameworks to achieve my PhD thesis. Diving deep into the nitty-gritty of renderer development provided invaluable insights and hands-on experience beyond the regular PhD curriculum.
 
-2. **Research Endeavor**: Most importantly, Vortex isn't merely a toy-renderer; it's a playground for my academic research. With it, I have been able to intertwine Path Guiding techniques with the power of neural networks.
+2. **Research Endeavor**: Vortex is a playground for my academic research. With it, I have been able to intertwine Path Guiding techniques with the power of neural networks.
 
-While Vortex is a comprehensive project, it's essential to note that its current version is a reflection of focused objectives under tight timelines. I've been the solo developer, so the prioritization was crucial. A few features like dynamic scenes and volumetrics are on my radar for future iterations but at present, the emphasis remains on optimizing and refining the neural network components due to the demands of my PhD work, which is a beast on its own.
+While Vortex is a comprehensive project, it's essential to note that its current version reflects focused objectives under tight timelines. I've been the solo developer, so prioritization has been crucial. A few features like volumetrics are on my radar for future iterations, but at present, the emphasis remains on optimizing and refining the neural network components due to the demands of my PhD work, which is a beast on its own.
 
 If you have feedback, find bugs, or are intrigued by any part of this project, please feel free to reach out 😄.
 
@@ -20,8 +20,8 @@ Happy rendering!
 ## Table of Contents
 
 - [Introduction](#vortex)
-- [Demo Video](#demo-video-check-out-vortex-in-action)
-- [Intaller](#installer)
+- [Demo Video](#demo-video)
+- [Installer](#installer)
 - [Technical Details](#technical-details)
   - [Tech Stack & Dependencies](#tech-stack--dependencies)
   - [Architecture](#architecture)
@@ -38,42 +38,59 @@ Happy rendering!
     - [Building MDL](#building-mdl)
     - [Configuring Vortex](#configuring-vortex)
 
+## Demo Video
+If you want to see Vortex in action, I've shot a small demo video, which you can find here on [youtube](https://www.youtube.com/watch?v=fQn29vja1NI)!
+
 ## Installer
-If you're up for giving Vortex a try, I've got an installer ready for you to download. Just a couple of things to know:
+If, instead, you want to give Vortex a try, I've set up an installer ready for you to download in the [Alpha Release](https://github.com/LorenzoMauro/Vortex/releases/download/v0.1.0-alpha/VortexInstaller.exe).
 
-- The installer comes with a demo scene you can load, just click on the File button in the main menu bar and then "Open Demo".
-- I've mainly tested this on a machine with an NVIDIA RTX 3090 and 24GB of RAM. Some features like the wavefront architecture and neural networks can be pretty memory-hungry.
-- In this regard, I managed to run it on a GTX 1060 Ti with 4GB, and it is able to run the provided demo scene without using the wavefront architecture or the neural network features.
+- **Usage**:
+  - **Navigation**:
+    - **Orbit** : `middle mouse button`
+    - **Pan** : `shift + middle mouse button`
+    - **Zoom** : `middle mouse scroll` or `ctr + middle mouse scroll`
+    - **Focal Length** : `alt + middle mouse scroll`
+  - **Transform Actions**:
+    Similarly to Blender, you can transform instances with mouse shortcuts. Just select an instance by mouse picking in the viewport or select a group by selecting the relative nodes in the node graph window or hierarchy panel, then press:
+    - **Rotation** : `R`
+    - **Scaling** : `S`
+    - **Translate** : `T`
 
-Keep in mind, I'm still in the trenches with my PhD work, so some optimizations and features are on hold. But feel free to download and let me know how it works on your setup.
+    While performing a transformation, you can change the axis by pressing `x`, `y` or `z`, then `enter` to confirm or `esc` to go back.
+  - **Saving/Loading** :  you can import models in the `*.obj`,`*.fbx` or `*.gltf` format. The most supported format for materials is the `*.gltf` format with separate textures (not embedded in the file). You can also save the scene to a `*.xml` or the custom binary extension `*vtx`, which you can load afterward.
+
+Finally, just a couple of things to know:
+- The installer comes with a demo scene you can load. Click on the File button in the main menu bar and then "Open Demo".
+- I've mainly tested this on a machine with an NVIDIA RTX 3090 and 24GB of RAM. Some features, like the wavefront architecture and neural networks, can be pretty memory-hungry. In this regard, I also ran the demo scene on a GTX 1060 Ti with just 4GB.
+
+Keep in mind, I'm still in the trenches with my PhD work, so some optimizations and features are on hold. But feel free to download it and let me know how it works on your setup.
 
 ![Screenshot](./assets/readme/Screenshot.jpeg)
 ## Technical Details
 
 ### Tech Stack & Dependencies
-Vortex is a GPU physically-based renderer. It leverages [Nvidia OptiX](https://developer.nvidia.com/rtx/ray-tracing/optix) for ray-tracing acceleration and the [Nvidia MDL-SDK](https://developer.nvidia.com/nvidia-mdl-sdk-get-started) for material shaders. With an [ImGui](https://github.com/ocornut/imgui)-based GUI it is possible to navigate the scene and customize most of the renderer settings. Vortex also supports the import of 3D scenes in standard formats with [Assimp](https://github.com/assimp/assimp), even though the gltfw format with separate textures has been proved the most compatible way of loading scenes. Scene customization and editing options are currently limited, but a shader graph node is available, allowing for material parameter edits.
+Vortex is a GPU physically-based renderer. It leverages [Nvidia OptiX](https://developer.nvidia.com/rtx/ray-tracing/optix) for ray-tracing acceleration and the [Nvidia MDL-SDK](https://developer.nvidia.com/nvidia-mdl-sdk-get-started) for material shaders. With an [ImGui](https://github.com/ocornut/imgui)-based GUI it is possible to navigate the scene and customize most of the renderer settings. Vortex also supports the import of 3D scenes in standard formats with [Assimp](https://github.com/assimp/assimp), even though the gltf format with separate textures has been proven to be the most compatible way of loading scenes. Scene customization and editing options are currently limited, but a shader graph node is available, allowing for material parameter edits.
 
 ### Architecture
-The core of Vortex's design utilizes the visitor pattern. As such most components are represented as nodes, including the renderer itself.
-Several visitors then perform varied operations, with one particular visitor responsible for loading data onto the GPU.
+The core of Vortex's design utilizes a node graph to describe most components in conjunction with the visitor pattern to perform various operations.
 
 The Renderer has two modes: 
-1. A mode reliant on Optix shader binding tables and functions for the architectural framework.
-2. A wavefront architecture mode that combines Optix functions for ray tracing with CUDA kernels for shading tasks, and SOA data structures to minimize divergence. 
+1. A mode reliant entirely on Optix shader binding tables and functions for the architectural framework.
+2. A wavefront architecture mode that combines Optix functions for ray tracing with CUDA kernels for shading tasks and SOA data structures to minimize divergence. 
 
-The wavefront architecture has been crucial to employ a neural network for path guiding and use it for training and inference during rendering. Currently the network is developed with [LibTorch](https://pytorch.org/cppdocs/). An eventual transition to [tiny-cuda](https://github.com/NVlabs/tiny-cuda-nn) is on the horizon, though immediate constraints make libTorch a more practical choice.
+The wavefront architecture has been crucial in allowing the use of neural networks for path guiding while performing training and inference during rendering. Currently, the network is developed with [LibTorch](https://pytorch.org/cppdocs/). An eventual transition to [tiny-cuda](https://github.com/NVlabs/tiny-cuda-nn) is on the horizon, though immediate constraints make libTorch a more practical choice.
 
 ### Features & Capabilities
-Vortex support instancing and, thanks to the integration of the mdl-sdk, is compatible with a broad range of materials. An in-house "uber-shader" has also been developed, drawing inspiration from the Disney principled shader and Blender's equivalent. Futhermore Vortex also implements adaptive sampling, firefly removal, tone mapping and denoising with the Optix Denoiser.
+Vortex supports instancing and, thanks to the integration of the mdl-sdk, is compatible with a broad range of materials. An in-house "uber-shader" has also been developed, drawing inspiration from the Disney principled shader and Blender's equivalent. Furthermore, Vortex also implements adaptive sampling, firefly removal, tone mapping, and denoising with the Optix Denoiser.
 
 ### Neural Network Path Guiding
 The highlight of Vortex is its use of neural networks for path guiding. In the wavefront architecture, bounce information is retained. During training, a neural network is fine-tuned to generate a distribution from which ray extension samples are derived. This training minimizes the KL divergence between the sample's distribution value and the light transport equation's returned value. This lets Vortex produce samples that simultaneously consider light distribution and material properties, greatly speeding up variance reduction in challenging scenes.
 
 ### Future Roadmap
-The immediate focus lies on optimizing the neural network. Improvements over existing methodologies have been identified, particularly in better sample selection for training. A primary identified challenge is ensuring the neural network has sufficient exposure during training to challenging sample paths, like caustics, which current papers don't adequately address. In terms of capabilities, future iterations of Vortex aim to support dynamic scenes, volumetric rendering, and eventually, geometry and material editing functionalities.
+The immediate focus lies on optimizing the neural network. Improvements over existing methodologies have been identified, particularly in better sample selection for training. A primary identified challenge is ensuring the neural network has sufficient exposure during training to challenging sample paths, like caustics, which current papers don't adequately address. In terms of capabilities, future iterations of Vortex aim at improving the general performance, both in terms of speed and memory usage, which at the current stage has yet to receive the proper attention it needs. Furthermore, the aim is to support dynamic scenes, volumetric rendering, and eventually, geometry and material editing functionalities.
 
 ### Collaboration
-Vortex has been my solo passion project, but if any brave soul out there feels a pull towards it and thinks, "Hey, I could help make this even cooler," then hit me up! I'd be thrilled to join forces and take Vortex to the next level together.
+Vortex has been my solo passion project so far, but if any brave soul out there feels a pull towards it and thinks, "Hey, I could help make this even cooler," hit me up! I'd be thrilled to join forces and take Vortex to the next level together.
 
 ## Installation Guide
 **Note on Compatibility**:
@@ -113,7 +130,7 @@ Before diving into the installation process, there are some dependencies you nee
 
 ### Scripted Setup
 
-For a quick setup, you can use the provided scripts in the repo's root: `install.py`, `install.exe`, `install.sh`.
+For a quick setup, you can use the provided scripts in the repo's root: `install.py` or `install.exe`.
 
 **What it does**:
    - Checks for required dependencies.
