@@ -135,11 +135,18 @@ namespace vtx
             frameBuffer->gBuffer[id] = 0.0f;
             reinterpret_cast<math::vec4f*>(frameBuffer->outputBuffer)[id] = math::vec4f(0.0f);
             frameBuffer->noiseBuffer[id].adaptiveSamples = 1;
-            params->networkInterface->debugBuffer1[id] = 0.0f;
-            params->networkInterface->debugBuffer3[id] = 0.0f;
-            params->networkInterface->paths->pathsAccumulator[id]  = 0.0f;
+            if(neuralNetworkActive(params))
+            {
+                params->networkInterface->debugBuffer1[id] = 0.0f;
+                params->networkInterface->debugBuffer3[id] = 0.0f;
+                params->networkInterface->paths->pathsAccumulator[id] = 0.0f;
+            }
+            
         }
-        params->networkInterface->debugBuffer2[id] = 0.0f;
+        if (neuralNetworkActive(params))
+        {
+            params->networkInterface->debugBuffer2[id] = 0.0f;
+        }
         params->frameBuffer.debugColor1[id] = 0.0f;
     }
 
@@ -464,6 +471,10 @@ namespace vtx
     {
 
         if (depth != 0)
+        {
+            return;
+        }
+        if(!neuralNetworkActive(params))
         {
             return;
         }
@@ -1094,7 +1105,10 @@ namespace vtx
         params->queues.shadowQueue->Reset();
         params->queues.escapedQueue->Reset();
         params->queues.accumulationQueue->Reset();
-        params->networkInterface->inferenceQueries->reset();
+        if(neuralNetworkActive(params))
+        {
+			params->networkInterface->inferenceQueries->reset();
+        }
     }
 
     __forceinline__ __device__ void fillCounters(const LaunchParams* params)
@@ -1111,7 +1125,10 @@ namespace vtx
         if (id == 0)
         {
             resetQueues(params);
-            params->networkInterface->paths->resetValidPixels();
+            if(neuralNetworkActive(params))
+            {
+	            params->networkInterface->paths->resetValidPixels();
+            }
             if(params->settings.renderer.iteration <=0)
             {
                 fillCounters(params);
@@ -1339,7 +1356,10 @@ namespace vtx
         if (queueWorkId == 0)
         {
             params.queues.shadeQueue->Reset();
-            params.networkInterface->inferenceQueries->reset();
+            if(neuralNetworkActive(&params))
+            {
+				params.networkInterface->inferenceQueries->reset();
+            }
         }
 
         int radianceTraceQueueSize = params.queues.radianceTraceQueue->Size();

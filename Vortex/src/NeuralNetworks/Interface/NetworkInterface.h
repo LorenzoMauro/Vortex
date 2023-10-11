@@ -32,12 +32,12 @@ namespace vtx
 		};
 
 		static NetworkInterface* upload(
-			const int&                      numberOfPixels,
-			const int&                      maxDatasetSize,
-			const int&                      maxDepth,
+			const int&                      _numberOfPixels,
+			const int&                      _maxDatasetSize,
+			const int&                      _maxDepth,
 			const int&                      frameId,
-			const network::DistributionType distributionType,
-			const int                       mixtureSize,
+			const network::DistributionType _distributionType,
+			const int                       _mixtureSize,
 			const ToneMapperSettings&       _toneMapperSettings,
 			const WhatChanged&              changed,
 			device::NetworkInterfaceBuffer& networkInterfaceBuffers);
@@ -54,8 +54,6 @@ namespace vtx
 			WhatChanged changed,
 			device::NetworkInterfaceBuffer& networkInterfaceBuffers);
 	public:
-
-		
 
 		__forceinline__ __device__ void sppDebugFrame(const int sampledPixel, const int sampledDepth)
 		{
@@ -138,6 +136,12 @@ namespace vtx
 		math::vec3f* debugBuffer1;
 		math::vec3f* debugBuffer2;
 		math::vec3f* debugBuffer3;
+
+		int numberOfPixels;
+		int maxDatasetSize;
+		int maxDepth;
+		network::DistributionType distributionType;
+		int mixtureSize;
 	};
 }
 

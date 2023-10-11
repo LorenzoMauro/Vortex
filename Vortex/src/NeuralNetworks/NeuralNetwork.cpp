@@ -40,7 +40,7 @@ namespace vtx::network
 
     void Network::train()
     {
-        if (settings.active && settings.doTraining)
+        if (settings.active && settings.doTraining && onDeviceData->launchParamsData.getHostImage().networkInterface != nullptr)
         {
             impl->train();
             CUDA_SYNC_CHECK();
@@ -49,7 +49,7 @@ namespace vtx::network
 
     bool Network::doInference()
     {
-        return onDeviceData->launchParamsData.getHostImage().settings.renderer.iteration >= settings.inferenceIterationStart && settings.active && settings.doInference;
+        return onDeviceData->launchParamsData.getHostImage().settings.renderer.iteration >= settings.inferenceIterationStart && settings.active && settings.doInference && onDeviceData->launchParamsData.getHostImage().networkInterface!=nullptr;
     }
 
     NetworkSettings& Network::getNeuralNetSettings()

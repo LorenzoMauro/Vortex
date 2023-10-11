@@ -47,6 +47,12 @@ namespace vtx
 			imageBuffer.free();
 		}
 
+		void freeResourceBuffer()
+		{
+			resourceBuffers.~B();
+			resourceBuffers = B();
+		}
+
 	private:
 		T          hostImage;
 	};

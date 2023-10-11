@@ -103,8 +103,29 @@ namespace vtx::device
 		DeviceData<DummyHostImage, NoiseComputationBuffers> noiseComputationData;
 		DeviceData<FrameBufferData, FrameBufferBuffers> frameBufferData;
 		DeviceData<LaunchParams, LaunchParamsBuffers> launchParamsData;
+
+		struct PrevWorkQueueInfo
+		{
+			bool wasAllocated = false;
+			int numberOfPixels = 0;
+			int maxBounces = 0;
+		};
+
 		DeviceData<QueuesData, WorkQueueBuffers> workQueuesData;
+		PrevWorkQueueInfo prevWorkQueueInfo;
+
+		struct PrevNetworkInterfaceInfo
+		{
+			bool                      wasAllocated = false;
+			int                       numberOfPixels = 0;
+			int                       maxDatasetSize = 0;
+			int                       maxDepth = 0;
+			network::DistributionType distributionType = network::D_COUNT;
+			int                       mixtureSize = 0;
+		};
+
 		DeviceData<DummyHostImage, NetworkInterfaceBuffer> networkInterfaceData;
+		PrevNetworkInterfaceInfo prevNetworkInterfaceInfo;
 
 		int										frameId = 0;
 		bool									isFrameIdUpdated = true;

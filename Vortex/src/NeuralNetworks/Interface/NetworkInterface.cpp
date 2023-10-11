@@ -21,12 +21,16 @@ namespace vtx
 		return networkInterfaceBuffers.networkInterfaceBuffer.upload(networkInterface);
 	}
 
-	NetworkInterface::NetworkInterface(const int&  numberOfPixels, const int& maxDatasetSize, const int& maxDepth,
-									   const int&  frameId, const network::DistributionType distributionType,
-									   int         mixtureSize, const ToneMapperSettings& _toneMapperSettings,
+	NetworkInterface::NetworkInterface(const int&  _numberOfPixels, const int& _maxDatasetSize, const int& _maxDepth,
+									   const int&  frameId, const network::DistributionType _distributionType,
+									   int         _mixtureSize, const ToneMapperSettings& _toneMapperSettings,
 									   WhatChanged changed, device::NetworkInterfaceBuffer& networkInterfaceBuffers)
 	{
-		//NetworkInterface networkInterface;
+		numberOfPixels = _numberOfPixels;
+		maxDatasetSize = _maxDatasetSize;
+		maxDepth = _maxDepth;
+		distributionType = _distributionType;
+		mixtureSize = _mixtureSize;
 
 		if (changed.maxDatasetSize)
 		{

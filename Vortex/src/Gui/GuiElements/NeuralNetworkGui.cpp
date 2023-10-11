@@ -237,9 +237,18 @@ namespace vtx::gui
 	{
 		if (ImGui::CollapsingHeader("Network Settings"))
 		{
+			bool wasActive = settings.active;
 			if (vtxImGui::halfSpaceWidget("Enable", ImGui::Checkbox, (hiddenLabel + "_Enable").c_str(), &settings.active))
 			{
 				settings.isUpdated = true;
+				if(settings.active && !wasActive)
+				{
+					settings.wasActive = false;
+				}
+				else
+				{
+					settings.wasActive = true;
+				}
 			}
 			if (vtxImGui::halfSpaceWidget("Reset Network", ImGui::Checkbox, (hiddenLabel + "_Reset Network").c_str(), &settings.isUpdated))
 			{
@@ -257,11 +266,9 @@ namespace vtx::gui
 				{
 					settings.batchSize = 1;
 				}
-				settings.isDatasetSizeUpdated = true;
 			}
 			if (vtxImGui::halfSpaceWidget("Max Training Steps Per Frame", ImGui::DragInt, (hiddenLabel + "_BatchSize").c_str(), &settings.maxTrainingStepPerFrame, 1, 0, 10000, "%d", 0))
 			{
-				settings.isDatasetSizeUpdated = true;
 			}
 
 			if (vtxImGui::halfSpaceWidget("Do Training", ImGui::Checkbox, (hiddenLabel + "_Do Training").c_str(), &settings.doTraining))

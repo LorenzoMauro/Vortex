@@ -22,7 +22,7 @@ namespace vtx
 		maxAllocDepth = _maxDepth + 1; // +1 for miss "bounce"
 		numberOfPaths = _numberOfPixels;
 		auto* allBounces = buffers.bouncesBuffer.alloc<Bounce>(maxAllocDepth * numberOfPaths);
-		buffers.resetBouncesBuffer.alloc<Bounce>(maxAllocDepth * numberOfPaths);
+		//buffers.resetBouncesBuffer.alloc<Bounce>(maxAllocDepth * numberOfPaths);
 		// Now select the proper pointer by considering the max depth and the index
 		std::vector<Path> pathsVector;
 		for (int i = 0; i < numberOfPaths; ++i)

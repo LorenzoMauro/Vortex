@@ -376,12 +376,12 @@ namespace vtx {
 
     struct QueuesData
     {
-        WorkQueueSOA<TraceWorkItem>* radianceTraceQueue;
-        WorkQueueSOA<RayWorkItem>* shadeQueue;
-        WorkQueueSOA<ShadowWorkItem>* shadowQueue;
-        WorkQueueSOA<EscapedWorkItem>* escapedQueue;
-        WorkQueueSOA<AccumulationWorkItem>* accumulationQueue;
-        Counters*                           queueCounters;
+        WorkQueueSOA<TraceWorkItem>* radianceTraceQueue = nullptr;
+        WorkQueueSOA<RayWorkItem>* shadeQueue = nullptr;
+        WorkQueueSOA<ShadowWorkItem>* shadowQueue = nullptr;
+        WorkQueueSOA<EscapedWorkItem>* escapedQueue = nullptr;
+        WorkQueueSOA<AccumulationWorkItem>* accumulationQueue = nullptr;
+        Counters*                           queueCounters = nullptr;
     };
 
 	struct LaunchParams
@@ -399,7 +399,7 @@ namespace vtx {
 
         QueuesData              queues;
 
-		NetworkInterface* networkInterface;
+		NetworkInterface* networkInterface = nullptr;
 
         OnDeviceSettings settings;
 	};

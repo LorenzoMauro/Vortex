@@ -175,6 +175,7 @@ namespace vtx::network
 	struct NetworkSettings
 	{
 		bool                            active;
+		bool							wasActive = active;	
 		int                             batchSize;
 		int                             maxTrainingStepPerFrame;
 		bool                            doTraining;
@@ -189,13 +190,11 @@ namespace vtx::network
 		SacSettings                     sac;
 		NpgSettings                     npg;
 		bool                            isUpdated            = true;
-		bool                            isDatasetSizeUpdated = true;
 		int                             depthToDebug         = 0;
 
 		void resetUpdate()
 		{
 			isUpdated = false;
-			isDatasetSizeUpdated = false;
 			pathGuidingSettings.isUpdated = false;
 			inputSettings.isUpdated = false;
 			inputSettings.positionEncoding.isUpdated = false;

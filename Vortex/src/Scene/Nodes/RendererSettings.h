@@ -210,7 +210,6 @@ namespace vtx
 		bool              useRussianRoulette;
 		bool              runOnSeparateThread;
 		bool              isUpdated = true;
-		bool              isMaxBounceChanged = true;
 		AdaptiveSamplingSettings adaptiveSamplingSettings;
 		FireflySettings           fireflySettings;
 		DenoiserSettings          denoiserSettings;
@@ -219,7 +218,6 @@ namespace vtx
 		void resetUpdate()
 		{
 			isUpdated = false;
-			isMaxBounceChanged = false;
 			adaptiveSamplingSettings.isUpdated = false;
 			fireflySettings.isUpdated = false;
 			denoiserSettings.isUpdated = false;

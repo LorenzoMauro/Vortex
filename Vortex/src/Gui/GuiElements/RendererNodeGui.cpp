@@ -183,8 +183,8 @@ namespace vtx::gui
 			vtxImGui::halfSpaceWidget("Fps:", vtxImGui::booleanText, "%.3f", fps);
 			ImGui::Separator();
 
-			float internalFps = 1000.0f * (float)renderNode->internalIteration / renderNode->overallTime;
-			float totTimeInternal = renderNode->overallTime / 1000.0f;
+			float totTimeInternal = renderNode->timer.elapsedMillis() / 1000.0f;
+			float internalFps = (float)renderNode->settings.iteration / totTimeInternal;
 			vtxImGui::halfSpaceWidget("CPU Fps:", vtxImGui::booleanText, "%.3f", internalFps);
 			vtxImGui::halfSpaceWidget("CPU Tot Time:", vtxImGui::booleanText, "%.3f", totTimeInternal);
 			ImGui::Separator();
@@ -223,7 +223,6 @@ namespace vtx::gui
 			if (vtxImGui::halfSpaceWidget("Max Bounces", ImGui::DragInt, (hiddenLabel + "_Max Bounces").c_str(), &(settings.maxBounces), 1.0f, 1, 1000000, "%d", 0))
 			{
 				settings.isUpdated = true;
-				settings.isMaxBounceChanged = true;
 				restartRendering = true;
 			}
 			if (vtxImGui::halfSpaceWidget("Max Samples", ImGui::DragInt, (hiddenLabel + "_Max Samples").c_str(), &settings.maxSamples, 1.0f, 1, 1000000, "%d", 0))
@@ -285,7 +284,12 @@ namespace vtx::gui
 
 			ImGui::PushItemWidth(availableWidth); // Set the width of the next widget to 200
 
+			const bool runOnSeparateThread = renderNode->settings.runOnSeparateThread;
 			restartRendering |= rendererSettingsEditorGui(renderNode->settings);
+			if(runOnSeparateThread != renderNode->settings.runOnSeparateThread)
+			{
+				renderNode->resizeGlBuffer = true;
+			}
 
 			ImGui::Separator();
 
@@ -294,6 +298,13 @@ namespace vtx::gui
 			ImGui::Separator();
 
 			restartRendering |= adaptiveSettingsEditorGui(renderNode->settings.adaptiveSamplingSettings);
+
+			if(renderNode->waveFrontIntegrator.network.settings.active && renderNode->settings.adaptiveSamplingSettings.active)
+			{
+				//	CURRENTLY NOT SUPPORTED
+				renderNode->settings.adaptiveSamplingSettings.active = false;
+			}
+
 
 			ImGui::Separator();
 
@@ -335,7 +346,7 @@ namespace vtx::gui
 
 			if (restartRendering)
 			{
-				renderNode->settings.iteration = -1;
+				renderNode->restart();
 			}
 
 		}

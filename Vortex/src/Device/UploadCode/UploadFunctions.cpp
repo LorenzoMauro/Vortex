@@ -675,38 +675,57 @@ namespace vtx::device
 	QueuesData createQueuesData(const int width, const int height, const int maxBounces)
 	{
 		int totPixels = width * height;
-
 		const int maxShadowQueue = totPixels * (maxBounces + 1);
 		const int maxAccumulationQueue = totPixels * (maxBounces + 1); // each bounce can produce an emissive hit
 
-		CUDABufferManager::deallocateAll();
-
-		const WorkQueueSOA<TraceWorkItem> radianceTraceQueue(totPixels, "radianceTraceQueue");
+		bool create = false;
+		DeviceDataCoordinator::PrevWorkQueueInfo prevQueuesInfo = onDeviceData->prevWorkQueueInfo;
+		if(!prevQueuesInfo.wasAllocated)
+		{
+			create = true;
+		}
+		else
+		{
+			if(prevQueuesInfo.numberOfPixels != totPixels || prevQueuesInfo.maxBounces != maxBounces)
+			{
+				create = true;
+			}
+		}
 
 		QueuesData queuesData;
-		queuesData.radianceTraceQueue = onDeviceData->workQueuesData.resourceBuffers.radianceTraceQueueBuffer.upload(radianceTraceQueue);
+		if(create)
+		{
+			VTX_INFO("Creating Wavefront Queues");
+			CUDABufferManager::deallocateAll();
+			const WorkQueueSOA<TraceWorkItem> radianceTraceQueue(totPixels, "radianceTraceQueue");
+			queuesData.radianceTraceQueue = onDeviceData->workQueuesData.resourceBuffers.radianceTraceQueueBuffer.upload(radianceTraceQueue);
 
-		const WorkQueueSOA<RayWorkItem> shadeQueue(totPixels, "shadeQueue");
-		queuesData.shadeQueue = onDeviceData->workQueuesData.resourceBuffers.shadeQueueBuffer.upload(shadeQueue);
+			const WorkQueueSOA<RayWorkItem> shadeQueue(totPixels, "shadeQueue");
+			queuesData.shadeQueue = onDeviceData->workQueuesData.resourceBuffers.shadeQueueBuffer.upload(shadeQueue);
 
-		const WorkQueueSOA<EscapedWorkItem> escapedQueue(totPixels, "escapedQueue");
-		queuesData.escapedQueue = onDeviceData->workQueuesData.resourceBuffers.escapedQueueBuffer.upload(escapedQueue);
+			const WorkQueueSOA<EscapedWorkItem> escapedQueue(totPixels, "escapedQueue");
+			queuesData.escapedQueue = onDeviceData->workQueuesData.resourceBuffers.escapedQueueBuffer.upload(escapedQueue);
 
-		const WorkQueueSOA<AccumulationWorkItem> accumulationQueue(maxShadowQueue, "accumulationQueue");
-		queuesData.accumulationQueue = onDeviceData->workQueuesData.resourceBuffers.accumulationQueueBuffer.upload(accumulationQueue);
+			const WorkQueueSOA<AccumulationWorkItem> accumulationQueue(maxShadowQueue, "accumulationQueue");
+			queuesData.accumulationQueue = onDeviceData->workQueuesData.resourceBuffers.accumulationQueueBuffer.upload(accumulationQueue);
 
-		const WorkQueueSOA<ShadowWorkItem> shadowQueue(maxAccumulationQueue, "shadowQueue");
-		queuesData.shadowQueue = onDeviceData->workQueuesData.resourceBuffers.shadowQueueBuffer.upload(shadowQueue);
+			const WorkQueueSOA<ShadowWorkItem> shadowQueue(maxAccumulationQueue, "shadowQueue");
+			queuesData.shadowQueue = onDeviceData->workQueuesData.resourceBuffers.shadowQueueBuffer.upload(shadowQueue);
 
-		Counters counters{};
-		queuesData.queueCounters = onDeviceData->workQueuesData.resourceBuffers.countersBuffer.upload(counters);
+			Counters counters{};
+			queuesData.queueCounters = onDeviceData->workQueuesData.resourceBuffers.countersBuffer.upload(counters);
+
+			onDeviceData->prevWorkQueueInfo.numberOfPixels = totPixels;
+			onDeviceData->prevWorkQueueInfo.maxBounces = maxBounces;
+			onDeviceData->prevWorkQueueInfo.wasAllocated = true;
+		}
 
 		return queuesData;
 	}
 
 	FrameBufferData prepareFrameBuffers(const int width, const int height)
 	{
-		FrameBufferData frameBufferData;
+ 		FrameBufferData frameBufferData;
 		frameBufferData.outputBuffer = (CUdeviceptr)(onDeviceData->frameBufferData.resourceBuffers.cudaOutputBuffer.alloc<math::vec4f>(width * height));
 		frameBufferData.radianceAccumulator = onDeviceData->frameBufferData.resourceBuffers.rawRadiance.alloc<math::vec3f>(width * height);
 		frameBufferData.albedoAccumulator = onDeviceData->frameBufferData.resourceBuffers.albedo.alloc<math::vec3f>(width * height);
@@ -748,10 +767,9 @@ namespace vtx::device
 
 	void setRendererData(const std::shared_ptr<graph::Renderer>& rendererNode)
 	{
-		const bool isResized = rendererNode->resized;
 		if (rendererNode->resized) {
 
-			rendererNode->threadData.bufferUpdateReady = false;
+			//rendererNode->threadData.bufferUpdateReady = false;
 
 			onDeviceData->launchParamsData.editableHostImage().frameBuffer = prepareFrameBuffers(rendererNode->width, rendererNode->height);
 
@@ -769,62 +787,135 @@ namespace vtx::device
 
 		//Wavefront Architecture
 		{
-			if (isResized || rendererNode->settings.isMaxBounceChanged)
-			{
-				onDeviceData->launchParamsData.editableHostImage().queues = createQueuesData(rendererNode->width, rendererNode->height, rendererNode->settings.maxBounces);
+			try {
+				if (rendererNode->waveFrontIntegrator.settings.active)
+				{
+					QueuesData queuesData = createQueuesData(rendererNode->width, rendererNode->height, rendererNode->settings.maxBounces);
+					if (queuesData.queueCounters != nullptr)
+					{
+						onDeviceData->launchParamsData.editableHostImage().queues = queuesData;
+					}
+				}
+				else if (onDeviceData->launchParamsData.getHostImage().queues.queueCounters != nullptr)
+				{
+					// Free memory if we are not using wavefront architecture
+					CUDABufferManager::deallocateAll();
+					onDeviceData->launchParamsData.editableHostImage().queues = QueuesData();
+					onDeviceData->prevWorkQueueInfo = DeviceDataCoordinator::PrevWorkQueueInfo();
+				}
 			}
-
+			catch (const std::exception& e) {
+				VTX_ERROR("Error while allocating memory for wavefront architecture");
+				VTX_ERROR("Error: {}", e.what());
+				rendererNode->waveFrontIntegrator.settings.active = false;
+				rendererNode->waveFrontIntegrator.settings.isUpdated = true;
+			}
+			
 			if (rendererNode->waveFrontIntegrator.settings.isUpdated)
 			{
-
 				onDeviceData->launchParamsData.editableHostImage().settings.wavefront = rendererNode->waveFrontIntegrator.settings;
 				rendererNode->waveFrontIntegrator.settings.isUpdated = false;
 			}
+		}
 
-			//Neural Network
+		{
+			try
 			{
-				NetworkInterface::WhatChanged changed;
-				if (rendererNode->settings.isMaxBounceChanged)
+				if (rendererNode->waveFrontIntegrator.network.settings.active && rendererNode->waveFrontIntegrator.settings.active)
 				{
-					changed.maxDepth = true;
-				}
+					NetworkInterface::WhatChanged changed;
 
-				if (isResized)
-				{
-					changed.numberOfPixels = true;
-				}
+					const int totPixels = rendererNode->width * rendererNode->height;
+					const int maxDatasetSize = rendererNode->waveFrontIntegrator.network.settings.batchSize * rendererNode->waveFrontIntegrator.network.settings.maxTrainingStepPerFrame;
+					const int maxBounces = rendererNode->settings.maxBounces;
+					const network::DistributionType distributionType = rendererNode->waveFrontIntegrator.network.settings.pathGuidingSettings.distributionType;
+					const int mixtureSize = rendererNode->waveFrontIntegrator.network.settings.pathGuidingSettings.mixtureSize;
 
-				{
-					if (rendererNode->waveFrontIntegrator.network.settings.isDatasetSizeUpdated)
+					DeviceDataCoordinator::PrevNetworkInterfaceInfo& prevNetworkInterfaceInfo = onDeviceData->prevNetworkInterfaceInfo;
+
+					bool createNetworkInterface = false;
+					if (!prevNetworkInterfaceInfo.wasAllocated)
 					{
+						createNetworkInterface = true;
+						changed.maxDepth = true;
+						changed.numberOfPixels = true;
 						changed.maxDatasetSize = true;
-						rendererNode->waveFrontIntegrator.network.settings.isDatasetSizeUpdated = false;
-					}
-
-					if (rendererNode->waveFrontIntegrator.network.settings.pathGuidingSettings.isUpdated)
-					{
 						changed.distributionType = true;
-						rendererNode->waveFrontIntegrator.network.settings.pathGuidingSettings.isUpdated = false;
+					}
+					else
+					{
+						if (prevNetworkInterfaceInfo.maxDatasetSize != maxDatasetSize)
+						{
+							changed.maxDatasetSize = true;
+							createNetworkInterface = true;
+						}
+						if (prevNetworkInterfaceInfo.numberOfPixels != totPixels)
+						{
+							changed.numberOfPixels = true;
+							createNetworkInterface = true;
+						}
+						if (prevNetworkInterfaceInfo.maxDepth != maxBounces)
+						{
+							changed.maxDepth = true;
+							createNetworkInterface = true;
+						}
+						if (prevNetworkInterfaceInfo.distributionType != distributionType)
+						{
+							changed.distributionType = true;
+							createNetworkInterface = true;
+						}
+						if (prevNetworkInterfaceInfo.mixtureSize != mixtureSize)
+						{
+							changed.distributionType = true;
+							createNetworkInterface = true;
+						}
 					}
 
-					const int              totPixels = rendererNode->width * rendererNode->height;
-					onDeviceData->launchParamsData.editableHostImage().networkInterface
-					= NetworkInterface::upload(
-						totPixels,
-						rendererNode->waveFrontIntegrator.network.settings.batchSize * rendererNode->waveFrontIntegrator.network.settings.maxTrainingStepPerFrame,
-						rendererNode->settings.maxBounces,
-						onDeviceData->frameId,
-						rendererNode->waveFrontIntegrator.network.settings.pathGuidingSettings.distributionType,
-						rendererNode->waveFrontIntegrator.network.settings.pathGuidingSettings.mixtureSize,
-						rendererNode->settings.toneMapperSettings,
-						changed, onDeviceData->networkInterfaceData.resourceBuffers);
-
-					if (rendererNode->waveFrontIntegrator.network.settings.isAnyUpdated())
+					if (createNetworkInterface)
 					{
-						onDeviceData->launchParamsData.editableHostImage().settings.neural = rendererNode->waveFrontIntegrator.network.settings;
-						rendererNode->waveFrontIntegrator.network.settings.resetUpdate();
+						VTX_INFO("Creating network interface");
+						onDeviceData->launchParamsData.editableHostImage().networkInterface
+							= NetworkInterface::upload(
+								totPixels,
+								maxDatasetSize,
+								maxBounces,
+								onDeviceData->frameId,
+								distributionType,
+								mixtureSize,
+								rendererNode->settings.toneMapperSettings,
+								changed, onDeviceData->networkInterfaceData.resourceBuffers);
+
+
+						prevNetworkInterfaceInfo.wasAllocated = true;
+						prevNetworkInterfaceInfo.numberOfPixels = totPixels;
+						prevNetworkInterfaceInfo.maxDatasetSize = maxDatasetSize;
+						prevNetworkInterfaceInfo.maxDepth = maxBounces;
+						prevNetworkInterfaceInfo.distributionType = distributionType;
+						prevNetworkInterfaceInfo.mixtureSize = mixtureSize;
+					}
+
+				}
+				else
+				{
+					if (auto& netInterface = onDeviceData->launchParamsData.getHostImage().networkInterface; netInterface != nullptr)
+					{
+						// Free memory if we are not using neural network
+						onDeviceData->networkInterfaceData.freeResourceBuffer();
+						onDeviceData->prevNetworkInterfaceInfo = DeviceDataCoordinator::PrevNetworkInterfaceInfo();
+						onDeviceData->launchParamsData.editableHostImage().networkInterface = nullptr;
 					}
 				}
+			}
+			catch (const std::exception& e) {
+				VTX_ERROR("Error while allocating memory for Neural Network Training Data");
+				VTX_ERROR("Error: {}", e.what());
+				rendererNode->waveFrontIntegrator.network.settings.active = false;
+				rendererNode->waveFrontIntegrator.network.settings.isUpdated = true;
+			}
+			if (rendererNode->waveFrontIntegrator.network.settings.isAnyUpdated())
+			{
+				onDeviceData->launchParamsData.editableHostImage().settings.neural = rendererNode->waveFrontIntegrator.network.settings;
+				rendererNode->waveFrontIntegrator.network.settings.resetUpdate();
 			}
 		}
 

@@ -82,7 +82,6 @@ namespace vtx::device
 				const vtxID meshId = meshNode->getUID();
 
 				const OptixTraversableHandle& traversable = geometryDataMap[meshId].getHostImage().traversable;
-
 				const math::affine3f& globalTransform = instance->transform->globalTransform;
 				const OptixInstance   optixInstance = optix::createInstance(instanceTypeId, globalTransform, traversable);
 				const InstanceData    instanceData = createInstanceData(instance);
@@ -96,6 +95,7 @@ namespace vtx::device
 					launchParamsData.editableHostImage().topObject = 0;
 				}
 				instance->state.updateOnDevice = false;
+				ops::restartRender();
 			}
 		}
 		//popTransform();
@@ -233,7 +233,6 @@ namespace vtx::device
 	{
 		if (instanceDataMap.isMapChanged && instanceDataMap.size() != 0)
 		{
-			ops::restartRender();
 			std::vector<InstanceData*> instances;
 			instanceDataMap.isMapChanged = false;
 

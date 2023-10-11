@@ -151,18 +151,19 @@ namespace vtx::device
 		CUDABuffer pathsArrayBuffer;
 		CUDABuffer validPixelsBuffer;
 		CUDABuffer pathsAccumulatorBuffer;
-		CUDABuffer resetBouncesBuffer;
+		//CUDABuffer resetBouncesBuffer;
 		CUDABuffer validLightSampleBuffer;
 		CUDABuffer pixelsWithContributionBuffer;
 
 		~PathsBuffer()
 		{
+			VTX_INFO("ShutDown: Destroying Paths Buffers");
 			bouncesBuffer.free();
 			pathStructBuffer.free();
 			pathsArrayBuffer.free();
 			validPixelsBuffer.free();
 			pathsAccumulatorBuffer.free();
-			resetBouncesBuffer.free();
+			//resetBouncesBuffer.free();
 			validLightSampleBuffer.free();
 			pixelsWithContributionBuffer.free();
 		}
@@ -180,6 +181,7 @@ namespace vtx::device
 
 		~NetworkInputBuffers()
 		{
+			VTX_INFO("ShutDown: Destroying Network Input Buffers");
 			networkStateStructBuffer.free();
 			positionBuffer.free();
 			normalBuffer.free();
@@ -203,6 +205,7 @@ namespace vtx::device
 
 		~ReplayBufferBuffers()
 		{
+			VTX_INFO("ShutDown: Destroying Replay Buffer Buffers");
 			replayBufferStructBuffer.free();
 			actionBuffer.free();
 			rewardBuffer.free();
@@ -222,6 +225,7 @@ namespace vtx::device
 
 		~NpgTrainingDataBuffers()
 		{
+			VTX_INFO("ShutDown: Destroying NPG Training Data Buffers");
 			npgTrainingDataStructBuffers.free();
 			outgoingRadianceBuffer.free();
 			incomingDirectionBuffer.free();
@@ -244,6 +248,7 @@ namespace vtx::device
 
 		~InferenceBuffers()
 		{
+			VTX_INFO("ShutDown: Destroying Inference Buffers");
 			inferenceStructBuffer.free();
 			distributionParameters.free();
 			inferenceSize.free();
@@ -272,9 +277,7 @@ namespace vtx::device
 
 		~NetworkInterfaceBuffer()
 		{
-			pathsBuffers.~PathsBuffer();
-			replayBufferBuffers.~ReplayBufferBuffers();
-			inferenceBuffers.~InferenceBuffers();
+			VTX_INFO("ShutDown: Destroying Network Interface Buffer");
 			networkInterfaceBuffer.free();
 			seedsBuffer.free();
 			debugBuffer1Buffer.free();
