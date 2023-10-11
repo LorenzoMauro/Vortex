@@ -6,6 +6,7 @@
 #include "Scene/Nodes/RendererSettings.h"
 #include <curand_kernel.h>
 #include "Device/UploadCode/DeviceDataCoordinator.h"
+#include "Device/DevicePrograms/NoiseData.h"
 
 namespace vtx
 {
@@ -304,7 +305,7 @@ namespace vtx
 		atomicMaxFloat(&globalRange[0].y, range.y);
 	}
 
-	void noiseComputation(const LaunchParams* deviceParams, const int& rendererNodeId)
+	void noiseComputation(const LaunchParams* deviceParams, const int& kernelSize, const float& albedoNoiseInfluence)
 	{
 		const CUDABuffer& radianceRangeBuffer = onDeviceData->noiseComputationData.resourceBuffers.radianceRangeBuffer;
 		auto* radianceRange = radianceRangeBuffer.castedPointer<math::vec2f>();
@@ -332,7 +333,7 @@ namespace vtx
 			dim3 numBlocks((width + threadsPerBlock.x - 1) / threadsPerBlock.x,
 						   (height + threadsPerBlock.y - 1) / threadsPerBlock.y);
 
-			computeNoise<<<numBlocks, threadsPerBlock>>> (deviceParams, noiseSum, deviceParams->settings.renderer.adaptiveSamplingSettings.noiseKernelSize, deviceParams->settings.renderer.adaptiveSamplingSettings.albedoNormalNoiseInfluence);
+			computeNoise<<<numBlocks, threadsPerBlock>>> (deviceParams, noiseSum, kernelSize, albedoNoiseInfluence);
 		}
 
 		{

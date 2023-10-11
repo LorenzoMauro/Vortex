@@ -115,7 +115,10 @@ namespace vtx
 		bool normalizeBySamples = true;
 		bool dotoneMap = true;
 
-		launchParams->networkInterface->paths->accumulatePath(fbIndex);
+		if(launchParams->settings.neural.active)
+		{
+			launchParams->networkInterface->paths->accumulatePath(fbIndex);
+		}
 
 		switch (settings.renderer.displayBuffer)
 		{
@@ -226,64 +229,76 @@ namespace vtx
 		case(FB_NETWORK_INFERENCE_IS_FRONT_FACE):
 		case(FB_NETWORK_INFERENCE_SAMPLING_FRACTION):
 		{
-			outputBuffer[fbIndex] = math::vec4f{ launchParams->networkInterface->debugBuffer2[fbIndex], 1.0f };
+			if (launchParams->settings.neural.active)
+			{
+				outputBuffer[fbIndex] = math::vec4f{ launchParams->networkInterface->debugBuffer2[fbIndex], 1.0f };
+			}
 		}
 		break;
 		case(FB_NETWORK_REPLAY_BUFFER_REWARD):
 		{
-			const float value = launchParams->networkInterface->debugBuffer1[fbIndex].x / (float)launchParams->networkInterface->debugBuffer1[fbIndex].z;
-			outputBuffer[fbIndex] = math::vec4f(floatToScientificRGB(value), 1.0f);
+			if (launchParams->settings.neural.active)
+			{
+				const float value = launchParams->networkInterface->debugBuffer1[fbIndex].x / (float)launchParams->networkInterface->debugBuffer1[fbIndex].z;
+				outputBuffer[fbIndex] = math::vec4f(floatToScientificRGB(value), 1.0f);
+			}
 		}
 		break;
 		case(FB_NETWORK_REPLAY_BUFFER_SAMPLES):
 		{
-			math::vec3f* debugBuffer = launchParams->networkInterface->debugBuffer3;
-
-			/*if (launchParams->networkInterface->paths->paths[fbIndex].isDepthAtTerminalZero)
+			if (launchParams->settings.neural.active)
 			{
-				debugBuffer[fbIndex].y += 1.0f;
-			}
-			float value = debugBuffer[fbIndex].y / ((float)launchParams->settings.renderer.iteration+1.0f);
-			
-			math::vec3f color = floatToScientificRGB(value);
-			outputBuffer[fbIndex] = math::vec4f(color, 1.0f);*/
+				math::vec3f* debugBuffer = launchParams->networkInterface->debugBuffer3;
 
-			const int& batchSize = launchParams->settings.neural.batchSize;
-			int totPixel = frameSize.x * frameSize.y;
-			int iteration = launchParams->frameBuffer.samples[fbIndex] + 1;
-			const int& numberOfTrainingStep = launchParams->settings.neural.maxTrainingStepPerFrame;
-			int totSamples = batchSize * iteration * numberOfTrainingStep;
-			float maxSamplesPerPixel = (float)totSamples / (float)(totPixel);
-			
-			float& totSampleAtPixel = debugBuffer[fbIndex].x;
-			float value = fmaxf(0.0f,fminf(totSampleAtPixel / maxSamplesPerPixel, 1.0f));
-			if (value < 0.0f || value > 1.0f || isnan(value))
-			{
-				printf(
-					"ToT sample at pixel %d is %f\n"
-					"Max sample per pixel is %f\n",
-					fbIndex,
-					totSampleAtPixel,
-					maxSamplesPerPixel
-				);
-			}
+				/*if (launchParams->networkInterface->paths->paths[fbIndex].isDepthAtTerminalZero)
+				{
+					debugBuffer[fbIndex].y += 1.0f;
+				}
+				float value = debugBuffer[fbIndex].y / ((float)launchParams->settings.renderer.iteration+1.0f);
 
-			math::vec3f color = floatToScientificRGB(value);
-			outputBuffer[fbIndex] = math::vec4f(color, 1.0f);
+				math::vec3f color = floatToScientificRGB(value);
+				outputBuffer[fbIndex] = math::vec4f(color, 1.0f);*/
+
+				const int& batchSize = launchParams->settings.neural.batchSize;
+				int totPixel = frameSize.x * frameSize.y;
+				int iteration = launchParams->frameBuffer.samples[fbIndex] + 1;
+				const int& numberOfTrainingStep = launchParams->settings.neural.maxTrainingStepPerFrame;
+				int totSamples = batchSize * iteration * numberOfTrainingStep;
+				float maxSamplesPerPixel = (float)totSamples / (float)(totPixel);
+
+				float& totSampleAtPixel = debugBuffer[fbIndex].x;
+				float value = fmaxf(0.0f, fminf(totSampleAtPixel / maxSamplesPerPixel, 1.0f));
+				if (value < 0.0f || value > 1.0f || isnan(value))
+				{
+					printf(
+						"ToT sample at pixel %d is %f\n"
+						"Max sample per pixel is %f\n",
+						fbIndex,
+						totSampleAtPixel,
+						maxSamplesPerPixel
+					);
+				}
+
+				math::vec3f color = floatToScientificRGB(value);
+				outputBuffer[fbIndex] = math::vec4f(color, 1.0f);
+			}
+			
 
 		}
 		break;
 		case(FB_NETWORK_DEBUG_PATHS):
 		{
+			if (launchParams->settings.neural.active)
+			{
 				math::vec3f reconstructedRadiance = launchParams->networkInterface->paths->pathsAccumulator[fbIndex] / launchParams->frameBuffer.samples[fbIndex];
 				reconstructedRadiance = toneMap(launchParams->settings.renderer.toneMapperSettings, reconstructedRadiance);
 				const math::vec3f& integratedRadiance = frameBuffer->tmRadiance[fbIndex];
 				const math::vec3f difference = integratedRadiance - reconstructedRadiance;
-				const float value = math::length(difference)*0.5f;
+				const float value = math::length(difference) * 0.5f;
 				const math::vec3f fts = floatToScientificRGB(value);
 				//outputBuffer[fbIndex] = math::vec4f(reconstructedRadiance, 1.0f);
 				outputBuffer[fbIndex] = math::vec4f(fts, 1.0f);
-
+			}
 		}
 		break;
 		}

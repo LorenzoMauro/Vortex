@@ -1,13 +1,11 @@
 ﻿#pragma once
 #include "LaunchParams.h"
 #include "Core/Math.h"
-#include "NoiseData.h"
-#include "Scene/Nodes/RendererSettings.h"
 
 
 namespace vtx
 {
-	void noiseComputation(const LaunchParams* deviceParams, const int& rendererNodeId);
+	void noiseComputation(const LaunchParams* deviceParams, const int& kernelSize, const float& albedoNoiseInfluence);
 
 	void switchOutput(const LaunchParams* launchParams, int width, int height, math::vec3f* beauty = nullptr);
 
