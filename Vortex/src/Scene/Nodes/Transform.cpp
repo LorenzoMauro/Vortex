@@ -100,10 +100,10 @@ namespace vtx::graph
 	}
 
 	void Transform::rotateOrbit(float pitch, math::vec3f xAxis, float yaw, math::vec3f zAxis) {
+
 		math::affine3f rotationPitchMatrix = math::affine3f::rotate(xAxis, pitch);
 		math::affine3f rotationYawMatrix = math::affine3f::rotate(zAxis, yaw);
-		affineTransform = rotationPitchMatrix * rotationYawMatrix * affineTransform;
-
+		affineTransform = rotationYawMatrix * rotationPitchMatrix * affineTransform;
 		updateFromAffine();
 	}
 

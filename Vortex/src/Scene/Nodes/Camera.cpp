@@ -63,7 +63,6 @@ namespace vtx::graph
 		const math::vec2f lastMousePosition = mousePosition;
 		mousePosition = Input::GetMousePosition();
 		mouseDelta = (mousePosition - lastMousePosition);
-		//VTX_INFO("Mouse Delta: {0}, {1}", mouseDelta.x, mouseDelta.y);
 		orbitNavigation(ts);
 	}
 
@@ -129,15 +128,15 @@ namespace vtx::graph
 			const float pitchDelta = -rotationSensibility * delta.y;
 			const float yawDelta = -rotationSensibility * delta.x;
 			transform->rotateOrbit(pitchDelta, horizontal, yawDelta, math::zAxis);
-				updateDirections();
-			}
-			break;
-			case NAV_FOV:
-				{
-				fovY -= delta.y;
-				fovY = fmaxf(1.0f, fminf(fovY, 179.0f));
-			}
-			break;
+			updateDirections();
+		}
+		break;
+		case NAV_FOV:
+			{
+			fovY -= delta.y;
+			fovY = fmaxf(1.0f, fminf(fovY, 179.0f));
+		}
+		break;
 		default: ;
 		}
 	}
