@@ -162,7 +162,10 @@ In case you’re a fan of hands-on work, (or the scripts fails, ops!) follow the
    - Build: `cmake --build . --config Release`
    - Install: `cmake --build . --config Release --target INSTALL`
 
-3. **Configuring Vortex**:
+3. **Unzip Demo Scene**:
+    - Navigate to the `<repositoryRoot>/assets/model/` folder and unzip the `DemoSpaceship.zip` to the same location.
+
+4. **Configuring Vortex**:
    - Navigate back to the root of Vortex.
    - Create a build directory if it doesn't exist and navigate to it.
    - Configure Vortex with cmake which will require you to specify some variables:
@@ -186,7 +189,7 @@ In case you’re a fan of hands-on work, (or the scripts fails, ops!) follow the
             ..
      ```
 - As before, if you prefer you can use cmake-gui, just make sure to set all the options as in the command line
-4. **Build and Run**:
+5. **Build and Run**:
    You can do so on the command line:
    - Build Vortex: `cmake --build . --config Release`
    - Run Vortex: `./Vortex/src/Release/Vortex.exe`

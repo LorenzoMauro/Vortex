@@ -16,6 +16,7 @@ CudaDebug/
 cudaDebugging/
 assets/icons/
 assets/readme/psd
+installer/
 # Ignore object files and libraries
 *.o
 *.a
@@ -48,3 +49,4 @@ install.spec
 VortexIconSketchpsd copy.jpg
 VortexIconSketchpsd.psd
 scripts/Untitled-3.py
+assets/model/DemoSpaceship.vtx

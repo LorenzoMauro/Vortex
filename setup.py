@@ -62,6 +62,8 @@ try:
 
     setup.prepareMDL(extFolder, vcpkg_dir)
 
+    setup.unzipDemoScene(repoRoot)
+    
     setup.prepareVortex(repoRoot, vcpkg_dir, torchPathDebug,torchPathRelease,cudaToolkitRoot,clang12Path,cuda8Path,optixPath)
 
     setup.buildOrOpenVortex(repoRoot)

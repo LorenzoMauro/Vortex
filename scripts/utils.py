@@ -6,6 +6,7 @@ from tkinter import simpledialog
 import webbrowser
 import os
 import subprocess
+import zipfile
 
 class OptionDialog(simpledialog.Dialog):
     def __init__(self, parent, title, message, options):
@@ -272,3 +273,10 @@ class Setup():
             self.echoGreen("Exiting.")
 
         input("Press any key to continue...")
+
+    def unzipDemoScene(self, repoRoot):
+        print("Unzipping Demo Scene")
+        demoScene = repoRoot + "/assets/model/DemoSpaceship.zip"
+        destination = repoRoot + "/assets/model/"
+        with zipfile.ZipFile(demoScene, 'r') as zip_ref:
+            zip_ref.extractall(destination)
