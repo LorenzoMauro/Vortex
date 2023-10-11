@@ -45,7 +45,11 @@ namespace vtx {
         {
 	        nodeEditor.arrangeNodes(gui::NodeEditor::LayoutDirection::Horizontal);
 		}
-        graph::Scene::get()->setSelected(nodeEditor.getSelected());
+        const auto selected = nodeEditor.getSelected();
+        if (!selected.empty())
+        {
+            graph::Scene::get()->setSelected(selected);
+        }
     }
     void ShaderGraphWindow::materialSelector()
     {

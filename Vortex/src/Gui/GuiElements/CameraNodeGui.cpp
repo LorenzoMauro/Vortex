@@ -37,7 +37,12 @@ namespace vtx::gui {
 
 			ImGui::PopItemWidth();
 			ImGui::Unindent();
-			drawEditGui(camera->transform);
+			ImGui::SetNextItemOpen(true, ImGuiCond_Once);
+			if(drawEditGui(camera->transform))
+			{
+				camera->updateDirections();
+				camera->state.updateOnDevice = true;
+			}
 		}
 		ImGui::PopID();
 
