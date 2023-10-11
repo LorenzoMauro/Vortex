@@ -31,17 +31,17 @@ namespace vtx::graph
 		sceneRoot = ops::createNode<Group>();
 		settings = getOptions()->rendererSettings;
 
-		drawFrameBuffer.setSize(width, height);
-		drawFrameBuffer.bind();
-		glClearColor(0.2f, 0.2f, 0.2f, 1.0f);
-		glClear(GL_COLOR_BUFFER_BIT);
-		drawFrameBuffer.unbind();
-
-		displayFrameBuffer.setSize(width, height);
-		displayFrameBuffer.bind();
-		glClearColor(0.2f, 0.2f, 0.2f, 1.0f);
-		glClear(GL_COLOR_BUFFER_BIT);
-		displayFrameBuffer.unbind();
+		//drawFrameBuffer.setSize(width, height);
+		//drawFrameBuffer.bind();
+		//glClearColor(0.2f, 0.2f, 0.2f, 1.0f);
+		//glClear(GL_COLOR_BUFFER_BIT);
+		//drawFrameBuffer.unbind();
+		//
+		//displayFrameBuffer.setSize(width, height);
+		//displayFrameBuffer.bind();
+		//glClearColor(0.2f, 0.2f, 0.2f, 1.0f);
+		//glClear(GL_COLOR_BUFFER_BIT);
+		//displayFrameBuffer.unbind();
 
 		setWindow(Application::get()->glfwWindow);
 	}
@@ -73,41 +73,40 @@ namespace vtx::graph
 	}
 
 	bool Renderer::isReady(const bool setBusy) {
-		if (threadData.renderMutex.try_lock()) {
-			std::unique_lock<std::mutex> lock(threadData.renderMutex, std::adopt_lock);
-			if (!threadData.renderThreadBusy) {
-				if (setBusy) {
-					threadData.renderThreadBusy = true;
-				}
-				return true;
-			}
-			return false;
+		std::unique_lock<std::mutex> lock(threadData.renderMutex, std::defer_lock);
+		if (lock.try_lock()) {
+			return true;
+			//if (!threadData.renderThreadBusy) {
+			//	if (setBusy) {
+			//		threadData.renderThreadBusy = true;
+			//	}
+			//	return true;
+			//}
 		}
 		return false;
 	}
 
 	void Renderer::threadedRender()
 	{
-		if (isReady(true))
-		{
-			std::unique_lock<std::mutex> lock(threadData.renderMutex);
-			threadData.renderThreadBusy = true;
+		if (isReady()) {
+			threadData.rendererBusy = true;
 			threadData.renderCondition.notify_one();
 		}
-
 	}
 
+	void Renderer::restart()
+	{
+		settings.iteration = 0;
+		settings.isUpdated = true;
+	}
+	void Renderer::prepare()
+	{
+		
+	}
 	void Renderer::render()
 	{
-
-		const LaunchParams& launchParams = onDeviceData->launchParamsData.getHostImage();
-		const LaunchParams* launchParamsDevice = onDeviceData->launchParamsData.getDeviceImage();
-		const size_t launchParamsSize = onDeviceData->launchParamsData.imageBuffer.bytesSize();
-
-		if (launchParams.frameBuffer.frameSize.x == 0 || launchParams.frameBuffer.frameSize.y == 0)
-		{
-			return;
-		}
+		onDeviceData->sync();
+		onDeviceData->incrementFrameIteration();
 		if (!settings.accumulate)
 		{
 			settings.iteration = 0;
@@ -116,7 +115,21 @@ namespace vtx::graph
 		{
 			resetKernelStats();
 			timer.reset();
-			internalIteration = 0;
+			threadData.bufferCount = 0;
+		}
+		if (settings.iteration > settings.maxSamples)
+		{
+			return;
+		}
+		const LaunchParams& launchParams = onDeviceData->launchParamsData.getHostImage();
+		const LaunchParams* launchParamsDevice = onDeviceData->launchParamsData.getDeviceImage();
+		const size_t launchParamsSize = onDeviceData->launchParamsData.imageBuffer.bytesSize();
+		const int fbWidth = launchParams.frameBuffer.frameSize.x;
+		const int fbHeight = launchParams.frameBuffer.frameSize.y;
+
+		if (fbWidth == 0 || fbHeight == 0)
+		{
+			return;
 		}
 
 		{
@@ -129,7 +142,7 @@ namespace vtx::graph
 				settings.adaptiveSamplingSettings.minAdaptiveSamples <= settings.iteration
 				)
 			{
-				noiseComputation(launchParamsDevice, getUID());
+				noiseComputation(launchParamsDevice, settings.adaptiveSamplingSettings.noiseKernelSize, settings.adaptiveSamplingSettings.albedoNormalNoiseInfluence);
 			}
 			cudaEventRecord(events.second);
 
@@ -139,7 +152,7 @@ namespace vtx::graph
 			const std::pair<cudaEvent_t, cudaEvent_t> events = GetProfilerEvents(eventNames[R_TRACE]);
 			cudaEventRecord(events.first);
 
-			if (waveFrontIntegrator.settings.active)
+			if (waveFrontIntegrator.settings.active && launchParams.queues.queueCounters!=nullptr)
 			{
 				waveFrontIntegrator.render();
 			}
@@ -170,12 +183,12 @@ namespace vtx::graph
 			const std::pair<cudaEvent_t, cudaEvent_t> events = GetProfilerEvents(eventNames[R_POSTPROCESSING]);
 			cudaEventRecord(events.first);
 
-			toneMapRadianceKernel(launchParamsDevice, width, height, eventNames[R_TONE_MAP_RADIANCE]);
+			toneMapRadianceKernel(launchParamsDevice, fbWidth, fbHeight, eventNames[R_TONE_MAP_RADIANCE]);
 			math::vec3f* beauty                 = nullptr;
 			const bool   isFireflyRemovalActive = settings.fireflySettings.active && settings.iteration > settings.fireflySettings.start;
 			if (isFireflyRemovalActive)
 			{
-				removeFireflies(launchParamsDevice, settings.fireflySettings.kernelSize, settings.fireflySettings.threshold, width, height);
+				removeFireflies(launchParamsDevice, settings.fireflySettings.kernelSize, settings.fireflySettings.threshold, fbWidth, fbHeight);
 				beauty = onDeviceData->frameBufferData.resourceBuffers.fireflyRemoval.castedPointer<math::vec3f>();
 			}
 
@@ -187,7 +200,8 @@ namespace vtx::graph
 				optix::getState()->denoiser.setInputs(denoiserRadianceInput, albedoBuffer, normalBuffer);
 				beauty = optix::getState()->denoiser.denoise(settings.denoiserSettings.denoiserBlend);
 			}
-			switchOutput(launchParamsDevice, width, height, beauty);
+			threadData.outputBufferBusy = true;
+			switchOutput(launchParamsDevice, fbWidth, fbHeight, beauty);
 
 			// Selection edge
 			{
@@ -204,20 +218,18 @@ namespace vtx::graph
 					{
 						typeIds.push_back((float)graph::Scene::getSim()->TIDfromUID(uid));
 					}
-					cuda::overlaySelectionEdge(gBuffer, outputBuffer, width, height, typeIds, 0.2f, 1.35f, &edgeMapBuffer, &selectedIdsBuffer);
+					cuda::overlaySelectionEdge(gBuffer, outputBuffer, fbWidth, fbHeight, typeIds, 0.2f, 1.35f, &edgeMapBuffer, &selectedIdsBuffer);
 				}
 			}
+			threadData.outputBufferBusy = false;
+			threadData.bufferCount += 1;
 			cudaEventRecord(events.second);
 		}
 
-		{
-			const std::pair<cudaEvent_t, cudaEvent_t> events = GetProfilerEvents(eventNames[R_DISPLAY]);
-			cudaEventRecord(events.first);
-			copyToGl();
-			cudaEventRecord(events.second);
-		}
+		copyToGl();
 
-		CudaEventTimes cuTimes = getCudaEventTimes();
+		settings.iteration++;
+		settings.isUpdated = true;
 	}
 
 	void Renderer::resize(const int _width, const int _height) {
@@ -242,58 +254,20 @@ namespace vtx::graph
 	void Renderer::copyToGl() {
 		// Update the GL buffer here
 		//CUDA_SYNC_CHECK();
-		const optix::State& state = *(optix::getState());
+		const std::pair<cudaEvent_t, cudaEvent_t> events = GetProfilerEvents(eventNames[R_DISPLAY]);
+		cudaEventRecord(events.first);
 		const LaunchParams& launchParams = onDeviceData->launchParamsData.getHostImage();
 
-		if(resizeGlBuffer)
-		{
-			if (cudaGraphicsResource != nullptr) {
-				const CUresult result = cuGraphicsUnregisterResource(cudaGraphicsResource);
-				CU_CHECK(result);
-			}
-			drawFrameBuffer.setSize(launchParams.frameBuffer.frameSize.x, launchParams.frameBuffer.frameSize.y);
+		const CUdeviceptr& buffer = launchParams.frameBuffer.outputBuffer;
+		const int& width = launchParams.frameBuffer.frameSize.x;
+		const int& height = launchParams.frameBuffer.frameSize.y;
+		const InteropUsage usage = settings.runOnSeparateThread ? InteropUsage::MultiThreaded : InteropUsage::SingleThreaded;
+		interopDraw.prepare(width, height, usage);
+		interopDraw.copyToGlBuffer(buffer, width, height);
+		std::swap(interopDraw, interopDisplay);
 
-			const CUresult result = cuGraphicsGLRegisterImage(&cudaGraphicsResource,
-															  drawFrameBuffer.colorAttachment,
-															  GL_TEXTURE_2D, CU_GRAPHICS_REGISTER_FLAGS_WRITE_DISCARD);
-			CU_CHECK(result);
-			resizeGlBuffer = false;
-		}
-
-		drawFrameBuffer.bind();
-		glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
-		glClear(GL_COLOR_BUFFER_BIT);
-		drawFrameBuffer.unbind();
-
-		CUresult CUresult = cuGraphicsMapResources(1, &cudaGraphicsResource, state.stream); // This is an implicit cuSynchronizeStream().
-		CU_CHECK(CUresult);
-		CUresult = cuGraphicsSubResourceGetMappedArray(&dstArray, cudaGraphicsResource, 0, 0); // arrayIndex = 0, mipLevel = 0
-		CU_CHECK(CUresult);
-
-		CUDA_MEMCPY3D params = {};
-		params.srcMemoryType = CU_MEMORYTYPE_DEVICE;
-		params.srcDevice = launchParams.frameBuffer.outputBuffer;
-		params.srcPitch = launchParams.frameBuffer.frameSize.x * sizeof(math::vec4f);
-		params.srcHeight = launchParams.frameBuffer.frameSize.y;
-
-		params.dstMemoryType = CU_MEMORYTYPE_ARRAY;
-		params.dstArray = dstArray;
-		params.WidthInBytes = launchParams.frameBuffer.frameSize.x * sizeof(math::vec4f);
-		params.Height = launchParams.frameBuffer.frameSize.y;
-		params.Depth = 1;
-
-		CU_CHECK(cuMemcpy3D(&params)); // Copy from linear to array layout.
-
-		CU_CHECK(cuGraphicsUnmapResources(1, &cudaGraphicsResource, state.stream)); // This is an implicit cuSynchronizeStream().
-
-		//// SWAP BUFFERS ///////////////////
-		//threadData.bufferUpdateReady = false;
-		//auto* tempBuffer = updatedFrameBuffer;
-		displayFrameBuffer.copyToThis(drawFrameBuffer);
-		//currentFrameBuffer = tempBuffer;
-		overallTime = timer.elapsedMillis();
-		internalIteration++;
 		CUDA_SYNC_CHECK();
+		cudaEventRecord(events.second);
 	}
 
 	void Renderer::setWindow(GLFWwindow* window)
@@ -304,14 +278,7 @@ namespace vtx::graph
 	}
 
 	GlFrameBuffer Renderer::getFrame() {
-		//if(threadData.bufferUpdateReady)
-		//{
-		//	// This section is helpfull when the renderer update is slow, else it's better not to have it!
-		//	copyToGl();
-		//	threadData.bufferUpdateReady = false;
-		//}
-		return displayFrameBuffer;
-		
+		return interopDisplay.glFrameBuffer;
 	}
 }
 

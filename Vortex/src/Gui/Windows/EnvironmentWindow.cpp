@@ -35,6 +35,9 @@ namespace vtx
 				glGenTextures(1, &glEnvironmentTexture);
 				glBindTexture(GL_TEXTURE_2D, glEnvironmentTexture);
 
+				glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
+				glClear(GL_COLOR_BUFFER_BIT);
+
 				// Modified this line
 				glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, width, height, 0, GL_RGBA, GL_FLOAT, ptr);
 

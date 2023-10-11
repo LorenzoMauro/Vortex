@@ -18,8 +18,7 @@ namespace vtx::ops
 
 		for (const std::shared_ptr<graph::Renderer>& renderer : renderers)
 		{
-			renderer->settings.isUpdated = true;
-			renderer->settings.iteration = -1;
+			renderer->restart();
 		}
 	}
 

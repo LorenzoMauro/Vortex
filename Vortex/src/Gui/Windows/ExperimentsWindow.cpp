@@ -121,8 +121,7 @@ namespace vtx
 			{
 				runCurrentSettingsExperiment();
 				// To unlock the renderer when the iteration is finished
-				renderer->settings.iteration = -1;
-				renderer->settings.isUpdated = true;
+				renderer->restart();
 			}
 
 			ImGui::SameLine();
@@ -234,8 +233,8 @@ namespace vtx
 
 	void ExperimentsWindow::startNewRender(const SamplingTechnique technique)
 	{
+		renderer->restart();
 		renderer->settings.samplingTechnique = technique;
-		renderer->settings.iteration = -1;
 		renderer->settings.maxSamples = em.maxSamples;
 		renderer->waveFrontIntegrator.settings.active = true;
 		renderer->settings.isUpdated = true;

@@ -14,7 +14,7 @@ void vtx::shutDownOperations()
 	VTX_INFO("ShutDown: Waiting For Render Threads");
 	const std::vector<std::shared_ptr<graph::Renderer>> rendererNodes = graph::Scene::getSim()->getAllNodeOfType<graph::Renderer>(graph::NT_RENDERER);
 
-	bool renderingConcluded = true;
+	bool renderingConcluded = false;
 
 	while(renderingConcluded!=true)
 	{
@@ -25,9 +25,13 @@ void vtx::shutDownOperations()
 			{
 				renderingConcluded = false;
 			}
+			else
+			{
+				renderer->settings.runOnSeparateThread = false;
+			}
 		}
 	}
-	VTX_INFO("ShutDown: Render Threads exitedd");
+	VTX_INFO("ShutDown: Render Threads exited");
 
 	UPLOAD_BUFFERS->shutDown();
 

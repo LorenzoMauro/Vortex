@@ -117,35 +117,22 @@ namespace vtx
 		graph::Scene* scene = graph::Scene::get();
 		const std::shared_ptr<graph::Renderer>& renderer = scene->renderer;
 		renderer->camera->onUpdate(timeStep);
-		if (renderer->settings.iteration <= renderer->settings.maxSamples)
+		//This step speed up the material computation, but is not really coherent with the rest of the code
+		graph::computeMaterialsMultiThreadCode();
+		renderer->traverse(hostVisitor);
+		if (renderer->settings.runOnSeparateThread)
 		{
-			if (renderer->settings.runOnSeparateThread)
+			if (renderer->isReady())
 			{
-				if (renderer->isReady())
-				{
-					renderer->settings.iteration++;
-					renderer->settings.isUpdated = true;
-					//This step speed up the material computation, but is not really coherent with the rest of the code
-					graph::computeMaterialsMultiThreadCode();
-					renderer->traverse(hostVisitor);
-					onDeviceData->sync();
-					onDeviceData->incrementFrameIteration();
-					renderer->threadedRender();
-				}
-			}
-			else
-			{
-				renderer->settings.iteration++;
-				renderer->settings.isUpdated = true;
-				//This step speed up the material computation, but is not really coherent with the rest of the code
-				graph::computeMaterialsMultiThreadCode();
-				renderer->traverse(hostVisitor);
-				onDeviceData->sync();
-				onDeviceData->incrementFrameIteration();
-				renderer->render();
+				renderer->prepare();
+				renderer->threadedRender();
 			}
 		}
-		
+		else
+		{
+			renderer->prepare();
+			renderer->render();
+		}
 	}
 
 	void Application::run() {
@@ -162,7 +149,7 @@ namespace vtx
 			}
 			windowManager->renderWindows();
 			ImGuiDraw(glfwWindow);
-			glfwSwapBuffers(glfwWindow);
+ 			glfwSwapBuffers(glfwWindow);
 		}
 		windowManager->removeClosedWindows();
 		const auto time = static_cast<float>(glfwGetTime());

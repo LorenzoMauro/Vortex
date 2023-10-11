@@ -11,34 +11,21 @@ namespace vtx {
     struct CUDABuffer {
 
         /* Get the raw cuda pointer */
-        __host__ inline CUdeviceptr dPointer() const
-        {
-            return (CUdeviceptr)d_ptr;
-        }
+        CUdeviceptr dPointer() const;
 
         /* Get the cuda pointer casted to the specific type */
         template<typename T>
-        __host__ T* castedPointer() const
+        T* castedPointer() const
         {
         	return reinterpret_cast<T*>(d_ptr);
 		}
 
         /* Free the allocated memory */
-        __host__ void free()
-        {
-            if (d_ptr)
-            {
-	            const auto err = cudaFree(d_ptr);
-				CUDA_CHECK(err);
-				d_ptr = nullptr;
-				sizeInBytes = 0;
-            }
-        }
-
+        void free();
 
         /*upload a generic T type, the function takes care of eventual resizing and allocation*/
         template<typename T>
-        __host__ T* upload(const T& uploadData)
+        T* upload(const T& uploadData)
         {
 	        const size_t newSize = sizeof(T);
             uploadImplementation(&uploadData, newSize);
@@ -46,7 +33,7 @@ namespace vtx {
         }
 
         template<typename T>
-        __host__ T* uploadAtPtr(const T& uploadData, T* ptr)
+        T* uploadAtPtr(const T& uploadData, T* ptr)
         {
 	        const size_t dataSize = sizeof(T);
             const char* endOfData = (char*)ptr + dataSize;
@@ -62,7 +49,7 @@ namespace vtx {
 
         /*upload a std::vector type, the function takes care of eventual resizing and allocation*/
         template<typename T>
-        __host__ T* upload(const std::vector<T>& uploadVector)
+        T* upload(const std::vector<T>& uploadVector)
         {
             const size_t newSize = sizeof(T)*uploadVector.size();
             uploadImplementation(uploadVector.data(), newSize);
@@ -70,7 +57,7 @@ namespace vtx {
         }
 
         template<typename T>
-        __host__ T* upload(T* uploadArray, const size_t count)
+        T* upload(T* uploadArray, const size_t count)
         {
             const size_t newSize = sizeof(T) * count;
             uploadImplementation(uploadArray, newSize);
@@ -80,7 +67,7 @@ namespace vtx {
          * It returns the count of the data
          */
         template<typename T>
-        __host__ uint32_t download(T* t)
+        uint32_t download(T* t)
         {
             VTX_ASSERT_CLOSE(d_ptr != nullptr, "CudaBuffer: trying to download a resource not previously allocated!");
             VTX_ASSERT_CLOSE(sizeInBytes % sizeof(T) == 0, 
@@ -92,7 +79,7 @@ namespace vtx {
 
 
         template<typename T>
-        __host__ T* alloc(const int count)
+        T* alloc(const int count)
         {
             const size_t newSize = sizeof(T) * count;
             resize(newSize);
@@ -100,49 +87,15 @@ namespace vtx {
         }
 
         //! re-size buffer to given number of bytes
-        __host__ void resize(const size_t size)
-        {
-            if(size != sizeInBytes)
-            {
-                free();
-                alloc(size);
-            }
-        }
+        void resize(const size_t size);
 
         //! allocate to given number of bytes
-        __host__ void alloc(const size_t size)
-        {
-            VTX_ASSERT_CLOSE(d_ptr == nullptr, "CudaBuffer: trying to allocate memory when device pointer is not null");
-            sizeInBytes = size;
-            CUDA_CHECK(cudaMalloc((void**)&d_ptr, sizeInBytes));
-        }
+        void alloc(const size_t size);
 
-        size_t bytesSize() const
-        {
-            return sizeInBytes;
-        }
+        size_t bytesSize() const;
     private:
         /*Internal Function to manage allocation, resize and upload on upload request*/
-        __host__ void uploadImplementation(const void* uploadData, const size_t newSize)
-        {
-            if (newSize == 0)
-            {
-                VTX_ERROR("CudaBuffer: trying to upload a zero size Data?");
-                return;
-                //waitAndClose();
-            }
-            if (d_ptr == nullptr)
-            {
-                alloc(newSize);
-            }
-            else if (newSize != sizeInBytes)
-            {
-                resize(newSize);
-            }
-
-            VTX_ASSERT_CLOSE(d_ptr != nullptr, "CudaBuffer: Some Error occured, the device pointer is still null");
-            CUDA_CHECK(cudaMemcpy(d_ptr, uploadData, sizeInBytes, cudaMemcpyHostToDevice));
-        }
+        void uploadImplementation(const void* uploadData, const size_t newSize);
 
         size_t sizeInBytes{ 0 };
         void* d_ptr{ nullptr };

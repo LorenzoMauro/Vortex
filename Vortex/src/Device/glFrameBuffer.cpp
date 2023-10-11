@@ -5,15 +5,15 @@
 namespace vtx
 {
 	GlFrameBuffer::GlFrameBuffer() :
-		height(getOptions()->height),
-		width(getOptions()->width)
+		height(0),
+		width(0)
 	{
-		generate();
+		//generate();
 		
 	}
 
-	void GlFrameBuffer::setSize(const uint32_t widthParam, const uint32_t heightParam) {
-		if (width != widthParam || height != heightParam) {
+	void GlFrameBuffer::setSize(const uint32_t widthParam, const uint32_t heightParam, const bool forceRegenerate) {
+		if (width != widthParam || height != heightParam || forceRegenerate) {
 			width = widthParam;
 			height = heightParam;
 			generate();
@@ -65,6 +65,8 @@ namespace vtx
 	{
 		setSize(src.width, src.height);
 		glBindFramebuffer(GL_READ_FRAMEBUFFER, src.frameBufferId); // Source framebuffer
+		//check error
+
 		glBindFramebuffer(GL_DRAW_FRAMEBUFFER, frameBufferId); // Destination framebuffer
 		glBlitFramebuffer(0, 0, width, height, 0, 0, src.width, src.height, GL_COLOR_BUFFER_BIT, GL_NEAREST);
 		glBindFramebuffer(GL_FRAMEBUFFER, 0);
