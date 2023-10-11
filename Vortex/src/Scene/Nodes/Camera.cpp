@@ -34,7 +34,7 @@ namespace vtx::graph
 		//direction = inputSockets[nodeNames[NT_TRANSFORM]].getNodeTransformTransfomr>->transformationAttribute.AffineTransform.l.vz;
 		//position = inputSockets[nodeNames[NT_TRANSFORM]].getNodeTransformTransfomr>->transformationAttribute.AffineTransform.p;
 
-		horizontal = transform->transformVector(math::vec3f{ 1.0f, 0.0f, 0.0f });
+		horizontal = transform->transformVector(math::vec3f{ -1.0f, 0.0f, 0.0f });
 		vertical = transform->transformVector(math::vec3f{ 0.0f, 1.0f, 0.0f });
 		direction = transform->transformVector(math::vec3f{ 0.0f, 0.0f, -1.0f });
 		position = transform->transformPoint(math::vec3f{ 0.0f, 0.0f, 0.0f });
@@ -125,8 +125,8 @@ namespace vtx::graph
 		break;
 		case NAV_ORBIT:
 		{
-			const float pitchDelta = -rotationSensibility * delta.y;
-			const float yawDelta = -rotationSensibility * delta.x;
+			const float pitchDelta = rotationSensibility * delta.y;
+			const float yawDelta = rotationSensibility * delta.x;
 			transform->rotateOrbit(pitchDelta, horizontal, yawDelta, math::zAxis);
 			updateDirections();
 		}

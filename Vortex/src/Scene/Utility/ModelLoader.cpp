@@ -737,7 +737,7 @@ namespace vtx::importer
             aiNode* node = scene->mRootNode->FindNode(cam->mName);
 
             // Get the transformation of the node
-            math::affine3f transform = convertAssimpMatrix(node->mTransformation, SwapType::None);
+            //math::affine3f transform = convertAssimpMatrix(node->mTransformation, SwapType::None);
             //math::affine3f rootM = convertAssimpMatrix(scene->mRootNode->mTransformation);
             //math::affine3f finalTransform = rootM * transform;
             // Transform the camera's local vectors into world space
@@ -759,8 +759,10 @@ namespace vtx::importer
 			std::shared_ptr<graph::Camera> camera = ops::createNode<graph::Camera>();
 
 			//math::affine3f cameraTransform(wHorizzontal, wUp, -wLookAt, wPos);
-
+            const auto cameraTransform = convertAssimpMatrix(node->mTransformation, swap);
             camera->transform->setAffine(convertAssimpMatrix(node->mTransformation, swap));
+            //camera->transform->rotateAroundPoint(camera->transform->affineTransform.p, math::zAxis, M_PI);
+            camera->transform->rotateAroundPoint(camera->transform->affineTransform.p, math::yAxis, M_PI_2);
             camera->fovY = fov*180.0f/M_PI;
             //camera->aspect = aspect;
             camera->updateDirections();
@@ -823,7 +825,7 @@ namespace vtx::importer
 
         sceneGraph->name = "Scene Root Group";
 
-		std::vector<std::shared_ptr<graph::Camera>> cameras = processCameras(scene, SwapType::None);
+		std::vector<std::shared_ptr<graph::Camera>> cameras = processCameras(scene, SwapType::yToZ);
         return { sceneGraph, cameras };
     }
 #pragma optimize("", on)
