@@ -1,6 +1,7 @@
 #pragma once
 #include <memory>
 #include <iostream>
+#define FMT_HEADER_ONLY
 #include "spdlog/spdlog.h"
 #include "spdlog/sinks/stdout_color_sinks.h"
 

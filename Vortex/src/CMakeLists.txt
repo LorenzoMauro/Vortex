@@ -7,7 +7,8 @@ file(GLOB_RECURSE HEADERS "*.h")
 file(GLOB CUDA_FUNCTIONS "${CMAKE_CURRENT_SOURCE_DIR}/Device/CudaFunctions/*.cu")
 file(GLOB DEVICE_CUDA "${CMAKE_CURRENT_SOURCE_DIR}/Device/DevicePrograms/Cuda/*.cu")
 file(GLOB NETWORK_CUDA "${CMAKE_CURRENT_SOURCE_DIR}/NeuralNetworks/*.cu")
-list(APPEND STANDARD_CUDA_COMPILE_FILES ${CUDA_FUNCTIONS} ${DEVICE_CUDA} ${NETWORK_CUDA})
+file(GLOB TCNN_CUDA "${CMAKE_CURRENT_SOURCE_DIR}/NeuralNetworks/Networks/tcnn/*.cu")
+list(APPEND STANDARD_CUDA_COMPILE_FILES ${CUDA_FUNCTIONS} ${DEVICE_CUDA} ${NETWORK_CUDA} ${TCNN_CUDA})
 
 #Vortex CU files to be compiled to intermediate representation
 file(GLOB PTX_COMPILE_FILES "${CMAKE_CURRENT_SOURCE_DIR}/Device/DevicePrograms/ptx/*.cu")
@@ -123,7 +124,7 @@ target_compile_options(Vortex PRIVATE
   $<$<COMPILE_LANGUAGE:CUDA>:
     --use_fast_math 
     --relocatable-device-code=true
-    -gencode=arch=compute_70,code="sm_70,compute_70"
+    -gencode=arch=compute_${CU_MIN_ARCH},code="sm_${CU_MIN_ARCH},compute_${CU_MIN_ARCH}"
     --use-local-env
     -x cu
     --maxrregcount=0
@@ -170,9 +171,7 @@ target_link_libraries(Vortex PRIVATE
   glfw
   implot::implot
   Glad
-  #yaml-cpp
   imnodes
-  #ImGuiFileDialog
   assimp::assimp
   CUDA::cudart_static
   CUDA::cuda_driver
@@ -181,6 +180,7 @@ target_link_libraries(Vortex PRIVATE
   CUDA::curand
   CUDA::cublas
   CUDA::cublasLt
+  tiny-cuda-nn
   $<$<OR:$<CONFIG:Release>,$<CONFIG:RelWithDebInfo>,$<CONFIG:MinSizeRel>>:${TORCH_RELEASE_LIBS}>
   $<$<CONFIG:Debug>:${TORCH_DEBUG_LIBS}>
 )
@@ -195,6 +195,7 @@ target_include_directories(Vortex PRIVATE
   ${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES}
   ${OPTIX_INCLUDE_DIR}
   ${MDL_SDK_INCLUDE_DIRS}
+  ${TCNN_INCLUDE_DIRECTORIES}
   ${EXTERNAL}/imnodes
   ${EXTERNAL}/cereal/include
   ${EXTERNAL}/stbImage

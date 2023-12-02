@@ -7,3 +7,6 @@
 [submodule "ext/cereal"]
 	path = ext/cereal
 	url = https://github.com/USCiLab/cereal.git
+[submodule "ext/tcnn"]
+	path = ext/tcnn
+	url = https://github.com/NVlabs/tiny-cuda-nn.git

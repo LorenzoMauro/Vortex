@@ -7,6 +7,7 @@ import webbrowser
 import os
 import subprocess
 import zipfile
+import sys
 
 class OptionDialog(simpledialog.Dialog):
     def __init__(self, parent, title, message, options):
@@ -131,6 +132,11 @@ class Setup():
         END = '\033[0m'
         print(f"{GREEN}{message}{END}")
 
+    def echoRed(self, message):
+        RED = '\033[91m'  # Red color ANSI escape code
+        END = '\033[0m'   # Reset to default color ANSI escape code
+        print(f"{RED}{message}{END}")
+
     def configureVcpkg(self, ):
         vcpkg_dir = ""
         if not self.stepDoneBefore("vcpkgInstallation"):
@@ -191,7 +197,7 @@ class Setup():
 
         return vcpkg_dir
         
-    def prepareMDL(self, extFolder, vcpkg_dir):
+    def prepareMDL(self, extFolder, vcpkg_dir, clangPath):
         if not self.stepDoneBefore("mdlBuild"):
             # Print message
             print("Configuring MDL Cmake")
@@ -214,18 +220,96 @@ class Setup():
                 "-DMDL_ENABLE_OPENGL_EXAMPLES=OFF",
                 "-DMDL_ENABLE_QT_EXAMPLES=OFF",
                 "-DMDL_ENABLE_VULKAN_EXAMPLES=OFF",
+                f"-Dclang_PATH={clangPath}",
                 ".."
             ]
             subprocess.run(cmake_cmd)
+            result = subprocess.run(cmake_cmd)
+            if result.returncode != 0:
+                self.echoRed("CMake configuration failed")
+                sys.exit(1)
 
-            # Build the project
             print("Building MDL")
-            subprocess.run(["cmake", "--build", ".", "--config", "Release"])
-            subprocess.run(["cmake", "--build", ".", "--config", "Release", "--target", "INSTALL"])
+            result = subprocess.run(["cmake", "--build", ".", "--config", "Release"])
+            if result.returncode != 0:
+                self.echoRed("MDL build failed")
+                sys.exit(1)
+
+            result = subprocess.run(["cmake", "--build", ".", "--config", "Release", "--target", "INSTALL"])
+            if result.returncode != 0:
+                self.echoRed("MDL install failed")
+                sys.exit(1)
+
             self.markStepDone("mdlBuild")
 
         else:
             self.echoGreen("MDL-SDK library already built")
+
+    def updateTCNNFmtSubmodule(self, extFolder):
+        tcnn_path = os.path.join(extFolder, 'tcnn')
+        fmt_path = os.path.join(tcnn_path, 'dependencies', 'fmt')
+
+        # Check if the fmt submodule directory exists
+        if not os.path.isdir(fmt_path):
+            print("fmt submodule directory not found.")
+            return
+
+        # Navigate to the fmt submodule and pull the latest changes from origin/master
+        print("Updating fmt submodule to latest commit on origin/master...")
+        update_cmds = [
+            ["git", "fetch", "origin"],
+            ["git", "checkout", "master"],
+            ["git", "pull", "origin", "master"]
+        ]
+
+        for cmd in update_cmds:
+            result = subprocess.run(cmd, cwd=fmt_path)
+            if result.returncode != 0:
+                print("Error updating fmt submodule. Command failed:", ' '.join(cmd))
+                return
+
+        # Update the main repository to point to the new commit of the submodule
+        # print("Updating main repository to point to the updated fmt submodule...")
+        # update_main_repo_cmd = ["git", "add", fmt_path]
+        # result = subprocess.run(update_main_repo_cmd, cwd=tcnn_path)
+        # if result.returncode != 0:
+        #     print("Error updating main repository for fmt submodule.")
+        #     return
+
+        print("fmt submodule successfully updated.")
+        
+    def prepareTinyCudaNN(self, extFolder):
+        tcnn_path = os.path.join(extFolder, 'tcnn')
+        if not self.stepDoneBefore("tcnnBuild"):
+            print("Configuring tiny-cuda-nn CMake")
+
+            # Create a build directory if it doesn't exist
+            os.makedirs(os.path.join(tcnn_path, 'build'), exist_ok=True)
+
+            # Configure the project
+            cmake_cmd = [
+                "cmake",
+                ".",
+                "-B", "build",
+                "-DCMAKE_BUILD_TYPE=RelWithDebInfo",
+                "-DTCNN_CUDA_ARCHITECTURES=75;86"
+            ]
+            result = subprocess.run(cmake_cmd, cwd=tcnn_path)
+            if result.returncode != 0:
+                self.echoRed("CMake configuration for tiny-cuda-nn failed")
+                sys.exit(1)
+
+            # Build the project
+            print("Building tiny-cuda-nn")
+            result = subprocess.run(["cmake", "--build", "build", "--config", "RelWithDebInfo", "-j"], cwd=tcnn_path)
+            if result.returncode != 0:
+                self.echoRed("Build of tiny-cuda-nn failed")
+                sys.exit(1)
+
+            self.markStepDone("tcnnBuild")
+
+        else:
+            self.echoGreen("tiny-cuda-nn already built")
 
     def prepareVortex(self, repoRoot, vcpkg_dir, torchPathDebug,torchPathRelease,cudaToolkitRoot,clang12Path,cuda8Path,optixPath):
         self.echoGreen("Configuring Vortex Cmake..")
@@ -248,7 +332,11 @@ class Setup():
                 f"-DOPTIX_PATH={optixPath}",
                 ".."
             ]
-        subprocess.run(cmake_cmd)
+        result = subprocess.run(cmake_cmd)
+        if result.returncode != 0:
+            self.echoRed("Vortex Build Failed")
+            sys.exit(1)
+
         self.echoGreen("Cmake Configuration Completed!")
 
     def buildOrOpenVortex(self, repoRoot):

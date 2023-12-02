@@ -60,7 +60,9 @@ try:
 
     vcpkg_dir = setup.configureVcpkg()
 
-    setup.prepareMDL(extFolder, vcpkg_dir)
+    setup.prepareMDL(extFolder, vcpkg_dir, clang12Path)
+
+    setup.updateTCNNFmtSubmodule(extFolder)
 
     setup.unzipDemoScene(repoRoot)
     

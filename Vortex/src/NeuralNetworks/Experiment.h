@@ -7,7 +7,7 @@
 #include "Core/Math.h"
 #include "Device/UploadCode/CUDABuffer.h"
 #include "Scene/Nodes/RendererSettings.h"
-#include "yaml-cpp/node/node.h"
+//#include "yaml-cpp/node/node.h"
 
 namespace vtx
 {

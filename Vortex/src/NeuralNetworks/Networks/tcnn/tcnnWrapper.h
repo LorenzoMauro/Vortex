@@ -1,0 +1,4 @@
+#undef PI
+
+void testTCNN();
+
