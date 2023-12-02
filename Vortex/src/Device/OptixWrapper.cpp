@@ -839,6 +839,13 @@ namespace vtx::optix
 
 		IASBuffer.resize(accelBufferSizes.outputSizeInBytes);
 
+		CUDABuffer aabbBuffer;
+		aabbBuffer.alloc(sizeof(OptixAabb));
+
+		OptixAccelEmitDesc emitDesc = {};
+		emitDesc.type = OPTIX_PROPERTY_TYPE_AABBS;
+		emitDesc.result = aabbBuffer.dPointer();
+
 		OPTIX_CHECK(optixAccelBuild(optixContext,
 									stream,
 									&accelBuildOptions,
@@ -849,7 +856,10 @@ namespace vtx::optix
 									IASBuffer.dPointer(),
 									IASBuffer.bytesSize(),
 									&topTraversable,
-									nullptr, 0));
+									&emitDesc, 1));
+
+		OptixAabb aabb;
+		aabbBuffer.download<OptixAabb>(&aabb);
 
 		CUDA_SYNC_CHECK();
 
