@@ -70,7 +70,7 @@ namespace vtx::network
 
             ic                       = InputComposer(device, &settings->inputSettings);
 			const int inputDimension = ic.dimension();
-            policyNetwork            = PathGuidingNetwork(inputDimension, device, &settings->pathGuidingSettings);
+            policyNetwork            = PathGuidingNetwork(inputDimension, device, &settings->pathGuidingSettings, &settings->inputSettings);
             q1Network                = QNetwork(inputDimension + actionDim, 1);
             q2Network                = QNetwork(inputDimension + actionDim, 1);
             q1TargetNetwork          = QNetwork(inputDimension + actionDim, 1);

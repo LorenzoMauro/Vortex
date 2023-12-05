@@ -7,12 +7,7 @@ namespace vtx::distribution
 	torch::Tensor Nasg::normalizationFactor(const torch::Tensor& lambda, const torch::Tensor& a)
 	{
 		torch::Tensor result = 2.0f * (float)M_PI * (1.0f - torch::exp(-2.0f * lambda)) / (lambda * torch::sqrt(1.0f + a));
-		CHECK_TENSOR_HAS_ZERO(result);
-		CHECK_TENSOR_ANOMALY(result);
-		if(CHECK_TENSOR_HAS_ZERO(lambda))
-		{
-			PRINT_TENSORS("Normalization", lambda, a, result);
-		}
+		TRACE_TENSOR(result);
 		return result;
 	}
 
@@ -138,27 +133,27 @@ namespace vtx::distribution
 
 	torch::Tensor Nasg::finalizeRawParams(const torch::Tensor& rawParams, const network::DistributionType& type)
 	{
-		CHECK_TENSOR_ANOMALY(rawParams);
+		TRACE_TENSOR(rawParams);
 		torch::Tensor xAxis, zAxis, lambdaA;
 		switch (type)
 		{
 		case network::D_NASG_TRIG:
-			{
-				std::tie(xAxis, zAxis, lambdaA) = trigonometricParametrization(rawParams);
-			}break;
+		{
+			std::tie(xAxis, zAxis, lambdaA) = trigonometricParametrization(rawParams);
+		}break;
 		case network::D_NASG_ANGLE:
-			{
-				std::tie(xAxis, zAxis, lambdaA) = eulerAngleParametrization(rawParams);
-			}break;
+		{
+			std::tie(xAxis, zAxis, lambdaA) = eulerAngleParametrization(rawParams);
+		}break;
 		case network::D_NASG_AXIS_ANGLE:
-			{
-				std::tie(xAxis, zAxis, lambdaA) = axisAngleParametrization(rawParams);
-			}break;
-		default: ;
+		{
+			std::tie(xAxis, zAxis, lambdaA) = axisAngleParametrization(rawParams);
+		}break;
+		default:;
 		}
-		CHECK_TENSOR_ANOMALY(xAxis);
-		CHECK_TENSOR_ANOMALY(zAxis);
-		CHECK_TENSOR_ANOMALY(lambdaA);
+		TRACE_TENSOR(xAxis);
+		TRACE_TENSOR(zAxis);
+		TRACE_TENSOR(lambdaA);
 		torch::Tensor params = torch::cat({ xAxis, zAxis, lambdaA }, -1);
 		return params;
 	}
@@ -166,16 +161,16 @@ namespace vtx::distribution
 	std::tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor> Nasg::splitParams(
 		const torch::Tensor& params)
 	{
-		torch::Tensor xAxis  = params.narrow(-1, 0, 3);
-		torch::Tensor zAxis  = params.narrow(-1, 3, 3);
+		torch::Tensor xAxis = params.narrow(-1, 0, 3);
+		torch::Tensor zAxis = params.narrow(-1, 3, 3);
 		torch::Tensor lambda = params.narrow(-1, 6, 1);
-		torch::Tensor a      = params.narrow(-1, 7, 1);
+		torch::Tensor a = params.narrow(-1, 7, 1);
 
-		CHECK_TENSOR_ANOMALY(xAxis);
-		CHECK_TENSOR_ANOMALY(zAxis);
-		CHECK_TENSOR_ANOMALY(lambda);
-		CHECK_TENSOR_ANOMALY(a);
-		return { xAxis, zAxis, lambda, a};
+		TRACE_TENSOR(xAxis);
+		TRACE_TENSOR(zAxis);
+		TRACE_TENSOR(lambda);
+		TRACE_TENSOR(a);
+		return { xAxis, zAxis, lambda, a };
 	}
 
 	torch::Tensor Nasg::prob(
@@ -186,31 +181,27 @@ namespace vtx::distribution
 		const torch::Tensor& a
 	)
 	{
-		const torch::Tensor vDotZ = (sample * zAxis).sum(-1, true).clamp(-1.0f + EPS, 1.0f-EPS);
-		const torch::Tensor vDotX       = (sample * xAxis).sum(-1, true);
-		const torch::Tensor scaleValue  = (vDotZ + 1.0f) / 2.0f;
+		const torch::Tensor vDotZ = (sample * zAxis).sum(-1, true).clamp(-1.0f + EPS, 1.0f - EPS);
+		const torch::Tensor vDotX = (sample * xAxis).sum(-1, true);
+		const torch::Tensor scaleValue = (vDotZ + 1.0f) / 2.0f;
 		const torch::Tensor denominator = 1.0f - torch::pow(vDotZ, 2.0f);
-		const torch::Tensor powerValue  = a * torch::pow(vDotX, 2.0f) / denominator;
+		const torch::Tensor powerValue = a * torch::pow(vDotX, 2.0f) / denominator;
 
 		const torch::Tensor pow1 = torch::pow(scaleValue, 1.0f + powerValue);
 		const torch::Tensor pow2 = torch::pow(scaleValue, powerValue);
 		const torch::Tensor g = torch::exp(2.0f * lambda * (pow1 - 1.0f)) * pow2;
 		const torch::Tensor normalization = normalizationFactor(lambda, a);
-		torch::Tensor       finalResult   = g / normalization;
+		torch::Tensor       finalResult = g / normalization;
 
-		//PRINT_TENSOR_ALWAYS("Nasg Prob computation:", sample, zAxis, xAxis, lambda, a, vDotZ, vDotX, scaleValue, denominator, powerValue, pow1, pow2, g, normalization, finalResult);
-		if(CHECK_TENSOR_ANOMALY(finalResult))
-		{
-			CHECK_TENSOR_ANOMALY(vDotZ);
-			CHECK_TENSOR_ANOMALY(vDotX);
-			CHECK_TENSOR_ANOMALY(scaleValue);
-			CHECK_TENSOR_ANOMALY(denominator);
-			CHECK_TENSOR_ANOMALY(powerValue);
-			CHECK_TENSOR_ANOMALY(pow1);
-			CHECK_TENSOR_ANOMALY(pow2);
-			CHECK_TENSOR_ANOMALY(g);
-			VTX_ASSERT_CLOSE(false,"Nasg Prob Anomaly");
-		}
+		TRACE_TENSOR(vDotZ);
+		TRACE_TENSOR(vDotX);
+		TRACE_TENSOR(scaleValue);
+		TRACE_TENSOR(denominator);
+		TRACE_TENSOR(powerValue);
+		TRACE_TENSOR(pow1);
+		TRACE_TENSOR(pow2);
+		TRACE_TENSOR(g);
+		TRACE_TENSOR(finalResult);
 
 		return finalResult;
 	}
@@ -227,34 +218,29 @@ namespace vtx::distribution
 		const torch::Tensor uniform2 = torch::rand_like(lambda);
 
 		// Map epsilons
-		const torch::Tensor s   = torch::exp(-2.0f * lambda) + uniform0 * (1.0f - torch::exp(-2.0f * lambda));
+		const torch::Tensor s = torch::exp(-2.0f * lambda) + uniform0 * (1.0f - torch::exp(-2.0f * lambda));
 		const torch::Tensor rho = -M_PI_2 + uniform1 * M_PI;
 
 		// To Sample Both the East and West Hemispheres by using the sign function
 		const torch::Tensor modifiedUniform2 = (0.5f + 0.5f * sign(uniform2 - 0.5f)) * M_PI;
 
 		// Compute theta and phi based on sampling
-		const torch::Tensor phi   = torch::atan(torch::sqrt(1.0f + a) * torch::tan(rho)) + modifiedUniform2; // 0 to 2PI
-		const torch::Tensor theta = torch::acos(2.0f * torch::pow(torch::log(s) / (2.0f * lambda) + 1.0f,(1.0f + a - a * torch::pow(torch::cos(rho), 2.0f)) / (1.0f + a)) -1.0f); // 0 to PI
+		const torch::Tensor phi = torch::atan(torch::sqrt(1.0f + a) * torch::tan(rho)) + modifiedUniform2; // 0 to 2PI
+		const torch::Tensor theta = torch::acos(2.0f * torch::pow(torch::log(s) / (2.0f * lambda) + 1.0f, (1.0f + a - a * torch::pow(torch::cos(rho), 2.0f)) / (1.0f + a)) - 1.0f); // 0 to PI
 
 		const torch::Tensor v = TransformUtils::cartesianFromSpherical(theta, phi);
 
-		PRINT_TENSOR_SIZE_ALWAYS(transform);
 		torch::Tensor result = matmul(v.unsqueeze(2), transform.unsqueeze(1)).squeeze(2);
-
-		if(CHECK_TENSOR_ANOMALY(result))
-		{
-			CHECK_TENSOR_ANOMALY(uniform0);
-			CHECK_TENSOR_ANOMALY(uniform1);
-			CHECK_TENSOR_ANOMALY(uniform2);
-			CHECK_TENSOR_ANOMALY(s);
-			CHECK_TENSOR_ANOMALY(rho);
-			CHECK_TENSOR_ANOMALY(modifiedUniform2);
-			CHECK_TENSOR_ANOMALY(phi);
-			CHECK_TENSOR_ANOMALY(theta);
-			CHECK_TENSOR_ANOMALY(v);
-			VTX_ASSERT_CLOSE(false,"Nasg Sample Anomaly");
-		}
+		TRACE_TENSOR(uniform0);
+		TRACE_TENSOR(uniform1);
+		TRACE_TENSOR(uniform2);
+		TRACE_TENSOR(s);
+		TRACE_TENSOR(rho);
+		TRACE_TENSOR(modifiedUniform2);
+		TRACE_TENSOR(phi);
+		TRACE_TENSOR(theta);
+		TRACE_TENSOR(v);
+		TRACE_TENSOR(result);
 		return result;
 	}
 

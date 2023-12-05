@@ -33,12 +33,12 @@ namespace vtx {
 		options.rendererSettings.maxSamples = 100000;
 		options.rendererSettings.accumulate = true;
 		options.rendererSettings.samplingTechnique = S_MIS;
-		options.rendererSettings.displayBuffer = FB_BEAUTY;
+		options.rendererSettings.displayBuffer = FB_NETWORK_REPLAY_BUFFER_SAMPLES;
 		options.rendererSettings.minClamp = 0.0001f;
 		options.rendererSettings.maxClamp = 1000.0f;
 		options.rendererSettings.useRussianRoulette = true;
 		options.rendererSettings.runOnSeparateThread = false;
-		options.rendererSettings.isUpdated = false;
+		options.rendererSettings.isUpdated = true;
 
 		options.rendererSettings.adaptiveSamplingSettings.active = false;
 		options.rendererSettings.adaptiveSamplingSettings.noiseKernelSize = 3;
@@ -47,18 +47,18 @@ namespace vtx {
 		options.rendererSettings.adaptiveSamplingSettings.maxPixelSamples = 1;
 		options.rendererSettings.adaptiveSamplingSettings.albedoNormalNoiseInfluence = 1.0f;
 		options.rendererSettings.adaptiveSamplingSettings.noiseCutOff = 0.1f;
-		options.rendererSettings.adaptiveSamplingSettings.isUpdated = false;
+		options.rendererSettings.adaptiveSamplingSettings.isUpdated = true;
 
 		options.rendererSettings.fireflySettings.kernelSize = 3;
 		options.rendererSettings.fireflySettings.threshold = 2.0f;
-		options.rendererSettings.fireflySettings.active = true;
+		options.rendererSettings.fireflySettings.active = false;
 		options.rendererSettings.fireflySettings.start = 200;
-		options.rendererSettings.fireflySettings.isUpdated = false;
+		options.rendererSettings.fireflySettings.isUpdated = true;
 
-		options.rendererSettings.denoiserSettings.active = true;
+		options.rendererSettings.denoiserSettings.active = false;
 		options.rendererSettings.denoiserSettings.denoiserStart = -5;
 		options.rendererSettings.denoiserSettings.denoiserBlend = 0.1f;
-		options.rendererSettings.denoiserSettings.isUpdated = false;
+		options.rendererSettings.denoiserSettings.isUpdated = true;
 
 		options.rendererSettings.toneMapperSettings.whitePoint = { 1.0f, 1.0f, 1.0f };
 		options.rendererSettings.toneMapperSettings.invWhitePoint = { 1.0f, 1.0f, 1.0f };
@@ -68,23 +68,23 @@ namespace vtx {
 		options.rendererSettings.toneMapperSettings.saturation = 1.0f;
 		options.rendererSettings.toneMapperSettings.gamma = 2.2f;
 		options.rendererSettings.toneMapperSettings.invGamma = 1.0f / 2.2f;
-		options.rendererSettings.toneMapperSettings.isUpdated = false;
+		options.rendererSettings.toneMapperSettings.isUpdated = true;
 
-		options.wavefrontSettings.active = false;
+		options.wavefrontSettings.active = true;
 		options.wavefrontSettings.fitWavefront = false;
 		options.wavefrontSettings.optixShade = false;
 		options.wavefrontSettings.parallelShade = false;
 		options.wavefrontSettings.longPathPercentage = 0.25f;
 		options.wavefrontSettings.useLongPathKernel = false;
-		options.wavefrontSettings.isUpdated  = false;
+		options.wavefrontSettings.isUpdated  = true;
 
 		////////////////////////////////////////////////////////////////////////////////////
 		/////////////////// Neural Network Options /////////////////////////////////////////
 		////////////////////////////////////////////////////////////////////////////////////
-		options.networkSettings.active = false; // 10;//
-		options.networkSettings.batchSize = 100000; // 10;//
+		options.networkSettings.active = true; // 10;//
+		options.networkSettings.batchSize = 256000; // 256 * 50;// 100000; // 10;//
 		options.networkSettings.maxTrainingStepPerFrame = 1;
-		options.networkSettings.doInference = true;
+		options.networkSettings.doInference = false;
 		options.networkSettings.doTraining = true;
 		options.networkSettings.maxTrainingSteps = 1000;
 		options.networkSettings.inferenceIterationStart = 1;
@@ -102,11 +102,13 @@ namespace vtx {
 		options.networkSettings.inputSettings.normalEncoding.type = network::E_NONE;
 		options.networkSettings.inputSettings.normalEncoding.features   = 3;
 
+		options.networkSettings.inputSettings.tcnnCompositeEncodingConfig.positionEncoding.otype = network::TcnnEncodingType::Frequency;
+
 		options.networkSettings.pathGuidingSettings.hiddenDim               = 64;
 		options.networkSettings.pathGuidingSettings.numHiddenLayers         = 4;
-		options.networkSettings.pathGuidingSettings.distributionType        = network::D_NASG_AXIS_ANGLE;
+		options.networkSettings.pathGuidingSettings.distributionType        = network::D_SPHERICAL_GAUSSIAN;
 		options.networkSettings.pathGuidingSettings.produceSamplingFraction = false;
-		options.networkSettings.pathGuidingSettings.mixtureSize				= 3;
+		options.networkSettings.pathGuidingSettings.mixtureSize				= 1;
 
 		options.networkSettings.sac.polyakFactor = 0.0001f;
 		options.networkSettings.sac.logAlphaStart = 0.0f;
@@ -116,12 +118,12 @@ namespace vtx {
 		options.networkSettings.sac.qLr = 0.00001f;
 		options.networkSettings.sac.alphaLr = 0.00001f;
 
-		options.networkSettings.npg.learningRate = 0.020f;
+		options.networkSettings.npg.learningRate = 0.01f;
 		options.networkSettings.npg.e = 0.8f;
 		options.networkSettings.npg.constantBlendFactor = false;
 		options.networkSettings.npg.samplingFractionBlend = false;
 		options.networkSettings.npg.lossType = network::L_KL_DIV_MC_ESTIMATION;
-		options.networkSettings.npg.meanLoss = false;
+		options.networkSettings.npg.meanLoss = true;
 		options.networkSettings.npg.absoluteLoss = false;
 
 
@@ -133,7 +135,7 @@ namespace vtx {
 		options.maxDcDepth = 2;
 		options.maxTraversableGraphDepth = 2;
 		options.LaunchParamName = "optixLaunchParams";
-		options.enableCache = true;
+		options.enableCache = false;
 
 		////////////////////////////////////////////////////////////////////////////////////
 		/////////////////// MDL Options ////////////////////////////////////////////////////

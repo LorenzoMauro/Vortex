@@ -402,6 +402,7 @@ namespace vtx {
 		NetworkInterface* networkInterface = nullptr;
 
         OnDeviceSettings settings;
+		OptixAabb              aabb;
 	};
 
     enum TypeRay

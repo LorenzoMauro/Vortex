@@ -283,6 +283,16 @@ namespace vtx::vtxImGui
         return halfWidgetFractionStack.top();
     }
 
+    bool halfSpaceDragInt(const char* label, int* v, float v_speed, int v_min, int v_max, const char* format, ImGuiSliderFlags flags)
+    {
+        return vtxImGui::halfSpaceWidget(label, ImGui::DragInt, (hiddenLabel + label).c_str(), v, v_speed, v_min, v_max, format, flags);
+    }
+
+    bool halfSpaceDragFloat(const char* label, float* v, float v_speed, float v_min, float v_max, const char* format, ImGuiSliderFlags flags)
+    {
+        return vtxImGui::halfSpaceWidget(label, ImGui::DragFloat, (hiddenLabel + label).c_str(), v, v_speed, v_min, v_max, format, flags);
+    }
+
     void DrawRowsBackground(const int row_count, const float line_height, const float x1, const float x2, const float y_offset, const ImU32 col_even, const ImU32 col_odd)
     {
         ImDrawList* draw_list = ImGui::GetWindowDrawList();

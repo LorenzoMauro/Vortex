@@ -4,6 +4,8 @@
 #include <map>
 #include <string>
 
+#include "Networks/TcnnSettings.h"
+
 namespace vtx::network
 {
 	enum LossType
@@ -83,7 +85,6 @@ namespace vtx::network
 	{
 		E_NONE,
 		E_TRIANGLE_WAVE,
-
 		E_COUNT
 	};
 
@@ -135,6 +136,7 @@ namespace vtx::network
 		EncodingSettings positionEncoding;
 		EncodingSettings woEncoding;
 		EncodingSettings normalEncoding;
+		TcnnCompositeEncodingConfig tcnnCompositeEncodingConfig;
 		bool isUpdated = true;
 	};
 

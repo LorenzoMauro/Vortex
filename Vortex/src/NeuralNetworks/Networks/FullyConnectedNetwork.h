@@ -18,20 +18,22 @@ namespace vtx::network
             const ActivationType hiddenActivation = AT_RELU,
             const ActivationType outputActivation = AT_NONE)
         {
-            std::vector<int64_t> layerSize;
+            std::vector<int64_t> networkShape = { inputDim };
             std::vector<ActivationType> activationTypes;
-            layerSize.push_back(inputDim);
 
-            for (int i = 0; i < numberOfHiddenLayers - 1; i++)
+            for (int i = 0; i < numberOfHiddenLayers; i++)
             {
-                layerSize.push_back(hiddenSize);
-                activationTypes.push_back(hiddenActivation);
+                networkShape.push_back(hiddenSize);
             }
 
-            layerSize.push_back(outputDim);
-            activationTypes.push_back(outputActivation);
+            for (int i = 0; i < numberOfHiddenLayers; i++)
+            {
+                activationTypes.push_back(AT_RELU);
+            }
+            networkShape.push_back(outputDim);
+            activationTypes.push_back(AT_NONE);
 
-            init(layerSize, activationTypes);
+            init(networkShape, activationTypes);
         }
 
         FcNetworkImpl(

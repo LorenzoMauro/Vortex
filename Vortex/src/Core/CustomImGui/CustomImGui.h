@@ -41,7 +41,8 @@ namespace vtx::vtxImGui
         const float labelFraction = getHalfWidgetFraction();
 
         // Calculate the size of the text and button
-		const float totalItemWidth = ImGui::CalcItemWidth();
+        //const float totalItemWidth = ImGui::CalcItemWidth();
+        const float totalItemWidth = ImGui::GetContentRegionAvail().x;
 
         const float labelWidth = totalItemWidth * labelFraction;
         const float widgetWidth = totalItemWidth * (1.0f - labelFraction);
@@ -69,6 +70,23 @@ namespace vtx::vtxImGui
         ImGui::PopID();
 
         return valueChanged;
+    }
+
+    bool halfSpaceDragInt(const char* label, int* v, float v_speed = 1.0f, int v_min = 0, int v_max = 0, const char* format = "%d", ImGuiSliderFlags flags = 0);
+
+    bool halfSpaceDragFloat(const char* label, float* v, float v_speed = 1.0f, float v_min = 0.0f, float v_max = 0.0f, const char* format = "%.3f", ImGuiSliderFlags flags = 0);
+
+    template<typename Enum>
+    bool halfSpaceCombo(const char* label, Enum& enumVariable, const char* const enumNames[], int enumCount)
+    {
+        int intEnum = (int)enumVariable;
+        bool isUpdated = false;
+        if (vtxImGui::halfSpaceWidget(label, (ComboFuncType)ImGui::Combo, (hiddenLabel + label).c_str(), &intEnum, enumNames, enumCount, -1))
+        {
+            isUpdated = true;
+            enumVariable = static_cast<Enum>(intEnum);
+        }
+        return isUpdated;
     }
 
     void DrawRowsBackground(int row_count, float line_height, float x1, float x2, float y_offset, ImU32 col_even, ImU32 col_odd);

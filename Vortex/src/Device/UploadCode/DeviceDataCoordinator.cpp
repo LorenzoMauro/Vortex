@@ -253,7 +253,9 @@ namespace vtx::device
 				optixInstancesVector.push_back(instance.second);
 			}
 
-			launchParamsData.editableHostImage().topObject = optix::createInstanceAcceleration(optixInstancesVector, launchParamsData.editableHostImage().topObject);
+			OptixAabb aabb;
+			launchParamsData.editableHostImage().topObject = optix::createInstanceAcceleration(optixInstancesVector, launchParamsData.editableHostImage().topObject, &aabb);
+			launchParamsData.editableHostImage().aabb = aabb;
 			launchParamsData.editableHostImage().instances = launchParamsData.resourceBuffers.instancesBuffer.upload(instances);
 			instanceDataMap.isMapChanged = false;
 		}

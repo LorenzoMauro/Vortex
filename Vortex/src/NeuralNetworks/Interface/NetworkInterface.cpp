@@ -1,5 +1,7 @@
 #include "NetworkInterface.h"
 
+#include <random>
+
 #include "InferenceQueries.h"
 #include "NpgTrainingData.h"
 #include "Paths.h"
@@ -37,10 +39,13 @@ namespace vtx
 			const unsigned        chronoSeed = std::chrono::system_clock::now().time_since_epoch().count();
 			std::vector<unsigned> seeds(maxDatasetSize);
 			unsigned              seed = tea<4>(frameId, chronoSeed);
+			std::mt19937 mt(chronoSeed); // Initialize with chronoSeed
+
 			for (int i = 0; i < maxDatasetSize; i++)
 			{
-				lcg(seed);
-				seeds[i] = seed;
+				seeds[i] = mt();
+				//lcg(seed);
+				//seeds[i] = seed;
 			}
 			lcgSeeds = networkInterfaceBuffers.seedsBuffer.upload(seeds);
 			VTX_INFO("Allocating ReplayBuffer and NpgTrainingData");

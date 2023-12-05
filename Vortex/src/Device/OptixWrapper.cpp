@@ -790,7 +790,7 @@ namespace vtx::optix
 
 	static CUDABuffer IASBuffer;
 
-	OptixTraversableHandle createInstanceAcceleration(const std::vector<OptixInstance>& optixInstances, OptixTraversableHandle& topTraversable)
+	OptixTraversableHandle createInstanceAcceleration(const std::vector<OptixInstance>& optixInstances, OptixTraversableHandle& topTraversable, OptixAabb* aabb)
 	{
 		//CUDA_SYNC_CHECK();
 		VTX_INFO("Optix Wrapper: Computing TLAS");
@@ -858,8 +858,7 @@ namespace vtx::optix
 									&topTraversable,
 									&emitDesc, 1));
 
-		OptixAabb aabb;
-		aabbBuffer.download<OptixAabb>(&aabb);
+		aabbBuffer.download<OptixAabb>(aabb);
 
 		CUDA_SYNC_CHECK();
 

@@ -98,5 +98,128 @@ namespace vtx::network
         }
     }
 
+    static TensorDebugger* tensorCallStackInstance = nullptr;
+
+    TensorDebugger& TensorDebugger::get()
+    {
+        if (tensorCallStackInstance == nullptr)
+        {
+            tensorCallStackInstance = new TensorDebugger();
+        }
+        return *tensorCallStackInstance;
+    }
+
+    std::tuple<bool, bool, bool> hasValues(const torch::Tensor& tensor)
+    {
+	    const bool hasNan = tensor.isnan().any().item<bool>();
+		const bool hasInf = tensor.isinf().any().item<bool>();
+		const bool hasZero = tensor.eq(0).any().item<bool>();
+		return std::make_tuple(hasNan, hasInf, hasZero);
+	}
+
+    void printTensorInfo(const std::string& scope, const std::string& name, const torch::Tensor& tensor, bool printTensor = false, bool gradient = false)
+    {
+	    const auto [hasNan, hasInf, hasZero] = hasValues(tensor);
+        torch::Tensor t = tensor;
+        if (gradient)
+        {
+            t = tensor.grad();
+            if(!t.defined()) return;
+            std::cout << "GRADIENT ";
+		}
+
+        std::cout << "Tensor : " << name << " Size: " << t.sizes() << " Type: " << t.dtype();
+		if (hasNan)
+		{
+            std::cout << " has NaN values!";
+		}
+		if (hasInf)
+		{
+            std::cout << " has Inf values!";
+		}
+		if (hasZero)
+		{
+			std::cout << " has zero values!";
+		}
+        std::cout << "\n\tScope: " << scope << "\n";
+        if (printTensor)
+        {
+	        std::cout << t << std::endl;
+		}
+        std::cout << std::endl;
+	}
+
+    void printGradientStack()
+    {
+        VTX_WARN("GRADIENT STACK:");
+	    const auto& tensors = TensorDebugger::get().tensors;
+		for (int i = 0; i< tensors.size(); i++)
+		{
+			const auto& [scope, name, tensor] = tensors[i];
+			if(tensor.is_leaf() && tensor.grad().defined())
+			{
+                const torch::Tensor& grad = tensor.grad();
+                printTensorInfo(scope, name, grad, false, true);
+			}
+		}
+    }
+
+	bool TensorDebugger::analyzeGradients()
+    {
+		const auto& tensors = TensorDebugger::get().tensors;
+        for (int i = 0; i< tensors.size(); i++)
+        {
+            const auto& [scope, name, tensor] = tensors[i];
+            if(tensor.is_leaf() && tensor.grad().defined())
+            {
+                const torch::Tensor& grad = tensor.grad();
+                auto [hasNan, hasInf, hasZero] = hasValues(grad);
+                if (hasNan || hasInf)
+                {
+                    VTX_ERROR("{} GRADIENT has {} values!", name, (hasNan) ? "NaN" : "Inf");
+                    return true;
+				}
+            }
+        }
+        return false;
+    }
+
+    void TensorDebugger::push(const std::string& scope, const std::string& name, const torch::Tensor& tensor)
+    {
+        if (!tensor.defined()) return;
+
+        get().tensors.emplace_back(scope, name, tensor);
+		auto [hasNan, hasInf, hasZero] = hasValues(tensor);
+        if (hasNan || hasInf)
+        {
+            VTX_ERROR("{} has {} values!", name, (hasNan) ? "NaN" : "Inf");
+            TensorDebugger::printStack();
+            __debugbreak();
+        }
+    }
+
+    void TensorDebugger::clear()
+    {
+		get().tensors.clear();
+    }
+
+    void TensorDebugger::printStack()
+    {
+        VTX_WARN("Tensor Call Stack:");
+        const auto& tensors = TensorDebugger::get().tensors;
+        for(int i=0; i<tensors.size(); i++)
+        {
+            auto [scope, name, tensor] = tensors[i];
+            printTensorInfo(scope, name, tensor, false, false);
+		}
+        
+    }
+
+    TensorDebugger::~TensorDebugger()
+    {
+		get().clear();
+	    delete tensorCallStackInstance;
+    }
+
 }
 

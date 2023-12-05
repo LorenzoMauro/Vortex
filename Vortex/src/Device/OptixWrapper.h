@@ -187,7 +187,7 @@ namespace vtx::optix
 
 	OptixInstance createInstance(uint32_t instanceId, const math::affine3f& transform, OptixTraversableHandle traversable);
 
-	OptixTraversableHandle createInstanceAcceleration(const std::vector<OptixInstance>& optixInstances, OptixTraversableHandle& topTraversable);
+	OptixTraversableHandle createInstanceAcceleration(const std::vector<OptixInstance>& optixInstances, OptixTraversableHandle& topTraversable, OptixAabb* aabb);
 
 
 }

@@ -4,7 +4,8 @@
 
 #include "FullyConnectedNetwork.h"
 #include "NeuralNetworks/NetworkSettings.h"
-
+#include "tcnn/TcnnTorchModule.h"
+#define TCNN
 namespace vtx::network
 {
 	
@@ -16,8 +17,8 @@ namespace vtx::network
 		PathGuidingNetwork(
 			const int& _inputDim,
 			const torch::Device& _device,
-			PathGuidingNetworkSettings* _settings
-			);
+			PathGuidingNetworkSettings* _settings,
+			InputSettings* _inputSettings);
 
 		void init();
 
@@ -35,14 +36,19 @@ namespace vtx::network
 
 		int getMixtureParameterCount();
 
+		std::tuple<torch::Tensor&, torch::Tensor&, torch::Tensor&> run(const torch::Tensor& input);
+
 	private:
 
 		void computeOutputDim();
 
-		std::tuple<torch::Tensor&, torch::Tensor&, torch::Tensor&> run(const torch::Tensor& input);
 
 	public:
+#ifdef TCNN
+		torchTcnn::TcnnModule network;
+#else
 		FcNetwork network;
+#endif
 		int64_t inputDim;
 		int64_t outputDim;
 
@@ -56,6 +62,7 @@ namespace vtx::network
 		torch::Device device = torch::kCPU;
 
 		PathGuidingNetworkSettings* settings = nullptr;
+		InputSettings*                         inputSettings;
 	};
 }
 

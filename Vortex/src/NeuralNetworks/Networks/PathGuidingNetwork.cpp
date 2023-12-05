@@ -4,10 +4,12 @@
 
 namespace vtx::network
 {
+	
 
-	PathGuidingNetwork::PathGuidingNetwork(const int& _inputDim, const torch::Device& _device, PathGuidingNetworkSettings* _settings)
+	PathGuidingNetwork::PathGuidingNetwork(const int& _inputDim, const torch::Device& _device, PathGuidingNetworkSettings* _settings, InputSettings* _inputSettings)
 	{
 		settings = _settings;
+		inputSettings = _inputSettings;
 		device = _device;
 		inputDim = _inputDim;
 		init();
@@ -16,29 +18,17 @@ namespace vtx::network
 	void PathGuidingNetwork::init()
 	{
 		computeOutputDim();
-		std::vector<int64_t> networkShape = { inputDim };
-		std::vector<ActivationType> activationTypes;
-
-		for (int i = 0; i < settings->numHiddenLayers; i++)
-		{
-			networkShape.push_back(settings->hiddenDim);
-		}
-
-		for (int i = 0; i < settings->numHiddenLayers; i++)
-		{
-			activationTypes.push_back(AT_RELU);
-		}
-		networkShape.push_back(outputDim);
-		activationTypes.push_back(AT_NONE);
-		network = FcNetwork(networkShape, activationTypes);
+#ifdef TCNN
+		network = torchTcnn::build(outputDim, settings, inputSettings);
+#else
+		network = FcNetwork(inputDim, outputDim, settings->numHiddenLayers);
+#endif
 		network->to(device);
 	}
 
 	torch::Tensor PathGuidingNetwork::evaluate(const torch::Tensor& input, const torch::Tensor& sample)
 	{
 		run(input);
-		PRINT_TENSORS("PGN RUN", cTensor, mixtureWeights, mixtureParameters);
-
 		return distribution::Mixture::prob(sample, mixtureParameters, mixtureWeights, settings->distributionType);
 	}
 
@@ -101,26 +91,25 @@ namespace vtx::network
 	}
 
 	std::tuple<torch::Tensor&, torch::Tensor&, torch::Tensor&> PathGuidingNetwork::run(const torch::Tensor& input) {
-		const torch::Tensor output = network->forward(input);
-		CHECK_TENSOR_ANOMALY(output);
-
+		torch::Tensor output = network->forward(input);
+		TRACE_TENSOR(output);
 		torch::Tensor rawMixtureParameters = output.narrow(1, 0, mixtureParametersCount);
 		rawMixtureParameters = rawMixtureParameters.view({ input.size(0), settings->mixtureSize, distributionParametersCount });
+		TRACE_TENSOR(rawMixtureParameters);
 		mixtureParameters = distribution::Mixture::finalizeParams(rawMixtureParameters, settings->distributionType);
-		CHECK_TENSOR_ANOMALY(mixtureParameters);
+		TRACE_TENSOR(mixtureParameters);
 
 		const torch::Tensor rawMixtureWeights = output.narrow(1, mixtureParametersCount, settings->mixtureSize);
 		mixtureWeights = softmax(rawMixtureWeights, 1);
-		CHECK_TENSOR_ANOMALY(mixtureWeights);
+		TRACE_TENSOR(mixtureWeights);
 
 		if (settings->produceSamplingFraction)
 		{
 			const torch::Tensor rawSamplingFraction = output.narrow(1, mixtureParametersCount + settings->mixtureSize, 1);
 			cTensor                           = sigmoid(rawSamplingFraction);
-			CHECK_TENSOR_ANOMALY(cTensor);
+			TRACE_TENSOR(cTensor);
 		}
 
-		PRINT_TENSORS("PGN RUN", cTensor, mixtureWeights, mixtureParameters);
 		return { mixtureParameters, mixtureWeights, cTensor };
 	}
 

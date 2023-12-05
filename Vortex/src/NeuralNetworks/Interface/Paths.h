@@ -387,20 +387,26 @@ namespace vtx {
 
 			// we don't want to select the last bounce which is either termination or miss shader
 			// but some paths might have just one bounce, so we need to handle that case
-			if (maxDepth == 0)
-			{
-				// This is not going to happen as it is because of how the setBounceAsTerminal is implemented
-				*selectedDepth = 0;
+			if(false){
+				if (maxDepth == 0)
+				{
+					// This is not going to happen as it is because of how the setBounceAsTerminal is implemented
+					*selectedDepth = 0;
+				}
+				else
+				{
+					const float rnd2 = rng(seed);
+					*selectedDepth = (int)round(rnd2 * (float)(maxDepth - 1));
+					assert(*selectedDepth < maxDepth);
+					assert(*selectedDepth >= 0);
+				}
 			}
 			else
 			{
-				const float rnd2 = rng(seed);
-				*selectedDepth = (int)round(rnd2 * (float)(maxDepth - 1));
-				assert(*selectedDepth < maxDepth);
-				assert(*selectedDepth >= 0);
+				*selectedDepth = 0;
 			}
 
-			*selectedDepth = 0;
+
 		}
 
 		struct Hit
@@ -480,6 +486,30 @@ namespace vtx {
 			hit->position = bounce.hit.position;
 			hit->normal = bounce.hit.normal;
 			hit->wOutgoing = bounce.outgoingDirection;
+			bool print = false;
+			//printf("Seed: %u SampledPixel: %d, SampledDepth: %d\n", seed, sampledPixel, sampledDepth);
+			if(print)
+			{
+				printf(
+					"Seed: %u\n"
+					" sampledPixel: %d, sampledDepth: %d, isTerminal: %d\n"
+					"Position (%f, %f, %f)\n"
+					"Normal (%f, %f, %f)\n"
+					"wOutgoing (%f, %f, %f)\n"
+					"Bsdf Prob %f\n"
+					"Light Contribution (%f, %f, %f)\n"
+					"wIncoming (%f, %f, %f)\n",
+					seed,
+					sampledPixel, sampledDepth, isTerminal,
+					hit->position.x, hit->position.y, hit->position.z,
+					hit->normal.x, hit->normal.y, hit->normal.z,
+					hit->wOutgoing.x, hit->wOutgoing.y, hit->wOutgoing.z,
+					lightContribution->bsdfProb,
+					lightContribution->outLight.x, lightContribution->outLight.y, lightContribution->outLight.z,
+					lightContribution->wIncoming.x, lightContribution->wIncoming.y, lightContribution->wIncoming.z
+				);
+			}
+			
 		}
 
 		__forceinline__ __device__ void getRandomLightSamplePath(

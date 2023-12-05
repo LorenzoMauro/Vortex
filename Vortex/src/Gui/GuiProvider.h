@@ -3,6 +3,7 @@
 #include <vector>
 
 #include "Gui/PlottingWrapper.h"
+#include "NeuralNetworks/Networks/TcnnSettings.h"
 
 namespace vtx
 {
@@ -61,6 +62,15 @@ namespace vtx::gui
 		static bool drawEditGui(network::NpgSettings& settings);
 		static bool drawEditGui(network::TrainingBatchGenerationSettings& settings);
 		static bool drawEditGui(network::NetworkSettings& settings);
+
+
+		static bool drawEditGui(network::FrequencyEncoding& config);
+		static bool drawEditGui(network::GridEncoding& config);
+		static bool drawEditGui(network::IdentityEncoding& config);
+		static bool drawEditGui(network::OneBlobEncoding& config);
+		static bool drawEditGui(network::SphericalHarmonicsEncoding& config);
+		static bool drawEditGui(network::TriangleWaveEncoding& config);
+		static bool drawEditGui(const std::string& featureName, network::TcnnEncodingConfig& config);
 
 		static void drawDisplayGui(network::EncodingSettings& settings, const std::string& encodedFeatureName);
 		static void drawDisplayGui(network::InputSettings& settings);

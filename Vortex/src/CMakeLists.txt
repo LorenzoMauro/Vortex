@@ -7,8 +7,8 @@ file(GLOB_RECURSE HEADERS "*.h")
 file(GLOB CUDA_FUNCTIONS "${CMAKE_CURRENT_SOURCE_DIR}/Device/CudaFunctions/*.cu")
 file(GLOB DEVICE_CUDA "${CMAKE_CURRENT_SOURCE_DIR}/Device/DevicePrograms/Cuda/*.cu")
 file(GLOB NETWORK_CUDA "${CMAKE_CURRENT_SOURCE_DIR}/NeuralNetworks/*.cu")
-file(GLOB TCNN_CUDA "${CMAKE_CURRENT_SOURCE_DIR}/NeuralNetworks/Networks/tcnn/*.cu")
-list(APPEND STANDARD_CUDA_COMPILE_FILES ${CUDA_FUNCTIONS} ${DEVICE_CUDA} ${NETWORK_CUDA} ${TCNN_CUDA})
+#file(GLOB TCNN_CUDA "${CMAKE_CURRENT_SOURCE_DIR}/NeuralNetworks/Networks/tcnn/*.cu")
+list(APPEND STANDARD_CUDA_COMPILE_FILES ${CUDA_FUNCTIONS} ${DEVICE_CUDA} ${NETWORK_CUDA})
 
 #Vortex CU files to be compiled to intermediate representation
 file(GLOB PTX_COMPILE_FILES "${CMAKE_CURRENT_SOURCE_DIR}/Device/DevicePrograms/ptx/*.cu")

@@ -8,7 +8,6 @@ namespace vtx::distribution
 
     torch::Tensor Mixture::finalizeParams(torch::Tensor& mixtureParameters, const network::DistributionType& type)
     {
-        PRINT_TENSORS("Mixture::finalizeParams", mixtureParameters);
         if (type == network::DistributionType::D_SPHERICAL_GAUSSIAN)
         {
             return SphericalGaussian::finalizeRawParams(mixtureParameters);
@@ -30,7 +29,7 @@ namespace vtx::distribution
         // expand x if not 3D to match the Batch Size x Mixture Size x x last dim
 
 		const torch::Tensor expandedX = x.unsqueeze(1).expand({ -1, mixtureParams.size(1), -1 });
-        PRINT_TENSORS("Mixture::prob", expandedX, mixtureParams, mixtureWeights);
+        TRACE_TENSOR(expandedX);
         torch::Tensor prob;
         if (type == network::DistributionType::D_SPHERICAL_GAUSSIAN)
         {
@@ -44,14 +43,12 @@ namespace vtx::distribution
         {
             VTX_ERROR("Mixture::prob not implemented for this distribution type");
         }
-
+        TRACE_TENSOR(prob);
         // Weighing the probability of each mixture
         // mixtureWeights is in the shape Batch Size x Mixture Size
         torch::Tensor weightedP = prob * mixtureWeights.unsqueeze(-1);
         weightedP = weightedP.sum(1);
-
-        PRINT_TENSORS("VON MISES MIXTURE PROB", expandedX, mixtureParams, prob);
-        CHECK_TENSOR_ANOMALY(weightedP);
+        TRACE_TENSOR(weightedP);
         return weightedP;
     }
 
@@ -85,8 +82,8 @@ namespace vtx::distribution
 
 
         torch::Tensor prob = Mixture::prob(sampleTensor, mixtureParams, mixtureWeights, type);
-        CHECK_TENSOR_ANOMALY(sampleTensor);
-        CHECK_TENSOR_ANOMALY(prob);
+        TRACE_TENSOR(sampleTensor);
+        TRACE_TENSOR(prob);
         return { sampleTensor, prob };
     }
 

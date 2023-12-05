@@ -1,8 +1,8 @@
 #include "Application.h"
-#include "NeuralNetworks/Networks/tcnn/tcnnWrapper.h"
+#include "NeuralNetworks/Networks/tcnn/test.h"
 
 int main(const int argc, char** argv) {
-	testTCNN();
+	testTccnTorch();
 	vtx::Log::Init();
 	vtx::Application app = vtx::Application();
 	app.init();

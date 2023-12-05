@@ -3,6 +3,7 @@
 #include "NeuralNetworks/NeuralNetworkGraphs.h"
 #include "NeuralNetworks/tools.h"
 
+#define SCALE_EPS 0.01f
 namespace vtx::distribution
 {
     torch::Tensor SphericalGaussian::sample(const torch::Tensor& loc, const torch::Tensor& scale) {
@@ -27,22 +28,38 @@ namespace vtx::distribution
         u = u / (u.norm(2, 1, true) + EPS);
         auto sample = x - 2 * (x * u).sum(-1, true) * u;
 
-        PRINT_TENSORS("VON MISES SAMPLE", loc, scale, uniform, w, w_, v, x, e1, u, sample);
+        TRACE_TENSOR(loc);
+        TRACE_TENSOR(scale);
+        TRACE_TENSOR(uniform);
+        TRACE_TENSOR(w);
+        TRACE_TENSOR(w_);
+        TRACE_TENSOR(v);
+        TRACE_TENSOR(x);
+        TRACE_TENSOR(e1);
+        TRACE_TENSOR(u);
+        TRACE_TENSOR(sample);;
 
         return sample;
     }
 
     torch::Tensor SphericalGaussian::prob(const torch::Tensor& x, const torch::Tensor& loc, const torch::Tensor& scale)
     {
-        torch::Tensor p = scale / (2.0f * M_PI_F * (1.0f - torch::exp(-2.0f * scale))) * torch::exp(scale * ((loc * x).sum(-1).unsqueeze(-1) - 1.0f));
-        PRINT_TENSORS("VON MISES PROB", x, loc, scale, p);
+        const torch::Tensor a = (2.0f * M_PI_F * (1.0f - torch::exp(-2.0f * scale)));
+        const torch::Tensor b = torch::exp(scale * ((loc * x).sum(-1).unsqueeze(-1) - 1.0f))toPrecision;
+        torch::Tensor p = scale / a * b;
+        TRACE_TENSOR(a);
+        TRACE_TENSOR(b);
+        TRACE_TENSOR(p);
         return p;
     }
 
     torch::Tensor SphericalGaussian::logLikelihood(const torch::Tensor& x, const torch::Tensor& loc, const torch::Tensor& scale) {
 
         torch::Tensor logP = torch::log(prob(x, loc, scale) + EPS);
-        PRINT_TENSORS("VON MISES LOG LIKELIHOOD", x, loc, scale, logP);
+        TRACE_TENSOR(x);
+        TRACE_TENSOR(loc);
+        TRACE_TENSOR(scale);
+        TRACE_TENSOR(logP);
         return logP;
     }
 
@@ -55,9 +72,9 @@ namespace vtx::distribution
 
     torch::Tensor SphericalGaussian::prob(const torch::Tensor& x, const torch::Tensor& params)
     {
-        PRINT_TENSORS("VON MISES PROB", x, params);
         auto [loc, scale] = splitParams(params);
-        PRINT_TENSORS("VON MISES PROB", x, loc, scale);
+        TRACE_TENSOR(loc);
+        TRACE_TENSOR(scale);
         return prob(x, loc, scale);
     }
 
@@ -79,11 +96,14 @@ namespace vtx::distribution
         // The dimension is Batch Size x Distribution Parameters Count
         // Extracting means and k for all mixtures at once
         auto [loc, scale] = splitParams(params);
-        PRINT_TENSORS("VON MISES RAW PARAMS", loc, scale);
+        TRACE_TENSOR(loc);
+        TRACE_TENSOR(scale);
+        loc = loc + EPS;
         torch::Tensor locNorm = linalg_vector_norm(loc, 2, -1, true);
-        loc                 = loc / locNorm;
-        scale               = softplus(scale) + EPS;
-        PRINT_TENSORS("VON MISES PARAMS", loc, scale);
+        loc                 = loc / (locNorm);
+        scale               = softplus(scale) + SCALE_EPS;
+        TRACE_TENSOR(loc);
+        TRACE_TENSOR(scale);
         // Stacking them along the last dimension
         torch::Tensor elaboratedParams = torch::cat({ loc, scale }, params.dim() - 1);
         return elaboratedParams;

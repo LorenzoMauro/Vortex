@@ -5,6 +5,95 @@
 
 namespace vtx::gui
 {
+	bool GuiProvider::drawEditGui(network::FrequencyEncoding& config)
+	{
+		bool isUpdated = vtxImGui::halfSpaceWidget("Frequency Count", ImGui::DragInt, (hiddenLabel + "Frequency Count").c_str(), &config.n_frequencies, 1.0f, 1, 50, "%d", 0);
+
+		return isUpdated;
+		
+	}
+
+	bool GuiProvider::drawEditGui(network::GridEncoding& config)
+	{
+		bool isUpdated = false;
+		isUpdated = vtxImGui::halfSpaceCombo("Grid Type", config.otype, network::GridTypeName, (int)network::GridType::GridTypeCount);
+		isUpdated |= vtxImGui::halfSpaceDragInt("Level Count", &config.n_levels, 1.0f, 1, 50);
+		isUpdated |= vtxImGui::halfSpaceDragInt("Features Per Level", &config.n_features_per_level, 1.0f, 1, 50, "%d", 0);
+		isUpdated |= vtxImGui::halfSpaceDragInt("Log2 Hashmap Size", &config.log2_hashmap_size, 1.0f, 1, 50, "%d", 0);
+		isUpdated |= vtxImGui::halfSpaceDragInt("Base resolution",  &config.base_resolution, 1.0f, 1, 50, "%d", 0);
+		isUpdated |= vtxImGui::halfSpaceDragFloat("Level Scale",  &config.per_level_scale, 0.1f, 1.0, 10.0, "%.10f", 0);
+		isUpdated |= vtxImGui::halfSpaceCombo("Interpolation", config.interpolation, network::InterpolationTypeName, (int)network::InterpolationType::InterpolationTypeCount);
+		return isUpdated;
+
+	}
+
+	bool GuiProvider::drawEditGui(network::IdentityEncoding& config)
+	{
+		bool isUpdated = false;
+
+		vtxImGui::halfSpaceDragFloat("Scale", &config.scale, 0.1f, 0.0f, 10.0f, "%.10f", 0);
+		vtxImGui::halfSpaceDragFloat("Offset", &config.offset, 0.1f, 0.0f, 10.0f, "%.10f", 0);
+
+		return isUpdated;
+
+	}
+
+	bool GuiProvider::drawEditGui(network::OneBlobEncoding& config)
+	{
+		bool isUpdated = false;
+		isUpdated |= vtxImGui::halfSpaceDragInt("Bins", &config.n_bins, 1.0f, 1, 50, "%d", 0);
+		return isUpdated;
+
+	}
+
+	bool GuiProvider::drawEditGui(network::SphericalHarmonicsEncoding& config)
+	{
+		bool isUpdated = false;
+		isUpdated |= vtxImGui::halfSpaceDragInt("Degree", &config.degree, 1.0f, 1, 50, "%d", 0);
+		return isUpdated;
+
+	}
+
+	bool GuiProvider::drawEditGui(network::TriangleWaveEncoding& config)
+	{
+		bool isUpdated = false;
+		isUpdated |= vtxImGui::halfSpaceDragInt("Frequencies", &config.n_frequencies, 1.0f, 1, 50, "%d", 0);
+		return isUpdated;
+
+	}
+
+	bool GuiProvider::drawEditGui(const std::string& featureName, network::TcnnEncodingConfig& config)
+	{
+		bool isUpdated = false;
+		if (ImGui::CollapsingHeader((featureName).c_str()))
+		{
+			isUpdated = vtxImGui::halfSpaceCombo("Encoding Type", config.otype, network::TcnnEncodingTypeName, (int)network::TcnnEncodingType::TcnnEncodingTypeCount);
+			switch(config.otype)
+			{
+			case network::TcnnEncodingType::Frequency:
+				isUpdated |= drawEditGui(config.frequencyEncoding);
+					break;
+			case network::TcnnEncodingType::Grid:
+				isUpdated |= drawEditGui(config.gridEncoding);
+					break;
+			case network::TcnnEncodingType::Identity:
+				isUpdated |= drawEditGui(config.identityEncoding);
+					break;
+			case network::TcnnEncodingType::OneBlob:
+				isUpdated |= drawEditGui(config.oneBlobEncoding);
+					break;
+			case network::TcnnEncodingType::SphericalHarmonics:
+				isUpdated |= drawEditGui(config.sphericalHarmonicsEncoding);
+					break;
+			case network::TcnnEncodingType::TriangleWave:
+				isUpdated |= drawEditGui(config.triangleWaveEncoding);
+				break;
+			default: ;
+			}
+		}
+
+		return isUpdated;
+	}
 	bool GuiProvider::drawEditGui(network::EncodingSettings& settings, const std::string& encodedFeatureName)
 	{
 		if (ImGui::CollapsingHeader((encodedFeatureName).c_str()))
@@ -39,9 +128,9 @@ namespace vtx::gui
 		if (ImGui::CollapsingHeader("Network Input Settings"))
 		{
 			ImGui::Indent();
-			settings.isUpdated |= GuiProvider::drawEditGui(settings.positionEncoding, "Position");
-			settings.isUpdated |= GuiProvider::drawEditGui(settings.woEncoding, "Outgoing Direction");
-			settings.isUpdated |= GuiProvider::drawEditGui(settings.normalEncoding, "Normal");
+			settings.isUpdated |= GuiProvider::drawEditGui("Position", settings.tcnnCompositeEncodingConfig.positionEncoding);
+			settings.isUpdated |= GuiProvider::drawEditGui("Normal", settings.tcnnCompositeEncodingConfig.normalEncoding);
+			settings.isUpdated |= GuiProvider::drawEditGui("Outgoing Direction", settings.tcnnCompositeEncodingConfig.directionEncoding);
 			ImGui::Unindent();
 		}
 		return settings.isUpdated;

@@ -68,7 +68,6 @@ namespace vtx
 			}
 
 			unsigned& seed = lcgSeeds[trainingDatasetIdx];
-
 			Paths::Hit hit;
 			Paths::Hit* nextHit = nullptr;
 			if (settings.type == network::NT_SAC)

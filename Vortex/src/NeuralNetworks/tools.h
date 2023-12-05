@@ -8,15 +8,18 @@
 
 #define MAX_CONCENTRATION 50.0f
 #define M_PI_F (float)M_PI
-#define EPS 1e-6f
+#define EPS 1e-4f
 
+#ifdef USE_HALF_PRECISION
+#define TO_TYPE .to(torch::kHalf)
+#else
+#define toPrecision 
+#endif
 
 //#define DEBUG_TENSORS
 //#define CHECK_ANOMALY
+//#define TENSOR_DEBUGGER
 
-#ifdef DEBUG
-#define CHECK_ANOMALY
-#endif
 inline static constexpr bool falseValue = false;
 namespace vtx::network
 {
@@ -33,6 +36,35 @@ namespace vtx::network
     bool checkTensorAnomaly(const torch::Tensor& tensor, const std::string& tensorName = "", const std::string& fileName ="", const int& line =-1);
     bool checkTensorHasZero(const torch::Tensor& tensor, const std::string& tensorName = "", const std::string& fileName ="", const int& line =-1);
 
+    class TensorDebugger
+    {
+    public:
+        static TensorDebugger& get();
+		static bool analyzeGradients();
+        static void push(const std::string& scope, const std::string& name, const torch::Tensor& tensor);
+        static void clear();
+        static void printStack();
+        ~TensorDebugger();
+	    std::vector<std::tuple<std::string, std::string, torch::Tensor>> tensors;
+    private:
+        TensorDebugger() = default;
+        TensorDebugger(const TensorDebugger&) = delete;
+        TensorDebugger& operator=(const TensorDebugger&) = delete;
+        TensorDebugger(TensorDebugger&&) = delete;
+    };
+
+#if defined(_DEBUG) || defined(TENSOR_DEBUGGER)
+#define TRACE_TENSOR(tensor) vtx::network::TensorDebugger::push(std::string(__FUNCSIG__),#tensor, tensor)
+#define CLEAR_TENSOR_DEBUGGER() vtx::network::TensorDebugger::clear()
+#define PRINT_TRACED_TENSORS() vtx::network::TensorDebugger::printStack()
+#define ANALYZE_TRACED_TENSOR_GRADIENTS() vtx::network::TensorDebugger::analyzeGradients()
+#else
+#define TRACE_TENSOR(tensor)
+#define CLEAR_TENSOR_DEBUGGER()
+#define PRINT_TRACED_TENSORS()
+#define ANALYZE_TRACED_TENSOR_GRADIENTS()
+#endif
+
 #define PRINT_TENSOR_SIZE_ALWAYS(tensor) \
     std::cout << #tensor << "\n" << tensor.sizes() << std::endl; \
 	CUDA_SYNC_CHECK()
@@ -44,7 +76,7 @@ namespace vtx::network
 #define CHECK_TENSOR_ANOMALY_ALWAYS(tensor) \
 	vtx::network::checkTensorAnomaly(tensor, #tensor)
 
-#ifdef DEBUG_TENSORS
+#if defined(_DEBUG) || defined(DEBUG_TENSORS)
 #define PRINT_TENSORS(info,...) \
 	vtx::network::printTensors(vtx::network::splitVariadicNames({#__VA_ARGS__}), {__VA_ARGS__}, info); \
     CUDA_SYNC_CHECK()
@@ -52,7 +84,7 @@ namespace vtx::network
 #define PRINT_TENSORS(info, ...)
 #endif
 
-#ifdef CHECK_ANOMALY
+#if defined(_DEBUG) || defined(CHECK_ANOMALY)
 #define ANOMALY_SWITCH torch::autograd::DetectAnomalyGuard detect_anomaly
 
 #define CHECK_TENSOR_ANOMALY(tensor) \
