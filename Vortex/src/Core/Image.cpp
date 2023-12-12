@@ -3,6 +3,8 @@
 #include "stb_image_write.h"
 #include <cstring>
 
+#include "Device/UploadCode/CUDABuffer.h"
+
 namespace vtx
 {
 	Image::Image(const std::string& path)
@@ -13,6 +15,13 @@ namespace vtx
 	Image::Image(const float* _data, const int _width, const int _height, const int _channels)
 	{
 		load(_data, _width, _height, _channels);
+	}
+
+	Image::Image(CUDABuffer buffer, const int _width, const int _height, const int _channels)
+	{
+		std::vector<float> tmpData(_width * _height * _channels);
+		buffer.download(tmpData.data());
+		load(tmpData.data(), _width, _height, _channels);
 	}
 
 	void Image::load(const std::string& path)

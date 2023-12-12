@@ -12,21 +12,21 @@
 
 namespace vtx
 {
-	NetworkInterface* NetworkInterface::upload(const int&                      numberOfPixels, const int&  maxDatasetSize,
-											   const int&                      maxDepth, const int&        frameId,
-											   const network::DistributionType distributionType, const int mixtureSize,
-											   const ToneMapperSettings&       _toneMapperSettings,
-											   const WhatChanged&              changed, device::NetworkInterfaceBuffer& networkInterfaceBuffers)
+	NetworkInterface* NetworkInterface::upload(const int&                              numberOfPixels, const int&  maxDatasetSize,
+											   const int&                              maxDepth, const int&        frameId,
+											   const network::config::DistributionType distributionType, const int mixtureSize,
+											   const ToneMapperSettings&               _toneMapperSettings,
+											   const WhatChanged&                      changed, device::NetworkInterfaceBuffer& networkInterfaceBuffers)
 	{
 		const NetworkInterface networkInterface(numberOfPixels, maxDatasetSize, maxDepth, frameId, distributionType,
 												mixtureSize, _toneMapperSettings, changed, networkInterfaceBuffers);
 		return networkInterfaceBuffers.networkInterfaceBuffer.upload(networkInterface);
 	}
 
-	NetworkInterface::NetworkInterface(const int&  _numberOfPixels, const int& _maxDatasetSize, const int& _maxDepth,
-									   const int&  frameId, const network::DistributionType _distributionType,
-									   int         _mixtureSize, const ToneMapperSettings& _toneMapperSettings,
-									   WhatChanged changed, device::NetworkInterfaceBuffer& networkInterfaceBuffers)
+	NetworkInterface::NetworkInterface(const int&  _numberOfPixels, const int&                      _maxDatasetSize, const int& _maxDepth,
+									   const int&  frameId, const network::config::DistributionType _distributionType,
+									   int         _mixtureSize, const ToneMapperSettings&          _toneMapperSettings,
+									   WhatChanged changed, device::NetworkInterfaceBuffer&         networkInterfaceBuffers)
 	{
 		numberOfPixels = _numberOfPixels;
 		maxDatasetSize = _maxDatasetSize;

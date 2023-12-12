@@ -826,10 +826,10 @@ namespace vtx::device
 					NetworkInterface::WhatChanged changed;
 
 					const int totPixels = rendererNode->width * rendererNode->height;
-					const int maxDatasetSize = rendererNode->waveFrontIntegrator.network.settings.batchSize * rendererNode->waveFrontIntegrator.network.settings.maxTrainingStepPerFrame;
+					const int maxDatasetSize = rendererNode->waveFrontIntegrator.network.settings.batchSize;// *rendererNode->waveFrontIntegrator.network.settings.maxTrainingStepPerFrame;
 					const int maxBounces = rendererNode->settings.maxBounces;
-					const network::DistributionType distributionType = rendererNode->waveFrontIntegrator.network.settings.pathGuidingSettings.distributionType;
-					const int mixtureSize = rendererNode->waveFrontIntegrator.network.settings.pathGuidingSettings.mixtureSize;
+					const network::config::DistributionType distributionType = rendererNode->waveFrontIntegrator.network.settings.distributionType;
+					const int mixtureSize = rendererNode->waveFrontIntegrator.network.settings.mixtureSize;
 
 					DeviceDataCoordinator::PrevNetworkInterfaceInfo& prevNetworkInterfaceInfo = onDeviceData->prevNetworkInterfaceInfo;
 

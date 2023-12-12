@@ -30,12 +30,15 @@ namespace vtx {
         void stopExperiment();
 
         void storeGroundTruth();
+		void test();
 
-    public:
+	public:
         CUDABuffer mapeBuffer;
         const std::shared_ptr<graph::Renderer>& renderer;
         bool toggleMisExperiment = true;
         bool toggleBsdfExperiment = true;
         float lossesContentPercentage = 0.75f;
+        bool performBatchExperiment = false;
+        bool displayAll = false;
     };
 };

@@ -2,16 +2,16 @@
 #include "TcnnTorchModule.h"
 #define DEBUG_TESNROS
 #include "NeuralNetworks/tools.h"
-#include "NeuralNetworks/Networks/TcnnSettings.h"
+#include "NeuralNetworks/Config/EncodingConfig.h"
 
 void testTccnTorch() {
     return;
     torch::autograd::DetectAnomalyGuard detect_anomaly;
     // Configuration setup
-	vtx::network::TcnnEncodingConfig encodingConfig;
-    encodingConfig.otype = vtx::network::TcnnEncodingType::Identity;
+	vtx::network::config::EncodingConfig encodingConfig;
+    encodingConfig.otype = vtx::network::config::EncodingType::Identity;
     nlohmann::json config;
-    config["encoding"]                         = torchTcnn::getEncodingSettings(&encodingConfig);
+    config["encoding"]                         = torchTcnn::getEncodingSettings(encodingConfig);
     config["network"]["otype"]                 = "FullyFusedMLP";
     config["network"]["activation"]            = "ReLU";
     config["network"]["output_activation"]     = "None";

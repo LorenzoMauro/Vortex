@@ -165,54 +165,41 @@ namespace vtx::gui
 		return settings.isUpdated;
 	}
 
-	void statisticsDisplayGui(const std::shared_ptr<graph::Renderer>& renderNode)
+	void GuiProvider::drawDisplayGui(graph::Statistics& statistics)
 	{
 		if (ImGui::CollapsingHeader("Statistics"))
 		{
-			const CudaEventTimes cuTimes = getCudaEventTimes();
-			const int actualLaunches = getLaunches();
-			float totTimeSeconds = (cuTimes.trace + cuTimes.noiseComputation + cuTimes.postProcessing + cuTimes.display) / 1000.0f;
-			float sppS = renderNode->width * renderNode->height * actualLaunches / totTimeSeconds;
-			float averageFrameTime = totTimeSeconds / actualLaunches;
-			float fps = 1.0f / averageFrameTime;
-
-			vtxImGui::halfSpaceWidget("Total Time:", vtxImGui::booleanText, "%.3f s", totTimeSeconds);
-			vtxImGui::halfSpaceWidget("Samples Per Pixels:", vtxImGui::booleanText, "%d", renderNode->settings.iteration);
-			vtxImGui::halfSpaceWidget("SPP per Seconds:", vtxImGui::booleanText, "%.3f", sppS);
-			vtxImGui::halfSpaceWidget("Frame Time:", vtxImGui::booleanText, "%.3f ms", averageFrameTime);
-			vtxImGui::halfSpaceWidget("Fps:", vtxImGui::booleanText, "%.3f", fps);
+			vtxImGui::halfSpaceWidget("Total Time:", vtxImGui::booleanText, "%.3f s", statistics.totTimeSeconds);
+			vtxImGui::halfSpaceWidget("Samples Per Pixels:", vtxImGui::booleanText, "%d", statistics.samplesPerPixel);
+			vtxImGui::halfSpaceWidget("SPP per Seconds:", vtxImGui::booleanText, "%.3f", statistics.sppPerSecond);
+			vtxImGui::halfSpaceWidget("Frame Time:", vtxImGui::booleanText, "%.3f ms", statistics.frameTime);
+			vtxImGui::halfSpaceWidget("Fps:", vtxImGui::booleanText, "%.3f", statistics.fps);
 			ImGui::Separator();
-
-			float totTimeInternal = renderNode->timer.elapsedMillis() / 1000.0f;
-			float internalFps = (float)renderNode->settings.iteration / totTimeInternal;
-			vtxImGui::halfSpaceWidget("CPU Fps:", vtxImGui::booleanText, "%.3f", internalFps);
-			vtxImGui::halfSpaceWidget("CPU Tot Time:", vtxImGui::booleanText, "%.3f", totTimeInternal);
+			vtxImGui::halfSpaceWidget("CPU Fps:", vtxImGui::booleanText, "%.3f", statistics.internalFps);
+			vtxImGui::halfSpaceWidget("CPU Tot Time:", vtxImGui::booleanText, "%.3f", statistics.totTimeInternal);
 			ImGui::Separator();
-
-			const float factor = 1.0f / (float)actualLaunches;
-
-			vtxImGui::halfSpaceWidget("Renderer Noise				", vtxImGui::booleanText, "%.2f ms", factor * cuTimes.noiseComputation);
-			vtxImGui::halfSpaceWidget("Renderer Trace				", vtxImGui::booleanText, "%.2f ms", factor * cuTimes.trace);
-			vtxImGui::halfSpaceWidget("Renderer Post				", vtxImGui::booleanText, "%.2f ms", factor * cuTimes.postProcessing);
-			vtxImGui::halfSpaceWidget("Renderer Display				", vtxImGui::booleanText, "%.2f ms", factor * cuTimes.display);
+			vtxImGui::halfSpaceWidget("Renderer Noise", vtxImGui::booleanText, "%.2f ms", statistics.rendererNoise);
+			vtxImGui::halfSpaceWidget("Renderer Trace", vtxImGui::booleanText, "%.2f ms", statistics.rendererTrace);
+			vtxImGui::halfSpaceWidget("Renderer Post", vtxImGui::booleanText, "%.2f ms", statistics.rendererPost);
+			vtxImGui::halfSpaceWidget("Renderer Display", vtxImGui::booleanText, "%.2f ms", statistics.rendererDisplay);
 			ImGui::Separator();
-			vtxImGui::halfSpaceWidget("WaveFront Generate Ray		", vtxImGui::booleanText, "%.2f ms", factor * cuTimes.genCameraRay);
-			vtxImGui::halfSpaceWidget("WaveFront Trace				", vtxImGui::booleanText, "%.2f ms", factor * cuTimes.traceRadianceRay);
-			vtxImGui::halfSpaceWidget("WaveFront Shade				", vtxImGui::booleanText, "%.2f ms", factor * cuTimes.shadeRay);
-			vtxImGui::halfSpaceWidget("WaveFront Shadow				", vtxImGui::booleanText, "%.2f ms", factor * cuTimes.shadowRay);
-			vtxImGui::halfSpaceWidget("WaveFront Escaped			", vtxImGui::booleanText, "%.2f ms", factor * cuTimes.handleEscapedRay);
-			vtxImGui::halfSpaceWidget("WaveFront Accumulate			", vtxImGui::booleanText, "%.2f ms", factor * cuTimes.accumulateRay);
-			vtxImGui::halfSpaceWidget("WaveFront Reset				", vtxImGui::booleanText, "%.2f ms", factor * cuTimes.reset);
-			vtxImGui::halfSpaceWidget("WaveFront Fetch Queue Size	", vtxImGui::booleanText, "%.2f ms", factor * cuTimes.fetchQueueSize);
-			ImGui::Separator();
-			vtxImGui::halfSpaceWidget("Neural Shuffle Dataset		", vtxImGui::booleanText, "%.2f ms", factor * cuTimes.nnShuffleDataset);
-			vtxImGui::halfSpaceWidget("Neural Network Train			", vtxImGui::booleanText, "%.2f ms", factor * cuTimes.nnTrain);
-			vtxImGui::halfSpaceWidget("Neural Network Infer			", vtxImGui::booleanText, "%.2f ms", factor * cuTimes.nnInfer);
+			vtxImGui::halfSpaceWidget("WaveFront Generate Ray		", vtxImGui::booleanText, "%.2f ms", statistics.waveFrontGenerateRay);
+			vtxImGui::halfSpaceWidget("WaveFront Trace				", vtxImGui::booleanText, "%.2f ms", statistics.waveFrontTrace);
+			vtxImGui::halfSpaceWidget("WaveFront Shade				", vtxImGui::booleanText, "%.2f ms", statistics.waveFrontShade);
+			vtxImGui::halfSpaceWidget("WaveFront Shadow				", vtxImGui::booleanText, "%.2f ms", statistics.waveFrontShadow);
+			vtxImGui::halfSpaceWidget("WaveFront Escaped			", vtxImGui::booleanText, "%.2f ms", statistics.waveFrontEscaped);
+			vtxImGui::halfSpaceWidget("WaveFront Accumulate			", vtxImGui::booleanText, "%.2f ms", statistics.waveFrontAccumulate);
+			vtxImGui::halfSpaceWidget("WaveFront Reset				", vtxImGui::booleanText, "%.2f ms", statistics.waveFrontReset);
+			vtxImGui::halfSpaceWidget("WaveFront Fetch Queue Size	", vtxImGui::booleanText, "%.2f ms", statistics.waveFrontFetchQueueSize);
+			ImGui::Separator();																			 
+			vtxImGui::halfSpaceWidget("Neural Shuffle Dataset		", vtxImGui::booleanText, "%.2f ms", statistics.neuralShuffleDataset);
+			vtxImGui::halfSpaceWidget("Neural Network Train			", vtxImGui::booleanText, "%.2f ms", statistics.neuralNetworkTrain);
+			vtxImGui::halfSpaceWidget("Neural Network Infer			", vtxImGui::booleanText, "%.2f ms", statistics.neuralNetworkInfer);
 
 		}
 	}
 
-	bool rendererSettingsEditorGui(RendererSettings& settings)
+	bool GuiProvider::drawEditGui(RendererSettings& settings)
 	{
 		bool restartRendering = false;
 		ImGui::SetNextItemOpen(true, ImGuiCond_Once);
@@ -285,7 +272,7 @@ namespace vtx::gui
 			ImGui::PushItemWidth(availableWidth); // Set the width of the next widget to 200
 
 			const bool runOnSeparateThread = renderNode->settings.runOnSeparateThread;
-			restartRendering |= rendererSettingsEditorGui(renderNode->settings);
+			restartRendering |= drawEditGui(renderNode->settings);
 			if(runOnSeparateThread != renderNode->settings.runOnSeparateThread)
 			{
 				renderNode->resizeGlBuffer = true;
@@ -316,7 +303,8 @@ namespace vtx::gui
 
 			ImGui::Separator();
 
-			statisticsDisplayGui(renderNode);
+			renderNode->statistics.update(renderNode);
+			drawDisplayGui(renderNode->statistics);
 
 			ImGui::PopItemWidth();
 

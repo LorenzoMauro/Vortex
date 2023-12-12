@@ -16,7 +16,7 @@ namespace vtx
         if (d_ptr)
         {
             const auto err = cudaFree(d_ptr);
-            CUDA_CHECK(err);
+            checkCudaError(err, __FILE__, __LINE__, false);
             d_ptr = nullptr;
             sizeInBytes = 0;
         }

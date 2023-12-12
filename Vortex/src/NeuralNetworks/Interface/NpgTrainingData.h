@@ -24,10 +24,12 @@ namespace vtx
 	public:
 
 		NetworkInput* inputs;
-		float* luminance;
-		math::vec3f* incomingDirection;
-		float* bsdfProbabilities;
-		int nAlloc;
+		math::vec3f*  outRadiance;
+		math::vec3f*  incomingDirection;
+		math::vec3f*  inRadiance;
+		math::vec3f*  throughput;
+		float*        bsdfProbabilities;
+		int           nAlloc;
 	};
 }
 

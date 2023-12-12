@@ -1,4 +1,5 @@
 #include "Application.h"
+
 #include "ShutDownOperations.h"
 #include "glad/glad.h"
 #include "ImGuiOp.h"
@@ -16,6 +17,7 @@
 #include "Gui/Windows/PropertiesWindow.h"
 #include "MDL/MdlWrapper.h"
 #include "Scene/Nodes/Material.h"
+#include "Serialization/Serializer.h"
 
 namespace vtx
 {
@@ -41,14 +43,22 @@ namespace vtx
 
 		windowManager = std::make_shared<WindowManager>();
 		windowManager->createWindow<AppWindow>();
+		windowManager->createWindow<ExperimentsWindow>();
 		windowManager->createWindow<SceneHierarchyWindow>();
 		windowManager->createWindow<ViewportWindow>();
 		windowManager->createWindow<PropertiesWindow>();
-		windowManager->createWindow<ExperimentsWindow>();
 		windowManager->createWindow<EnvironmentWindow>();
 		windowManager->createWindow<ShaderGraphWindow>();
 		windowManager->createWindow<GraphWindow>();
 
+	}
+
+	void Application::reset()
+	{
+		onDeviceData->reset();
+		optix::getRenderingPipeline()->invalidate();
+		cudaDeviceReset();
+		optix::init();
 	}
 
 	void Application::shutDown() {
@@ -136,20 +146,77 @@ namespace vtx
 	}
 
 	void Application::run() {
+		if(const std::shared_ptr<ExperimentsWindow> ew = windowManager->getWindow<ExperimentsWindow>();
+			ew!=nullptr && ew->performBatchExperiment)
+		{
+			BatchExperimentRun();
+		}
+		else
+		{
+			standardRun();
+		}
+		
+	}
+
+	void Application::standardRun()
+	{
 		glfwPollEvents();
-		dataLoop();
+		constexpr int maxTries = 3;
+		int tryCount = 0;
+		while(tryCount < maxTries)
+		{
+			try
+			{
+				dataLoop();
+				break;
+			}
+			catch (std::exception& e)
+			{
+				VTX_ERROR("Standard exception in experiment {}", e.what());
+			}
+			catch (...)
+			{
+				VTX_ERROR("Unknown exception in experiment");
+			}
+			if(const auto& renderer = graph::Scene::get()->renderer; renderer->waveFrontIntegrator.network.settings.active == true)
+			{
+				renderer->waveFrontIntegrator.network.reset();
+			}
+			else
+			{
+				tryCount++;
+			}
+		}
 		windowManager->updateWindows(timeStep);
 
-		if(!isWindowMinimized(glfwWindow))
+		if (!isWindowMinimized(glfwWindow))
 		{
 			ImGuiRenderStart();
-			if(iteration >3) // it seems the minimum frame to render the initial gui
+			if (iteration > 3) // it seems the minimum frame to render the initial gui
 			{
 				LoadingSaving::get().performLoadSave();
+				if (loadEM && LoadingSaving::get().getCurrentState() == LoadingSaving::LoadSaveState::Idle)
+				{
+					ExperimentsManager* em;
+					if (utl::fileExists(EmFile))
+					{
+						vtx::serializer::deserializeExperimentManager(EmFile);
+						loadEM = false;
+					}
+					else
+					{
+						graph::Scene::get()->renderer->waveFrontIntegrator.network.experimentManager.saveFilePath = EmFile;
+					}
+					if (const std::shared_ptr<ExperimentsWindow> ew = windowManager->getWindow<ExperimentsWindow>(); ew != nullptr)
+					{
+						ew->performBatchExperiment = true;
+					}
+
+				}
 			}
 			windowManager->renderWindows();
 			ImGuiDraw(glfwWindow);
- 			glfwSwapBuffers(glfwWindow);
+			glfwSwapBuffers(glfwWindow);
 		}
 		windowManager->removeClosedWindows();
 		const auto time = static_cast<float>(glfwGetTime());
@@ -157,6 +224,47 @@ namespace vtx
 		timeStep = std::min(frameTime, 0.0333f);
 		lastFrameTime = time;
 		iteration += 1;
+	}
+
+	void Application::batchExperimentAppLoopBody(int i, const std::shared_ptr<graph::Renderer>& renderer)
+	{
+		glfwPollEvents();
+		if (i == 0)
+		{
+			renderer->camera->onUpdate(timeStep);
+			graph::computeMaterialsMultiThreadCode();
+			renderer->traverse(hostVisitor);
+		}
+		renderer->render();
+
+		{
+			glfwPollEvents();
+			windowManager->updateWindows(timeStep);
+
+			if (!isWindowMinimized(glfwWindow))
+			{
+				ImGuiRenderStart();
+				if (iteration > 3) // it seems the minimum frame to render the initial gui
+				{
+					LoadingSaving::get().performLoadSave();
+				}
+				windowManager->renderWindows();
+				ImGuiDraw(glfwWindow);
+				glfwSwapBuffers(glfwWindow);
+			}
+			windowManager->removeClosedWindows();
+			const auto time = static_cast<float>(glfwGetTime());
+			frameTime = time - lastFrameTime;
+			timeStep = std::min(frameTime, 0.0333f);
+			lastFrameTime = time;
+			iteration += 1;
+		}
+	}
+
+	void Application::BatchExperimentRun()
+	{
+		auto& em = graph::Scene::get()->renderer->waveFrontIntegrator.network.experimentManager;
+		em.BatchExperimentRun();
 	}
 
 	void Application::setStartUpFile(const std::string& filePath)

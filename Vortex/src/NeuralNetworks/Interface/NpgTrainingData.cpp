@@ -17,7 +17,9 @@ namespace vtx
 
 	NpgTrainingData::NpgTrainingData(device::NpgTrainingDataBuffers& buffers, const int& maxDatasetSize)
 	{
-		luminance = buffers.outgoingRadianceBuffer.alloc<float>(maxDatasetSize);
+		outRadiance = buffers.outgoingRadianceBuffer.alloc<math::vec3f>(maxDatasetSize);
+		inRadiance = buffers.incomingRadianceBuffer.alloc<math::vec3f>(maxDatasetSize);
+		throughput = buffers.trhoughputBuffer.alloc<math::vec3f>(maxDatasetSize);
 		incomingDirection = buffers.incomingDirectionBuffer.alloc<math::vec3f>(maxDatasetSize);
 		bsdfProbabilities = buffers.bsdfProbabilitiesBuffer.alloc<float>(maxDatasetSize);
 		inputs = NetworkInput::upload(maxDatasetSize, buffers.inputBuffer);

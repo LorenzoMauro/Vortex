@@ -2,7 +2,7 @@
 
 #include "Utils.h"
 #include "Device/DevicePrograms/LaunchParams.h"
-#include "NeuralNetworks/NetworkSettings.h"
+#include "NeuralNetworks/Experiment.h"
 
 namespace vtx {
 
@@ -33,7 +33,7 @@ namespace vtx {
 		options.rendererSettings.maxSamples = 100000;
 		options.rendererSettings.accumulate = true;
 		options.rendererSettings.samplingTechnique = S_MIS;
-		options.rendererSettings.displayBuffer = FB_NETWORK_REPLAY_BUFFER_SAMPLES;
+		options.rendererSettings.displayBuffer = FB_BEAUTY;
 		options.rendererSettings.minClamp = 0.0001f;
 		options.rendererSettings.maxClamp = 1000.0f;
 		options.rendererSettings.useRussianRoulette = true;
@@ -83,48 +83,33 @@ namespace vtx {
 		////////////////////////////////////////////////////////////////////////////////////
 		options.networkSettings.active = true; // 10;//
 		options.networkSettings.batchSize = 256000; // 256 * 50;// 100000; // 10;//
-		options.networkSettings.maxTrainingStepPerFrame = 1;
-		options.networkSettings.doInference = false;
+		options.networkSettings.doInference = true;
 		options.networkSettings.doTraining = true;
 		options.networkSettings.maxTrainingSteps = 1000;
 		options.networkSettings.inferenceIterationStart = 1;
 		options.networkSettings.clearOnInferenceStart = true;
-		options.networkSettings.type = network::NetworkType::NT_NGP;
 
 		options.networkSettings.trainingBatchGenerationSettings.lightSamplingProb = 0.0f;
 		options.networkSettings.trainingBatchGenerationSettings.weightByMis= true;
-		options.networkSettings.trainingBatchGenerationSettings.strategy = network::SS_PATHS_WITH_CONTRIBUTION;
+		options.networkSettings.trainingBatchGenerationSettings.strategy = network::config::SS_PATHS_WITH_CONTRIBUTION;
 
-		options.networkSettings.inputSettings.positionEncoding.type= network::E_NONE;
-		options.networkSettings.inputSettings.positionEncoding.features = 3;
-		options.networkSettings.inputSettings.woEncoding.type = network::E_NONE;
-		options.networkSettings.inputSettings.woEncoding.features = 3;
-		options.networkSettings.inputSettings.normalEncoding.type = network::E_NONE;
-		options.networkSettings.inputSettings.normalEncoding.features   = 3;
+		options.networkSettings.inputSettings.position.otype = network::config::EncodingType::Frequency;
 
-		options.networkSettings.inputSettings.tcnnCompositeEncodingConfig.positionEncoding.otype = network::TcnnEncodingType::Frequency;
+		options.networkSettings.mainNetSettings.hiddenDim = 64;
+		options.networkSettings.mainNetSettings.numHiddenLayers = 4;
+		options.networkSettings.distributionType = network::config::D_NASG_TRIG;
+		options.networkSettings.mixtureSize = 1;
 
-		options.networkSettings.pathGuidingSettings.hiddenDim               = 64;
-		options.networkSettings.pathGuidingSettings.numHiddenLayers         = 4;
-		options.networkSettings.pathGuidingSettings.distributionType        = network::D_SPHERICAL_GAUSSIAN;
-		options.networkSettings.pathGuidingSettings.produceSamplingFraction = false;
-		options.networkSettings.pathGuidingSettings.mixtureSize				= 1;
+		options.networkSettings.learningRate = 0.01f;
+		options.networkSettings.blendFactor = 0.8f;
+		options.networkSettings.constantBlendFactor = false;
+		options.networkSettings.samplingFractionBlend = false;
+		options.networkSettings.lossType = network::config::L_KL_DIV_MC_ESTIMATION;
+		options.networkSettings.lossReduction = network::config::MEAN;
 
-		options.networkSettings.sac.polyakFactor = 0.0001f;
-		options.networkSettings.sac.logAlphaStart = 0.0f;
-		options.networkSettings.sac.gamma = 0.0f;
-		options.networkSettings.sac.neuralSampleFraction = 0.9f;
-		options.networkSettings.sac.policyLr = 0.00001f;
-		options.networkSettings.sac.qLr = 0.00001f;
-		options.networkSettings.sac.alphaLr = 0.00001f;
-
-		options.networkSettings.npg.learningRate = 0.01f;
-		options.networkSettings.npg.e = 0.8f;
-		options.networkSettings.npg.constantBlendFactor = false;
-		options.networkSettings.npg.samplingFractionBlend = false;
-		options.networkSettings.npg.lossType = network::L_KL_DIV_MC_ESTIMATION;
-		options.networkSettings.npg.meanLoss = true;
-		options.networkSettings.npg.absoluteLoss = false;
+		options.networkSettings = ExperimentsManager::getBestGuess();
+		options.networkSettings.isUpdated = true;
+		options.networkSettings.active = false;
 
 
 		////////////////////////////////////////////////////////////////////////////////////
@@ -135,7 +120,7 @@ namespace vtx {
 		options.maxDcDepth = 2;
 		options.maxTraversableGraphDepth = 2;
 		options.LaunchParamName = "optixLaunchParams";
-		options.enableCache = false;
+		options.enableCache = true;
 
 		////////////////////////////////////////////////////////////////////////////////////
 		/////////////////// MDL Options ////////////////////////////////////////////////////

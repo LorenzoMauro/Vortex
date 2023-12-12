@@ -143,6 +143,8 @@ namespace vtx::optix
 
 		static void launchOptixKernel(const math::vec2i& launchDimension, const std::string& pipelineName);
 
+		void invalidate();
+
 	private:
 		OptixPipeline															pipeline = nullptr;
 		bool																	isDirty = true;

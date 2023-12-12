@@ -1,6 +1,7 @@
 #include "ExperimentsWindow.h"
 
 #include "Core/FileDialog.h"
+#include "Core/LoadingSaving.h"
 #include "Core/CustomImGui/CustomImGui.h"
 #include "Device/CudaFunctions/cudaFunctions.h"
 #include "Device/UploadCode/DeviceDataCoordinator.h"
@@ -56,7 +57,7 @@ namespace vtx
 			{
 				continue;
 			}
-			if (experiment.displayExperiment)
+			if (experiment.displayExperiment || displayAll)
 			{
 				MapePlot.addPlot(experiment.mape, experiment.name);
 			}
@@ -96,18 +97,32 @@ namespace vtx
 
 	void ExperimentsWindow::toolBarContent()
 	{
+		const float halfItemWidth = ImGui::CalcItemWidth() * 0.5f;
+		ImVec2 buttonSize = ImVec2(halfItemWidth, 0);
+
+		if(vtxImGui::halfSpaceCheckbox("Perform Batch Experiments", &performBatchExperiment) && performBatchExperiment)
+		{
+			em.saveFilePath = FileDialogs::saveFileDialog({ "*.vtx", "*.xml" });
+		}
+
+		if(ImGui::Button("Load Experiment Manager"))
+		{
+			em.saveFilePath = FileDialogs::openFileDialog({ "*.vtx", "*.xml" });
+			serializer::deserializeExperimentManager(em.saveFilePath);
+			return;
+		}
+
 		auto stageName = experimentStageNames[em.stage];
 		vtxImGui::halfSpaceWidget("Stage", vtxImGui::booleanText, "%s", stageName.c_str());
 
 		vtxImGui::halfSpaceWidget("Current Step", vtxImGui::booleanText, "%d", em.currentExperimentStep);
 
 
-		vtxImGui::halfSpaceWidget("Max Samples", ImGui::DragInt, (hiddenLabel + "_Max Samples").c_str(), &(em.maxSamples), 1, 0, 10000, "%d", 0);
+		vtxImGui::halfSpaceWidget("GT Max Samples", ImGui::DragInt, (hiddenLabel + "_Max Samples").c_str(), &(em.gtSamples), 1, 0, 10000, "%d", 0);
+		vtxImGui::halfSpaceWidget("TEST Max Samples", ImGui::DragInt, (hiddenLabel + "_Max Samples").c_str(), &(em.testSamples), 1, 0, 10000, "%d", 0);
 		vtxImGui::halfSpaceWidget("Width", ImGui::DragInt, (hiddenLabel + "_Max Samples").c_str(), &(em.width), 1, 0, 4000, "%d", 0);
 		vtxImGui::halfSpaceWidget("Height", ImGui::DragInt, (hiddenLabel + "_Max Samples").c_str(), &(em.height), 1, 0, 4000, "%d", 0);
 
-		const float halfItemWidth = ImGui::CalcItemWidth() * 0.5f;
-		ImVec2 buttonSize = ImVec2(halfItemWidth, 0);
 
 		if (ImGui::Button("Generate Ground Truth", buttonSize))
 		{
@@ -132,51 +147,6 @@ namespace vtx
 			}
 		}
 
-		/*if (ImGui::Button("Save Experiments", buttonSize))
-		{
-			std::string filepath = FileDialogs::saveFileDialog({"*.yaml"});
-			if (!filepath.empty())
-			{
-				serializer::serializeExperimentManger(filepath, *em);
-			}
-		}
-		ImGui::SameLine();
-
-		if (ImGui::Button("Load Experiments", buttonSize))
-		{
-			std::string filepath = FileDialogs::openFileDialog({ "*.yaml" });
-			if (!filepath.empty())
-			{
-				*em = serializer::deserializeExperimentManager(filepath);
-			}
-		}*/
-
-#ifdef DEBUG_UI
-		if (ImGui::Button("Store Ground Truth"))
-		{
-			vtxImGui::openFileDialog("saveGT", "Save Ground Truth", ".*,.png,.jpg,.bmp,.hdr");
-		}
-		{
-			auto [result, filePathName, filePath] = vtxImGui::fileDialog("saveGT");
-			if (result)
-			{
-				em.saveGroundTruth(filePathName);
-			}
-		}
-
-		if (ImGui::Button("Load Ground Truth"))
-		{
-			vtxImGui::openFileDialog("loadGT", "Load Ground Truth", ".*,.png,.jpg,.bmp,.hdr");
-		}
-		{
-			auto [result, filePathName, filePath] = vtxImGui::fileDialog("loadGT");
-			if (result)
-			{
-				em.loadGroundTruth(filePathName);
-			}
-		}
-#endif
-
 		if (ImGui::Button("Bsdf Experiments", buttonSize))
 		{
 			toggleBsdfExperiment = !toggleBsdfExperiment;
@@ -188,6 +158,10 @@ namespace vtx
 		{
 			toggleMisExperiment = !toggleMisExperiment;
 		}
+
+		vtxImGui::halfSpaceCheckbox("Display All Tests", &displayAll);
+
+		vtxImGui::halfSpaceWidget("Experiments in Queue", vtxImGui::booleanText, "%d", em.experimentQueue.size());
 
 		std::vector<int> toRemove;
 		int i = -1;
@@ -203,25 +177,17 @@ namespace vtx
 				continue;
 			}
 			ImGui::Separator();
-			if (ImGui::CollapsingHeader(("Experiment Nr. " + std::to_string(i)).c_str()))
+			ImGui::PushID(i);
+			if (ImGui::CollapsingHeader((experiment.name).c_str()))
 			{
-				vtxImGui::halfSpaceWidget("Experiment Nr. ", vtxImGui::booleanText, "%d", i);
-
-
-				vtxImGui::halfSpaceWidget("Sampling Technique ", vtxImGui::booleanText, "%s", samplingTechniqueNames[experiment.rendererSettings.samplingTechnique]);
-				if (experiment.networkSettings.active)
-				{
-					vtxImGui::halfSpaceWidget("Network ", vtxImGui::booleanText, "%s", network::networkNames[experiment.networkSettings.type]);
-				}
-
-				vtxImGui::halfSpaceWidget("Store", ImGui::Checkbox, (hiddenLabel + "_Store" + std::to_string(i)).c_str(), &(experiment.storeExperiment));
-				vtxImGui::halfSpaceWidget("Display", ImGui::Checkbox, (hiddenLabel + "_Display" + std::to_string(i)).c_str(), &(experiment.displayExperiment));
+				gui::GuiProvider::drawEditGui(experiment);
 
 				if (ImGui::Button("Delete", buttonSize))
 				{
 					toRemove.push_back(i);
 				}
 			}
+			ImGui::PopID();
 		}
 
 		for (auto& i : toRemove)
@@ -235,7 +201,7 @@ namespace vtx
 	{
 		renderer->restart();
 		renderer->settings.samplingTechnique = technique;
-		renderer->settings.maxSamples = em.maxSamples;
+		renderer->settings.maxSamples = em.testSamples;
 		renderer->waveFrontIntegrator.settings.active = true;
 		renderer->settings.isUpdated = true;
 
@@ -266,11 +232,11 @@ namespace vtx
 				renderer->waveFrontIntegrator.network.settings.active= true;
 
 				bool initNetwork = false;
-				if (net.settings.type != experiment.networkSettings.type)
+				/*if (net.settings.type != experiment.networkSettings.type)
 				{
 					net.settings.type = experiment.networkSettings.type;
 					initNetwork = true;
-				}
+				}*/
 				if (net.isInitialized == false)
 				{
 					initNetwork = true;
@@ -283,7 +249,7 @@ namespace vtx
 				{
 					net.reset();
 				}
-				network::NetworkSettings& networkSettings = net.getNeuralNetSettings();
+				network::config::NetworkSettings& networkSettings = net.getNeuralNetSettings();
 				networkSettings.inferenceIterationStart = experiment.networkSettings.inferenceIterationStart;
 				networkSettings.doInference = true;
 				networkSettings.clearOnInferenceStart = false;
@@ -299,7 +265,7 @@ namespace vtx
 		const float mape = cuda::computeMape(em.groundTruth, onDeviceData->launchParamsData.getHostImage().frameBuffer.tmRadiance, em.width, em.height);
 		experiment.mape.push_back(mape);
 
-		if (renderer->settings.iteration == em.maxSamples)
+		if (renderer->settings.iteration == em.testSamples)
 		{
 			em.currentExperiment += 1;
 			em.currentExperimentStep = 0;
@@ -307,6 +273,7 @@ namespace vtx
 		}
 		em.currentExperimentStep++;
 	}
+
 	void ExperimentsWindow::generateGroundTruth()
 	{
 		if (em.currentExperimentStep == 0)
@@ -317,7 +284,7 @@ namespace vtx
 			renderer->waveFrontIntegrator.network.settings.isUpdated = true;
 		}
 
-		if (renderer->settings.iteration == em.maxSamples)
+		if (renderer->settings.iteration == em.testSamples)
 		{
 			storeGroundTruth();
 			em.stage = STAGE_NONE;
@@ -367,5 +334,8 @@ namespace vtx
 
 		em.currentExperimentStep = 0;
 	}
+
+
+	
 }
 

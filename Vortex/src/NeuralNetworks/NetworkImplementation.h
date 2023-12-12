@@ -1,7 +1,6 @@
 ﻿#pragma once
 #ifndef NETWORK_IMPLEMENTATION_H
 #define NETWORK_IMPLEMENTATION_H
-#include "NetworkSettings.h"
 #include "NeuralNetworkGraphs.h"
 
 namespace vtx
@@ -11,6 +10,11 @@ namespace vtx
 
 namespace vtx::network
 {
+	namespace config
+	{
+		struct NetworkSettings;
+	}
+
 	class NetworkImplementation
 	{
 	public:
@@ -22,7 +26,7 @@ namespace vtx::network
 
 		void shuffleDataset(LaunchParams* params) const;
 
-		NetworkSettings* settings;
+		config::NetworkSettings* settings;
 	};
 
 }

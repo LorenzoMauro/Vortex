@@ -73,10 +73,24 @@ namespace vtx {
 
 		void removeClosedWindows();
 
+		template<typename T>
+		std::shared_ptr<T> getWindow() const
+		{
+			static_assert(std::is_base_of_v<Window, T>, "Pushed type is not subclass of Window!");
+			const std::type_index typeIdx = typeid(T);
+			const auto            it      = windowMap.find(typeIdx);
+			if (it == windowMap.end())
+			{
+				return nullptr;
+			}
+
+			return std::dynamic_pointer_cast<T>(it->second);
+		}
+
 		//std::map<std::string, std::vector<vtxID>> selectedNodes;
+		std::unordered_map<std::type_index, std::shared_ptr<Window>> windowMap;
 	private:
 		std::vector<std::shared_ptr<Window>> windows;
-		std::unordered_map<std::type_index, std::shared_ptr<Window>> windowMap;
 
 	};
 }

@@ -5,8 +5,10 @@
 #include "Device/UploadCode/UploadBuffers.h"
 
 #include "Device/UploadCode/DeviceDataCoordinator.h"
-#include "Networks/Sac.h"
-#include "Networks/Npg.h"
+//#include "Networks/Sac.h"
+//#include "Networks/Npg.h"
+#include "Device/Wrappers/KernelTimings.h"
+#include "Networks/PGNet.h"
 
 
 namespace vtx::network
@@ -21,20 +23,7 @@ namespace vtx::network
 
     void Network::initNetworks()
     {
-        if (settings.type == NetworkType::NT_SAC)
-        {
-            settings.pathGuidingSettings.produceSamplingFraction = false;
-            impl = std::make_unique<Sac>(&settings);
-        }
-        else if (settings.type == NetworkType::NT_NGP)
-        {
-            settings.pathGuidingSettings.produceSamplingFraction = true;
-            impl = std::make_unique<Npg>(&settings);
-		}
-		else
-		{
-			VTX_ERROR("Network settings.type not supported");
-        }
+        impl = std::make_unique<PGNet>(&settings);
         isInitialized = true;
     }
 
@@ -42,8 +31,11 @@ namespace vtx::network
     {
         if (settings.active && settings.doTraining && onDeviceData->launchParamsData.getHostImage().networkInterface != nullptr)
         {
+            const std::pair<cudaEvent_t, cudaEvent_t> events = GetProfilerEvents(eventNames[N_TRAIN]);
+            cudaEventRecord(events.first);
             impl->train();
             CUDA_SYNC_CHECK();
+            cudaEventRecord(events.second);
         }
     }
 
@@ -52,7 +44,7 @@ namespace vtx::network
         return onDeviceData->launchParamsData.getHostImage().settings.renderer.iteration >= settings.inferenceIterationStart && settings.active && settings.doInference && onDeviceData->launchParamsData.getHostImage().networkInterface!=nullptr;
     }
 
-    NetworkSettings& Network::getNeuralNetSettings()
+	config::NetworkSettings& Network::getNeuralNetSettings()
     {
         return settings;
     }
@@ -61,8 +53,11 @@ namespace vtx::network
     {
         if(doInference())
         {
+            const std::pair<cudaEvent_t, cudaEvent_t> events = GetProfilerEvents(eventNames[N_INFER]);
+            cudaEventRecord(events.first);
             impl->inference(depth);
             CUDA_SYNC_CHECK();
+            cudaEventRecord(events.second);
         }
     }
 

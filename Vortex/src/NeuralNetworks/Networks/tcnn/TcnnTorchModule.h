@@ -5,9 +5,14 @@ namespace vtx
 {
 	namespace network
 	{
-		struct InputSettings;
-		struct TcnnEncodingConfig;
-		struct PathGuidingNetworkSettings;
+		namespace config
+		{
+			struct AuxNetEncodingConfig;
+			struct MlpSettings;
+			struct NetworkSettings;
+            struct EncodingConfig;
+            struct MainNetEncodingConfig;
+		}
 	}
 }
 
@@ -42,14 +47,11 @@ namespace torchTcnn
 
     };
     TORCH_MODULE(TcnnModule);
+    nlohmann::json getNetworkSettings(const vtx::network::config::MlpSettings& settings);
+    nlohmann::json getEncodingSettings(const vtx::network::config::EncodingConfig& inputSettings);
+    nlohmann::json getEncodingSettings(const vtx::network::config::MainNetEncodingConfig& inputSettings);
+    nlohmann::json getEncodingSettings(int rawFeatureSize, const vtx::network::config::AuxNetEncodingConfig& inputSettings);
 
-    nlohmann::json getNetworkSettings(vtx::network::PathGuidingNetworkSettings* settings);
-
-	nlohmann::json getEncodingSettings(vtx::network::TcnnEncodingConfig* inputSettings);
-
-	nlohmann::json getCompositeEncodingSettings(vtx::network::InputSettings* inputSettings);
-
-	torchTcnn::TcnnModule build(int outputDim, vtx::network::PathGuidingNetworkSettings* settings, vtx::network::InputSettings* inputSettings);
 
 }
 

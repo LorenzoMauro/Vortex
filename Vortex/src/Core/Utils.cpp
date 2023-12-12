@@ -202,6 +202,11 @@ namespace utl{
 		}
 	}
 
+	bool fileExists(const std::string& string)
+	{
+		return std::filesystem::exists(string);
+	}
+
 
 	std::string getDateTime()
 	{

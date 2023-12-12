@@ -6,15 +6,21 @@ namespace vtx::distribution
 {
 	torch::Tensor Nasg::normalizationFactor(const torch::Tensor& lambda, const torch::Tensor& a)
 	{
-		torch::Tensor result = 2.0f * (float)M_PI * (1.0f - torch::exp(-2.0f * lambda)) / (lambda * torch::sqrt(1.0f + a));
-		TRACE_TENSOR(result);
-		return result;
+		const torch::Tensor denumenator = lambda * torch::sqrt(1.0f + a)+EPS;
+		const torch::Tensor numerator = 2.0f * (float)M_PI * (1.0f - torch::exp(-2.0f * lambda));
+		torch::Tensor normalizationFactor = numerator / denumenator;
+		TRACE_TENSOR(denumenator);
+		TRACE_TENSOR(numerator);
+		TRACE_TENSOR(normalizationFactor);
+		return normalizationFactor;
 	}
 
 	torch::Tensor lambdaAActivation(const torch::Tensor& rawParams, const int& startIndex)
 	{
 		const torch::Tensor s1 = rawParams.narrow(-1, startIndex, 2);
-		torch::Tensor       lambdaA = softplus(s1) + EPS;//torch::exp(s1) + EPS;
+		//torch::Tensor lambdaA = sigmoid(s1)*50.0f + EPS*10;
+		torch::Tensor       lambdaA = softplus(s1) + EPS*10;
+		lambdaA = torch::clamp(lambdaA, 0, 50.0f);
 		return lambdaA;
 	}
 
@@ -47,6 +53,7 @@ namespace vtx::distribution
 
 		const torch::Tensor cosTheta = trigParams.narrow(-1, 0, 1);
 		const torch::Tensor sinTheta = torch::sqrt(1 - torch::pow(cosTheta, 2) + EPS);
+		TRACE_TENSOR(sinTheta);
 
 		// Extract parts of trigParams
 		const torch::Tensor cosPhi_sinPhi_cosPsi_sinPsi = trigParams.narrow(-1, 1, 4);
@@ -57,8 +64,10 @@ namespace vtx::distribution
 
 		// Normalize the trigonometric values so that they refer to real angles
 
-		trigParams = trigParams / linalg_vector_norm(trigParams, 2, -1, true).expand_as(trigParams);
-		//trigParams = normalize(trigParams, torch::nn::functional::NormalizeFuncOptions().dim(trigParams.dim() - 1));
+		trigParams += EPS;
+		const torch::Tensor normalization = linalg_vector_norm(trigParams, 2, -1, true).expand_as(trigParams);
+		trigParams = trigParams / normalization;
+		TRACE_TENSOR(trigParams);
 		trigParams = trigParams.view({ rawParamsSize.at(0), rawParamsSize.at(1), 6 });
 
 		const torch::Tensor cosThetaEuler = trigParams.narrow(-1, 0, 1);
@@ -125,27 +134,26 @@ namespace vtx::distribution
 		torch::Tensor xAxis = term1 + term2 + term3;
 		xAxis = normalize(xAxis, torch::nn::functional::NormalizeFuncOptions().dim(-1));
 
-		auto xDotZ = sum(zAxis * xAxis, -1, true);
 		const torch::Tensor lambdaA = lambdaAActivation(rawParams, 4);
 
 		return { xAxis, zAxis, lambdaA };
 	}
 
-	torch::Tensor Nasg::finalizeRawParams(const torch::Tensor& rawParams, const network::DistributionType& type)
+	torch::Tensor Nasg::finalizeRawParams(const torch::Tensor& rawParams, const network::config::DistributionType& type)
 	{
 		TRACE_TENSOR(rawParams);
 		torch::Tensor xAxis, zAxis, lambdaA;
 		switch (type)
 		{
-		case network::D_NASG_TRIG:
+		case network::config::D_NASG_TRIG:
 		{
 			std::tie(xAxis, zAxis, lambdaA) = trigonometricParametrization(rawParams);
 		}break;
-		case network::D_NASG_ANGLE:
+		case network::config::D_NASG_ANGLE:
 		{
 			std::tie(xAxis, zAxis, lambdaA) = eulerAngleParametrization(rawParams);
 		}break;
-		case network::D_NASG_AXIS_ANGLE:
+		case network::config::D_NASG_AXIS_ANGLE:
 		{
 			std::tie(xAxis, zAxis, lambdaA) = axisAngleParametrization(rawParams);
 		}break;
@@ -154,6 +162,8 @@ namespace vtx::distribution
 		TRACE_TENSOR(xAxis);
 		TRACE_TENSOR(zAxis);
 		TRACE_TENSOR(lambdaA);
+		//PRINT_TENSOR_ALWAYS("", xAxis);
+		//PRINT_TENSOR_ALWAYS("", zAxis);
 		torch::Tensor params = torch::cat({ xAxis, zAxis, lambdaA }, -1);
 		return params;
 	}
@@ -191,7 +201,7 @@ namespace vtx::distribution
 		const torch::Tensor pow2 = torch::pow(scaleValue, powerValue);
 		const torch::Tensor g = torch::exp(2.0f * lambda * (pow1 - 1.0f)) * pow2;
 		const torch::Tensor normalization = normalizationFactor(lambda, a);
-		torch::Tensor       finalResult = g / normalization;
+		torch::Tensor       finalResult = g / (normalization+EPS);
 
 		TRACE_TENSOR(vDotZ);
 		TRACE_TENSOR(vDotX);
@@ -201,6 +211,7 @@ namespace vtx::distribution
 		TRACE_TENSOR(pow1);
 		TRACE_TENSOR(pow2);
 		TRACE_TENSOR(g);
+		TRACE_TENSOR(normalization);
 		TRACE_TENSOR(finalResult);
 
 		return finalResult;
@@ -285,13 +296,13 @@ namespace vtx::distribution
 
 		if (isTraining)
 		{
-			graphData.addData(network::G_NASG_T_LAMBDA, hostTensors[0].item<float>());
-			graphData.addData(network::G_NASG_T_A, hostTensors[1].item<float>());
+			graphData.addData("Lambda", "Iteration", "Lambda", "Lambda Train", hostTensors[0].item<float>());
+			graphData.addData("A", "Iteration", "A", "A Train", hostTensors[1].item<float>());
 		}
 		else
 		{
-			graphData.addData(network::G_NASG_I_LAMBDA, hostTensors[0].item<float>(), depth);
-			graphData.addData(network::G_NASG_I_A, hostTensors[1].item<float>(), depth);
+			graphData.addData("Lambda", "Iteration", "Lambda", "Lambda Inference", hostTensors[0].item<float>(), depth);
+			graphData.addData("A", "Iteration", "A", "A Inference", hostTensors[1].item<float>(), depth);
 		}
 	}
 }

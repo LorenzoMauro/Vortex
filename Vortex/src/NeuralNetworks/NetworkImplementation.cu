@@ -8,9 +8,9 @@ namespace vtx::network
 {
 	void NetworkImplementation::shuffleDataset(LaunchParams* params) const
 	{
-		const int datasetSize = settings->batchSize * settings->maxTrainingStepPerFrame;
-		LaunchParams* paramsCopy = params;
-		NetworkSettings settingsCopy = *settings;
+		const int               datasetSize  = settings->batchSize; // *settings->maxTrainingStepPerFrame;
+		LaunchParams*           paramsCopy   = params;
+		config::NetworkSettings settingsCopy = *settings;
 		gpuParallelFor(eventNames[N_SHUFFLE_DATASET],
 			datasetSize,
 			[paramsCopy, settingsCopy] __device__(const int id)

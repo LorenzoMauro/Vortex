@@ -4,7 +4,7 @@
 
 namespace vtx
 {
-	InferenceQueries* InferenceQueries::upload(device::InferenceBuffers& buffers, const int& numberOfPixels, const network::DistributionType& type, const int& _mixtureSize)
+	InferenceQueries* InferenceQueries::upload(device::InferenceBuffers& buffers, const int& numberOfPixels, const network::config::DistributionType& type, const int& _mixtureSize)
 	{
 		const InferenceQueries inferenceQueries(buffers, numberOfPixels, type, _mixtureSize);
 		return buffers.inferenceStructBuffer.upload(inferenceQueries);
@@ -15,7 +15,7 @@ namespace vtx
 		return buffers.inferenceStructBuffer.castedPointer<InferenceQueries>();
 	}
 
-	InferenceQueries::InferenceQueries(device::InferenceBuffers& buffers, const int& numberOfPixels, const network::DistributionType& type, const int& _mixtureSize)
+	InferenceQueries::InferenceQueries(device::InferenceBuffers& buffers, const int& numberOfPixels, const network::config::DistributionType& type, const int& _mixtureSize)
 	{
 		device::InferenceBuffers& inferenceBuffers = buffers;
 		distributionParameters = inferenceBuffers.distributionParameters.alloc<float>(numberOfPixels * _mixtureSize * distribution::Mixture::getDistributionParametersCount(type));

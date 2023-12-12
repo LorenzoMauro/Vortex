@@ -1,27 +1,32 @@
 ﻿#pragma once
 #include <memory>
 #include <vector>
-
 #include "Gui/PlottingWrapper.h"
-#include "NeuralNetworks/Networks/TcnnSettings.h"
+#include "NeuralNetworks/Config/NetworkSettings.h"
 
 namespace vtx
 {
 	namespace network
 	{
-		class Network;
-		struct NetworkSettings;
-		struct TrainingBatchGenerationSettings;
-		struct NpgSettings;
-		struct SacSettings;
-		struct PathGuidingNetworkSettings;
-		struct InputSettings;
-		struct EncodingSettings;
-	}
-}
+		namespace config
+		{
+			struct NetworkSettings;
+			struct BatchGenerationConfig;
+			struct EncodingConfig;
+			struct TriangleWaveEncoding;
+			struct SphericalHarmonicsEncoding;
+			struct OneBlobEncoding;
+			struct IdentityEncoding;
+			struct GridEncoding;
+			struct FrequencyEncoding;
+		}
 
-namespace vtx
-{
+		class Network;
+	}
+
+	struct Experiment;
+	struct RendererSettings;
+
 	namespace graph
 	{
 		namespace shader
@@ -30,6 +35,7 @@ namespace vtx
 			class ShaderNode;
 		}
 
+		struct Statistics;
 		class Material;
 		class Transform;
 		class Camera;
@@ -55,31 +61,27 @@ namespace vtx::gui
 
 		static bool drawEditGui(const std::shared_ptr<graph::shader::ShaderNode>& shaderNode, const bool isNodeEditor = false);
 		static bool drawEditGui(const graph::shader::ShaderNodeSocket& socket);
-		static bool drawEditGui(network::EncodingSettings& settings, const std::string& encodedFeatureName);
-		static bool drawEditGui(network::InputSettings& settings);
-		static bool drawEditGui(network::PathGuidingNetworkSettings& settings);
-		static bool drawEditGui(network::SacSettings& settings);
-		static bool drawEditGui(network::NpgSettings& settings);
-		static bool drawEditGui(network::TrainingBatchGenerationSettings& settings);
-		static bool drawEditGui(network::NetworkSettings& settings);
 
-
-		static bool drawEditGui(network::FrequencyEncoding& config);
-		static bool drawEditGui(network::GridEncoding& config);
-		static bool drawEditGui(network::IdentityEncoding& config);
-		static bool drawEditGui(network::OneBlobEncoding& config);
-		static bool drawEditGui(network::SphericalHarmonicsEncoding& config);
-		static bool drawEditGui(network::TriangleWaveEncoding& config);
-		static bool drawEditGui(const std::string& featureName, network::TcnnEncodingConfig& config);
-
-		static void drawDisplayGui(network::EncodingSettings& settings, const std::string& encodedFeatureName);
-		static void drawDisplayGui(network::InputSettings& settings);
-		static void drawDisplayGui(network::PathGuidingNetworkSettings& settings);
-		static void drawDisplayGui(network::SacSettings& settings);
-		static void drawDisplayGui(network::NpgSettings& settings);
-		static void drawDisplayGui(network::NetworkSettings& settings);
-
+		static bool                  drawEditGui(network::config::FrequencyEncoding& config);
+		static bool                  drawEditGui(network::config::GridEncoding& config);
+		static bool                  drawEditGui(network::config::IdentityEncoding& config);
+		static bool                  drawEditGui(network::config::OneBlobEncoding& config);
+		static bool                  drawEditGui(network::config::SphericalHarmonicsEncoding& config);
+		static bool                  drawEditGui(network::config::TriangleWaveEncoding& config);
+		static bool                  drawEditGui(const std::string& featureName, network::config::EncodingConfig& config);
+		static bool                  drawEditGui(network::config::BatchGenerationConfig& settings);
+		static bool                  drawEditGui(network::config::MlpSettings& config);
+		static bool                  drawEditGui(network::config::MainNetEncodingConfig& config);
+		static bool					 drawEditGui(network::config::AuxNetEncodingConfig& config);
+		static bool                  drawEditGui(network::config::NetworkSettings& settings);
 		static std::vector<PlotInfo> getPlots(network::Network& network);
+
+		static bool drawEditGui(Experiment& experiment);
+
+		static bool drawEditGui(RendererSettings& settings);
+		static void drawDisplayGui(graph::Statistics& settings);
+
+
 
 	};
 }

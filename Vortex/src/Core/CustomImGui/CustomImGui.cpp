@@ -293,6 +293,11 @@ namespace vtx::vtxImGui
         return vtxImGui::halfSpaceWidget(label, ImGui::DragFloat, (hiddenLabel + label).c_str(), v, v_speed, v_min, v_max, format, flags);
     }
 
+    bool halfSpaceCheckbox(const char* label, bool* v)
+    {
+        return vtxImGui::halfSpaceWidget(label, ImGui::Checkbox, (hiddenLabel + label).c_str(), v);
+    }
+
     void DrawRowsBackground(const int row_count, const float line_height, const float x1, const float x2, const float y_offset, const ImU32 col_even, const ImU32 col_odd)
     {
         ImDrawList* draw_list = ImGui::GetWindowDrawList();

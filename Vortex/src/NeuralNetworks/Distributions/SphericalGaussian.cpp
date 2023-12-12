@@ -124,14 +124,13 @@ namespace vtx::distribution
                 scaleWeightedMean
             }
         );
-
         if(isTraining)
         {
-			graphData.addData(network::G_SPHERICAL_GAUSSIAN_T_K, hostTensors[0].item<float>());
+            graphData.addData("Concentration", "Iteration", "Concentration", "Concentration Train", hostTensors[0].item<float>());
         }
         else
         {
-	        graphData.addData(network::G_SPHERICAL_GAUSSIAN_I_K, hostTensors[0].item<float>(), depth);
+            graphData.addData("Concentration", "Iteration", "Concentration", "Concentration Inference", hostTensors[0].item<float>(), depth);
         }
     }
 

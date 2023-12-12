@@ -36,6 +36,7 @@ namespace vtx
 		std::string                     getFilePathToSave();
 		LoadSaveState                   getCurrentState();
 		void							setManualLoad(const std::string& filePath);
+		void							reset();
 
 	private:
 		LoadSaveState currentState = LoadSaveState::Idle;

@@ -305,5 +305,30 @@ namespace vtx::device
 		frameId++;
 		isFrameIdUpdated = true;
 	}
+	void DeviceDataCoordinator::reset()
+	{
+		optixInstances.clear();
+		instanceDataMap.clear();
+		geometryDataMap.clear();
+		materialDataMap.clear();
+		textureDataMap.clear();
+		bsdfDataMap.clear();
+		lightProfileDataMap.clear();
+		lightDataMap.clear();
+
+		// The following data currently does not need a map
+		// However if we want to support multiple renderers (Viewports) these should be unique to each viewport, we can map them by rendererID
+		noiseComputationData = DeviceData<DummyHostImage, NoiseComputationBuffers>();
+		frameBufferData = DeviceData<FrameBufferData, FrameBufferBuffers>();
+		launchParamsData = DeviceData<LaunchParams, LaunchParamsBuffers>() ;
+		workQueuesData = DeviceData<QueuesData, WorkQueueBuffers>();
+		networkInterfaceData = DeviceData<DummyHostImage, NetworkInterfaceBuffer>();
+
+		prevWorkQueueInfo = PrevWorkQueueInfo();
+		prevNetworkInterfaceInfo = PrevNetworkInterfaceInfo();
+
+		frameId = 0;
+		isFrameIdUpdated = true;
+	}
 }
 

@@ -60,4 +60,6 @@ namespace utl{
 
 		return data;
 	}
+
+	bool fileExists(const std::string& string);
 }

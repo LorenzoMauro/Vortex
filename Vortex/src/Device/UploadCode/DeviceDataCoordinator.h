@@ -89,6 +89,8 @@ namespace vtx::device
 
 		void incrementFrameIteration();
 
+		void reset();
+
 		std::map<vtxID, OptixInstance>                       optixInstances;
 		DeviceDataMap<InstanceData, InstanceBuffers>         instanceDataMap;
 		DeviceDataMap<GeometryData, GeometryBuffers>         geometryDataMap;
@@ -120,7 +122,7 @@ namespace vtx::device
 			int                       numberOfPixels = 0;
 			int                       maxDatasetSize = 0;
 			int                       maxDepth = 0;
-			network::DistributionType distributionType = network::D_COUNT;
+			network::config::DistributionType distributionType = network::config::D_COUNT;
 			int                       mixtureSize = 0;
 		};
 

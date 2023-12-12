@@ -9,11 +9,15 @@
 #include <condition_variable>
 
 #include "RendererSettings.h"
+#include "Statistics.h"
 #include "Device/InteropWrapper.h"
 #include "Device/DevicePrograms/WavefrontIntegrator.h"
 
 namespace vtx::graph
 {
+
+
+
 	class Renderer : public Node
 	{
 	public:
@@ -57,6 +61,8 @@ namespace vtx::graph
 		RendererSettings								settings;
 		bool											resized = true;
 		vtx::Timer timer;
+
+		Statistics statistics;
 
 		struct ThreadData {
 			template <typename Fn>
@@ -108,5 +114,6 @@ namespace vtx::graph
 		bool        resizeGlBuffer;
 		GLFWwindow* sharedContext;
 	};
+
 
 }

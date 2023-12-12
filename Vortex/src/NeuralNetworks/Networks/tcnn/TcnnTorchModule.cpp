@@ -1,8 +1,7 @@
 #include "TcnnTorchModule.h"
-
 #include "TcnnAutoGrad.h"
 #include "tcnnUtils.h"
-#include "NeuralNetworks/NetworkSettings.h"
+#include "NeuralNetworks/Config/NetworkSettings.h"
 
 namespace torchTcnn
 {
@@ -15,7 +14,7 @@ namespace torchTcnn
         dType = torchPrecision(nativeTcnnModule.paramPrecision());
         seed = _seed;
         params = register_parameter("params", nativeTcnnModule.initialParams(seed), true);
-        loss_scale = tcnn::cpp::default_loss_scale(nativeTcnnModule.paramPrecision());
+        loss_scale = default_loss_scale(nativeTcnnModule.paramPrecision());
 		//overflowLayer = OverflowLayer();
 		//register_module("overflowLayer", overflowLayer);
     }
@@ -43,49 +42,40 @@ namespace torchTcnn
         return output;
     }
 
-	nlohmann::json getNetworkSettings(vtx::network::PathGuidingNetworkSettings* settings)
-	{
-		nlohmann::json config;
-		config["otype"] = "FullyFusedMLP";
-		config["activation"] = "ReLU";
-		config["output_activation"] = "None";
-		config["n_neurons"] = settings->hiddenDim;
-		config["n_hidden_layers"] = settings->numHiddenLayers;
-		return config;
-	}
 
-	nlohmann::json getEncodingSettings(vtx::network::TcnnEncodingConfig* inputSettings) {
+	nlohmann::json getEncodingSettings(const vtx::network::config::EncodingConfig& inputSettings) {
+		using namespace vtx::network::config;
 		nlohmann::json config;
-		config["otype"] = vtx::network::TcnnEncodingTypeName[static_cast<int>(inputSettings->otype)];
+		config["otype"] = EncodingTypeName[static_cast<int>(inputSettings.otype)];
 
-		switch (inputSettings->otype) {
-		case vtx::network::TcnnEncodingType::Composite:
+		switch (inputSettings.otype) {
+		case EncodingType::Composite:
 			// Assuming you have logic to handle Composite type
 			break;
-		case vtx::network::TcnnEncodingType::Frequency:
-			config["n_frequencies"] = inputSettings->frequencyEncoding.n_frequencies;
+		case EncodingType::Frequency:
+			config["n_frequencies"] = inputSettings.frequencyEncoding.n_frequencies;
 			break;
-		case vtx::network::TcnnEncodingType::Grid:
-			config["type"] = vtx::network::GridTypeName[static_cast<int>(inputSettings->gridEncoding.type)]; // Assuming GridTypeName is similar to TcnnEncodingTypeName
-			config["n_levels"]             = inputSettings->gridEncoding.n_levels;
-			config["n_features_per_level"] = inputSettings->gridEncoding.n_features_per_level;
-			config["log2_hashmap_size"]    = inputSettings->gridEncoding.log2_hashmap_size;
-			config["base_resolution"]      = inputSettings->gridEncoding.base_resolution;
-			config["per_level_scale"]      = inputSettings->gridEncoding.per_level_scale;
-			config["interpolation"]        = vtx::network::InterpolationTypeName[static_cast<int>(inputSettings->gridEncoding.interpolation)]; // Assuming a similar mapping for InterpolationType
+		case EncodingType::Grid:
+			config["type"] = GridTypeName[static_cast<int>(inputSettings.gridEncoding.type)]; // Assuming GridTypeName is similar to config::EncodingTypeName
+			config["n_levels"]             = inputSettings.gridEncoding.n_levels;
+			config["n_features_per_level"] = inputSettings.gridEncoding.n_features_per_level;
+			config["log2_hashmap_size"]    = inputSettings.gridEncoding.log2_hashmap_size;
+			config["base_resolution"]      = inputSettings.gridEncoding.base_resolution;
+			config["per_level_scale"]      = inputSettings.gridEncoding.per_level_scale;
+			config["interpolation"]        = InterpolationTypeName[static_cast<int>(inputSettings.gridEncoding.interpolation)]; // Assuming a similar mapping for InterpolationType
 			break;
-		case vtx::network::TcnnEncodingType::Identity:
-			config["scale"] = inputSettings->identityEncoding.scale;
-			config["offset"] = inputSettings->identityEncoding.offset;
+		case EncodingType::Identity:
+			config["scale"] = inputSettings.identityEncoding.scale;
+			config["offset"] = inputSettings.identityEncoding.offset;
 			break;
-		case vtx::network::TcnnEncodingType::OneBlob:
-			config["n_bins"] = inputSettings->oneBlobEncoding.n_bins;
+		case EncodingType::OneBlob:
+			config["n_bins"] = inputSettings.oneBlobEncoding.n_bins;
 			break;
-		case vtx::network::TcnnEncodingType::SphericalHarmonics:
-			config["degree"] = inputSettings->sphericalHarmonicsEncoding.degree;
+		case EncodingType::SphericalHarmonics:
+			config["degree"] = inputSettings.sphericalHarmonicsEncoding.degree;
 			break;
-		case vtx::network::TcnnEncodingType::TriangleWave:
-			config["n_frequencies"] = inputSettings->triangleWaveEncoding.n_frequencies;
+		case EncodingType::TriangleWave:
+			config["n_frequencies"] = inputSettings.triangleWaveEncoding.n_frequencies;
 			break;
 		default:
 			throw std::runtime_error("Unsupported encoding type");
@@ -94,26 +84,41 @@ namespace torchTcnn
 		return config;
 	}
 
-	nlohmann::json getCompositeEncodingSettings(vtx::network::InputSettings* inputSettings)
+	nlohmann::json getEncodingSettings(const vtx::network::config::MainNetEncodingConfig& inputSettings)
 	{
 		nlohmann::json config;
 		config["otype"] = "Composite";
-		nlohmann::json positionEncoding = getEncodingSettings(&inputSettings->tcnnCompositeEncodingConfig.positionEncoding);
-		positionEncoding["n_dims_to_encode"] = 3;
-		nlohmann::json directionEncoding = getEncodingSettings(&inputSettings->tcnnCompositeEncodingConfig.positionEncoding);
-		directionEncoding["n_dims_to_encode"] = 3;
-		nlohmann::json normalEncoding = getEncodingSettings(&inputSettings->tcnnCompositeEncodingConfig.positionEncoding);
-		normalEncoding["n_dims_to_encode"] = 3;
-		config["nested"][0] = positionEncoding;
-		config["nested"][1] = directionEncoding;
-		config["nested"][2] = normalEncoding;
+		config["nested"][0] = getEncodingSettings(inputSettings.position);
+		config["nested"][0]["n_dims_to_encode"] = 3;
+		config["nested"][1] = getEncodingSettings(inputSettings.normal);
+		config["nested"][1]["n_dims_to_encode"] = 3;
+		config["nested"][2] = getEncodingSettings(inputSettings.wo);
+		config["nested"][2]["n_dims_to_encode"] = 3;
 		return config;
 	}
 
-	torchTcnn::TcnnModule build(int outputDim, vtx::network::PathGuidingNetworkSettings* settings, vtx::network::InputSettings* inputSettings)
+
+	nlohmann::json getEncodingSettings(int rawFeatureSize, const vtx::network::config::AuxNetEncodingConfig& inputSettings)
 	{
-		// Assuming your module requires input dimension, output dimension, encoding and network configuration, and a seed
-		int seed = 1337;   // Example seed
-		return std::move(torchTcnn::TcnnModule(9, outputDim, getCompositeEncodingSettings(inputSettings), getNetworkSettings(settings), seed));
+		nlohmann::json config;
+		config["otype"] = "Composite";
+		config["nested"][0] = {};
+		config["nested"][0]["otype"] = "Identity";
+		config["nested"][0]["n_dims_to_encode"] = rawFeatureSize;
+		config["nested"][1] = getEncodingSettings(inputSettings.wi);
+		config["nested"][1]["n_dims_to_encode"] = 3;
+		return config;
+	}
+
+
+	nlohmann::json getNetworkSettings(const vtx::network::config::MlpSettings& settings)
+	{
+		nlohmann::json config;
+		config["otype"] = "FullyFusedMLP";
+		config["activation"] = "ReLU";
+		config["output_activation"] = "None";
+		config["n_neurons"] = settings.hiddenDim;
+		config["n_hidden_layers"] = settings.numHiddenLayers;
+		return config;
 	}
 }

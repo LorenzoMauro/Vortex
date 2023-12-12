@@ -8,7 +8,7 @@
 
 #define MAX_CONCENTRATION 50.0f
 #define M_PI_F (float)M_PI
-#define EPS 1e-4f
+#define EPS 1e-3f
 
 #ifdef USE_HALF_PRECISION
 #define TO_TYPE .to(torch::kHalf)

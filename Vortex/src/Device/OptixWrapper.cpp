@@ -664,6 +664,16 @@ namespace vtx::optix
 		CUDA_SYNC_CHECK();
 	}
 
+	void PipelineOptix::invalidate()
+	{
+		isDirty = true;
+		for(auto& [sbtName, sbtPipe] : sbtPipelines)
+		{
+			sbtPipe.isDirty = true;
+		}
+		allProgramGroups.clear();
+	}
+
 	OptixTraversableHandle createGeometryAcceleration(CUdeviceptr vertexData, uint32_t verticesNumber, uint32_t verticesStride, CUdeviceptr indexData, uint32_t indexNumber, uint32_t indicesStride)
 	{
 		VTX_INFO("Optix Wrapper: Computing BLAS");

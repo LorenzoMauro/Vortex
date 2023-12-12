@@ -572,34 +572,25 @@ namespace vtx
 
     __forceinline__ __device__ float neuralSamplingFraction(const LaunchParams& params, const int& shadeQueueIndex)
     {
-	    float samplingFraction;
-		if(params.settings.neural.type == network::NT_SAC)
-		{
-			samplingFraction = params.settings.neural.sac.neuralSampleFraction;
-		}
-		else
-		{
-			samplingFraction = params.networkInterface->inferenceQueries->getSamplingFraction(shadeQueueIndex);
-		}
+		//if(params.settings.neural.type == network::NT_SAC)
+		//{
+		//	samplingFraction = params.settings.neural.sac.neuralSampleFraction;
+		//}
+		//else
+		//{
+		//}
+        const float samplingFraction = params.networkInterface->inferenceQueries->getSamplingFraction(shadeQueueIndex);
+        
 		return samplingFraction;
 	}
 
-    __forceinline__ __device__ void correctBsdfSampling(const LaunchParams& params, mdl::MaterialEvaluation* matEval, const RayWorkItem& prd, const math::vec4f& neuralSample, const bool& doNeuralSample, const int& shadeQueueIndex)
+    __forceinline__ __device__ void correctBsdfSampling(const LaunchParams& params, mdl::MaterialEvaluation* matEval, const RayWorkItem& prd, const math::vec4f& neuralSample, float samplingFraction, const bool& doNeuralSample, const int& shadeQueueIndex)
     {
-	    //{
-		//    const math::vec3f& normal = prd.hitProperties.shadingNormal;
-	    //	float eval = distribution::Nasg::prob(normal, { 1.0f, 0.0f, 0.0f }, { 0.0f, 0.0f, 1.0f }, 10, 2);
-	    //	eval = fminf(1.0f, eval);
-	    //	math::vec3f color = floatToScientificRGB(eval);
-	    //	addDebug(color, prd.originPixel, &params);
-	    //}
-        // If the bsdf sample is specular, we don't use the neural sampling.
-        const float samplingFraction = neuralSamplingFraction(params, shadeQueueIndex);
+	    
         if (matEval->bsdfSample.eventType & mi::neuraylib::BSDF_EVENT_SPECULAR)
         {
             if (doNeuralSample)
             {
-
                 const math::vec3f neuralDirection = { neuralSample.x, neuralSample.y, neuralSample.z };
                 const float cosineDirection = dot(neuralDirection, prd.hitProperties.trueNormal);
                 auxiliaryNetworkInference(&params, prd.originPixel, prd.depth, shadeQueueIndex, samplingFraction, neuralDirection, neuralSample.w, cosineDirection);
@@ -619,7 +610,7 @@ namespace vtx
         if (doNeuralSample)
         {
             bsdf = matEval->neuralBsdfEvaluation.diffuse + matEval->neuralBsdfEvaluation.glossy;
-           neuralDirection = { neuralSample.x, neuralSample.y, neuralSample.z };
+			neuralDirection = { neuralSample.x, neuralSample.y, neuralSample.z };
             const float cosineDirection = dot(neuralDirection, prd.hitProperties.trueNormal);
             auxiliaryNetworkInference(&params, prd.originPixel, prd.depth, shadeQueueIndex, samplingFraction, neuralDirection, neuralSample.w, cosineDirection);
 
@@ -648,41 +639,17 @@ namespace vtx
         }
         matEval->bsdfSample.isValid = true;
         matEval->bsdfSample.pdf = bsdfPdf * (1.0f - samplingFraction) + neuralPdf * samplingFraction;
-        matEval->bsdfSample.bsdfOverPdf = bsdf / matEval->bsdfSample.pdf;
-
-        if(math::isNan(matEval->bsdfSample.bsdfOverPdf) || matEval->bsdfSample.pdf <= 0.0f)
+        if (matEval->bsdfSample.pdf == 0.0f)
         {
-            printf(
-                "Do Neural Sample %d\n"
-                "Event Type Name %s\n"
-                "Event Type %d\n"
-                "Original Bsdf Over Pdf %f %f %f\n"
-                "bsdf %f %f %f\n"
-                "Original Pdf %f\n"
-                "final Pdf %f\n"
-                "bsdfPdf %f\n"
-                "neuralPdf %f\n"
-                "samplingFraction %f\n"
-                "neural Direction %f %f %f\n"
-                ,
-                doNeuralSample,
-                mdl::bsdfEventTypeName(matEval->bsdfSample.eventType),
-                matEval->bsdfSample.eventType,
-                originalBsdfOverPdf.x, originalBsdfOverPdf.y, originalBsdfOverPdf.z
-                , bsdf.x, bsdf.y, bsdf.z
-                , matEval->bsdfSample.bsdfPdf
-                , matEval->bsdfSample.pdf
-                , bsdfPdf
-                , neuralPdf
-                , samplingFraction,
-                neuralDirection.x, neuralDirection.y, neuralDirection.z
-            );
+	        matEval->bsdfSample.eventType = mi::neuraylib::BSDF_EVENT_ABSORB;
+			return;
+		}
+        matEval->bsdfSample.bsdfOverPdf = bsdf / (matEval->bsdfSample.pdf);
+
+        if(math::isNan(matEval->bsdfSample.bsdfOverPdf) || matEval->bsdfSample.pdf < 0.0f)
+        {
+            matEval->bsdfSample.eventType = mi::neuraylib::BSDF_EVENT_ABSORB;
         }
-        assert(!isinf(matEval->bsdfSample.pdf));
-        assert(matEval->bsdfSample.pdf > 0.0f);
-        assert(!isnan(matEval->bsdfSample.pdf));
-        assert(!utl::isNan(matEval->bsdfSample.nextDirection));
-        assert(!utl::isNan(matEval->bsdfSample.bsdfOverPdf));
     }
 
     __forceinline__ __device__ void correctLightSample(const LaunchParams & params, mdl::MaterialEvaluation * matEval, const math::vec3f & lightDirection, const int& shadeQueueIndex) {
@@ -729,31 +696,49 @@ namespace vtx
         math::vec4f neuralSample = math::vec4f(0.0f);
         bool isNeuralSamplingActivated = neuralSamplingActivated(&params, prd.depth);
         bool doNeuralSample = false;
+        float samplingFraction = 0.0f;
         if(doSampleBsdf)
         {
             request.bsdfSample = true;
             if(isNeuralSamplingActivated)
             {
-                const float samplingFraction = neuralSamplingFraction(params, shadeQueueIndex);
-
-                if (const float uniformSample = rng(prd.seed); uniformSample > samplingFraction)
+                samplingFraction = neuralSamplingFraction(params, shadeQueueIndex);
+                if (isnan(samplingFraction) || isinf(samplingFraction) || samplingFraction < 0.0f || samplingFraction > 1.0f)
                 {
-                    doNeuralSample = false;
+#ifdef DEBUG
+                    printf("Invalid sampling fraction %f\n", samplingFraction);
+#endif
+                    samplingFraction = 0.0f;
                 }
                 else
                 {
-                    doNeuralSample = true;
-                    request.evalOnNeuralSampling = true;
-                    neuralSample = params.networkInterface->inferenceQueries->sample(shadeQueueIndex, prd.seed);
-                    request.toNeuralSample = {neuralSample.x, neuralSample.y, neuralSample.z};
+                    if (const float uniformSample = rng(prd.seed); uniformSample > samplingFraction)
+                    {
+                        doNeuralSample = false;
+                    }
+                    else
+                    {
+                        doNeuralSample = true;
+                        request.evalOnNeuralSampling = true;
+                        neuralSample = params.networkInterface->inferenceQueries->sample(shadeQueueIndex, prd.seed);
+                        request.toNeuralSample = { neuralSample.x, neuralSample.y, neuralSample.z };
+                        if (utl::isNan(request.toNeuralSample) || utl::isInf(request.toNeuralSample) || math::length(request.toNeuralSample) <= 0.0f || neuralSample.w < 0.0f)
+						{
+#ifdef DEBUG
+
+							printf("Invalid neural sample %f %f %f Prob %f\n", neuralSample.x, neuralSample.y, neuralSample.z, neuralSample.w);
+#endif
+                            doNeuralSample = false;
+                            request.evalOnNeuralSampling = false;
+                            samplingFraction = 0.0f;
+						}
+                    }
                 }
+               
             }
         }
 
-        //params.settings.renderer.iteration == 15 ? printf("Launching MatEval [%d, %d, %d, %d, %d]\n", *params.frameID, params.settings.renderer.iteration, prd.originPixel, prd.depth, prd.hitProperties.programCall) : 0;
         evaluateMaterial(prd.hitProperties.programCall, &request, matEval);
-
-        //params.settings.renderer.iteration == 15 ? printf("Ending MatEval    [%d, %d, %d, %d, %d]\n", *params.frameID, params.settings.renderer.iteration, prd.originPixel, prd.depth, prd.hitProperties.programCall) : 0;
 
         assert(!(utl::isNan(matEval->bsdfSample.nextDirection) && matEval->bsdfSample.eventType != 0));
 
@@ -761,7 +746,7 @@ namespace vtx
         {
             if(doSampleBsdf)
             {
-                correctBsdfSampling(params, matEval, prd, neuralSample, doNeuralSample, shadeQueueIndex);
+                correctBsdfSampling(params, matEval, prd, neuralSample, samplingFraction, doNeuralSample, shadeQueueIndex);
             }
             if(doSampleLight)
             {
@@ -980,7 +965,7 @@ namespace vtx
         {
             params->networkInterface->paths->recordBounceHit(
                 prd.originPixel, prd.depth,
-                prd.hitProperties.position, prd.hitProperties.shadingNormal, prd.direction);
+                prd.hitProperties.position, prd.hitProperties.shadingNormal, -prd.direction, (int)prd.hitProperties.instanceId, (int)prd.hitProperties.triangleId, prd.hitProperties.programCall);
         }
 
         setGBuffer(prd, *params);

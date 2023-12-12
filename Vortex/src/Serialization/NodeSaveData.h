@@ -281,9 +281,14 @@ namespace vtx::serializer
 			: name(experiment.name)
 			, mape(experiment.mape)
 			, rendererSettings(experiment.rendererSettings)
-			, networkSettings(experiment.networkSettings)
 			, wavefrontSettings(experiment.wavefrontSettings)
-		{}
+			, averageMape(experiment.averageMape)
+			, statistics(experiment.statistics)
+			, generatedByBatchExperiments(experiment.generatedByBatchExperiments)
+			, completed(experiment.completed)
+		{
+			networkSettings = experiment.networkSettings;
+		}
 
 		Experiment restore() const
 		{
@@ -293,14 +298,22 @@ namespace vtx::serializer
 			experiment.rendererSettings = rendererSettings;
 			experiment.networkSettings = networkSettings;
 			experiment.wavefrontSettings = wavefrontSettings;
+			experiment.averageMape = averageMape;
+			experiment.statistics = statistics;
+			experiment.generatedByBatchExperiments = generatedByBatchExperiments;
+			experiment.completed = completed;
 			return experiment;
 		}
 
-		std::string              name;
-		std::vector<float>       mape;
-		RendererSettings         rendererSettings;
-		network::NetworkSettings networkSettings;
-		WavefrontSettings        wavefrontSettings;
+		std::string                      name;
+		std::vector<float>               mape;
+		RendererSettings                 rendererSettings;
+		network::config::NetworkSettings networkSettings;
+		WavefrontSettings                wavefrontSettings;
+		float 							 averageMape;
+		graph::Statistics                statistics;
+		bool                             generatedByBatchExperiments;
+		bool                             completed;
 	};
 
 	struct ExperimentManagerSaveData
@@ -312,16 +325,18 @@ namespace vtx::serializer
 			, width(experimentManager.width)
 			, height(experimentManager.height)
 			, isGroundTruthReady(experimentManager.isGroundTruthReady)
-			, maxSamples(experimentManager.maxSamples)
+			, gtSamples(experimentManager.gtSamples),
+		testSamples(experimentManager.testSamples)
 		{
 			for (const Experiment& experiment : experimentManager.experiments)
 			{
-				experiments.emplace_back(experiment, filePath);
+				ExperimentSaveData experimentSaveData(experiment, filePath);
+				experiments.push_back(experimentSaveData);
 			}
 			if(experimentManager.isGroundTruthReady)
 			{
-				groundTruthImage = std::vector<math::vec3f>(experimentManager.width * experimentManager.height);
-				experimentManager.groundTruthBuffer.download(groundTruthImage.data());
+				groundTruthImage = experimentManager.groundTruthHost;
+
 			}
 			else
 			{
@@ -337,14 +352,43 @@ namespace vtx::serializer
 			experimentManager.width = width;
 			experimentManager.height = height;
 			experimentManager.isGroundTruthReady = isGroundTruthReady;
-			experimentManager.maxSamples = maxSamples;
+			experimentManager.gtSamples = gtSamples;
+			experimentManager.testSamples = testSamples;
 			for (const ExperimentSaveData& experiment : experiments)
 			{
 				experimentManager.experiments.emplace_back(experiment.restore());
+				Experiment& exp = experimentManager.experiments.back();
+				if(exp.generatedByBatchExperiments)
+				{
+					if(exp.completed)
+					{
+						experimentManager.experimentSet.emplace(exp.getStringHashKey());
+						float mapeScore = exp.averageMape + exp.mape.back();
+						experimentManager.experimentMinHeap.push({ mapeScore, experimentManager.experiments.size() - 1 });
+						if (mapeScore < experimentManager.bestMapeScore)
+						{
+							experimentManager.bestMapeScore = mapeScore;
+							experimentManager.bestExperimentIndex = experimentManager.experiments.size() - 1;
+							exp.displayExperiment = true;
+						}
+						else
+						{
+							exp.displayExperiment = false;
+						}
+					}
+					else
+					{
+						experimentManager.experimentQueue.push_back(exp);
+						experimentManager.experiments.pop_back();
+					}
+				}
 			}
 			if(experimentManager.isGroundTruthReady)
 			{
-				experimentManager.groundTruthBuffer.upload(groundTruthImage.data());
+				experimentManager.groundTruthHost = groundTruthImage;
+				experimentManager.groundTruthBuffer.upload(experimentManager.groundTruthHost);
+				experimentManager.groundTruth = experimentManager.groundTruthBuffer.castedPointer<math::vec3f>();
+
 			}
 			return experimentManager;
 		}
@@ -354,9 +398,10 @@ namespace vtx::serializer
 		int width;
 		int height;
 		bool isGroundTruthReady;
-		int maxSamples;
+		int gtSamples;
+		int testSamples;
 		std::vector<ExperimentSaveData> experiments;
-		std::vector<math::vec3f> groundTruthImage;
+		std::vector<float> groundTruthImage;
 	};
 
 	struct RendererNodeSaveData
@@ -399,14 +444,14 @@ namespace vtx::serializer
 			}
 		}
 
-		BaseNodeSaveData         base;
-		RendererSettings         rendererSettings;
-		WavefrontSettings        wavefrontSettings;
-		network::NetworkSettings networkSettings;
-		vtxID                    cameraUID;
-		vtxID                    sceneRootUID;
-		vtxID                    environmentLightUID;
-		ExperimentManagerSaveData experimentManagerSaveData;
+		BaseNodeSaveData                 base;
+		RendererSettings                 rendererSettings;
+		WavefrontSettings                wavefrontSettings;
+		network::config::NetworkSettings networkSettings;
+		vtxID                            cameraUID;
+		vtxID                            sceneRootUID;
+		vtxID                            environmentLightUID;
+		ExperimentManagerSaveData        experimentManagerSaveData;
 
 		std::shared_ptr<graph::Renderer> restoredNode;
 	};

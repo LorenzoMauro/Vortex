@@ -348,11 +348,9 @@ namespace cereal
         );
     }
 
-    
-
     //Serialization for TrainingBatchGenerationSettings
     template<class Archive>
-    void serialize(Archive& archive, vtx::network::TrainingBatchGenerationSettings& data)
+    void serialize(Archive& archive, vtx::network::config::BatchGenerationConfig& data)
     {
         archive(
             nvp(data, strategy),
@@ -361,100 +359,187 @@ namespace cereal
             nvp(data, lightSamplingProb)
         );
     }
-    
-    //Serialization for EncodingSettings
+
     template<class Archive>
-    void serialize(Archive& archive, vtx::network::EncodingSettings& data)
-    {
+    void serialize(Archive& archive, vtx::network::config::FrequencyEncoding& data){
         archive(
+            nvp(data, otype),
+			nvp(data, n_frequencies)
+        );
+    };
+
+    template<class Archive>
+    void serialize(Archive& archive, vtx::network::config::GridEncoding& data){
+        archive(
+            nvp(data, otype),
             nvp(data, type),
-            //nvp(data, isUpdated ),
-            nvp(data, features)
+            nvp(data, n_levels),
+            nvp(data, n_features_per_level),
+            nvp(data, log2_hashmap_size),
+            nvp(data, base_resolution),
+            nvp(data, per_level_scale),
+            nvp(data, interpolation)
         );
-    }
+    };
 
-    //Serialization for InputSettings
     template<class Archive>
-    void serialize(Archive& archive, vtx::network::InputSettings& data)
+    void serialize(Archive& archive, vtx::network::config::IdentityEncoding& data){
+        archive(
+            nvp(data, otype),
+            nvp(data, scale),
+            nvp(data, offset)
+        );
+    };
+
+    template<class Archive>
+    void serialize(Archive& archive, vtx::network::config::OneBlobEncoding& data){
+        archive(
+            nvp(data, otype),
+            nvp(data, n_bins)
+        );
+    };
+
+    template<class Archive>
+    void serialize(Archive& archive, vtx::network::config::SphericalHarmonicsEncoding& data){
+        archive(
+            nvp(data, otype),
+            nvp(data, degree)
+        );
+    };
+
+    template<class Archive>
+    void serialize(Archive& archive, vtx::network::config::TriangleWaveEncoding& data){
+        archive(
+            nvp(data, otype),
+            nvp(data, n_frequencies)
+        );
+    };
+
+    //Serialization for NetworkSettings
+    template<class Archive>
+    void serialize(Archive& archive, vtx::network::config::EncodingConfig& data)
     {
         archive(
-            nvp(data, positionEncoding),
-            nvp(data, woEncoding),
-            //nvp(data, isUpdated = true),
-            nvp(data, normalEncoding)
-        );
-    }
-    
-    //Serialization for PathGuidingSettings
-    template<class Archive>
-    void serialize(Archive& archive, vtx::network::PathGuidingNetworkSettings& data)
-    {
-        archive(
-            nvp(data, hiddenDim),
-            nvp(data, numHiddenLayers),
-            nvp(data, distributionType),
-            nvp(data, mixtureSize),
-            //nvp(data, isUpdated ),
-            nvp(data, produceSamplingFraction)
-        );
-    }
-
-
-    //Serialization for SacSettings
-    template<class Archive>
-    void serialize(Archive& archive, vtx::network::SacSettings& data)
-    {
-        archive(
-            nvp(data, polyakFactor),
-            nvp(data, logAlphaStart),
-            nvp(data, gamma),
-            nvp(data, neuralSampleFraction),
-            nvp(data, policyLr),
-            nvp(data, qLr),
-            //nvp(data, isUpdated = true),
-            nvp(data, alphaLr)
-        );
-    }
-    
-
-    //Serialization for NpgSettings
-    template<class Archive>
-    void serialize(Archive& archive, vtx::network::NpgSettings& data)
-    {
-        archive(
-            nvp(data, learningRate),
-            nvp(data, e),
-            nvp(data, constantBlendFactor),
-            nvp(data, samplingFractionBlend),
-            nvp(data, lossType),
-            nvp(data, isUpdated),
-            nvp(data, absoluteLoss),
-            nvp(data, meanLoss)
+            nvp(data, otype),
+	        nvp(data, frequencyEncoding),
+	        nvp(data, gridEncoding),
+	        nvp(data, identityEncoding),
+	        nvp(data, oneBlobEncoding),
+	        nvp(data, sphericalHarmonicsEncoding),
+	        nvp(data, triangleWaveEncoding)
         );
     }
 
     //Serialization for NetworkSettings
     template<class Archive>
-    void serialize(Archive& archive, vtx::network::NetworkSettings& data)
+    void serialize(Archive& archive, vtx::network::config::MainNetEncodingConfig& data)
     {
         archive(
-            nvp(data, active),
-            nvp(data, batchSize),
-            nvp(data, maxTrainingStepPerFrame),
-            nvp(data, doTraining),
-            nvp(data, maxTrainingSteps),
-            nvp(data, doInference),
-            nvp(data, inferenceIterationStart),
-            nvp(data, clearOnInferenceStart),
-            nvp(data, type),
-            nvp(data, trainingBatchGenerationSettings),
-            nvp(data, inputSettings),
-            nvp(data, pathGuidingSettings),
-            nvp(data, sac),
-            //nvp(data, isUpdated = true),
-            //nvp(data, isDatasetSizeUpdated = true),
-            //nvp(data, depthToDebug = 0),
-            nvp(data, npg)
+            nvp(data, normalizePosition),
+            nvp(data, position),
+            nvp(data, wo),
+            nvp(data, normal)
+        );
+    }
+
+    //Serialization for NetworkSettings
+    template<class Archive>
+    void serialize(Archive& archive, vtx::network::config::MlpSettings& data)
+    {
+        archive(
+            nvp(data, inputDim),
+            nvp(data, outputDim),
+            nvp(data, hiddenDim),
+            nvp(data, numHiddenLayers),
+            nvp(data, activationType)
+        );
+    }
+
+    //Serialization for NetworkSettings
+    template<class Archive>
+    void serialize(Archive& archive, vtx::network::config::AuxNetEncodingConfig& data)
+    {
+        archive(
+            nvp(data, wi)
+        );
+    }
+
+    //Serialization for NetworkSettings
+    template<class Archive>
+    void serialize(Archive& archive, vtx::network::config::NetworkSettings& data)
+    {
+        archive(
+            nvp(data, active ),
+	        nvp(data, wasActive ),
+	        nvp(data, doTraining ),
+	        nvp(data, doInference ),
+	        nvp(data, plotGraphs ),
+	        //nvp(data, isUpdated ),
+	        nvp(data, depthToDebug ),
+	        nvp(data, maxTrainingSteps ),
+	        nvp(data, batchSize ),
+	        nvp(data, learningRate ),
+	        nvp(data, inferenceIterationStart ),
+	        nvp(data, clearOnInferenceStart ),
+	        nvp(data, trainingBatchGenerationSettings),
+            nvp(data, mainNetSettings),
+	        nvp(data, inputSettings),
+	        nvp(data, distributionType ),
+	        nvp(data, mixtureSize ),
+	        nvp(data, lossType ),
+	        nvp(data, lossReduction ),
+	        nvp(data, constantBlendFactor ),
+	        nvp(data, blendFactor ),
+            nvp(data, targetScale),
+	        nvp(data, samplingFractionBlend ),
+	        nvp(data, useEntropyLoss ),
+	        nvp(data, entropyWeight ),
+	        nvp(data, targetEntropy ),
+	        nvp(data, useAuxiliaryNetwork ),
+	        nvp(data, auxiliaryNetSettings),
+	        nvp(data, auxiliaryInputSettings),
+	        nvp(data, totAuxInputSize ),
+	        nvp(data, inRadianceLossFactor ),
+	        nvp(data, outRadianceLossFactor ),
+	        nvp(data, throughputLossFactor ),
+	        nvp(data, auxiliaryWeight),
+            nvp(data, throughputTargetScaleFactor),
+            nvp(data, radianceTargetScaleFactor),
+            nvp(data, useInstanceId),
+            nvp(data, useTriangleId),
+            nvp(data, useMaterialId),
+            nvp(data, scaleLossBlendedQ),
+            nvp(data, clampBsdfProb)
+        );
+    }
+
+    //Serialization for ExperimentSaveData
+    template<class Archive>
+    void serialize(Archive& archive, vtx::graph::Statistics& data)
+    {
+        archive(
+            nvp(data, totTimeSeconds),
+	        nvp(data, samplesPerPixel),
+	        nvp(data, sppPerSecond),
+	        nvp(data, frameTime),
+	        nvp(data, fps),
+	        nvp(data, totTimeInternal),
+	        nvp(data, internalFps),
+	        nvp(data, rendererNoise),
+	        nvp(data, rendererTrace),
+	        nvp(data, rendererPost),
+	        nvp(data, rendererDisplay),
+	        nvp(data, waveFrontGenerateRay),
+	        nvp(data, waveFrontTrace),
+	        nvp(data, waveFrontShade),
+	        nvp(data, waveFrontShadow),
+	        nvp(data, waveFrontEscaped),
+	        nvp(data, waveFrontAccumulate),
+	        nvp(data, waveFrontReset),
+	        nvp(data, waveFrontFetchQueueSize),
+	        nvp(data, neuralShuffleDataset),
+	        nvp(data, neuralNetworkTrain),
+	        nvp(data, neuralNetworkInfer)
         );
     }
 
@@ -467,7 +552,11 @@ namespace cereal
             nvp(data, mape),
             nvp(data, rendererSettings),
             nvp(data, networkSettings),
-            nvp(data, wavefrontSettings)
+            nvp(data, wavefrontSettings),
+            nvp(data, statistics),
+            nvp(data, averageMape),
+            nvp(data, generatedByBatchExperiments),
+            nvp(data, completed)
         );
     }
 
@@ -481,7 +570,8 @@ namespace cereal
             nvp(data, width),
             nvp(data, height),
             nvp(data, isGroundTruthReady),
-            nvp(data, maxSamples),
+            nvp(data, gtSamples),
+            nvp(data, testSamples),
             nvp(data, experiments),
             nvp(data, groundTruthImage)
         );

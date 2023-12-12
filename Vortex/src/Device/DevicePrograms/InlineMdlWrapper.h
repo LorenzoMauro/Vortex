@@ -33,13 +33,13 @@ namespace vtx::mdl {
 
         if (mdlData->isFrontFace || mdlData->isThinWalled)
         {
-            data.ior1 = surroundingIor;
+            data.ior1 = {1.0f, 1.0f, 1.0f};
             data.ior2.x = MI_NEURAYLIB_BSDF_USE_MATERIAL_IOR;
         }
         else
         {
             data.ior1.x = MI_NEURAYLIB_BSDF_USE_MATERIAL_IOR;
-            data.ior2 = surroundingIor;
+            data.ior2 = {1.0f, 1.0f, 1.0f};
         }
 
         if (mdlData->isFrontFace || !mdlData->isThinWalled || true)

@@ -47,7 +47,7 @@ namespace vtx::distribution
             const float pdf = k / (2.0f * M_PI * (1 - expf(-2.0f * k))) * expf(k * (dot(mean, action) - 1.0f));
             if (isnan(pdf))
             {
-                return 0.0f;
+                return -1.0f;
             }
             return pdf;
         }

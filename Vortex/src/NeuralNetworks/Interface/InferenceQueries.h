@@ -3,7 +3,6 @@
 #define INFERENCE_QUERIES_H
 #include "NetworkInputs.h"
 #include "Core/Math.h"
-#include "NeuralNetworks/NetworkSettings.h"
 #include "Device/Wrappers/WorkItems.h"
 #include "Device/DevicePrograms/nvccUtils.h"
 
@@ -22,12 +21,12 @@ namespace vtx
 
 	struct InferenceQueries
 	{
-		static InferenceQueries* upload(device::InferenceBuffers& buffers, const int& numberOfPixels, const network::DistributionType& type, const int& _mixtureSize);
+		static InferenceQueries* upload(device::InferenceBuffers& buffers, const int& numberOfPixels, const network::config::DistributionType& type, const int& _mixtureSize);
 
 		static InferenceQueries* getPreviouslyUploaded(const device::InferenceBuffers& buffers);
 
 	private:
-		InferenceQueries(device::InferenceBuffers& buffers, const int& numberOfPixels, const network::DistributionType& type, const int& _mixtureSize);
+		InferenceQueries(device::InferenceBuffers& buffers, const int& numberOfPixels, const network::config::DistributionType& type, const int& _mixtureSize);
 	public:
 
 		__forceinline__ __device__ void reset()
@@ -38,7 +37,7 @@ namespace vtx
 		__forceinline__ __device__ int addInferenceQuery(const RayWorkItem& prd, const int index)
 		{
 			const int newSize = cuAtomicAdd(size, 1);
-			state->addState(index, prd.hitProperties.position, prd.direction, prd.hitProperties.shadingNormal);
+			state->addState(index, prd.hitProperties.position, -prd.direction, prd.hitProperties.shadingNormal, (float)prd.hitProperties.instanceId, (float)prd.hitProperties.triangleId, (float)prd.hitProperties.programCall);
 			return index;
 		}
 
@@ -58,22 +57,6 @@ namespace vtx
 			getSampleMixtureParameters(idx, sampleMixtureParams, sampleMixtureWeights);
 			math::vec3f  sample = distribution::Mixture::sample(sampleMixtureParams, sampleMixtureWeights, mixtureSize, distributionType, seed);
 			const float  sampleProb = distribution::Mixture::evaluate(sampleMixtureParams, sampleMixtureWeights, mixtureSize, distributionType, sample);
-
-			/*if(idx<10)
-			{
-				float sampleNorm = math::length(sample);
-
-				printf(
-					"Sample : %f %f %f\n"
-					"Sample norm : %f\n"
-					"Sample prob : %f\n\n",
-					sample.x, sample.y, sample.z,
-					sampleNorm,
-					sampleProb
-				);
-			}*/
-			
-
 			return { sample, sampleProb };
 		}
 
@@ -83,6 +66,22 @@ namespace vtx
 			const int mixtureWeightsOffset = idx * mixtureSize;
 			sampleMixtureParams = distributionParameters + mixtureParamsOffset;
 			sampleMixtureWeights = mixtureWeights + mixtureWeightsOffset;
+			/*printf(
+				"idx : %d\n"
+				"mixtureSize : %d\n"
+				"distributionCount : %d\n"
+				"mixtureParamsOffset : %d\n"
+				"mixtureWeightsOffset : %d\n"
+				"sampleMixtureParams : %p\n"
+				"sampleMixtureWeights : %p\n\n",
+				idx,
+				mixtureSize,
+				distribution::Mixture::getDistributionParametersCount(distributionType),
+				mixtureParamsOffset,
+				mixtureWeightsOffset,
+				sampleMixtureParams,
+				sampleMixtureWeights
+			);*/
 		}
 
 		__forceinline__ __device__ math::vec3f& getStatePosition(const int& idx)
@@ -139,7 +138,7 @@ namespace vtx
 
 		int* size;
 		int                        maxSize;
-		network::DistributionType  distributionType;
+		network::config::DistributionType  distributionType;
 		int                        mixtureSize;
 	};
 }

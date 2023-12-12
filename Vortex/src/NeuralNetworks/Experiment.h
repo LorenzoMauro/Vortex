@@ -1,24 +1,24 @@
 ﻿#pragma once
 #include <map>
 #include <memory>
+#include <queue>
+#include <unordered_set>
 
-#include "NetworkSettings.h"
+#include "Config/NetworkSettings.h"
+#include "Core/Application.h"
 #include "Core/Image.h"
 #include "Core/Math.h"
 #include "Device/UploadCode/CUDABuffer.h"
 #include "Scene/Nodes/RendererSettings.h"
-//#include "yaml-cpp/node/node.h"
+#include "Scene/Nodes/Statistics.h"
 
-namespace vtx
-{
-	
-}
 
 namespace vtx
 {
 	namespace graph
 	{
 		class Renderer;
+		struct Statistics;
 	}
 
 	namespace network
@@ -47,18 +47,26 @@ namespace vtx
 		{ STAGE_END, "End" }
 	};
 
+	struct MinHeapComparator {
+		bool operator()(const std::pair<float, int>& a, const std::pair<float, int>& b) const {
+			return a.first > b.first; // For min heap
+		}
+	};
+
 	struct Experiment
 	{
-		RendererSettings         rendererSettings;
-		network::NetworkSettings networkSettings;
-		WavefrontSettings        wavefrontSettings;
-		std::vector<float>       mape;
-		std::string              name = "Unnamed";
+		RendererSettings                 rendererSettings;
+		network::config::NetworkSettings networkSettings;
+		WavefrontSettings                wavefrontSettings;
+		std::vector<float>               mape;
+		std::string                      name        = "Unnamed";
+		float                            averageMape = FLT_MAX;
+		graph::Statistics                statistics;
+		bool                             generatedByBatchExperiments = false;
+		bool                             completed = false;
 
-		void constructName(const int experimentNumber)
-		{
-			name = "Experiment_" + std::to_string(experimentNumber);
-		}
+		void        constructName(const int experimentNumber);
+		std::string getStringHashKey();
 
 		bool storeExperiment = false;
 		bool displayExperiment = true;
@@ -68,47 +76,51 @@ namespace vtx
 	{
 	public:
 
-		void loadGroundTruth(const std::string& filePath)
-		{
-			Image image;
-			image.load(filePath);
-			float* hostImage = image.getData();
-			width = image.getWidth();
-			height = image.getHeight();
+		void loadGroundTruth(const std::string& filePath);
 
-			groundTruthBuffer.resize(image.getWidth() * image.getHeight() * image.getChannels() * sizeof(float));
-			groundTruthBuffer.upload(hostImage, image.getWidth() * image.getHeight() * image.getChannels());
-			groundTruth = groundTruthBuffer.castedPointer<math::vec3f>();
+		void                                                 saveGroundTruth(const std::string& filePath);
 
-			isGroundTruthReady = true;
-		};
+		static std::vector<network::config::NetworkSettings>                   generateNetworkSettingNeighbors(const network::config::NetworkSettings& setting);
+		static std::vector<Experiment>                                         generateExperimentNeighbors(const Experiment& experiment);
+		static network::config::NetworkSettings getBestGuess();
+		std::tuple<Experiment, Experiment, Experiment, Experiment, Experiment> startingConfigExperiments(const std::shared_ptr<graph::Renderer>& renderer);
+		void																   setupNewExperiment(const Experiment& experiment, const std::shared_ptr<graph::Renderer>& renderer);
+		static std::vector<network::config::NetworkSettings>                   generateNetworkSettingsCombination();
+		std::pair<Experiment, std::vector<Experiment>>                         generateExperiments(const std::shared_ptr<graph::Renderer>& renderer);
+		void                                                                   generateGroundTruth(const Experiment& gtExperiment,Application* app, const std::shared_ptr<graph::Renderer>& renderer);
+		bool performExperiment(Experiment& experiment, Application* app,const std::shared_ptr<graph::Renderer>& renderer);
+		void refillExperimentQueue();
+		void BatchExperimentRun();
 
-		void saveGroundTruth(const std::string& filePath)
-		{
-			std::vector<math::vec3f> hostImage(width * height);
-			math::vec3f* hostImagePtr = hostImage.data();
-			groundTruthBuffer.download(hostImagePtr);
-			Image image;
-			image.load((float*)hostImagePtr, width, height, 3);
-			image.save(filePath);
-		}
+		std::string getImageSavePath(std::string experimentName);
 
 	public:
 		std::vector<Experiment> experiments;
-		int currentExperiment = 0;
-		int currentExperimentStep = 0;
 
 		int width = 800;
 		int height = 800;
-
-		ExperimentStages stage = STAGE_NONE;
 
 		bool isGroundTruthReady = false;
 		math::vec3f* groundTruth = nullptr;
 		CUDABuffer groundTruthBuffer;
 
-		int maxSamples = 1000;
+		int gtSamples = 5000;
+		int testSamples = 400;
 
+		// Manual Testing
+		int currentExperiment = 0;
+		int currentExperimentStep = 0;
+		ExperimentStages stage = STAGE_NONE;
+
+
+		// Batch Testing
+		std::string                                                                                       saveFilePath;
+		std::unordered_set<std::string>                                                                   experimentSet;
+		std::priority_queue<std::pair<float, int>, std::vector<std::pair<float, int>>, MinHeapComparator> experimentMinHeap;
+		std::deque<Experiment>                                                                            experimentQueue;
+		float                                                                                             bestMapeScore = FLT_MAX;
+		int                                                                                               bestExperimentIndex;
+		std::vector<float>																				  groundTruthHost;
 	};
 
 }

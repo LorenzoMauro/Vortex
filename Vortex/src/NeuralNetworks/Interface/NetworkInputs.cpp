@@ -19,6 +19,9 @@ namespace vtx
 		position = buffers.positionBuffer.alloc<math::vec3f>(maxSize);
 		wo = buffers.woBuffer.alloc<math::vec3f>(maxSize);
 		normal = buffers.normalBuffer.alloc<math::vec3f>(maxSize);
+		instanceId = buffers.instanceIdBuffer.alloc<float>(maxSize);
+		materialId = buffers.materialIdBuffer.alloc<float>(maxSize);
+		triangleId = buffers.triangleIdBuffer.alloc<float>(maxSize);
 	}
 }
 

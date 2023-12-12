@@ -14,7 +14,7 @@
 
 namespace vtx::serializer
 {
-    bool deserialize(const std::string& filePath, bool importScene)
+    bool deserialize(const std::string& filePath, bool importScene, bool skipExperimentManager)
     {
         try
         {
@@ -33,7 +33,11 @@ namespace vtx::serializer
                 VTX_ERROR("Could not open file {0}", filePath);
                 return false;
             }
-
+            ExperimentsManager em;
+            if(skipExperimentManager && graph::Scene::get()->renderer)
+            {
+                em = graph::Scene::get()->renderer->waveFrontIntegrator.network.experimentManager;
+            }
             std::shared_ptr<graph::Camera> camera = nullptr;
             std::shared_ptr<graph::Renderer> rendererNode = nullptr;
             std::shared_ptr<graph::Group> sceneRootNode = nullptr;
@@ -91,6 +95,10 @@ namespace vtx::serializer
             {
                 // if there is no renderer node we create a new one
                 scene->renderer = ops::createNode<graph::Renderer>();
+            }
+            if(skipExperimentManager)
+            {
+	            scene->renderer->waveFrontIntegrator.network.experimentManager = em;
             }
             if (camera)
             {
@@ -162,5 +170,104 @@ namespace vtx::serializer
         {
             VTX_ERROR("Unknown exception caught during serialization");
         }
+    }
+    void serializeBatchExperiments(const std::string& filePath)
+    {
+        try
+        {
+            std::ofstream file;
+            const std::string fileExtension = utl::getFileExtension(filePath);
+
+            if (fileExtension == "vtx") {
+                file.open(filePath, std::ios::binary); // Open in binary mode for binary files
+            }
+            else {
+                file.open(filePath); // Open in text mode for text-based formats like XML or JSON
+            }
+
+            ExperimentsManager& em = graph::Scene::get()->renderer->waveFrontIntegrator.network.experimentManager;
+            ExperimentManagerSaveData experimentManagerSaveData(em, filePath);
+
+			if (fileExtension == "xml")
+            {
+                cereal::XMLOutputArchive archiveOut(file);
+                archiveOut(experimentManagerSaveData);
+            }
+            else if (fileExtension == "vtx")
+            {
+                cereal::BinaryOutputArchive archiveOut(file);
+                archiveOut(experimentManagerSaveData);
+            }
+            else
+            {
+                VTX_ERROR("Unsupported file extension: {0}", fileExtension);
+            }
+        }
+        catch (const std::exception& e)
+        {
+            VTX_ERROR("Exception caught during serialization: {0}", e.what());
+        }
+        catch (...)
+        {
+            VTX_ERROR("Unknown exception caught during serialization");
+        }
+    }
+
+    bool deserializeExperimentManager(const std::string& filePath)
+    {
+        try
+        {
+            VTX_INFO("Deserializing scene from {0}", filePath);
+
+            const std::string fileExtension = utl::getFileExtension(filePath);
+            std::ifstream file;
+            if (fileExtension == "vtx") {
+                file.open(filePath, std::ios::binary);
+            }
+            else {
+                file.open(filePath);
+            }
+            if (!file.is_open())
+            {
+                VTX_ERROR("Could not open file {0}", filePath);
+                return false;
+            }
+
+            ExperimentManagerSaveData experimentManagerSaveData;
+            if (fileExtension == "json")
+            {
+                //cereal::JSONInputArchive archiveIn(file);
+                //archiveIn(graphSaveData);
+            }
+            else if (fileExtension == "xml")
+            {
+                cereal::XMLInputArchive archiveIn(file);
+                archiveIn(experimentManagerSaveData);
+            }
+            else if (fileExtension == "vtx")
+            {
+                cereal::BinaryInputArchive archiveIn(file);
+                archiveIn(experimentManagerSaveData);
+            }
+            else
+            {
+                VTX_ERROR("Unsupported file extension: {0}", fileExtension);
+                return false;
+            }
+            graph::Scene::get()->renderer->waveFrontIntegrator.network.experimentManager = experimentManagerSaveData.restore();
+            graph::Scene::get()->renderer->waveFrontIntegrator.network.experimentManager.saveFilePath = filePath;
+        }
+        catch (const std::exception& e)
+        {
+            VTX_ERROR("Could not deserialize Experiment Mangaer from {0}: {1}", filePath, e.what());
+            return false;
+        }
+        catch (...)
+        {
+            VTX_ERROR("Unknown exception caught during serialization");
+        }
+
+
+        return true;
     }
 }

@@ -1,5 +1,7 @@
 #include "tools.h"
 
+#define PRINT_TENSOR_IN_STACK true
+//#define PRINT_TENSOR_IN_STACK false
 namespace vtx::network
 {
     std::vector<torch::Tensor> downloadTensors(const torch::ITensorListRef& tensorList)
@@ -132,6 +134,7 @@ namespace vtx::network
 		if (hasNan)
 		{
             std::cout << " has NaN values!";
+            
 		}
 		if (hasInf)
 		{
@@ -142,9 +145,14 @@ namespace vtx::network
 			std::cout << " has zero values!";
 		}
         std::cout << "\n\tScope: " << scope << "\n";
-        if (printTensor)
+        if (printTensor && (hasInf || hasNan || hasZero))
         {
-	        std::cout << t << std::endl;
+            if (t.size(0) > 11) {
+                std::cout << t.slice(0, 0, 10) << std::endl;
+            }
+            else {
+                std::cout << t << std::endl;
+            }
 		}
         std::cout << std::endl;
 	}
@@ -186,6 +194,7 @@ namespace vtx::network
 
     void TensorDebugger::push(const std::string& scope, const std::string& name, const torch::Tensor& tensor)
     {
+        CUDA_SYNC_CHECK();
         if (!tensor.defined()) return;
 
         get().tensors.emplace_back(scope, name, tensor);
@@ -210,7 +219,7 @@ namespace vtx::network
         for(int i=0; i<tensors.size(); i++)
         {
             auto [scope, name, tensor] = tensors[i];
-            printTensorInfo(scope, name, tensor, false, false);
+            printTensorInfo(scope, name, tensor, PRINT_TENSOR_IN_STACK, false);
 		}
         
     }

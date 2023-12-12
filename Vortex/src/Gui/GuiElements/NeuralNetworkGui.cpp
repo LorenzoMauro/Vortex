@@ -2,10 +2,15 @@
 #include "NeuralNetworks/NeuralNetworkGraphs.h"
 #include "NeuralNetworks/NeuralNetwork.h"
 #include "Gui/GuiProvider.h"
+#include "NeuralNetworks/Config/NetworkSettings.h"
+#include "NeuralNetworks/Distributions/Mixture.h"
 
 namespace vtx::gui
 {
-	bool GuiProvider::drawEditGui(network::FrequencyEncoding& config)
+	using namespace network;
+	using namespace config;
+
+	bool GuiProvider::drawEditGui(FrequencyEncoding& config)
 	{
 		bool isUpdated = vtxImGui::halfSpaceWidget("Frequency Count", ImGui::DragInt, (hiddenLabel + "Frequency Count").c_str(), &config.n_frequencies, 1.0f, 1, 50, "%d", 0);
 
@@ -13,21 +18,21 @@ namespace vtx::gui
 		
 	}
 
-	bool GuiProvider::drawEditGui(network::GridEncoding& config)
+	bool GuiProvider::drawEditGui(GridEncoding& config)
 	{
 		bool isUpdated = false;
-		isUpdated = vtxImGui::halfSpaceCombo("Grid Type", config.otype, network::GridTypeName, (int)network::GridType::GridTypeCount);
+		isUpdated = vtxImGui::halfSpaceCombo("Grid Type", config.type, GridTypeName, (int)GridType::GridTypeCount);
 		isUpdated |= vtxImGui::halfSpaceDragInt("Level Count", &config.n_levels, 1.0f, 1, 50);
 		isUpdated |= vtxImGui::halfSpaceDragInt("Features Per Level", &config.n_features_per_level, 1.0f, 1, 50, "%d", 0);
 		isUpdated |= vtxImGui::halfSpaceDragInt("Log2 Hashmap Size", &config.log2_hashmap_size, 1.0f, 1, 50, "%d", 0);
 		isUpdated |= vtxImGui::halfSpaceDragInt("Base resolution",  &config.base_resolution, 1.0f, 1, 50, "%d", 0);
 		isUpdated |= vtxImGui::halfSpaceDragFloat("Level Scale",  &config.per_level_scale, 0.1f, 1.0, 10.0, "%.10f", 0);
-		isUpdated |= vtxImGui::halfSpaceCombo("Interpolation", config.interpolation, network::InterpolationTypeName, (int)network::InterpolationType::InterpolationTypeCount);
+		isUpdated |= vtxImGui::halfSpaceCombo("Interpolation", config.interpolation, InterpolationTypeName, (int)InterpolationType::InterpolationTypeCount);
 		return isUpdated;
 
 	}
 
-	bool GuiProvider::drawEditGui(network::IdentityEncoding& config)
+	bool GuiProvider::drawEditGui(IdentityEncoding& config)
 	{
 		bool isUpdated = false;
 
@@ -38,7 +43,7 @@ namespace vtx::gui
 
 	}
 
-	bool GuiProvider::drawEditGui(network::OneBlobEncoding& config)
+	bool GuiProvider::drawEditGui(OneBlobEncoding& config)
 	{
 		bool isUpdated = false;
 		isUpdated |= vtxImGui::halfSpaceDragInt("Bins", &config.n_bins, 1.0f, 1, 50, "%d", 0);
@@ -46,7 +51,7 @@ namespace vtx::gui
 
 	}
 
-	bool GuiProvider::drawEditGui(network::SphericalHarmonicsEncoding& config)
+	bool GuiProvider::drawEditGui(SphericalHarmonicsEncoding& config)
 	{
 		bool isUpdated = false;
 		isUpdated |= vtxImGui::halfSpaceDragInt("Degree", &config.degree, 1.0f, 1, 50, "%d", 0);
@@ -54,7 +59,7 @@ namespace vtx::gui
 
 	}
 
-	bool GuiProvider::drawEditGui(network::TriangleWaveEncoding& config)
+	bool GuiProvider::drawEditGui(TriangleWaveEncoding& config)
 	{
 		bool isUpdated = false;
 		isUpdated |= vtxImGui::halfSpaceDragInt("Frequencies", &config.n_frequencies, 1.0f, 1, 50, "%d", 0);
@@ -62,500 +67,279 @@ namespace vtx::gui
 
 	}
 
-	bool GuiProvider::drawEditGui(const std::string& featureName, network::TcnnEncodingConfig& config)
+	bool GuiProvider::drawEditGui(const std::string& featureName, EncodingConfig& config)
 	{
 		bool isUpdated = false;
+		ImGui::PushID(featureName.c_str());
+		ImGui::SetNextItemOpen(true, ImGuiCond_Once);
 		if (ImGui::CollapsingHeader((featureName).c_str()))
 		{
-			isUpdated = vtxImGui::halfSpaceCombo("Encoding Type", config.otype, network::TcnnEncodingTypeName, (int)network::TcnnEncodingType::TcnnEncodingTypeCount);
+			ImGui::Indent();
+			isUpdated = vtxImGui::halfSpaceCombo("Encoding Type", config.otype, EncodingTypeName, (int)EncodingType::EncodingTypeCount);
 			switch(config.otype)
 			{
-			case network::TcnnEncodingType::Frequency:
+			case EncodingType::Frequency:
 				isUpdated |= drawEditGui(config.frequencyEncoding);
 					break;
-			case network::TcnnEncodingType::Grid:
+			case EncodingType::Grid:
 				isUpdated |= drawEditGui(config.gridEncoding);
 					break;
-			case network::TcnnEncodingType::Identity:
+			case EncodingType::Identity:
 				isUpdated |= drawEditGui(config.identityEncoding);
 					break;
-			case network::TcnnEncodingType::OneBlob:
+			case EncodingType::OneBlob:
 				isUpdated |= drawEditGui(config.oneBlobEncoding);
 					break;
-			case network::TcnnEncodingType::SphericalHarmonics:
+			case EncodingType::SphericalHarmonics:
 				isUpdated |= drawEditGui(config.sphericalHarmonicsEncoding);
 					break;
-			case network::TcnnEncodingType::TriangleWave:
+			case EncodingType::TriangleWave:
 				isUpdated |= drawEditGui(config.triangleWaveEncoding);
 				break;
 			default: ;
 			}
+			ImGui::Unindent();
 		}
+		ImGui::PopID();
 
 		return isUpdated;
 	}
-	bool GuiProvider::drawEditGui(network::EncodingSettings& settings, const std::string& encodedFeatureName)
-	{
-		if (ImGui::CollapsingHeader((encodedFeatureName).c_str()))
-		{
-			int encodingType = settings.type;
-			ImGui::Text((encodedFeatureName + "Encoding:").c_str());
-			if (vtxImGui::halfSpaceWidget("Encoding Type", (ComboFuncType)ImGui::Combo, (hiddenLabel + "_Input Encoding Type" + encodedFeatureName).c_str(), &encodingType, network::encodingNames, network::E_COUNT, -1))
-			{
-				settings.isUpdated = true;
-				settings.type = static_cast<network::EncodingType>(encodingType);
-			}
 
-			if (vtxImGui::halfSpaceWidget("Feature Size", ImGui::DragInt, (hiddenLabel + "_Feature Size" + encodedFeatureName).c_str(), &settings.features, 1.0f, 1, 50, "%d", 0))
-			{
-				settings.isUpdated = true;
-			}
-		}
-		return settings.isUpdated;
-	}
-
-	void GuiProvider::drawDisplayGui(network::EncodingSettings& settings, const std::string& encodedFeatureName)
-	{
-		if (ImGui::CollapsingHeader((encodedFeatureName + " :").c_str()))
-		{
-			vtxImGui::halfSpaceWidget("Encoding Type", vtxImGui::booleanText, "%s", network::encodingNames[settings.type]);
-			vtxImGui::halfSpaceWidget("Feature Size", vtxImGui::booleanText, "%d", settings.features);
-		}
-	}
-
-	bool GuiProvider::drawEditGui(network::InputSettings& settings)
-	{
-		if (ImGui::CollapsingHeader("Network Input Settings"))
-		{
-			ImGui::Indent();
-			settings.isUpdated |= GuiProvider::drawEditGui("Position", settings.tcnnCompositeEncodingConfig.positionEncoding);
-			settings.isUpdated |= GuiProvider::drawEditGui("Normal", settings.tcnnCompositeEncodingConfig.normalEncoding);
-			settings.isUpdated |= GuiProvider::drawEditGui("Outgoing Direction", settings.tcnnCompositeEncodingConfig.directionEncoding);
-			ImGui::Unindent();
-		}
-		return settings.isUpdated;
-	}
-
-	void GuiProvider::drawDisplayGui(network::InputSettings& settings)
-	{
-		if (ImGui::CollapsingHeader("Network Input Settings"))
-		{
-			GuiProvider::drawDisplayGui(settings.positionEncoding, "Position");
-			GuiProvider::drawDisplayGui(settings.woEncoding, "Outgoing Direction");
-			GuiProvider::drawDisplayGui(settings.normalEncoding, "Normal");
-		}
-	}
-
-	bool GuiProvider::drawEditGui(network::PathGuidingNetworkSettings& settings)
-	{
-		if (ImGui::CollapsingHeader("Path Guiding Network Settings"))
-		{
-			if (vtxImGui::halfSpaceWidget("Hidden Dimension", ImGui::DragInt, (hiddenLabel + "_Hidden Dimension").c_str(), &(settings.hiddenDim), 1.0f, 1, 500, "%d", 0))
-			{
-				settings.isUpdated = true;
-			}
-
-			if (vtxImGui::halfSpaceWidget("Number of Hidden Layers", ImGui::DragInt, (hiddenLabel + "_Number of Hidden Layers").c_str(), &(settings.numHiddenLayers), 1.0f, 1, 10, "%d", 0))
-			{
-				settings.isUpdated = true;
-			}
-
-			int distributionType = settings.distributionType;
-			if (vtxImGui::halfSpaceWidget("Distribution Type", (ComboFuncType)ImGui::Combo, (hiddenLabel + "_Distribution Type").c_str(), &distributionType, network::distributionNames, network::D_COUNT, -1))
-			{
-				settings.distributionType = (network::DistributionType)distributionType;
-				settings.isUpdated = true;
-			}
-
-
-			if (vtxImGui::halfSpaceWidget("Mixture Size", ImGui::DragInt, (hiddenLabel + "_Mixture Size").c_str(), &(settings.mixtureSize), 1.0f, 1, 10, "%d", 0))
-			{
-				settings.isUpdated = true;
-			}
-		}
-
-		return settings.isUpdated;
-	}
-
-	void GuiProvider::drawDisplayGui(network::PathGuidingNetworkSettings& settings)
-	{
-		if (ImGui::CollapsingHeader("Path Guiding Network Settings"))
-		{
-			vtxImGui::halfSpaceWidget("Hidden Dimension", vtxImGui::booleanText, "%d", settings.hiddenDim);
-			vtxImGui::halfSpaceWidget("Number of Hidden Layers", vtxImGui::booleanText, "%d", settings.numHiddenLayers);
-			vtxImGui::halfSpaceWidget("Distribution Type", vtxImGui::booleanText, "%s", network::distributionNames[settings.distributionType]);
-		}
-	}
-
-	bool GuiProvider::drawEditGui(network::SacSettings& settings)
-	{
-		if (ImGui::CollapsingHeader("Soft Actor Critic Settings"))
-		{
-			if (vtxImGui::halfSpaceWidget("Policy Lr", ImGui::DragFloat, (hiddenLabel + "_Policy Lr").c_str(), &settings.policyLr, 0.00001, 0, 1, "%.10f", 0))
-			{
-				settings.isUpdated = true;
-			}
-
-			if (vtxImGui::halfSpaceWidget("Q Lr", ImGui::DragFloat, (hiddenLabel + "_Q Lr").c_str(), &settings.qLr, 0.00001, 0, 1, "%.10f", 0))
-			{
-				settings.isUpdated = true;
-			}
-
-			if (vtxImGui::halfSpaceWidget("Alpha Lr", ImGui::DragFloat, (hiddenLabel + "_Alpha Lr").c_str(), &settings.alphaLr, 0.00001, 0, 1, "%.10f", 0))
-			{
-				settings.isUpdated = true;
-			}
-
-			if (vtxImGui::halfSpaceWidget("Gamma ", ImGui::DragFloat, (hiddenLabel + "_Learning Rate").c_str(), &settings.gamma, 0.00001, 0, 1, "%.6f", 0))
-			{
-				settings.isUpdated = true;
-			}
-
-			if (vtxImGui::halfSpaceWidget("Polyak Update Factor", ImGui::DragFloat, (hiddenLabel + "_Polyak Update Factor").c_str(), &settings.polyakFactor, 0.00001, 0, 1, "%.6f", 0))
-			{
-				settings.isUpdated = true;
-			}
-
-			if (vtxImGui::halfSpaceWidget("Neural Sampling Fraction", ImGui::DragFloat, (hiddenLabel + "_Neural Sampling Fraction").c_str(), &settings.neuralSampleFraction, 0.001, 0, 1, "%.3f", 0))
-			{
-				settings.isUpdated = true;
-			}
-
-			if (vtxImGui::halfSpaceWidget("Log Alpha Start", ImGui::DragFloat, (hiddenLabel + "_Log Alpha Start").c_str(), &settings.logAlphaStart, 0.001, 0, 1, "%.3f", 0))
-			{
-				settings.isUpdated = true;
-			}
-		}
-
-		return settings.isUpdated;
-	}
-
-	void GuiProvider::drawDisplayGui(network::SacSettings& settings)
-	{
-		if (ImGui::CollapsingHeader("Soft Actor Critic Settings"))
-		{
-			vtxImGui::halfSpaceWidget("Policy Lr", vtxImGui::booleanText, "%.5f", settings.policyLr);
-			vtxImGui::halfSpaceWidget("Q Lr", vtxImGui::booleanText, "%.5f", settings.qLr);
-			vtxImGui::halfSpaceWidget("Alpha Lr", vtxImGui::booleanText, "%.5f", settings.alphaLr);
-			vtxImGui::halfSpaceWidget("Gamma ", vtxImGui::booleanText, "%.5f", settings.gamma);
-			vtxImGui::halfSpaceWidget("Polyak Update Factor", vtxImGui::booleanText, "%.5f", settings.polyakFactor);
-			vtxImGui::halfSpaceWidget("Neural Sampling Fraction", vtxImGui::booleanText, "%.5f", settings.neuralSampleFraction);
-			vtxImGui::halfSpaceWidget("Log Alpha Start", vtxImGui::booleanText, "%.5f", settings.logAlphaStart);
-		}
-	}
-
-	bool GuiProvider::drawEditGui(network::NpgSettings& settings)
-	{
-		if (ImGui::CollapsingHeader("Neural Path Guiding Settings"))
-		{
-			if (vtxImGui::halfSpaceWidget("Learning Rate", ImGui::DragFloat, (hiddenLabel + "_Learning Rate").c_str(), &settings.learningRate, 0.00001, 0, 1, "%.10f", 0))
-			{
-				settings.isUpdated = true;
-			}
-
-			if (vtxImGui::halfSpaceWidget("Loss Blending Factor", ImGui::DragFloat, (hiddenLabel + "_Loss Blending Factor").c_str(), &settings.e, 0.00001, 0, 1, "%.10f", 0))
-			{
-				settings.isUpdated = true;
-			}
-
-			if (vtxImGui::halfSpaceWidget("Constant Loss Blend Factor", ImGui::Checkbox, (hiddenLabel + "_Constant Loss Blend Factor").c_str(), &settings.constantBlendFactor))
-			{
-				settings.isUpdated = true;
-			}
-
-			if (vtxImGui::halfSpaceWidget("Sampling Fraction Blend", ImGui::Checkbox, (hiddenLabel + "_Sampling Fraction Blend").c_str(), &settings.samplingFractionBlend))
-			{
-				settings.isUpdated = true;
-			}
-			int lossType = settings.lossType;
-			if (vtxImGui::halfSpaceWidget("Loss Type", (ComboFuncType)ImGui::Combo, (hiddenLabel + "_Loss Type").c_str(), &lossType, network::lossNames, network::L_COUNT, -1))
-			{
-				settings.lossType = (network::LossType)lossType;
-				settings.isUpdated = true;
-			}
-
-			if (vtxImGui::halfSpaceWidget("Reduce to Mean", ImGui::Checkbox, (hiddenLabel + "_Reduce to Mean").c_str(), &settings.meanLoss))
-			{
-				settings.isUpdated = true;
-			}
-
-
-			if (vtxImGui::halfSpaceWidget("Take Absolute Loss", ImGui::Checkbox, (hiddenLabel + "_Take Abs Loss").c_str(), &settings.absoluteLoss))
-			{
-				settings.isUpdated = true;
-			}
-
-		}
-
-		return settings.isUpdated;
-	}
-
-	void GuiProvider::drawDisplayGui(network::NpgSettings& settings)
-	{
-		if (ImGui::CollapsingHeader("Neural Path Guiding Settings"))
-		{
-			vtxImGui::halfSpaceWidget("Learning Rate", vtxImGui::booleanText, "%.10f", settings.learningRate);
-			vtxImGui::halfSpaceWidget("Blending Weight", vtxImGui::booleanText, "%.10f", settings.e);
-		}
-	}
-
-	bool GuiProvider::drawEditGui(network::TrainingBatchGenerationSettings& settings)
+	bool GuiProvider::drawEditGui(BatchGenerationConfig& settings)
 	{
 		if (ImGui::CollapsingHeader("Training Batch Generation Settings"))
 		{
-			if (vtxImGui::halfSpaceWidget("Light Sampling Prob", ImGui::DragFloat, (hiddenLabel + "_Light Sampling Prob").c_str(), &settings.lightSamplingProb, 0.00001, 0, 1, "%.10f", 0))
-			{
-				settings.isUpdated = true;
-			}
-			if (vtxImGui::halfSpaceWidget("Weight Contribution", ImGui::Checkbox, (hiddenLabel + "_Weight Contribution").c_str(), &settings.weightByMis))
-			{
-				settings.isUpdated = true;
-			}
-			int strategy = settings.strategy;
-			if (vtxImGui::halfSpaceWidget("Sampling Strategy", (ComboFuncType)ImGui::Combo, (hiddenLabel + "_Sampling Strategy").c_str(), &strategy, network::samplingStrategyNames, network::SS_COUNT, -1))
-			{
-				settings.strategy = (network::SamplingStrategy)strategy;
-				settings.isUpdated = true;
-			}
+			settings.isUpdated |= vtxImGui::halfSpaceCombo("Sampling Strategy", settings.strategy, samplingStrategyNames, SS_COUNT);
+			settings.isUpdated |= vtxImGui::halfSpaceDragFloat("Light Sampling Prob", &settings.lightSamplingProb, 0.00001, 0, 1, "%.10f", 0);
+			settings.isUpdated |= vtxImGui::halfSpaceCheckbox("Weight Contribution", &settings.weightByMis);
 		}
 		
 		return settings.isUpdated;
 	}
 
-	bool GuiProvider::drawEditGui(network::NetworkSettings& settings)
+	bool GuiProvider::drawEditGui(MlpSettings& config)
+	{
+		bool isUpdated = false;
+		isUpdated |= vtxImGui::halfSpaceDragInt("Hidden Dimension", &(config.hiddenDim), 1.0f, 1, 500, "%d", 0);
+		isUpdated |= vtxImGui::halfSpaceDragInt("Number of Hidden Layers", &(config.numHiddenLayers), 1.0f, 1, 10, "%d", 0);
+		return isUpdated;
+	}
+
+	bool GuiProvider::drawEditGui(MainNetEncodingConfig& config)
+	{
+		bool isUpdated = false;
+		isUpdated |= vtxImGui::halfSpaceCheckbox("Normalize Position", &config.normalizePosition);
+		isUpdated |= drawEditGui("Position Encoding", config.position);
+		isUpdated |= drawEditGui("Normal Encoding", config.normal);
+		isUpdated |= drawEditGui("Wo Encoding", config.wo);
+		return isUpdated;
+	}
+
+	bool GuiProvider::drawEditGui(AuxNetEncodingConfig& config)
+	{
+		bool isUpdated = false;
+		isUpdated |= drawEditGui("Wi Encoding", config.wi);
+		return isUpdated;
+	}
+
+	bool GuiProvider::drawEditGui(NetworkSettings& settings)
 	{
 		if (ImGui::CollapsingHeader("Network Settings"))
 		{
-			bool wasActive = settings.active;
-			if (vtxImGui::halfSpaceWidget("Enable", ImGui::Checkbox, (hiddenLabel + "_Enable").c_str(), &settings.active))
-			{
-				settings.isUpdated = true;
-				if(settings.active && !wasActive)
-				{
-					settings.wasActive = false;
-				}
-				else
-				{
-					settings.wasActive = true;
-				}
-			}
-			if (vtxImGui::halfSpaceWidget("Reset Network", ImGui::Checkbox, (hiddenLabel + "_Reset Network").c_str(), &settings.isUpdated))
-			{
-				settings.isUpdated = true;
-			}
-			int type = settings.type;
-			if (vtxImGui::halfSpaceWidget("Network Type", (ComboFuncType)ImGui::Combo, (hiddenLabel + "_Network Type").c_str(), &type, network::networkNames, network::NT_COUNT, -1))
-			{
-				settings.type = (network::NetworkType)type;
-				settings.isUpdated = true;
-			}
-			if (vtxImGui::halfSpaceWidget("BatchSize", ImGui::DragInt, (hiddenLabel + "_BatchSize").c_str(), &settings.batchSize, 1, 1, 10000, "%d", 0))
-			{
-				if (settings.batchSize == 0)
-				{
-					settings.batchSize = 1;
-				}
-			}
-			if (vtxImGui::halfSpaceWidget("Max Training Steps Per Frame", ImGui::DragInt, (hiddenLabel + "_BatchSize").c_str(), &settings.maxTrainingStepPerFrame, 1, 0, 10000, "%d", 0))
-			{
-			}
-
-			if (vtxImGui::halfSpaceWidget("Do Training", ImGui::Checkbox, (hiddenLabel + "_Do Training").c_str(), &settings.doTraining))
-			{
-				settings.isUpdated = true;
-			}
-			if (vtxImGui::halfSpaceWidget("Max Training Steps", ImGui::DragInt, (hiddenLabel + "_Max Training Steps").c_str(), &settings.maxTrainingSteps, 1, 0, 10000, "%d", 0))
-			{
-				settings.isUpdated = true;
-			}
-			if (vtxImGui::halfSpaceWidget("Do Inference", ImGui::Checkbox, (hiddenLabel + "_Do Inference").c_str(), &settings.doInference))
-			{
-				settings.isUpdated = true;
-			}
-			if (vtxImGui::halfSpaceWidget("Inference Start", ImGui::DragInt, (hiddenLabel + "_Inference Start").c_str(), &settings.inferenceIterationStart, 1, 0, 10000, "%d", 0))
-			{
-				settings.isUpdated = true;
-			}
-			if (vtxImGui::halfSpaceWidget("Clear buffer on Inference Start", ImGui::Checkbox, (hiddenLabel + "_Inference Start").c_str(), &settings.clearOnInferenceStart))
-			{
-				settings.isUpdated = true;
-			}
-			if (vtxImGui::halfSpaceWidget("Depth To Debug", ImGui::DragInt, (hiddenLabel + "_Depth To Debug").c_str(), &settings.depthToDebug, 1, 0, 5, "%d", 0))
-			{
-				settings.isUpdated = true;
-			}
-
-
 			ImGui::Indent();
-			settings.isUpdated |= GuiProvider::drawEditGui(settings.trainingBatchGenerationSettings);
-			settings.isUpdated |= GuiProvider::drawEditGui(settings.inputSettings);
-			settings.isUpdated |= GuiProvider::drawEditGui(settings.pathGuidingSettings);
+			settings.wasActive = settings.active;
+			settings.isUpdated |= vtxImGui::halfSpaceCheckbox("Enable", &settings.active);
+			//settings.wasActive = (settings.active && !wasActive) ? false : true;
+			settings.isUpdated |= vtxImGui::halfSpaceCheckbox("Reset Network", &settings.isUpdated);
 
-			if (settings.type == network::NT_SAC)
+			ImGui::SetNextItemOpen(true, ImGuiCond_Once);
+			if (ImGui::CollapsingHeader("General"))
 			{
-				settings.isUpdated |= GuiProvider::drawEditGui(settings.sac);
+				ImGui::Indent();
+				settings.isUpdated |= vtxImGui::halfSpaceWidget("Do Training", ImGui::Checkbox,(hiddenLabel + "_Do Training").c_str(),&settings.doTraining);
+				settings.isUpdated |= vtxImGui::halfSpaceDragInt("Max Training Steps", &settings.maxTrainingSteps, 1, 0, 10000, "%d", 0);
+				settings.isUpdated |= vtxImGui::halfSpaceWidget("Do Inference", ImGui::Checkbox,(hiddenLabel + "_Do Inference").c_str(),&settings.doInference);
+				settings.isUpdated |= vtxImGui::halfSpaceDragInt("Inference Start", &settings.inferenceIterationStart, 1, 0, 10000, "%d", 0);
+				settings.isUpdated |= vtxImGui::halfSpaceWidget("Clear buffer on Inference Start", ImGui::Checkbox,(hiddenLabel + "_Inference Start").c_str(),&settings.clearOnInferenceStart);
+				settings.isUpdated |= vtxImGui::halfSpaceDragInt("Depth To Debug", &settings.depthToDebug, 1, 0, 5, "%d", 0);
+				ImGui::Unindent();
 			}
-			else if (settings.type == network::NT_NGP)
+			ImGui::SetNextItemOpen(true, ImGuiCond_Once);
+			if (ImGui::CollapsingHeader("Main Network Settings"))
 			{
-				settings.isUpdated |= GuiProvider::drawEditGui(settings.npg);
+				ImGui::Indent();
+				ImGui::PushID("Main Network Settings");
+				settings.isUpdated |= drawEditGui(settings.mainNetSettings);
+				settings.isUpdated |= drawEditGui(settings.inputSettings);
+				ImGui::PopID();
+				ImGui::Unindent();
 			}
+			ImGui::SetNextItemOpen(true, ImGuiCond_Once);
+			if (ImGui::CollapsingHeader("Distribution Settings"))
+			{
+				ImGui::Indent();
+				settings.isUpdated |= vtxImGui::halfSpaceCombo("Distribution Type", settings.distributionType, distributionNames, D_COUNT);
+				settings.isUpdated |= vtxImGui::halfSpaceDragInt("Mixture Size", &(settings.mixtureSize), 1.0f, 1, 10, "%d", 0);
+				ImGui::Unindent();
+			}
+
+			ImGui::SetNextItemOpen(true, ImGuiCond_Once);
+			if (ImGui::CollapsingHeader("Additional Inputs"))
+			{
+				ImGui::Indent();
+				settings.isUpdated |= vtxImGui::halfSpaceCheckbox("Use Material Id", &settings.useMaterialId);
+				settings.isUpdated |= drawEditGui("Material Id Encoding", settings.materialIdEncodingConfig);
+				settings.isUpdated |= vtxImGui::halfSpaceCheckbox("Use Triangle Id", &settings.useTriangleId);
+				settings.isUpdated |= drawEditGui("Triangle Id Encoding", settings.triangleIdEncodingConfig);
+				settings.isUpdated |= vtxImGui::halfSpaceCheckbox("Use Instance Id", &settings.useInstanceId);
+				settings.isUpdated |= drawEditGui("Instance Id Encoding", settings.instanceIdEncodingConfig);
+				ImGui::Unindent();
+			}
+			settings.isUpdated |= vtxImGui::halfSpaceCheckbox("Use Auxiliary Network", &settings.useAuxiliaryNetwork);
+			ImGui::SetNextItemOpen(true, ImGuiCond_Once);
+			if (ImGui::CollapsingHeader("Auxiliary Network Settings"))
+			{
+				ImGui::Indent();
+				ImGui::PushID("Auxiliary Network Settings");
+				settings.isUpdated |= vtxImGui::halfSpaceDragInt("Tot Aux Input Size", &(settings.totAuxInputSize), 1.0f, 1, 128, "%d", 0);
+				settings.isUpdated |= drawEditGui(settings.auxiliaryNetSettings);
+				settings.isUpdated |= drawEditGui(settings.auxiliaryInputSettings);
+				settings.isUpdated |= vtxImGui::halfSpaceDragFloat("Input Radiance Loss Factor",   &settings.inRadianceLossFactor, 0.1f, 0, 10);
+				settings.isUpdated |= vtxImGui::halfSpaceDragFloat("Output Radiance Loss Factor",   &settings.outRadianceLossFactor, 0.1f, 0, 10);
+				settings.isUpdated |= vtxImGui::halfSpaceDragFloat("Throughput Radiance Loss Factor",   &settings.throughputLossFactor, 0.1f, 0, 10);
+				settings.isUpdated |= vtxImGui::halfSpaceDragFloat("Auxiliary Weight Loss Factor", &settings.auxiliaryWeight, 0.1f, 0, 10);
+				settings.isUpdated |= vtxImGui::halfSpaceDragFloat("Target Radiance Scale Factor", &settings.throughputTargetScaleFactor, 0.1f, 0, 100);
+				settings.isUpdated |= vtxImGui::halfSpaceDragFloat("Target Throughput Scale Factor",   &settings.radianceTargetScaleFactor, 0.1f, 0, 100);
+				ImGui::PopID();
+				ImGui::Unindent();
+			}
+			ImGui::SetNextItemOpen(true, ImGuiCond_Once);
+			if (ImGui::CollapsingHeader("Training"))
+			{
+				ImGui::Indent();
+				settings.isUpdated |= vtxImGui::halfSpaceDragFloat("Learning Rate", &settings.learningRate, 0.00001, 0,   1, "%.10f", 0);
+				vtxImGui::halfSpaceDragInt("BatchSize", &settings.batchSize, 1, 1, 10000, "%d", 0);
+				settings.batchSize = (settings.batchSize == 0) ? 1 : settings.batchSize;
+				ImGui::SetNextItemOpen(true, ImGuiCond_Once);
+				settings.isUpdated |= drawEditGui(settings.trainingBatchGenerationSettings);
+				ImGui::SetNextItemOpen(true, ImGuiCond_Once);
+				if (ImGui::CollapsingHeader("Loss Settings"))
+				{
+					ImGui::Indent();
+					settings.isUpdated |= vtxImGui::halfSpaceCheckbox("Clamp Bsdf Prob", &settings.clampBsdfProb);
+					settings.isUpdated |= vtxImGui::halfSpaceCheckbox("Scale Loss Blended", &settings.scaleLossBlendedQ);
+
+					settings.isUpdated |= vtxImGui::halfSpaceDragFloat("Loss Blending Factor", &settings.blendFactor,	   0.00001, 0, 1, "%.10f", 0);
+					settings.isUpdated |= vtxImGui::halfSpaceCheckbox("Constant Loss Blend Factor",	  &settings.constantBlendFactor);
+					settings.isUpdated |= vtxImGui::halfSpaceCheckbox("Sampling Fraction Blend",	  &settings.samplingFractionBlend);
+					settings.isUpdated |= vtxImGui::halfSpaceCombo("Loss Type", settings.lossType, lossNames, L_COUNT);
+					settings.isUpdated |= vtxImGui::halfSpaceCombo("Loss Reduction", settings.lossReduction,   lossReductionNames, COUNT);
+					settings.isUpdated |= vtxImGui::halfSpaceDragFloat("Target Scale", &settings.targetScale, 0.1f,	   0.0f, 1.0f);
+
+					settings.isUpdated |= vtxImGui::halfSpaceCheckbox("Use Entropy Loss", &settings.useEntropyLoss);
+					ImGui::SetNextItemOpen(true, ImGuiCond_Once);
+					if (ImGui::CollapsingHeader("Entropy Loss Settings"))
+					{
+						ImGui::Indent();
+						settings.isUpdated |= vtxImGui::halfSpaceDragFloat("Entropy Loss Weight", &settings.entropyWeight, 0.1f, 0, 10);
+						settings.isUpdated |= vtxImGui::halfSpaceDragFloat("Target Entropy", &settings.targetEntropy, 0.1f, 0, 10);
+						ImGui::Unindent();
+					}
+					ImGui::Unindent();
+				}
+				ImGui::Unindent();
+			}
+
 			ImGui::Unindent();
-
 		}
-
 
 		return settings.isUpdated;
 	}
 
-	void GuiProvider::drawDisplayGui(network::NetworkSettings& settings)
+	std::vector<PlotInfo> GuiProvider::getPlots(Network& network)
 	{
-		if (ImGui::CollapsingHeader("Network Settings"))
-		{
-			vtxImGui::halfSpaceWidget("BatchSize", vtxImGui::booleanText, "%d", settings.batchSize);
-			vtxImGui::halfSpaceWidget("Max Training Steps Per Frame", vtxImGui::booleanText, "%d", settings.maxTrainingStepPerFrame);
-			vtxImGui::halfSpaceWidget("Do Inference", vtxImGui::booleanText, "%d", settings.doInference);
-			vtxImGui::halfSpaceWidget("Inference Start", vtxImGui::booleanText, "%d", settings.inferenceIterationStart);
-			vtxImGui::halfSpaceWidget("Clear buffer on Inference Start", vtxImGui::booleanText, "%d", settings.clearOnInferenceStart);
-			GuiProvider::drawDisplayGui(settings.inputSettings);
-			GuiProvider::drawDisplayGui(settings.pathGuidingSettings);
-			if (settings.type == network::NT_SAC)
-			{
-				GuiProvider::drawDisplayGui(settings.sac);
-			}
-			else if (settings.type == network::NT_NGP)
-			{
-				GuiProvider::drawDisplayGui(settings.npg);
-			}
-		}
-	}
+		auto graphsData = network.getGraphs();
+		std::vector<PlotInfo> plots;
 
-	std::vector<PlotInfo> ngpPlots(network::GraphsData& graphsData, const network::DistributionType& dt)
-	{
+		for(auto& [PlotTitle, PlotData] : graphsData.graphs)
+		{
+			PlotInfo plot;
+			plot.title = PlotTitle;
+			plot.xLabel = PlotData.xLabel;
+			plot.yLabel = PlotData.yLabel;
+			for(auto& [PlotName, PlotValues] : PlotData.data)
+			{
+				plot.addPlot(PlotValues, PlotName);
+			}
+			plots.push_back(plot);
+		}
+		/*auto dt = network.settings.distributionType;
+
 		PlotInfo loss;
 		loss.title = "Loss";
 		loss.xLabel = "Batches";
 		loss.yLabel = "Loss";
-		loss.addPlot(graphsData.graphs[network::G_NGP_T_LOSS], "Loss");
-		loss.addPlot(graphsData.graphs[network::G_NGP_T_LOSS_Q], "Loss non Blended");
-		loss.addPlot(graphsData.graphs[network::G_NGP_T_LOSS_BLENDED_Q], "Loss Blended");
+		loss.addPlot(graphsData.graphs[G_NGP_T_LOSS], "Loss");
+		loss.addPlot(graphsData.graphs[G_NGP_T_LOSS_Q], "Loss non Blended");
+		loss.addPlot(graphsData.graphs[G_NGP_T_LOSS_BLENDED_Q], "Loss Blended");
 
 		PlotInfo target;
 		target.title = "Probabilities";
 		target.xLabel = "Batches";
 		target.yLabel = "Target";
-		target.addPlot(graphsData.graphs[network::G_NGP_T_TARGET_P], "Target");
-		target.addPlot(graphsData.graphs[network::G_NGP_T_NEURAL_P], "Neural Pdf");
+		target.addPlot(graphsData.graphs[G_NGP_T_TARGET_P], "Target");
+		target.addPlot(graphsData.graphs[G_NGP_T_NEURAL_P], "Neural Pdf");
 
 		PlotInfo bsdf;
 		bsdf.title = "Bsdf";
 		bsdf.xLabel = "Batches";
 		bsdf.yLabel = "Bsdf";
-		bsdf.addPlot(graphsData.graphs[network::G_NGP_T_BSDF_P], "Bsdf Pdf");
-		bsdf.addPlot(graphsData.graphs[network::G_NGP_T_BLENDED_P], "Blended Pdf Target");
+		bsdf.addPlot(graphsData.graphs[G_NGP_T_BSDF_P], "Bsdf Pdf");
+		bsdf.addPlot(graphsData.graphs[G_NGP_T_BLENDED_P], "Blended Pdf Target");
 
 		PlotInfo samplingFraction;
 		samplingFraction.title = "Sampling Fraction";
 		samplingFraction.xLabel = "Batches";
 		samplingFraction.yLabel = "Sampling Fraction";
-		samplingFraction.addPlot(graphsData.graphs[network::G_NGP_T_SAMPLING_FRACTION], "Sampling Fraction Train");
-		samplingFraction.addPlot(graphsData.graphs[network::G_NGP_I_SAMPLING_FRACTION], "Sampling Fraction Inference");
-		samplingFraction.addPlot(graphsData.graphs[network::G_NGP_TAU], "Tau");
+		samplingFraction.addPlot(graphsData.graphs[G_NGP_T_SAMPLING_FRACTION], "Sampling Fraction Train");
+		samplingFraction.addPlot(graphsData.graphs[G_NGP_I_SAMPLING_FRACTION], "Sampling Fraction Inference");
+		samplingFraction.addPlot(graphsData.graphs[G_NGP_TAU], "Tau");
 
-		std::vector<PlotInfo> plots = { loss,target, samplingFraction, bsdf};
+		std::vector<PlotInfo> plots = { loss,target, samplingFraction, bsdf };
 
-		if(dt == network::D_SPHERICAL_GAUSSIAN)
+		if (dt == D_SPHERICAL_GAUSSIAN)
 		{
 			PlotInfo concentration;
 			concentration.title = "Concentration";
 			concentration.xLabel = "Batches";
 			concentration.yLabel = "Concentration";
-			concentration.addPlot(graphsData.graphs[network::G_SPHERICAL_GAUSSIAN_T_K], "Concentration Train");
-			concentration.addPlot(graphsData.graphs[network::G_SPHERICAL_GAUSSIAN_I_K], "Concentration Inference");
+			concentration.addPlot(graphsData.graphs[G_SPHERICAL_GAUSSIAN_T_K], "Concentration Train");
+			concentration.addPlot(graphsData.graphs[G_SPHERICAL_GAUSSIAN_I_K], "Concentration Inference");
 
 			plots.push_back(concentration);
 		}
 
-		if(dt==network::D_NASG_ANGLE || dt == network::D_NASG_TRIG|| dt == network::D_NASG_AXIS_ANGLE)
+		if (dt == D_NASG_ANGLE || dt == D_NASG_TRIG || dt == D_NASG_AXIS_ANGLE)
 		{
 			PlotInfo lambda;
 			lambda.title = "Lambda";
 			lambda.xLabel = "Batches";
 			lambda.yLabel = "Lambda";
-			lambda.addPlot(graphsData.graphs[network::G_NASG_T_LAMBDA], "Lambda Train");
-			lambda.addPlot(graphsData.graphs[network::G_NASG_I_LAMBDA], "Lambda Inference");
+			lambda.addPlot(graphsData.graphs[G_NASG_T_LAMBDA], "Lambda Train");
+			lambda.addPlot(graphsData.graphs[G_NASG_I_LAMBDA], "Lambda Inference");
 
 			PlotInfo a;
 			a.title = "A";
 			a.xLabel = "Batches";
 			a.yLabel = "A";
-			a.addPlot(graphsData.graphs[network::G_NASG_T_A], "Anisotropy Train");
-			a.addPlot(graphsData.graphs[network::G_NASG_I_A], "Anisotropy Inference");
+			a.addPlot(graphsData.graphs[G_NASG_T_A], "Anisotropy Train");
+			a.addPlot(graphsData.graphs[G_NASG_I_A], "Anisotropy Inference");
 
 			plots.push_back(lambda);
 			plots.push_back(a);
-		}
-		
+		}*/
 
 		return plots;
-	}
-
-	std::vector<PlotInfo> sacPlots(network::GraphsData& graphsData)
-	{
-		PlotInfo q1q2Losses;
-		q1q2Losses.title = "Q1Q2Losses";
-		q1q2Losses.xLabel = "Batches";
-		q1q2Losses.yLabel = "Loss";
-		q1q2Losses.addPlot(graphsData.graphs[network::G_Q1_LOSS], "Q1 Loss");
-		q1q2Losses.addPlot(graphsData.graphs[network::G_Q2_LOSS], "Q2 Loss");
-
-
-		PlotInfo alphaLosses;
-		alphaLosses.title = "AlphaLosses";
-		alphaLosses.xLabel = "Batches";
-		alphaLosses.yLabel = "Loss";
-		alphaLosses.addPlot(graphsData.graphs[network::G_ALPHA_LOSS], "Alpha Loss");
-
-		PlotInfo alphaValues;
-		alphaValues.title = "AlphaValues";
-		alphaValues.xLabel = "Batches";
-		alphaValues.yLabel = "Alpha";
-		alphaValues.addPlot(graphsData.graphs[network::G_ALPHA_VALUES], "Alpha Value");
-
-		PlotInfo policyLosses;
-		policyLosses.title = "PolicyLosses";
-		policyLosses.xLabel = "Batches";
-		policyLosses.yLabel = "Loss";
-		policyLosses.addPlot(graphsData.graphs[network::G_POLICY_LOSS], "Policy Loss");
-
-		PlotInfo rewards;
-		rewards.title = "Replay buffer Rewards";
-		rewards.xLabel = "Batches";
-		rewards.yLabel = "Reward";
-		rewards.addPlot(graphsData.graphs[network::G_DATASET_REWARDS], "Replay buffer Rewards");
-		rewards.addPlot(graphsData.graphs[network::G_Q1_VALUES], "Q1");
-		rewards.addPlot(graphsData.graphs[network::G_Q2_VALUES], "Q2");
-
-		PlotInfo inferenceConcentration;
-		inferenceConcentration.title = "Inference Concentration";
-		inferenceConcentration.xLabel = "Batches";
-		inferenceConcentration.yLabel = "Concentration";
-		inferenceConcentration.addPlot(graphsData.graphs[network::G_INFERENCE_CONCENTRATION], "Inference Concentration");
-
-		return { q1q2Losses, alphaLosses, alphaValues, policyLosses, rewards, inferenceConcentration };
-
-	}
-
-	std::vector<PlotInfo> GuiProvider::getPlots(network::Network& network)
-	{
-		if (network.settings.type == network::NT_SAC)
-		{
-			return sacPlots(network.getGraphs());
-		}
-		if (network.settings.type == network::NT_NGP)
-		{
-			return ngpPlots(network.getGraphs(), network.settings.pathGuidingSettings.distributionType);
-		}
-		return {};
 	}
 }
 

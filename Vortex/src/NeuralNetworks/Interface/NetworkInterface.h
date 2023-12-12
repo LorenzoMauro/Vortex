@@ -5,9 +5,9 @@
 #include "NpgTrainingData.h"
 #include "Paths.h"
 #include "ReplayBuffer.h"
-#include "NeuralNetworks/NetworkSettings.h"
 #include "Scene/Nodes/RendererSettings.h"
 #include "Device/DevicePrograms/ToneMapper.h"
+#include "NeuralNetworks/Config/NetworkSettings.h"
 
 namespace vtx
 {
@@ -36,7 +36,7 @@ namespace vtx
 			const int&                      _maxDatasetSize,
 			const int&                      _maxDepth,
 			const int&                      frameId,
-			const network::DistributionType _distributionType,
+			const network::config::DistributionType _distributionType,
 			const int                       _mixtureSize,
 			const ToneMapperSettings&       _toneMapperSettings,
 			const WhatChanged&              changed,
@@ -48,7 +48,7 @@ namespace vtx
 			const int& maxDatasetSize,
 			const int& maxDepth,
 			const int& frameId,
-			const network::DistributionType distributionType,
+			const network::config::DistributionType distributionType,
 			int mixtureSize,
 			const ToneMapperSettings& _toneMapperSettings,
 			WhatChanged changed,
@@ -60,7 +60,7 @@ namespace vtx
 			debugBuffer3[sampledPixel].x += 1.0f;
 		}
 
-		__forceinline__ __device__ void shuffleDataset(const int& trainingDatasetIdx, const network::NetworkSettings& settings)
+		__forceinline__ __device__ void shuffleDataset(const int& trainingDatasetIdx, const network::config::NetworkSettings& settings)
 		{
 			if (trainingDatasetIdx >= npgTrainingData->nAlloc)
 			{
@@ -70,23 +70,23 @@ namespace vtx
 			unsigned& seed = lcgSeeds[trainingDatasetIdx];
 			Paths::Hit hit;
 			Paths::Hit* nextHit = nullptr;
-			if (settings.type == network::NT_SAC)
+			/*if (settings.type == network::NT_SAC)
 			{
 				*nextHit = Paths::Hit();
-			}
+			}*/
 			Paths::LightContribution lightContribution;
 			bool isTerminal = false;
 			int sampledPixel = 0;
 			int sampledDepth = 0;
-			if(settings.trainingBatchGenerationSettings.strategy == network::SS_ALL || settings.trainingBatchGenerationSettings.strategy == network::SS_PATHS_WITH_CONTRIBUTION)
+			if(settings.trainingBatchGenerationSettings.strategy == network::config::SS_ALL || settings.trainingBatchGenerationSettings.strategy == network::config::SS_PATHS_WITH_CONTRIBUTION)
 			{
 				paths->getRandomPathSample(
-					seed, settings.trainingBatchGenerationSettings,
+					seed, settings,
 					sampledPixel, sampledDepth,
 					&hit, &lightContribution, isTerminal, nextHit
 				);
 			}
-			else if(settings.trainingBatchGenerationSettings.strategy == network::SS_LIGHT_SAMPLES)
+			else if(settings.trainingBatchGenerationSettings.strategy == network::config::SS_LIGHT_SAMPLES)
 			{
 				paths->getRandomLightSamplePath(
 					seed, settings.trainingBatchGenerationSettings,
@@ -99,28 +99,17 @@ namespace vtx
 				printf("Unknown training batch generation strategy, file: %s, line %d\n", __FILE__, __LINE__);
 			}
 
-			const float signal = utl::luminance(lightContribution.outLight);
-			if (settings.type == network::NT_SAC)
-			{
-				replayBuffer->state->addState(trainingDatasetIdx, hit.position, hit.wOutgoing, hit.normal);
-				replayBuffer->nextState->addState(trainingDatasetIdx, nextHit->position, nextHit->wOutgoing, nextHit->normal);
-				replayBuffer->action[trainingDatasetIdx] = lightContribution.wIncoming; //hit incoming direction
-				replayBuffer->reward[trainingDatasetIdx] = signal; //hit incoming direction
-				replayBuffer->doneSignal[trainingDatasetIdx] = isTerminal; //hit incoming direction
-			}
-			else if (settings.type == network::NT_NGP)
-			{
-				npgTrainingData->inputs->addState(trainingDatasetIdx, hit.position, hit.wOutgoing, hit.normal);
-				npgTrainingData->incomingDirection[trainingDatasetIdx] = lightContribution.wIncoming;
-				npgTrainingData->bsdfProbabilities[trainingDatasetIdx] = lightContribution.bsdfProb;
-				npgTrainingData->luminance[trainingDatasetIdx] = signal;
-			}
-			else
-			{
-				printf("Unknown network type, file: %s, line %d\n", __FILE__, __LINE__);
-			}
+
+			npgTrainingData->inputs->addState(trainingDatasetIdx, hit.position, hit.wOutgoing, hit.normal, (float)hit.instanceId, (float)hit.triangleId, (float)hit.materialId);
+			npgTrainingData->incomingDirection[trainingDatasetIdx] = lightContribution.wIncoming;
+			npgTrainingData->bsdfProbabilities[trainingDatasetIdx] = lightContribution.bsdfProb;
+			npgTrainingData->outRadiance[trainingDatasetIdx] = lightContribution.outRadiance;
+			npgTrainingData->inRadiance[trainingDatasetIdx] = lightContribution.inRadiance;
+			npgTrainingData->throughput[trainingDatasetIdx] = lightContribution.throughput;
 			
-			debugBuffer1[sampledPixel].x += (signal + 1.0f) / 2.0f;
+			const float signal = utl::luminance(lightContribution.outRadiance);
+			//debugBuffer1[sampledPixel].x += (signal + 1.0f) / 2.0f;
+			debugBuffer1[sampledPixel].x = lightContribution.bsdfProb;
 			debugBuffer1[sampledPixel].z += 1.0f;
 			sppDebugFrame(sampledPixel, sampledDepth);
 		}
@@ -139,7 +128,7 @@ namespace vtx
 		int numberOfPixels;
 		int maxDatasetSize;
 		int maxDepth;
-		network::DistributionType distributionType;
+		network::config::DistributionType distributionType;
 		int mixtureSize;
 	};
 }

@@ -178,6 +178,9 @@ namespace vtx::device
 		CUDABuffer encodedPositionBuffer;
 		CUDABuffer encodedNormalBuffer;
 		CUDABuffer encodedWoBuffer;
+		CUDABuffer instanceIdBuffer;
+		CUDABuffer materialIdBuffer;
+		CUDABuffer triangleIdBuffer;
 
 		~NetworkInputBuffers()
 		{
@@ -189,6 +192,9 @@ namespace vtx::device
 			encodedPositionBuffer.free();
 			encodedNormalBuffer.free();
 			encodedWoBuffer.free();
+			instanceIdBuffer.free();
+			materialIdBuffer.free();
+			triangleIdBuffer.free();
 		}
 	};
 
@@ -222,6 +228,8 @@ namespace vtx::device
 		CUDABuffer          outgoingRadianceBuffer;
 		CUDABuffer          incomingDirectionBuffer;
 		CUDABuffer          bsdfProbabilitiesBuffer;
+		CUDABuffer          trhoughputBuffer;
+		CUDABuffer          incomingRadianceBuffer;
 
 		~NpgTrainingDataBuffers()
 		{

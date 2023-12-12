@@ -85,6 +85,12 @@ namespace vtx
 			isMapChanged = true;
 		}
 
+		void clear()
+		{
+			deviceDataMap.clear();
+			isMapChanged = true;
+		}
+
 		B& getResourceBuffers(vtxID id)
 		{
 			return deviceDataMap[id].resourceBuffers;

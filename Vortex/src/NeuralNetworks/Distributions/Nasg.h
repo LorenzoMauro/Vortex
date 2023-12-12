@@ -13,7 +13,7 @@
 #include "TransformUtils.h"
 #include "Device/DevicePrograms/Utils.h"
 #endif
-#include "NeuralNetworks/NetworkSettings.h"
+#include "NeuralNetworks/Config/DistributionConfig.h"
 
 namespace vtx
 {
@@ -29,19 +29,19 @@ namespace vtx::distribution
 	{
 	public:
 
-		__forceinline__ __device__ __host__ static int getParametersCount(const network::DistributionType dt, const bool forNetworkOutput = false)
+		__forceinline__ __device__ __host__ static int getParametersCount(const network::config::DistributionType dt, const bool forNetworkOutput = false)
 		{
 			int paramCount;
 			if (forNetworkOutput){
-				if (dt == network::D_NASG_TRIG)
+				if (dt == network::config::D_NASG_TRIG)
 				{
 					paramCount = 7;
 				}
-				else if (dt == network::D_NASG_ANGLE)
+				else if (dt == network::config::D_NASG_ANGLE)
 				{
 					paramCount = 5;
 				}
-				else if (dt == network::D_NASG_AXIS_ANGLE)
+				else if (dt == network::config::D_NASG_AXIS_ANGLE)
 				{
 					paramCount = 6;
 				}
@@ -72,7 +72,7 @@ namespace vtx::distribution
 			const float& a
 		)
 		{
-			const float factor = 2.0f * M_PI * (1.0f - expf(-2.0f * lambda)) / (lambda * sqrtf(1.0f + a));
+			const float factor = 2.0f * M_PI * (1.0f - expf(-2.0f * lambda)) / (lambda * sqrtf(1.0f + a) + EPS);
 			return factor;
 		}
 
@@ -84,9 +84,13 @@ namespace vtx::distribution
 			const float& a
 		)
 		{
+			if(!(math::length(xAxis) > 0.0f && math::length(zAxis) > 0.0f && lambda > 0.0f && a > 0.0f))
+			{
+				return -1.0f;
+			}
+			
 			float lambdaClamp = fmaxf(lambda, EPS);
 			float aClamp = fmaxf(a, EPS);
-			assert(!utl::isNan(v));
 
 			const float vDotZ = dot(v, zAxis);
 
@@ -102,7 +106,6 @@ namespace vtx::distribution
 				return 1.0f / normalization;
 			}
 
-
 			const float vDotX = dot(v, xAxis);
 
 			const float scaleValue = (vDotZ + 1.0f) / 2.0f;
@@ -113,38 +116,6 @@ namespace vtx::distribution
 			const float g = expf(2.0f * lambdaClamp * (powf(scaleValue, 1 + powerValue) - 1.0f)) * powf(scaleValue, powerValue);
 
 			const float result = g / normalization;
-			if (isinf(result))
-			{
-				printf(
-					"g: %f\n"
-					"normalization: %f\n"
-					"lambda: %f\n"
-					"a: %f\n"
-					"scaleValue: %f\n"
-					"denominator: %f\n"
-					"powerValue: %f\n"
-					"vDotZ: %f\n"
-					"vDotX: %f\n"
-					"v %f %f %f\n"
-					"z %f %f %f\n"
-					"x %f %f %f\n"
-					,
-					g,
-					normalization,
-					lambdaClamp,
-					aClamp,
-					scaleValue,
-					denominator,
-					powerValue,
-					vDotZ,
-					vDotX,
-					v.x, v.y, v.z,
-					zAxis.x, zAxis.y, zAxis.z,
-					xAxis.x, xAxis.y, xAxis.z
-				);
-			}
-			assert(!isnan(result));
-			assert(!isinf(result));
 
 			return result;
 
@@ -158,13 +129,6 @@ namespace vtx::distribution
 			const float* a = nullptr;
 			splitParameters(xAxis, zAxis, lambda, a, distributionParams);
 
-			assert(
-				!utl::isNan(*xAxis) &&
-				!utl::isNan(*zAxis) &&
-				!isnan(*lambda) &&
-				!isnan(*a)
-			);
-
 			const float result = prob(
 				sample,
 				*xAxis,
@@ -172,8 +136,6 @@ namespace vtx::distribution
 				*lambda,
 				*a
 			);
-
-			assert(!isnan(result));
 
 			return result;
 		}
@@ -223,58 +185,10 @@ namespace vtx::distribution
 				cosf(theta)
 			);
 
-			
-
 			const math::vec3f yAxis = cross(zAxis, xAxis);
 
 			math::vec3f v = vNonTransformed.x * xAxis + vNonTransformed.y * yAxis + vNonTransformed.z * zAxis;
-
-			float sampleProb = prob(
-				v,
-				xAxis,
-				zAxis,
-				lambda,
-				a
-			);
-			if(sampleProb <= 0)
-			{
-				printf(
-					"v non transformed : %f %f %f\n"
-					"v : %f %f %f\n"
-					"xAxis : %f %f %f\n"
-					"yAxis : %f %f %f\n"
-					"zAxis : %f %f %f\n"
-					"lambda : %f\n"
-					"a : %f\n"
-					"rho : %f\n"
-					"phi : %f\n"
-					"theta : %f\n"
-					"s : %f\n"
-					"base : %f\n"
-					"exponent : %f\n"
-					"cosRho : %f\n"
-					"uniform0 : %f\n"
-					"uniform1 : %f\n"
-					, vNonTransformed.x, vNonTransformed.y, vNonTransformed.z
-					, v.x, v.y, v.z
-					, xAxis.x, xAxis.y, xAxis.z
-					, yAxis.x, yAxis.y, yAxis.z
-					, zAxis.x, zAxis.y, zAxis.z
-					, lambda
-					, a
-					, rho
-					, phi
-					, theta
-					, s
-					, base
-					, exponent
-					, cosRho
-					, uniform0
-					, uniform1
-				);
-			}
 			
-			assert(!utl::isNan(v));
 			return v;
 		}
 
@@ -306,7 +220,7 @@ namespace vtx::distribution
 			const torch::Tensor& a);
 
 
-		static torch::Tensor finalizeRawParams(const torch::Tensor& rawParams,const network::DistributionType& type);
+		static torch::Tensor finalizeRawParams(const torch::Tensor& rawParams,const network::config::DistributionType& type);
 
 		static std::tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor> Nasg::splitParams(const torch::Tensor& params);
 

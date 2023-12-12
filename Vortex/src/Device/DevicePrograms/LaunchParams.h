@@ -9,7 +9,7 @@
 #include "NoiseData.h"
 #include "Device/Structs/GeometryData.h"
 #include "Device/Wrappers/WorkQueue.h"
-#include "NeuralNetworks/NetworkSettings.h"
+#include "NeuralNetworks/Config/NetworkSettings.h"
 #include "Scene/DataStructs/VertexAttribute.h"
 #include "Scene/Nodes/LightTypes.h"
 #include "Scene/Nodes/RendererSettings.h"
@@ -371,7 +371,7 @@ namespace vtx {
     {
 		RendererSettings renderer;
         WavefrontSettings wavefront;
-        network::NetworkSettings neural;
+        network::config::NetworkSettings neural;
     };
 
     struct QueuesData

@@ -194,4 +194,15 @@ namespace vtx
 		doLoadFile = true;
 		filePathToLoad = filePath;
 	}
+	void LoadingSaving::reset()
+	{
+		currentState = LoadSaveState::Idle;
+		previousModelPath = "";
+		filePathToLoad = "";
+		filePathToSave = "";
+		doLoadFile = false;
+		isLoadingGuiOpen = false;
+		doSaveFile = false;
+		isSavingGuiOpen = false;
+	}
 }

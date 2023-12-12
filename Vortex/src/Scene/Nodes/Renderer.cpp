@@ -280,5 +280,35 @@ namespace vtx::graph
 	GlFrameBuffer Renderer::getFrame() {
 		return interopDisplay.glFrameBuffer;
 	}
+
+	void Statistics::update(const std::shared_ptr<graph::Renderer>& renderNode)
+	{
+		const CudaEventTimes cuTimes = getCudaEventTimes();
+		const int actualLaunches = getLaunches();
+		totTimeSeconds = (cuTimes.trace + cuTimes.noiseComputation + cuTimes.postProcessing + cuTimes.display) / 1000.0f;
+		samplesPerPixel = renderNode->settings.iteration;
+		sppPerSecond = (float)(renderNode->width * renderNode->height * actualLaunches) / totTimeSeconds;
+		frameTime = totTimeSeconds / (float)actualLaunches;
+		fps = 1.0f / frameTime;
+		totTimeInternal = renderNode->timer.elapsedMillis() / 1000.0f;
+		internalFps = (float)renderNode->settings.iteration / totTimeInternal;
+		const float factor = 1.0f / (float)actualLaunches;
+		rendererNoise = factor * cuTimes.noiseComputation;
+		rendererTrace = factor * cuTimes.trace;
+		rendererPost = factor * cuTimes.postProcessing;
+		rendererDisplay = factor * cuTimes.display;
+		waveFrontGenerateRay = factor * cuTimes.genCameraRay;
+		waveFrontTrace = factor * cuTimes.traceRadianceRay;
+		waveFrontShade = factor * cuTimes.shadeRay;
+		waveFrontShadow = factor * cuTimes.shadowRay;
+		waveFrontEscaped = factor * cuTimes.handleEscapedRay;
+		waveFrontAccumulate = factor * cuTimes.accumulateRay;
+		waveFrontReset = factor * cuTimes.reset;
+		waveFrontFetchQueueSize = factor * cuTimes.fetchQueueSize;
+		neuralShuffleDataset = factor * cuTimes.nnShuffleDataset;
+		neuralNetworkTrain = factor * cuTimes.nnTrain;
+		neuralNetworkInfer = factor * cuTimes.nnInfer;
+	}
+
 }
 

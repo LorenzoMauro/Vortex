@@ -5,6 +5,8 @@
 
 namespace vtx
 {
+	struct CUDABuffer;
+
 	class Image
 	{
 	public:
@@ -13,6 +15,8 @@ namespace vtx
 		Image(const std::string& path);
 
 		Image(const float* _data, const int _width, const int _height, const int _channels);
+
+		Image(CUDABuffer buffer, const int _width, const int _height, const int _channels);
 
 		void load(const std::string& path);
 

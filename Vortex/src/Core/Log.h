@@ -76,9 +76,10 @@ inline void waitAndClose() {
 		__debugbreak();
 }
 #endif
-    std::cerr << "Press ENTER to exit..." << std::endl;
-    std::cin.get();
-    std::exit(EXIT_FAILURE);
+	throw std::runtime_error("Debug break triggered in waitAndClose.");
+    //std::cerr << "Press ENTER to exit..." << std::endl;
+    //std::cin.get();
+    //std::exit(EXIT_FAILURE);
 }
 
 #define IS_EMPTY(...) (strcmp(#__VA_ARGS__, "") == 0)

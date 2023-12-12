@@ -14,6 +14,10 @@ namespace vtx::utl
 		return (isnan(vec.x) || isnan(vec.y) || isnan(vec.z));
 	}
 
+	__forceinline__ __device__ bool isInf(const math::vec3f& vec)
+	{
+		return (isinf(vec.x) || isinf(vec.y) || isinf(vec.z));
+	}
 
 	template<typename T>
 	__device__ T lerp(const T& a, const T& b, const float& t)

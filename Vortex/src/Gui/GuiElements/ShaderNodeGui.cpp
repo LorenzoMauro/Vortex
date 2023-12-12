@@ -20,7 +20,7 @@ namespace vtx::gui
         {
         case graph::shader::PK_FLOAT:
 
-            changed |= vtxImGui::halfSpaceWidget(param.annotation.displayName.c_str(), ImGui::SliderFloat, HiddenIdentifier.c_str(), &param.data<float>(), param.annotation.range[0], param.annotation.range[1], "%.3f", 0);
+            changed |= vtxImGui::halfSpaceDragFloat(param.annotation.displayName.c_str(), &param.data<float>(), param.annotation.range[0], param.annotation.range[1]);
             break;
         case graph::shader::PK_FLOAT2:
             changed |= ImGui::SliderFloat2(param.annotation.displayName.c_str(), &param.data<float>(), param.annotation.range[0], param.annotation.range[1]);

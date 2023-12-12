@@ -161,6 +161,7 @@ namespace vtx
             vertices[2] = &(geometry->vertexAttributeData[triVerticesIndices.z]);
             const math::vec3f nsO = math::normalize(vertices[0]->normal * baricenter.x + vertices[1]->normal * baricenter.y + vertices[2]->normal * baricenter.z);
             shadingNormal = math::normalize(math::transformNormal3F(objectToWorld, nsO));
+            determineMaterialInfo(params);
 
         }
         __forceinline__ __device__ void determineMaterialInfo(const LaunchParams* params)

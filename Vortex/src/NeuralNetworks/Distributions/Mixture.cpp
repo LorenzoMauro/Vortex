@@ -6,13 +6,13 @@
 namespace vtx::distribution
 {
 
-    torch::Tensor Mixture::finalizeParams(torch::Tensor& mixtureParameters, const network::DistributionType& type)
+    torch::Tensor Mixture::finalizeParams(torch::Tensor& mixtureParameters, const network::config::DistributionType& type)
     {
-        if (type == network::DistributionType::D_SPHERICAL_GAUSSIAN)
+        if (type == network::config::DistributionType::D_SPHERICAL_GAUSSIAN)
         {
             return SphericalGaussian::finalizeRawParams(mixtureParameters);
         }
-        else if (type == network::D_NASG_TRIG || type == network::D_NASG_ANGLE || type == network::D_NASG_AXIS_ANGLE)
+        else if (type == network::config::D_NASG_TRIG || type == network::config::D_NASG_ANGLE || type == network::config::D_NASG_AXIS_ANGLE)
         {
             return Nasg::finalizeRawParams(mixtureParameters, type);
         }
@@ -24,18 +24,18 @@ namespace vtx::distribution
         return mixtureParameters;
     }
 
-    torch::Tensor Mixture::prob(const torch::Tensor& x, const torch::Tensor& mixtureParams, const torch::Tensor& mixtureWeights, const network::DistributionType type)
+    torch::Tensor Mixture::prob(const torch::Tensor& x, const torch::Tensor& mixtureParams, const torch::Tensor& mixtureWeights, const network::config::DistributionType type)
     {
         // expand x if not 3D to match the Batch Size x Mixture Size x x last dim
 
 		const torch::Tensor expandedX = x.unsqueeze(1).expand({ -1, mixtureParams.size(1), -1 });
         TRACE_TENSOR(expandedX);
         torch::Tensor prob;
-        if (type == network::DistributionType::D_SPHERICAL_GAUSSIAN)
+        if (type == network::config::DistributionType::D_SPHERICAL_GAUSSIAN)
         {
             prob = SphericalGaussian::prob(expandedX, mixtureParams);
         }
-        else if (type == network::D_NASG_TRIG || type == network::D_NASG_ANGLE || type == network::D_NASG_AXIS_ANGLE)
+        else if (type == network::config::D_NASG_TRIG || type == network::config::D_NASG_ANGLE || type == network::config::D_NASG_AXIS_ANGLE)
         {
 	        prob = Nasg::prob(expandedX, mixtureParams);
 		}
@@ -52,7 +52,7 @@ namespace vtx::distribution
         return weightedP;
     }
 
-    std::tuple<torch::Tensor, torch::Tensor> Mixture::sample(const torch::Tensor& mixtureParams, const torch::Tensor& mixtureWeights, const network::DistributionType type)
+    std::tuple<torch::Tensor, torch::Tensor> Mixture::sample(const torch::Tensor& mixtureParams, const torch::Tensor& mixtureWeights, const network::config::DistributionType type)
     {
         // Select mixture from mixtureWeights tensor
         const torch::Tensor selectedMixture = multinomial(mixtureWeights, 1);
@@ -66,11 +66,11 @@ namespace vtx::distribution
 
 
         torch::Tensor sampleTensor;
-        if (type == network::D_SPHERICAL_GAUSSIAN)
+        if (type == network::config::D_SPHERICAL_GAUSSIAN)
         {
             sampleTensor = SphericalGaussian::sample(selectedParameters);
         }
-        else if (type == network::D_NASG_TRIG || type == network::D_NASG_ANGLE || type == network::D_NASG_AXIS_ANGLE)
+        else if (type == network::config::D_NASG_TRIG || type == network::config::D_NASG_ANGLE || type == network::config::D_NASG_AXIS_ANGLE)
         {
 	        sampleTensor = Nasg::sample(selectedParameters);
         }
@@ -87,13 +87,13 @@ namespace vtx::distribution
         return { sampleTensor, prob };
     }
 
-    void Mixture::setGraphData(const network::DistributionType type, const torch::Tensor& params, const torch::Tensor& mixtureWeights, network::GraphsData& graphData, const bool isTraining, const int depth)
+    void Mixture::setGraphData(const network::config::DistributionType type, const torch::Tensor& params, const torch::Tensor& mixtureWeights, network::GraphsData& graphData, const bool isTraining, const int depth)
     {
-        if (type == network::DistributionType::D_SPHERICAL_GAUSSIAN)
+        if (type == network::config::DistributionType::D_SPHERICAL_GAUSSIAN)
         {
 	        SphericalGaussian::setGraphData(params, mixtureWeights, graphData, isTraining, depth);
 		}
-		else if (type == network::D_NASG_TRIG || type == network::D_NASG_ANGLE || type == network::D_NASG_AXIS_ANGLE)
+		else if (type == network::config::D_NASG_TRIG || type == network::config::D_NASG_ANGLE || type == network::config::D_NASG_AXIS_ANGLE)
 		{
 			Nasg::setGraphData(params, mixtureWeights, graphData, isTraining, depth);
 		}

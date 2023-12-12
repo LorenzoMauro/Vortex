@@ -39,10 +39,10 @@ namespace vtx
 			}
 		}
 
-		// Calculate average luminance in the kernel (excluding center)
+		// Calculate average outRadiance in the kernel (excluding center)
 		float avgLuminance = utl::luminance(sumValue / count);
 
-		// If the center pixel's luminance is higher than average plus threshold
+		// If the center pixel's outRadiance is higher than average plus threshold
 		// replace it with average, otherwise keep the original
 		if (utl::luminance(centerValue) > avgLuminance*threshold)
 		{
@@ -262,8 +262,8 @@ namespace vtx
 				const int& batchSize = launchParams->settings.neural.batchSize;
 				int totPixel = frameSize.x * frameSize.y;
 				int iteration = launchParams->frameBuffer.samples[fbIndex] + 1;
-				const int& numberOfTrainingStep = launchParams->settings.neural.maxTrainingStepPerFrame;
-				int totSamples = batchSize * iteration * numberOfTrainingStep;
+				//const int& numberOfTrainingStep = launchParams->settings.neural.maxTrainingStepPerFrame;
+				int totSamples = batchSize * iteration; // *numberOfTrainingStep;
 				float maxSamplesPerPixel = (float)totSamples / (float)(totPixel);
 
 				float& totSampleAtPixel = debugBuffer[fbIndex].x;
