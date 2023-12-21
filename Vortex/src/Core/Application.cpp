@@ -150,6 +150,7 @@ namespace vtx
 			ew!=nullptr && ew->performBatchExperiment)
 		{
 			BatchExperimentRun();
+			ew->performBatchExperiment = false;
 		}
 		else
 		{

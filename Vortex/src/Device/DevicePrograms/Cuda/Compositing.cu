@@ -1,3 +1,4 @@
+
 #include "../CudaKernels.h"
 #include "device_launch_parameters.h"
 #include "Device/CUDAChecks.h"
@@ -6,6 +7,7 @@
 #include "Device/Wrappers/KernelLaunch.h"
 #include "NeuralNetworks/Interface/NetworkInterface.h"
 #include "NeuralNetworks/Interface/Paths.h"
+#include "NeuralNetworks/Interface/TrainingDataBuffers.h"
 
 namespace vtx
 {
@@ -115,10 +117,10 @@ namespace vtx
 		bool normalizeBySamples = true;
 		bool dotoneMap = true;
 
-		if(launchParams->settings.neural.active)
+		/*if(launchParams->settings.neural.active)
 		{
 			launchParams->networkInterface->paths->accumulatePath(fbIndex);
-		}
+		}*/
 
 		switch (settings.renderer.displayBuffer)
 		{
@@ -239,8 +241,9 @@ namespace vtx
 		{
 			if (launchParams->settings.neural.active)
 			{
+				/*outputBuffer[fbIndex] = math::vec4f{ launchParams->networkInterface->debugBuffer2[fbIndex] / (launchParams->networkInterface->debugBuffer3[fbIndex].x), 1.0f };*/
 				const float value = launchParams->networkInterface->debugBuffer1[fbIndex].x / (float)launchParams->networkInterface->debugBuffer1[fbIndex].z;
-				outputBuffer[fbIndex] = math::vec4f(floatToScientificRGB(value), 1.0f);
+				outputBuffer[fbIndex] = math::vec4f(math::vec3f(value), 1.0f);// math::vec4f(floatToScientificRGB(value), 1.0f);
 			}
 		}
 		break;
@@ -338,6 +341,19 @@ namespace vtx
 			[=] __device__(const int id)
 		{
 			toneMapRadiance(id, launchParams);
+		});
+	}
+
+	void toneMapBuffer(CUDABuffer& src, CUDABuffer& dst, const int width, const int height, ToneMapperSettings settings)
+	{
+		const auto* const srcDevice = src.castedPointer<math::vec3f>();
+		auto*                    dstDevice = dst.castedPointer<math::vec3f>();
+
+		gpuParallelFor("ToneMap",
+			width * height,
+			[=] __device__(const int id)
+		{
+			dstDevice[id] = toneMap(settings, srcDevice[id]);
 		});
 	}
 }

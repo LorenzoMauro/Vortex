@@ -269,7 +269,7 @@ namespace vtx {
 				const math::vec3f directLight = bounce.lightSample.throughputMultiplier * bounce.lightHit.outgoingRadiance * misWeight;
 				if (inRadiance != nullptr)
 				{
-					*inRadiance = bounce.lightHit.outgoingRadiance;
+					*inRadiance = misWeight * bounce.lightHit.outgoingRadiance;
 				}
 				return directLight;
 			}
@@ -289,7 +289,7 @@ namespace vtx {
 			return { 0.0f };
 		}
 
-		__forceinline__ __device__ math::vec3f outgoingIndirectLight(const int& originPixel, const int& depth, const bool useMis, math::vec3f* inRadiance=nullptr)
+		__forceinline__ __device__ math::vec3f outgoingIndirectLight(const int& originPixel, const int& depth, const bool useMis, float* overallProb = nullptr, math::vec3f* inRadiance=nullptr)
 		{
 			assertBounceValidity(originPixel, depth);
 			math::vec3f incomingRadiance(0.0f);
@@ -303,6 +303,8 @@ namespace vtx {
 			}
 
 			math::vec3f firstBounceThroughput = startingBounce.bsdfSample.throughputMultiplier;
+			if(overallProb) *overallProb *= startingBounce.bsdfSample.sampleProb;
+			
 
 			math::vec3f throughput = math::vec3f(1.0f);
 			for (int i = depth + 1; i <= pathMaxDepth; ++i)
@@ -320,6 +322,7 @@ namespace vtx {
 					break;
 				}
 				throughput *= currentBounce.bsdfSample.throughputMultiplier;
+				if (overallProb) (*overallProb) *= currentBounce.bsdfSample.sampleProb;
 			}
 
 			math::vec3f outRadiance = incomingRadiance * firstBounceThroughput;
@@ -380,7 +383,7 @@ namespace vtx {
 			validLightSample[idx].z = type;
 		}
 		
-		__forceinline__ __device__ void selectRandomBounce(unsigned& seed, int* selectedPixel, int* selectedDepth, const network::config::SamplingStrategy strategy)
+		__forceinline__ __device__ void selectRandomBounce(unsigned& seed, int* selectedPixel, int* selectedDepth, const network::config::SamplingStrategy strategy, bool limitToFirst, float* overallProb)
 		{
 
 			int* validPixelsArray;
@@ -400,10 +403,11 @@ namespace vtx {
 			const int   randomOriginPixel = validPixelsArray[(int)(rnd * (float)(*validPixelsCounter))];
 			const int   maxDepth = paths[randomOriginPixel].maxDepth;
 			*selectedPixel = randomOriginPixel;
+			(*overallProb ) *= 1.0f / (float)(*validPixelsCounter);
 
 			// we don't want to select the last bounce which is either termination or miss shader
 			// but some paths might have just one bounce, so we need to handle that case
-			if(false){
+			if(!limitToFirst){
 				if (maxDepth == 0)
 				{
 					// This is not going to happen as it is because of how the setBounceAsTerminal is implemented
@@ -415,6 +419,7 @@ namespace vtx {
 					*selectedDepth = (int)round(rnd2 * (float)(maxDepth - 1));
 					assert(*selectedDepth < maxDepth);
 					assert(*selectedDepth >= 0);
+					(*overallProb) *= 1.0f / (float)(maxDepth - 1);
 				}
 			}
 			else
@@ -430,9 +435,10 @@ namespace vtx {
 			math::vec3f position;
 			math::vec3f normal;
 			math::vec3f wOutgoing;
-			int 	   materialId;
-			int		   instanceId;
-			int		   triangleId;
+			int         materialId;
+			int         instanceId;
+			int         triangleId;
+			float       overallProb;
 		};
 
 		struct LightContribution
@@ -452,13 +458,14 @@ namespace vtx {
 		{
 			int randomOriginPixel;
 			int randomDepth;
-			selectRandomBounce(seed, &randomOriginPixel, &randomDepth, settings.trainingBatchGenerationSettings.strategy);
+			hit->overallProb = 1.0f;
+			selectRandomBounce(seed, &randomOriginPixel, &randomDepth, settings.trainingBatchGenerationSettings.strategy, settings.trainingBatchGenerationSettings.limitToFirstBounce, (&hit->overallProb));
 			const Bounce& bounce = paths[randomOriginPixel][randomDepth];
 
 			sampledPixel = randomOriginPixel;
 			sampledDepth = randomDepth;
 
-			if (bounce.lightSample.isValid && rng(seed) <= settings.trainingBatchGenerationSettings.lightSamplingProb)
+			if (settings.trainingBatchGenerationSettings.lightSamplingProb> 0.0f && bounce.lightSample.isValid && rng(seed) <= settings.trainingBatchGenerationSettings.lightSamplingProb)
 			{
 				lightContribution->outRadiance = outgoingDirectLight(randomOriginPixel, randomDepth, settings.trainingBatchGenerationSettings.weightByMis, &lightContribution->inRadiance);
 				lightContribution->bsdfProb = bounce.lightSample.bsdfPdf;
@@ -474,7 +481,7 @@ namespace vtx {
 			}
 			else
 			{
-				lightContribution->outRadiance = outgoingIndirectLight(randomOriginPixel, randomDepth, settings.trainingBatchGenerationSettings.weightByMis, &lightContribution->inRadiance);
+				lightContribution->outRadiance = outgoingIndirectLight(randomOriginPixel, randomDepth, settings.trainingBatchGenerationSettings.weightByMis, &(hit->overallProb), &lightContribution->inRadiance);
 				lightContribution->bsdfProb = bounce.bsdfSample.bsdfPdf;
 				lightContribution->wIncoming = bounce.bsdfSample.direction;
 				lightContribution->throughput = bounce.bsdfSample.throughputMultiplier;

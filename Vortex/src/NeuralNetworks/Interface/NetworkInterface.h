@@ -106,9 +106,11 @@ namespace vtx
 			npgTrainingData->outRadiance[trainingDatasetIdx] = lightContribution.outRadiance;
 			npgTrainingData->inRadiance[trainingDatasetIdx] = lightContribution.inRadiance;
 			npgTrainingData->throughput[trainingDatasetIdx] = lightContribution.throughput;
+			npgTrainingData->overallProb[trainingDatasetIdx] = hit.overallProb;
 			
 			const float signal = utl::luminance(lightContribution.outRadiance);
-			//debugBuffer1[sampledPixel].x += (signal + 1.0f) / 2.0f;
+			debugBuffer1[sampledPixel].x += signal;
+			//debugBuffer2[sampledPixel] += lightContribution.outRadiance;
 			debugBuffer1[sampledPixel].x = lightContribution.bsdfProb;
 			debugBuffer1[sampledPixel].z += 1.0f;
 			sppDebugFrame(sampledPixel, sampledDepth);

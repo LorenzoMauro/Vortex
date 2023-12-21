@@ -22,6 +22,7 @@ namespace vtx
 		throughput = buffers.trhoughputBuffer.alloc<math::vec3f>(maxDatasetSize);
 		incomingDirection = buffers.incomingDirectionBuffer.alloc<math::vec3f>(maxDatasetSize);
 		bsdfProbabilities = buffers.bsdfProbabilitiesBuffer.alloc<float>(maxDatasetSize);
+		overallProb = buffers.overallProbBuffer.alloc<float>(maxDatasetSize);
 		inputs = NetworkInput::upload(maxDatasetSize, buffers.inputBuffer);
 		nAlloc = maxDatasetSize;
 	}

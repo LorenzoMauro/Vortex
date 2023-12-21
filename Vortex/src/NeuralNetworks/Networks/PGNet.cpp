@@ -20,7 +20,6 @@ namespace vtx::network
 	void PGNet::init()
 	{
 		constexpr int auxAdditionInputSize = 3; // wi
-		int mainInputSize = 9; // position, normal, wo
 		constexpr int mainOutputSize = 9; // outRadiance, inRadiance, throughput
 		distributionParametersCount = distribution::Mixture::getDistributionParametersCount(settings->distributionType, true);
 		mixtureParametersCount = settings->mixtureSize * distributionParametersCount;
@@ -35,6 +34,13 @@ namespace vtx::network
 		auto encodingSettings = torchTcnn::getEncodingSettings(settings->inputSettings);
 
 		int configN = 3;
+		int mainInputSize = 9; // position, normal, wo
+		if (settings->learnInputRadiance)
+		{
+			configN = 2;
+			mainInputSize = 6;
+			encodingSettings["nested"].erase(configN);
+		}
 		if(settings->useMaterialId)
 		{
 			encodingSettings["nested"][configN] = torchTcnn::getEncodingSettings(settings->materialIdEncodingConfig);
@@ -98,11 +104,21 @@ namespace vtx::network
 		const torch::Tensor& position = inputTensors.position;
 		const torch::Tensor& wo = inputTensors.wo;
 		const torch::Tensor& normal = inputTensors.normal;
-		const torch::Tensor& incomingDirection = inputTensors.incomingDirection;
+		const torch::Tensor& incomingDirection = inputTensors.wi;
 		torch::Tensor& bsdfProb = inputTensors.bsdfProb;
 		const torch::Tensor& outRadianceTarget = inputTensors.outRadiance;
 
-		torch::Tensor input = torch::cat({ position, wo, normal }, -1);
+		torch::Tensor targetRadiance;
+		torch::Tensor input = torch::cat({ position, normal }, -1);
+		if(settings->learnInputRadiance)
+		{
+			targetRadiance = inputTensors.inRadiance;
+		}
+		else
+		{
+			input = torch::cat({ input, wo }, -1);
+			targetRadiance = outRadianceTarget;
+		}
 		if(settings->useTriangleId)
 		{
 			input = torch::cat({ input, inputTensors.triangleId }, -1);
@@ -120,7 +136,16 @@ namespace vtx::network
 		const auto& [mixtureParameters, mixtureWeights, c] = guidingForward(rawOutput);
 		const torch::Tensor neuralProb = distribution::Mixture::prob(incomingDirection, mixtureParameters, mixtureWeights, settings->distributionType);
 
-		torch::Tensor pgLoss = guidingLoss(neuralProb, bsdfProb, outRadianceTarget, c);
+		torch::Tensor pgLoss;
+		pgLoss = guidingLoss(neuralProb, bsdfProb, targetRadiance, c, inputTensors.sampleProb);
+		/*if (!settings->learnInputRadiance) {
+			pgLoss = guidingLoss(neuralProb, bsdfProb, targetRadiance, c, inputTensors.sampleProb);
+		}
+		else
+		{
+			pgLoss = guidingLoss(neuralProb, bsdfProb, targetRadiance, c, inputTensors.sampleProb);
+			pgLoss = gudingLossIncomingRadiance(neuralProb, bsdfProb, targetRadiance, c, inputTensors.sampleProb);
+		}*/
 
 
 		if (settings->useEntropyLoss)
@@ -145,8 +170,10 @@ namespace vtx::network
 			pgLoss += (1.0f - lossBlendFactor())*auxLoss;
 
 		}
-
 		pgLoss.backward();
+
+		torch::nn::utils::clip_grad_norm_(mlpBase->parameters(), 1.0);
+
 		if (TensorDebugger::analyzeGradients()) {
 			return; // NAN or INF gradients
 		}
@@ -176,7 +203,10 @@ namespace vtx::network
 		const torch::Tensor& position = inputTensors.position;
 		const torch::Tensor& wo = inputTensors.wo;
 		const torch::Tensor& normal = inputTensors.normal;
-		torch::Tensor input = torch::cat({ position, wo, normal }, -1);
+		torch::Tensor input = torch::cat({ position, normal }, -1);
+		if (!settings->learnInputRadiance){
+			input = torch::cat({ input, wo }, -1);
+		}
 
 		if (settings->useTriangleId)
 		{
@@ -195,7 +225,9 @@ namespace vtx::network
 		auto [mixtureParameters, mixtureWeights, c] = guidingForward(rawOutput);
 		if (settings->samplingFractionBlend)
 		{
-			c = tau() * c;
+
+			const float fractionBlend = std::min(1.0f, (float)trainingStep / (settings->fractionBlendTrainPercentage*(float)settings->maxTrainingSteps));
+			c = fractionBlend * c;
 		}
 
 		TRACE_TENSOR(c);
@@ -274,7 +306,7 @@ namespace vtx::network
 
 
 		InputDataPointers inputPointers;
-		inputPointers.incomingDirection = buffers.incomingDirectionBuffer.castedPointer<float>();
+		inputPointers.wi = buffers.incomingDirectionBuffer.castedPointer<float>();
 		inputPointers.bsdfProb = buffers.bsdfProbabilitiesBuffer.castedPointer<float>();
 		inputPointers.position = buffers.inputBuffer.positionBuffer.castedPointer<float>();
 
@@ -293,10 +325,14 @@ namespace vtx::network
 		inputPointers.wo = buffers.inputBuffer.woBuffer.castedPointer<float>();
 		inputPointers.normal = buffers.inputBuffer.normalBuffer.castedPointer<float>();
 		inputPointers.outRadiance = buffers.outgoingRadianceBuffer.castedPointer<float>();
+		inputPointers.inRadiance = buffers.incomingRadianceBuffer.castedPointer<float>();
 		if(settings->useAuxiliaryNetwork)
 		{
 			inputPointers.throughput = buffers.trhoughputBuffer.castedPointer<float>();
-			inputPointers.inRadiance = buffers.incomingRadianceBuffer.castedPointer<float>();
+		}
+		if(settings->scaleBySampleProb)
+		{
+			inputPointers.sampleProb = buffers.overallProbBuffer.castedPointer<float>();
 		}
 
 		const auto          aabb = onDeviceData->launchParamsData.getHostImage().aabb;
@@ -311,6 +347,7 @@ namespace vtx::network
 		TRACE_TENSOR(output.incomingDirection);
 		TRACE_TENSOR(output.bsdfProb);
 		TRACE_TENSOR(output.outRadiance);
+
 		return output;
 	}
 
@@ -351,7 +388,6 @@ namespace vtx::network
 		TRACE_TENSOR(output.position);
 		TRACE_TENSOR(output.wo);
 		TRACE_TENSOR(output.normal);
-		TRACE_TENSOR(output.hitProp);
 
 		return output;
 	}
@@ -386,7 +422,7 @@ namespace vtx::network
 		}
 		tensors.wo = pointerToTensor(inputPointers.wo, batchDim, 3);
 		tensors.normal = pointerToTensor(inputPointers.normal, batchDim, 3);
-		if (settings->inputSettings.normal.otype == config::EncodingType::SphericalHarmonics)
+		if (settings->inputSettings.wo.otype == config::EncodingType::SphericalHarmonics)
 		{
 			tensors.wo = (tensors.wo + 1.0f) / 2.0f; // map to [0,1]
 		}
@@ -394,7 +430,7 @@ namespace vtx::network
 		{
 			tensors.normal = (tensors.normal + 1.0f) / 2.0f; // map to [0,1]
 		}
-		tensors.incomingDirection = pointerToTensor(inputPointers.incomingDirection, batchDim, 3);
+		tensors.wi = pointerToTensor(inputPointers.wi, batchDim, 3);
 		tensors.bsdfProb = pointerToTensor(inputPointers.bsdfProb, batchDim, 1, -65504, 65504);
 		tensors.outRadiance = pointerToTensor(inputPointers.outRadiance, batchDim, 3);
 		tensors.inRadiance = pointerToTensor(inputPointers.inRadiance, batchDim, 3);
@@ -402,6 +438,7 @@ namespace vtx::network
 		tensors.triangleId = pointerToTensor(inputPointers.triangleId, batchDim, 1);
 		tensors.instanceId = pointerToTensor(inputPointers.instanceId, batchDim, 1);
 		tensors.materialId = pointerToTensor(inputPointers.materialId, batchDim, 1);
+		tensors.sampleProb = pointerToTensor(inputPointers.sampleProb, batchDim, 1);
 		return tensors;
 	}
 
@@ -431,33 +468,38 @@ namespace vtx::network
 
 	std::tuple<torch::Tensor, torch::Tensor, torch::Tensor> PGNet::guidingForward(const torch::Tensor& rawOutput)
 	{
-		auto [rawMixtureParameters, rawMixtureWeights, rawSamplingFraction] = splitGuidingOutput(rawOutput);
+		const torch::Tensor rawOutputFullPrecision = rawOutput.to(torch::kFloat32);
+		auto [rawMixtureParameters, rawMixtureWeights, rawSamplingFraction] = splitGuidingOutput(rawOutputFullPrecision);
 		auto [mixtureParameters, mixtureWeights, cTensor] = finalizeGuidingOutput(rawMixtureParameters, rawMixtureWeights, rawSamplingFraction);
 		return { mixtureParameters, mixtureWeights, cTensor };
 	}
 
-	torch::Tensor PGNet::guidingLoss(const torch::Tensor& neuralProb, torch::Tensor& bsdfProb, const torch::Tensor& outRadiance, const torch::Tensor& c)
+	torch::Tensor crossEntropy(const torch::Tensor& target, const torch::Tensor& prediction)
 	{
-		//const auto mask = bsdfProb > 100.0f; // Replace `threshold` with your threshold value
-		//const auto neuralProbNoGrad = neuralProb.detach();
-		//const auto neuralProbConditional = torch::where(mask, neuralProbNoGrad, neuralProb);
+		return -target * torch::log(prediction + 1e-8);
+	}
+	torch::Tensor customLoss(const torch::Tensor& target, const torch::Tensor& prediction)
+	{
+		torch::Tensor lossCE = crossEntropy(target, prediction);
+		//torch::Tensor lossRCE = crossEntropy(prediction, target);
+		torch::Tensor loss = lossCE;// +lossRCE;
+		return loss;
+	}
+	torch::Tensor sigmoidClamp(const torch::Tensor& input, const float clampValue, const float steepness)
+	{
+		torch::Tensor output = clampValue * torch::tanh(steepness * input);
+		return output;
+	}
 
-		//auto bsdfProbClamped = torch::clamp(bsdfProb, 0.0f, 1.0f);
-
-		const torch::Tensor targetLuminance = settings->targetScale*(outRadiance * ntscLuminance).sum(-1, true);
-		const torch::Tensor lossQ = divergenceLoss(neuralProb, targetLuminance);
-		if(settings->clampBsdfProb)
-		{
-			bsdfProb = torch::min(bsdfProb, targetLuminance);
-		}
-		const torch::Tensor blendedQ = c * neuralProb + (1 - c) * bsdfProb;
-		torch::Tensor lossBlendedQ = divergenceLoss(blendedQ, targetLuminance);
-		if(settings->scaleLossBlendedQ)
-		{
-			lossBlendedQ  = lossBlendedQ / (bsdfProb + 0.01);
-		}
-
-		torch::Tensor loss = lossBlendFactor() * lossQ + (1.0f - lossBlendFactor()) * lossBlendedQ;
+	torch::Tensor PGNet::gudingLossIncomingRadiance(const torch::Tensor& neuralProb, torch::Tensor& bsdfProb, const torch::Tensor& outRadiance, const torch::Tensor& c, const torch::Tensor& sampleProb)
+	{
+		using namespace torch::nn::functional;
+		const torch::Tensor    targetLuminance = settings->targetScale * (outRadiance * ntscLuminance).sum(-1, true);
+		const torch::Tensor    blendedQ        = c * neuralProb + (1 - c) * bsdfProb;
+		const torch::Tensor    lossQ = customLoss(targetLuminance, neuralProb);
+		const torch::Tensor    lossBlendedQ = customLoss(targetLuminance, blendedQ);
+		torch::Tensor          loss            = lossBlendFactor() * lossQ + (1.0f - lossBlendFactor()) * lossBlendedQ;
+		loss = sigmoidClamp(loss, settings->lossClamp, 0.01f);
 
 		switch (settings->lossReduction)
 		{
@@ -487,6 +529,83 @@ namespace vtx::network
 
 			graphs.addData(SAMPLING_PROB_PLOT, "BSDF Prob", bsdfProb.mean().unsqueeze(-1).item<float>());
 			graphs.addData(SAMPLING_PROB_PLOT, "Blended Prob", blendedQ.mean().unsqueeze(-1).item<float>());
+
+			if (settings->scaleBySampleProb)
+			{
+				graphs.addData("Overall Prob", "Iteration", "Prob", "Overall Sample Prob", sampleProb.mean().unsqueeze(-1).item<float>());
+			}
+
+		}
+
+
+		TRACE_TENSOR(blendedQ);
+		TRACE_TENSOR(lossQ);
+		TRACE_TENSOR(lossBlendedQ);
+		TRACE_TENSOR(loss);
+		return loss;
+	}
+	torch::Tensor PGNet::guidingLoss(const torch::Tensor& neuralProb, torch::Tensor& bsdfProb, const torch::Tensor& outRadiance, const torch::Tensor& c, const torch::Tensor& sampleProb)
+	{
+		//const auto mask = bsdfProb > 100.0f; // Replace `threshold` with your threshold value
+		//const auto neuralProbNoGrad = neuralProb.detach();
+		//const auto neuralProbConditional = torch::where(mask, neuralProbNoGrad, neuralProb);
+
+		//auto bsdfProbClamped = torch::clamp(bsdfProb, 0.0f, 1.0f);
+
+		const torch::Tensor targetLuminance = settings->targetScale*(outRadiance * ntscLuminance).sum(-1, true);
+		const torch::Tensor lossQ = customLoss(targetLuminance, neuralProb);
+		if(settings->clampBsdfProb)
+		{
+			bsdfProb = torch::min(bsdfProb, targetLuminance);
+		}
+		const torch::Tensor blendedQ = c * neuralProb + (1 - c) * bsdfProb;
+		torch::Tensor lossBlendedQ = customLoss(targetLuminance, blendedQ);
+		if(settings->scaleLossBlendedQ)
+		{
+			lossBlendedQ  = lossBlendedQ / (bsdfProb + 0.01);
+		}
+
+		torch::Tensor loss = lossBlendFactor() * lossQ + (1.0f - lossBlendFactor()) * lossBlendedQ;
+
+		if(settings->scaleBySampleProb)
+		{
+			loss /= (sampleProb+0.01);
+		}
+		loss = sigmoidClamp(loss, settings->lossClamp, 0.01f);
+		switch (settings->lossReduction)
+		{
+		case config::SUM:
+			loss = loss.sum();
+			break;
+		case config::MEAN:
+			loss = loss.mean();
+			break;
+		case config::ABS:
+			loss = torch::abs(loss);
+			break;
+		default:
+			VTX_ERROR("Loss Reduction Not implemented");
+		}
+
+		TRACE_TENSOR(loss);
+
+		if (settings->plotGraphs)
+		{
+			graphs.addData(LOSS_PLOT, "Path Guiding Loss", loss.unsqueeze(-1).item<float>());
+			graphs.addData(LOSS_PLOT, "Loss Q", lossQ.mean().unsqueeze(-1).item<float>());
+			graphs.addData(LOSS_PLOT, "Loss Blended Q", lossBlendedQ.mean().unsqueeze(-1).item<float>());
+
+			graphs.addData(PROB_PLOT, "Neural Prob", neuralProb.mean().unsqueeze(-1).item<float>());
+			graphs.addData(PROB_PLOT, "Target Prob", targetLuminance.mean().unsqueeze(-1).item<float>());
+
+			graphs.addData(SAMPLING_PROB_PLOT, "BSDF Prob", bsdfProb.mean().unsqueeze(-1).item<float>());
+			graphs.addData(SAMPLING_PROB_PLOT, "Blended Prob", blendedQ.mean().unsqueeze(-1).item<float>());
+
+			if (settings->scaleBySampleProb)
+			{
+				graphs.addData("Overall Prob", "Iteration", "Prob", "Overall Sample Prob", sampleProb.mean().unsqueeze(-1).item<float>());
+			}
+
 		}
 
 
@@ -515,18 +634,7 @@ namespace vtx::network
 		const torch::Tensor luminance = (radiance * ntscLuminance).sum(-1, true).detach();
 		const torch::Tensor predictionSqPlusEpsilon = torch::pow(luminance, 2) + 0.01f;
 		const torch::Tensor relativeL2 = torch::pow(difference, 2) / predictionSqPlusEpsilon;
-		const torch::Tensor relativeL2Mean = relativeL2.mean();
-
-		//PRINT_TENSOR_SLICE(radiance);
-		//PRINT_TENSOR_SLICE(radianceTarget);
-		//PRINT_TENSOR_SLICE(scaledTarget);
-		//PRINT_TENSOR_SLICE(difference);
-		//PRINT_TENSOR_SLICE(luminance);
-		//PRINT_TENSOR_SLICE(predictionSqPlusEpsilon);
-		//PRINT_TENSOR_SLICE(relativeL2);
-		//PRINT_TENSOR_ALWAYS("relativeL2Mean", relativeL2Mean);
-
-		//PRINT_TENSOR_ALWAYS("Loss Radiance", radiance, radianceTarget, squaredLuminance, relativeL2);
+		const torch::Tensor relativeL2Mean = relativeL2;// .mean();
 
 		TRACE_TENSOR(relativeL2);
 
@@ -571,13 +679,13 @@ namespace vtx::network
 		const torch::Tensor lossOutRadiance = outRadScale * relativeL2LossRadiance(outRadiance, outRadianceTarget);
 		const torch::Tensor lossThroughput = throughputScale * relativeL2LossThroughput(throughput, throughputTarget);
 
-		torch::Tensor loss = settings->auxiliaryWeight * (lossInRadiance +  lossOutRadiance +  lossThroughput);
+		torch::Tensor loss =( settings->auxiliaryWeight * (lossInRadiance +  lossOutRadiance +  lossThroughput)).mean();
 
 		if (settings->plotGraphs)
 		{
-			graphs.addData("Auxiliary Loss","Iteration","Loss", "Input Radiance loss", lossInRadiance.item<float>());
-			graphs.addData("Auxiliary Loss", "Iteration", "Loss", "Output Radiance loss", lossOutRadiance.item<float>());
-			graphs.addData("Auxiliary Loss", "Iteration", "Loss", "Throughput loss", lossThroughput.item<float>());
+			graphs.addData("Auxiliary Loss","Iteration","Loss", "Input Radiance loss", lossInRadiance.mean().item<float>());
+			graphs.addData("Auxiliary Loss", "Iteration", "Loss", "Output Radiance loss", lossOutRadiance.mean().item<float>());
+			graphs.addData("Auxiliary Loss", "Iteration", "Loss", "Throughput loss", lossThroughput.mean().item<float>());
 			graphs.addData("Auxiliary Loss", "Iteration", "Loss", "Total loss", loss.item<float>());
 		}
 		TRACE_TENSOR(loss);

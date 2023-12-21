@@ -209,12 +209,14 @@ namespace vtx::device
 	void DeviceDataCoordinator::syncNode(const std::shared_ptr<graph::EnvironmentLight>& envLight)
 	{
 		//TODO : Check if the mesh has been updated
-		if (const vtxID lightId = envLight->getUID(); !lightDataMap.contains(lightId)) {
+		if (const vtxID lightId = envLight->getUID(); !lightDataMap.contains(lightId) || envLight->transform->state.updateOnDevice || envLight->state.updateOnDevice
+			) {
 			LightData lightData = createEnvLightData(envLight);
 			// TODO : How do we handle the presence of another env Light?
 			lightData.use = true;
 			lightDataMap.insert(lightId, lightData);
 			launchParamsData.editableHostImage().envLight = lightDataMap[lightId].getDeviceImage();
+			ops::restartRender();
 		}
 	}
 	void DeviceDataCoordinator::cleanDeletedNodes()

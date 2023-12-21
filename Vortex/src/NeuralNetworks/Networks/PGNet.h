@@ -12,7 +12,7 @@ namespace vtx::network
 		torch::Tensor position = torch::Tensor();
 		torch::Tensor wo = torch::Tensor();
 		torch::Tensor normal = torch::Tensor();
-		torch::Tensor incomingDirection = torch::Tensor();
+		torch::Tensor wi = torch::Tensor();
 		torch::Tensor bsdfProb = torch::Tensor();
 		torch::Tensor outRadiance = torch::Tensor();
 		torch::Tensor throughput = torch::Tensor();
@@ -20,6 +20,7 @@ namespace vtx::network
 		torch::Tensor instanceId = torch::Tensor();
 		torch::Tensor triangleId = torch::Tensor();
 		torch::Tensor materialId = torch::Tensor();
+		torch::Tensor sampleProb = torch::Tensor();
 	};
 
 	struct InputDataPointers
@@ -27,7 +28,7 @@ namespace vtx::network
 		float* position          = nullptr;
 		float* wo                = nullptr;
 		float* normal            = nullptr;
-		float* incomingDirection = nullptr;
+		float* wi = nullptr;
 		float* bsdfProb          = nullptr;
 		float* outRadiance       = nullptr;
 		float* throughput        = nullptr;
@@ -35,6 +36,7 @@ namespace vtx::network
 		float* instanceId		 = nullptr;
 		float* materialId		 = nullptr;
 		float* triangleId		 = nullptr;
+		float* sampleProb		 = nullptr;
 	};
 
 	class PGNet : public NetworkImplementation
@@ -71,8 +73,9 @@ namespace vtx::network
 			torch::Tensor& rawMixtureParameters, const torch::Tensor& rawMixtureWeights,
 			const torch::Tensor& rawSamplingFraction);
 		std::tuple<torch::Tensor, torch::Tensor, torch::Tensor> guidingForward(const torch::Tensor& rawOutput);
+		torch::Tensor gudingLossIncomingRadiance(const torch::Tensor& neuralProb, torch::Tensor& bsdfProb, const torch::Tensor& outRadiance, const torch::Tensor& c, const torch::Tensor& sampleProb);
 		torch::Tensor guidingLoss(const torch::Tensor& neuralProb, torch::Tensor& bsdfProb,
-								  const torch::Tensor& outRadiance, const torch::Tensor& c);
+								  const torch::Tensor& outRadiance, const torch::Tensor& c, const torch::Tensor& sampleProb);
 		std::tuple<torch::Tensor, torch::Tensor, torch::Tensor> splitAuxiliaryOutput(
 			const torch::Tensor& rawAuxiliaryOutput);
 		torch::Tensor relativeL2LossRadiance(const torch::Tensor& radiance, const torch::Tensor& radianceTarget);

@@ -177,6 +177,7 @@ namespace vtx {
         AliasData* aliasMap;
         math::affine3f    transformation;
         math::affine3f    invTransformation;
+        float scaleLuminosity;
     };
 
     struct MeshLightAttributesData

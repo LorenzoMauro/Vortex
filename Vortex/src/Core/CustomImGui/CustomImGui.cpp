@@ -293,6 +293,31 @@ namespace vtx::vtxImGui
         return vtxImGui::halfSpaceWidget(label, ImGui::DragFloat, (hiddenLabel + label).c_str(), v, v_speed, v_min, v_max, format, flags);
     }
 
+    bool halfSpaceIntCombo(const char* label, int& intVariable, const std::vector<int>& options)
+    {
+        const int nOptions = options.size();
+        std::vector<std::string> stringOptions(nOptions);
+        std::vector<const char*> charOptions(nOptions);
+        int optionIndex = 0;
+        for (int i = 0; i < nOptions; ++i)
+        {
+            const int opt = options[i];
+            stringOptions[i] = std::to_string(opt);
+            charOptions[i] = stringOptions[i].c_str();
+            if (intVariable == opt)
+            {
+                optionIndex = i;
+            }
+        }
+
+        if (vtxImGui::halfSpaceWidget(label, (ComboFuncType)ImGui::Combo, (hiddenLabel + label).c_str(), &optionIndex, charOptions.data(), nOptions, -1))
+        {
+            intVariable = std::stoi(stringOptions[optionIndex]);
+            return true;
+        }
+        return false;
+    }
+
     bool halfSpaceCheckbox(const char* label, bool* v)
     {
         return vtxImGui::halfSpaceWidget(label, ImGui::Checkbox, (hiddenLabel + label).c_str(), v);

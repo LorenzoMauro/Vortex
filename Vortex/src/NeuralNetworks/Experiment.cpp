@@ -5,10 +5,12 @@
 #include <unordered_set>
 
 #include "Core/Application.h"
+#include "Device/OptixWrapper.h"
 #include "Device/UploadCode/DeviceDataCoordinator.h"
 #include "Gui/Windows/ExperimentsWindow.h"
 #include "Scene/Nodes/Renderer.h"
 #include "Device/CudaFunctions/cudaFunctions.h"
+#include "Device/DevicePrograms/CudaKernels.h"
 #include "Serialization/Serializer.h"
 
 static std::random_device rd;  // Obtain a random number from hardware
@@ -24,7 +26,7 @@ namespace vtx
 		hash << stringHash(config.strategy);
 		hash << stringHash(config.weightByMis);
 		hash << stringHash(config.lightSamplingProb);
-		hash << stringHash(config.isUpdated);
+		hash << stringHash(config.limitToFirstBounce);
 		return hash.str();
 	}
 
@@ -145,6 +147,7 @@ namespace vtx
 		if(settings.constantBlendFactor)
 		{
 			hash << stringHash(settings.blendFactor);
+			hash << stringHash(settings.fractionBlendTrainPercentage);
 		}
 		hash << stringHash(settings.samplingFractionBlend);
 		hash << stringHash(settings.useEntropyLoss);
@@ -183,6 +186,13 @@ namespace vtx
 		}
 		hash << stringHash(settings.scaleLossBlendedQ);
 		hash << stringHash(settings.clampBsdfProb);
+		hash << stringHash(settings.scaleBySampleProb);
+
+		hash << stringHash(settings.learnInputRadiance);
+		if(settings.learnInputRadiance)
+		{
+			hash << stringHash(settings.lossClamp);
+		}
 
 		return hash.str();
 	}
@@ -362,6 +372,7 @@ namespace vtx
 		mutate(setting, learningRates, &NetworkSettings::learningRate, newNetworkSettings);
 		mutate(setting, lossTypes, &NetworkSettings::lossType, newNetworkSettings);
 		mutateNested(setting, { false, true }, &BatchGenerationConfig::weightByMis, &NetworkSettings::trainingBatchGenerationSettings, newNetworkSettings);
+		mutateNested(setting, { false, true }, &BatchGenerationConfig::limitToFirstBounce, &NetworkSettings::trainingBatchGenerationSettings, newNetworkSettings);
 
 		// ENTROPY LOSS MUTATION
 		mutate(setting, { true, false }, &NetworkSettings::useEntropyLoss, newNetworkSettings);
@@ -421,13 +432,22 @@ namespace vtx
 		mutate(setting, { true, false }, &NetworkSettings::clampBsdfProb, newNetworkSettings);
 		mutate(setting, { true, false }, &NetworkSettings::samplingFractionBlend, newNetworkSettings);
 		mutate(setting, { true, false }, &NetworkSettings::constantBlendFactor, newNetworkSettings);
+		mutate(setting, { true, false }, &NetworkSettings::scaleBySampleProb, newNetworkSettings);
 		if(setting.constantBlendFactor)
 		{
 			mutate(setting, { 1.0f, 0.99f, 0.9f, 0.8f, 0.5f }, &NetworkSettings::blendFactor, newNetworkSettings);
+			mutate(setting, { 0.1f, 0.15f, 0.2f, 0.3f }, &NetworkSettings::fractionBlendTrainPercentage, newNetworkSettings);
 		}
 		mutate(setting, { true, false }, &NetworkSettings::constantBlendFactor, newNetworkSettings);
 
-		//mutateNested(setting, {0.0f, 0.5f, 0.75f, 1.0f}, &BatchGenerationConfig::lightSamplingProb, & NetworkSettings::trainingBatchGenerationSettings, newNetworkSettings);
+		mutateNested(setting, {0.0f, 0.5f, 0.75f, 1.0f}, &BatchGenerationConfig::lightSamplingProb, & NetworkSettings::trainingBatchGenerationSettings, newNetworkSettings);
+
+		mutate(setting, { true, false }, &NetworkSettings::learnInputRadiance, newNetworkSettings);
+		if (setting.learnInputRadiance)
+		{
+			mutate(setting, { 50.0f, 100.0f, 200.0f, 400.0f, 600.0f}, &NetworkSettings::lossClamp, newNetworkSettings);
+		}
+		mutate(setting, { true, false }, &NetworkSettings::constantBlendFactor, newNetworkSettings);
 
 		std::shuffle(newNetworkSettings.begin(), newNetworkSettings.end(), g);
 		return newNetworkSettings;
@@ -443,7 +463,7 @@ namespace vtx
 			newExperiment.networkSettings = networkSetting;
 			//newExperiment.rendererSettings.samplingTechnique = S_MIS;
 			//newExperiments.push_back(newExperiment);
-			newExperiment.rendererSettings.samplingTechnique = S_BSDF;
+			//newExperiment.rendererSettings.samplingTechnique = S_BSDF;
 			newExperiments.push_back(newExperiment);
 		}
 		return newExperiments;
@@ -470,30 +490,38 @@ namespace vtx
 		bestGuessNetworkSettings.mainNetSettings.hiddenDim = 128;
 		bestGuessNetworkSettings.mainNetSettings.numHiddenLayers = 3;
 
-		bestGuessNetworkSettings.inputSettings.normalizePosition = true;
-		bestGuessNetworkSettings.inputSettings.position.otype = EncodingType::Frequency;
-		bestGuessNetworkSettings.inputSettings.position.frequencyEncoding.n_frequencies = 6;
+		{
+			bestGuessNetworkSettings.inputSettings.normalizePosition = true;
+			bestGuessNetworkSettings.inputSettings.position.otype = EncodingType::Grid; //EncodingType::Frequency;
+			bestGuessNetworkSettings.inputSettings.normal.gridEncoding.n_levels = 16;
+			bestGuessNetworkSettings.inputSettings.normal.gridEncoding.n_features_per_level = 4;
+			bestGuessNetworkSettings.inputSettings.normal.gridEncoding.log2_hashmap_size = 19;
+			bestGuessNetworkSettings.inputSettings.normal.gridEncoding.base_resolution = 8;
+			bestGuessNetworkSettings.inputSettings.normal.gridEncoding.per_level_scale = 2.0f;
+			bestGuessNetworkSettings.inputSettings.normal.gridEncoding.interpolation = InterpolationType::Smoothstep;
+		}
+		{
+			bestGuessNetworkSettings.inputSettings.normal.otype = EncodingType::OneBlob;
+			bestGuessNetworkSettings.inputSettings.normal.gridEncoding.type = GridType::Hash;
+			bestGuessNetworkSettings.inputSettings.normal.gridEncoding.n_levels = 16;
+			bestGuessNetworkSettings.inputSettings.normal.gridEncoding.n_features_per_level = 1;
+			bestGuessNetworkSettings.inputSettings.normal.gridEncoding.log2_hashmap_size = 19;
+			bestGuessNetworkSettings.inputSettings.normal.gridEncoding.base_resolution = 16;
+			bestGuessNetworkSettings.inputSettings.normal.gridEncoding.per_level_scale = 4.0f;
+			bestGuessNetworkSettings.inputSettings.normal.gridEncoding.interpolation = InterpolationType::Linear;
+		}
+		{
+			bestGuessNetworkSettings.inputSettings.wo.otype = EncodingType::Grid;
+			bestGuessNetworkSettings.inputSettings.wo.frequencyEncoding.n_frequencies = 12;
 
-		bestGuessNetworkSettings.inputSettings.normal.otype = EncodingType::Grid;
-		bestGuessNetworkSettings.inputSettings.normal.gridEncoding.type = GridType::Tiled;
-		bestGuessNetworkSettings.inputSettings.normal.gridEncoding.n_levels = 16;
-		bestGuessNetworkSettings.inputSettings.normal.gridEncoding.n_features_per_level = 1;
-		bestGuessNetworkSettings.inputSettings.normal.gridEncoding.log2_hashmap_size = 19;
-		bestGuessNetworkSettings.inputSettings.normal.gridEncoding.base_resolution = 16;
-		bestGuessNetworkSettings.inputSettings.normal.gridEncoding.per_level_scale = 4.0f;
-		bestGuessNetworkSettings.inputSettings.normal.gridEncoding.interpolation = InterpolationType::Smoothstep;
-
-
-		bestGuessNetworkSettings.inputSettings.wo.otype = EncodingType::Frequency;
-		bestGuessNetworkSettings.inputSettings.wo.frequencyEncoding.n_frequencies = 12;
-
-		bestGuessNetworkSettings.inputSettings.wo.gridEncoding.type = GridType::Hash;
-		bestGuessNetworkSettings.inputSettings.wo.gridEncoding.n_levels = 32;
-		bestGuessNetworkSettings.inputSettings.wo.gridEncoding.n_features_per_level = 4;
-		bestGuessNetworkSettings.inputSettings.wo.gridEncoding.log2_hashmap_size = 19;
-		bestGuessNetworkSettings.inputSettings.wo.gridEncoding.base_resolution = 32;
-		bestGuessNetworkSettings.inputSettings.wo.gridEncoding.per_level_scale = 2.0f;
-		bestGuessNetworkSettings.inputSettings.wo.gridEncoding.interpolation = InterpolationType::Nearest;
+			bestGuessNetworkSettings.inputSettings.wo.gridEncoding.type = GridType::Hash;
+			bestGuessNetworkSettings.inputSettings.wo.gridEncoding.n_levels = 32;
+			bestGuessNetworkSettings.inputSettings.wo.gridEncoding.n_features_per_level = 4;
+			bestGuessNetworkSettings.inputSettings.wo.gridEncoding.log2_hashmap_size = 19;
+			bestGuessNetworkSettings.inputSettings.wo.gridEncoding.base_resolution = 32;
+			bestGuessNetworkSettings.inputSettings.wo.gridEncoding.per_level_scale = 2.0f;
+			bestGuessNetworkSettings.inputSettings.wo.gridEncoding.interpolation = InterpolationType::Linear;
+		}
 
 
 		bestGuessNetworkSettings.distributionType = D_NASG_AXIS_ANGLE;
@@ -501,36 +529,41 @@ namespace vtx
 
 		//AUXILIARY NETWORK SETTINGS
 
-		bestGuessNetworkSettings.useAuxiliaryNetwork = false;// false;// false;
-		bestGuessNetworkSettings.totAuxInputSize = 64;
-		bestGuessNetworkSettings.auxiliaryNetSettings.hiddenDim = 64;
-		bestGuessNetworkSettings.auxiliaryNetSettings.numHiddenLayers = 3;
+		{
+			bestGuessNetworkSettings.useAuxiliaryNetwork = false;// false;// false;
+			bestGuessNetworkSettings.totAuxInputSize = 64;
+			bestGuessNetworkSettings.auxiliaryNetSettings.hiddenDim = 64;
+			bestGuessNetworkSettings.auxiliaryNetSettings.numHiddenLayers = 3;
 
-		bestGuessNetworkSettings.auxiliaryInputSettings.wi.otype = EncodingType::Grid;
-		bestGuessNetworkSettings.auxiliaryInputSettings.wi.gridEncoding.type = GridType::Hash;
-		bestGuessNetworkSettings.auxiliaryInputSettings.wi.gridEncoding.n_levels = 16;
-		bestGuessNetworkSettings.auxiliaryInputSettings.wi.gridEncoding.n_features_per_level = 2;
-		bestGuessNetworkSettings.auxiliaryInputSettings.wi.gridEncoding.log2_hashmap_size = 19;
-		bestGuessNetworkSettings.auxiliaryInputSettings.wi.gridEncoding.base_resolution = 16;
-		bestGuessNetworkSettings.auxiliaryInputSettings.wi.gridEncoding.per_level_scale = 2.0f;
-		bestGuessNetworkSettings.auxiliaryInputSettings.wi.gridEncoding.interpolation = InterpolationType::Linear;
+			bestGuessNetworkSettings.auxiliaryInputSettings.wi.otype = EncodingType::Grid;
+			bestGuessNetworkSettings.auxiliaryInputSettings.wi.gridEncoding.type = GridType::Hash;
+			bestGuessNetworkSettings.auxiliaryInputSettings.wi.gridEncoding.n_levels = 16;
+			bestGuessNetworkSettings.auxiliaryInputSettings.wi.gridEncoding.n_features_per_level = 2;
+			bestGuessNetworkSettings.auxiliaryInputSettings.wi.gridEncoding.log2_hashmap_size = 19;
+			bestGuessNetworkSettings.auxiliaryInputSettings.wi.gridEncoding.base_resolution = 16;
+			bestGuessNetworkSettings.auxiliaryInputSettings.wi.gridEncoding.per_level_scale = 2.0f;
+			bestGuessNetworkSettings.auxiliaryInputSettings.wi.gridEncoding.interpolation = InterpolationType::Linear;
 
-		bestGuessNetworkSettings.inRadianceLossFactor = 1.0f;
-		bestGuessNetworkSettings.outRadianceLossFactor = 1.0f;
-		bestGuessNetworkSettings.throughputLossFactor = 1.0f;
-		bestGuessNetworkSettings.auxiliaryWeight = 0.001f;
+			bestGuessNetworkSettings.inRadianceLossFactor = 1.0f;
+			bestGuessNetworkSettings.outRadianceLossFactor = 1.0f;
+			bestGuessNetworkSettings.throughputLossFactor = 1.0f;
+			bestGuessNetworkSettings.auxiliaryWeight = 0.001f;
+		}
 
 		// TRAINING SETTINGS
-		bestGuessNetworkSettings.learningRate = 0.005f;
-		bestGuessNetworkSettings.batchSize = 256000;// 64000;
+		bestGuessNetworkSettings.learnInputRadiance = true;
+		bestGuessNetworkSettings.lossClamp = 200.0f;
+		bestGuessNetworkSettings.learningRate = 0.01f;
+		bestGuessNetworkSettings.batchSize = 512000;// 64000;
 		bestGuessNetworkSettings.trainingBatchGenerationSettings.strategy = SS_ALL;
 		bestGuessNetworkSettings.trainingBatchGenerationSettings.lightSamplingProb = 0.0f;
-		bestGuessNetworkSettings.trainingBatchGenerationSettings.weightByMis = false;
+		bestGuessNetworkSettings.trainingBatchGenerationSettings.weightByMis = true;
 		bestGuessNetworkSettings.clampBsdfProb = false;
 		bestGuessNetworkSettings.scaleLossBlendedQ = false;
-		bestGuessNetworkSettings.blendFactor = 1.0f;
+		bestGuessNetworkSettings.blendFactor = 0.8f;
 		bestGuessNetworkSettings.constantBlendFactor = false;
 		bestGuessNetworkSettings.samplingFractionBlend = false;
+		bestGuessNetworkSettings.fractionBlendTrainPercentage = 0.2;
 		bestGuessNetworkSettings.lossType = L_KL_DIV_MC_ESTIMATION;
 		bestGuessNetworkSettings.lossReduction = MEAN;
 
@@ -542,6 +575,62 @@ namespace vtx
 
 		return bestGuessNetworkSettings;
 	}
+
+
+	NetworkSettings ExperimentsManager::getSOTA()
+	{
+		NetworkSettings bestGuessNetworkSettings;
+		bestGuessNetworkSettings.active = true;
+		bestGuessNetworkSettings.doTraining = true;
+		bestGuessNetworkSettings.doInference = true;
+		bestGuessNetworkSettings.plotGraphs = true;
+		bestGuessNetworkSettings.isUpdated = true;
+		bestGuessNetworkSettings.depthToDebug = 0;
+		bestGuessNetworkSettings.maxTrainingSteps = 1000;
+		bestGuessNetworkSettings.inferenceIterationStart = 1;
+		bestGuessNetworkSettings.clearOnInferenceStart = false;
+
+
+		bestGuessNetworkSettings.useTriangleId = false;
+		bestGuessNetworkSettings.useInstanceId = false;
+		bestGuessNetworkSettings.useMaterialId = false;
+
+		bestGuessNetworkSettings.mainNetSettings.hiddenDim = 128;
+		bestGuessNetworkSettings.mainNetSettings.numHiddenLayers = 4;
+
+		bestGuessNetworkSettings.inputSettings.normalizePosition = true;
+		bestGuessNetworkSettings.inputSettings.position.otype = EncodingType::OneBlob;
+		bestGuessNetworkSettings.inputSettings.normal.otype = EncodingType::Identity;
+		bestGuessNetworkSettings.inputSettings.wo.otype = EncodingType::Identity;
+
+
+		bestGuessNetworkSettings.distributionType = D_NASG_TRIG;
+		bestGuessNetworkSettings.mixtureSize = 4;// 5;// 3;
+
+		//AUXILIARY NETWORK SETTINGS
+
+		bestGuessNetworkSettings.useAuxiliaryNetwork = false;
+
+		// TRAINING SETTINGS
+		bestGuessNetworkSettings.learningRate = 0.001f;
+		bestGuessNetworkSettings.batchSize = 512000;// 64000;
+		bestGuessNetworkSettings.trainingBatchGenerationSettings.strategy = SS_ALL;
+		bestGuessNetworkSettings.trainingBatchGenerationSettings.lightSamplingProb = 0.0f;
+		bestGuessNetworkSettings.trainingBatchGenerationSettings.weightByMis = true;
+		bestGuessNetworkSettings.clampBsdfProb = false;
+		bestGuessNetworkSettings.scaleLossBlendedQ = false;
+		bestGuessNetworkSettings.blendFactor = 0.8f;
+		bestGuessNetworkSettings.constantBlendFactor = true;
+		bestGuessNetworkSettings.samplingFractionBlend = true;
+		bestGuessNetworkSettings.fractionBlendTrainPercentage = 0.2;
+		bestGuessNetworkSettings.lossType = L_KL_DIV_MC_ESTIMATION;
+		bestGuessNetworkSettings.lossReduction = MEAN;
+
+		bestGuessNetworkSettings.useEntropyLoss = false;
+
+		return bestGuessNetworkSettings;
+	}
+
 	std::tuple<Experiment, Experiment, Experiment, Experiment, Experiment>
 	ExperimentsManager::startingConfigExperiments(const std::shared_ptr<graph::Renderer>& renderer)
 	{
@@ -550,22 +639,35 @@ namespace vtx
 		groundTruthExp.rendererSettings.samplingTechnique = S_MIS;
 		groundTruthExp.rendererSettings.maxBounces = 8;
 		groundTruthExp.rendererSettings.maxSamples = gtSamples;
+		groundTruthExp.rendererSettings.denoiserSettings.active = true;
+
+		groundTruthExp.wavefrontSettings = renderer->waveFrontIntegrator.settings;
 		groundTruthExp.wavefrontSettings.active = true;
+		groundTruthExp.wavefrontSettings.fitWavefront = false;
+		groundTruthExp.wavefrontSettings.optixShade = false;
+		groundTruthExp.wavefrontSettings.parallelShade = false;
+		groundTruthExp.wavefrontSettings.longPathPercentage = 0.25f;
+		groundTruthExp.wavefrontSettings.useLongPathKernel = false;
+
 		groundTruthExp.networkSettings = getBestGuess();
 		groundTruthExp.networkSettings.active = false;
 
 		Experiment bsdfExperiment = groundTruthExp;
 		bsdfExperiment.rendererSettings.samplingTechnique = S_BSDF;
 		bsdfExperiment.rendererSettings.maxSamples = testSamples;
+		bsdfExperiment.rendererSettings.denoiserSettings.active = false;
 
 		Experiment misExperiment = groundTruthExp;
 		misExperiment.rendererSettings.maxSamples = testSamples;
+		misExperiment.rendererSettings.denoiserSettings.active = false;
 
 		Experiment bestGuessBsdf = bsdfExperiment;
 		bestGuessBsdf.networkSettings.active = true;
+		bestGuessBsdf.rendererSettings.denoiserSettings.active = false;
 
 		Experiment bestGuessMis = misExperiment;
-		bestGuessBsdf.networkSettings.active = true;
+		bestGuessMis.networkSettings.active = true;
+		bestGuessMis.rendererSettings.denoiserSettings.active = false;
 
 		return { groundTruthExp, misExperiment, bsdfExperiment, bestGuessBsdf, bestGuessMis };
 	}
@@ -685,28 +787,39 @@ namespace vtx
 			app->batchExperimentAppLoopBody(i, renderer);
 		}
 		{
+			CUDABuffer& gtBuffer = optix::getState()->denoiser.output;
 			const size_t imageSize = (size_t)width * (size_t)height * sizeof(math::vec3f);
 
 			groundTruthBuffer.resize(imageSize);
+			toneMapBuffer(gtBuffer, groundTruthBuffer, width, height, onDeviceData->launchParamsData.getHostImage().settings.renderer.toneMapperSettings);
+
+
 			groundTruth = groundTruthBuffer.castedPointer<math::vec3f>();
-			const void* groundTruthRendered = onDeviceData->launchParamsData.getHostImage().frameBuffer.tmRadiance;
+			//const void* groundTruthRendered = gtBuffer.castedPointer<math::vec3f>();
+			//cudaError_t        error = cudaMemcpy((void*)groundTruth, groundTruthRendered, imageSize, cudaMemcpyDeviceToDevice);
 
-			cudaError_t        error = cudaMemcpy((void*)groundTruth, groundTruthRendered, imageSize, cudaMemcpyDeviceToDevice);
 			groundTruthHost = std::vector<float>((size_t)width * (size_t)height * 3);
-			onDeviceData->frameBufferData.resourceBuffers.tmRadiance.download(groundTruthHost.data());
+			groundTruthBuffer.download(groundTruthHost.data());
 			isGroundTruthReady = true;
-
 			currentExperimentStep = 0;
+
+			Image(groundTruthBuffer, width, height, 3).save(getImageSavePath("groundTruth.png"));
+
 		}
 	}
 
-	bool ExperimentsManager::performExperiment(Experiment& experiment, Application* app, const std::shared_ptr<graph::Renderer>& renderer) {
+	bool ExperimentsManager::performExperiment(Experiment& experiment, Application* app, const std::shared_ptr<graph::Renderer>& renderer)
+	{
+		experiment.constructName(experiments.size());
+		experiment.generatedByBatchExperiments = true;
+		experiment.displayExperiment = true;
+
+		bool success = false;
 
 		constexpr int      maxRetries = 3;
-		const std::string& name       = experiment.name;
-		constexpr int      nTries     = 3;
-		int                tryCount   = 0;
-		while (tryCount < nTries)
+		const std::string& name = experiment.name;
+		int                tryCount = 0;
+		while (tryCount < maxRetries)
 		{
 			try
 			{
@@ -718,14 +831,24 @@ namespace vtx
 				for (int i = 0; i < renderer->settings.maxSamples; i++)
 				{
 					app->batchExperimentAppLoopBody(i, renderer);
-					const float mape = cuda::computeMape(groundTruth, onDeviceData->launchParamsData.getHostImage().frameBuffer.tmRadiance, width, height);
+					float mape;
+					if (experiment.rendererSettings.denoiserSettings.active)
+					{
+						toneMapBuffer(optix::getState()->denoiser.output, rendererImageBufferToneMapped, width, height, onDeviceData->launchParamsData.getHostImage().settings.renderer.toneMapperSettings);
+						mape = cuda::computeMse(groundTruth, rendererImageBufferToneMapped.castedPointer<math::vec3f>(), width, height);
+					}
+					else
+					{
+						mape = cuda::computeMse(groundTruth, onDeviceData->launchParamsData.getHostImage().frameBuffer.tmRadiance, width, height);
+					}
 					experiment.mape.push_back(mape);
 					mapeSum += mape;
 					if (glfwWindowShouldClose(app->glfwWindow))
 						return false;
 				}
 				experiment.averageMape = mapeSum / (float)renderer->settings.maxSamples;
-				return true;
+				success = true;
+				break;
 			}
 			catch (std::exception& e)
 			{
@@ -737,10 +860,45 @@ namespace vtx
 			}
 			tryCount++;
 		}
-		
-		return false;
-	}
 
+		bool breakLoop = false;
+		if (success)
+		{
+			Image(onDeviceData->frameBufferData.resourceBuffers.tmRadiance, width, height, 3).save(getImageSavePath(experiment.name));
+			if(renderer->settings.denoiserSettings.active)
+			{
+				Image(rendererImageBufferToneMapped, width, height, 3).save(getImageSavePath(experiment.name + "_DENOISED"));
+			}
+			experiment.statistics = renderer->statistics;
+			float mapeScore = experiment.mape.back();
+			experimentMinHeap.push({ mapeScore, experiments.size() - 1 });
+			experimentSet.insert(experiment.getStringHashKey());
+			experiment.completed = true;
+			VTX_INFO("\tExperiment {} finished with MAPE {} Overall {} best Overall Mape is {}", experiment.name, experiment.averageMape, mapeScore, bestMapeScore);
+			if (mapeScore < bestMapeScore && experiment.networkSettings.active)
+			{
+				VTX_INFO("\t\tNew best experiment {} with MAPE {}", experiment.name, experiment.averageMape);
+				VTX_INFO("\t\tBreaking and Searching from this!");
+				bestMapeScore = mapeScore;
+				bestExperimentIndex = experiments.size() - 1;
+				experiment.displayExperiment = true;
+				breakLoop = true;
+			}
+			else if (experiment.networkSettings.active)
+			{
+				experiment.displayExperiment = false;
+			}
+		}
+		else
+		{
+			VTX_ERROR("Experiment {} failed", experiment.name);
+			experiment.completed = false;
+			experiment.displayExperiment = false;
+		}
+		vtx::serializer::serializeBatchExperiments(saveFilePath);
+
+		return breakLoop;
+	}
 	void ExperimentsManager::refillExperimentQueue()
 	{
 		bool firstRun = true;
@@ -751,7 +909,7 @@ namespace vtx
 			while (!experimentMinHeap.empty())
 			{
 				const int minIndex = experimentMinHeap.top().second; experimentMinHeap.pop();
-				if (experiments[minIndex].networkSettings.active && experiments[minIndex].rendererSettings.samplingTechnique != S_MIS)
+				if (experiments[minIndex].networkSettings.active)
 				{
 					bestIndex = minIndex;
 					break;
@@ -799,25 +957,42 @@ namespace vtx
 		renderer->camera->resize(width, height);
 		renderer->camera->lockCamera = true;
 
+		rendererImageBufferToneMapped.resize((size_t)width * (size_t)height * sizeof(math::vec3f));
+
 
 		// for each Scene
 		{
 			auto [gtExperiment, misExperiment, bsdfExperiment, bestGuessBsdf, bestGuessMis] = startingConfigExperiments(renderer);
 			//experimentQueue.push_back(misExperiment);
 			//experimentQueue.push_back(bestGuessMis);
-			if (experimentSet.count(bsdfExperiment.getStringHashKey()) == 0)
+
+			//auto noNetworkExperiment = bsdfExperiment;
+			//auto networkExperiment = bsdfExperiment;
+
+			auto noNetworkExperiment = misExperiment;
+			auto networkExperiment = bestGuessMis;
+
+			//noNetworkExperiment.rendererSettings.denoiserSettings.active = true;
+			//networkExperiment.rendererSettings.denoiserSettings.active = true;
+
+			auto net2Exp = networkExperiment;
+			net2Exp.networkSettings.learnInputRadiance = false;
+			if (experimentSet.count(net2Exp.getStringHashKey()) == 0)
 			{
-				experimentQueue.push_back(bsdfExperiment);
+				experimentQueue.push_front(net2Exp);
 			}
-			if (experimentSet.count(bestGuessBsdf.getStringHashKey()) == 0)
+			//if (experimentSet.count(networkExperiment.getStringHashKey()) == 0)
+			//{
+			//	experimentQueue.push_front(networkExperiment);
+			//}
+			if (experimentSet.count(noNetworkExperiment.getStringHashKey()) == 0)
 			{
-				experimentQueue.push_back(bestGuessBsdf);
+				experimentQueue.push_front(noNetworkExperiment);
 			}
 
 			if(!(isGroundTruthReady && groundTruthBuffer.bytesSize()!=0))
 			{
 				generateGroundTruth(gtExperiment, app, renderer);
-				Image(renderedImageBuffer, lPHost.frameBuffer.frameSize.x, lPHost.frameBuffer.frameSize.y, 3).save(getImageSavePath("groundTruth.png"));
 				experimentSet.insert(gtExperiment.getStringHashKey());
 			}
 			else
@@ -830,54 +1005,22 @@ namespace vtx
 				refillExperimentQueue();
 			}
 
+			auto sotaExperiment = networkExperiment;
+			sotaExperiment.networkSettings = getSOTA();
+			if(experimentSet.count(sotaExperiment.getStringHashKey()) == 0)
+			{
+				experiments.push_back(sotaExperiment);
+				performExperiment(experiments.back(), app, renderer);
+			}
+
 			while (!experimentQueue.empty() && !glfwWindowShouldClose(app->glfwWindow))
 			{
 				const int queueSize = experimentQueue.size();
 				for (int i = 0; i < queueSize; i++)
 				{
 					experiments.push_back(experimentQueue.front()); experimentQueue.pop_front();
-					auto& experiment = experiments.back();
-					experiment.constructName(experiments.size());
-					experiment.generatedByBatchExperiments = true;
-
-					const bool success = performExperiment(experiment, app, renderer);
-
-					if(success)
-					{
-						Image(renderedImageBuffer, lPHost.frameBuffer.frameSize.x, lPHost.frameBuffer.frameSize.y, 3).save(getImageSavePath(experiment.name));
-						experiment.statistics = renderer->statistics;
-						float mapeScore = experiment.averageMape + experiment.mape.back();
-						experimentMinHeap.push({ mapeScore, experiments.size() - 1 });
-						experimentSet.insert(experiment.getStringHashKey());
-						experiment.completed = true;
-						VTX_INFO("\tExperiment {} finished with MAPE {} Overall {} best Overall Mape is {}", experiment.name, experiment.averageMape, mapeScore, bestMapeScore);
-						if(mapeScore < bestMapeScore && experiment.networkSettings.active)
-						{
-							VTX_INFO("\t\tNew best experiment {} with MAPE {}", experiment.name, experiment.averageMape);
-							VTX_INFO("\t\tBreaking and Searching from this!");
-							bestMapeScore = mapeScore;
-							bestExperimentIndex = experiments.size() - 1;
-							vtx::serializer::serializeBatchExperiments(saveFilePath);
-							experiment.displayExperiment = true;
-							break;
-						}
-						else if (experiment.networkSettings.active)
-						{
-							experiment.displayExperiment = false;
-						}
-					}
-					else
-					{
-						VTX_ERROR("Experiment {} failed", experiment.name);
-						experiment.completed = false;
-						experiment.displayExperiment = false;
-					}
-					vtx::serializer::serializeBatchExperiments(saveFilePath);
-
-					if (glfwWindowShouldClose(app->glfwWindow))
-					{
-						break;
-					}
+					bool breakLoop = performExperiment(experiments.back(), app, renderer);
+					if (breakLoop) break;
 				}
 
 				refillExperimentQueue();

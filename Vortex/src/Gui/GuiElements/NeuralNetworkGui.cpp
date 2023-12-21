@@ -36,8 +36,8 @@ namespace vtx::gui
 	{
 		bool isUpdated = false;
 
-		vtxImGui::halfSpaceDragFloat("Scale", &config.scale, 0.1f, 0.0f, 10.0f, "%.10f", 0);
-		vtxImGui::halfSpaceDragFloat("Offset", &config.offset, 0.1f, 0.0f, 10.0f, "%.10f", 0);
+		isUpdated |= vtxImGui::halfSpaceDragFloat("Scale", &config.scale, 0.1f, 0.0f, 10.0f, "%.10f", 0);
+		isUpdated |= vtxImGui::halfSpaceDragFloat("Offset", &config.offset, 0.1f, 0.0f, 10.0f, "%.10f", 0);
 
 		return isUpdated;
 
@@ -112,6 +112,7 @@ namespace vtx::gui
 			settings.isUpdated |= vtxImGui::halfSpaceCombo("Sampling Strategy", settings.strategy, samplingStrategyNames, SS_COUNT);
 			settings.isUpdated |= vtxImGui::halfSpaceDragFloat("Light Sampling Prob", &settings.lightSamplingProb, 0.00001, 0, 1, "%.10f", 0);
 			settings.isUpdated |= vtxImGui::halfSpaceCheckbox("Weight Contribution", &settings.weightByMis);
+			settings.isUpdated |= vtxImGui::halfSpaceCheckbox("Limit To First Bounce", &settings.limitToFirstBounce);
 		}
 		
 		return settings.isUpdated;
@@ -120,7 +121,8 @@ namespace vtx::gui
 	bool GuiProvider::drawEditGui(MlpSettings& config)
 	{
 		bool isUpdated = false;
-		isUpdated |= vtxImGui::halfSpaceDragInt("Hidden Dimension", &(config.hiddenDim), 1.0f, 1, 500, "%d", 0);
+		//isUpdated |= vtxImGui::halfSpaceDragInt("Hidden Dimension", &(config.hiddenDim), 1.0f, 1, 500, "%d", 0);
+		isUpdated |= vtxImGui::halfSpaceIntCombo("Hidden Dimension", config.hiddenDim, {16, 32, 64, 128});
 		isUpdated |= vtxImGui::halfSpaceDragInt("Number of Hidden Layers", &(config.numHiddenLayers), 1.0f, 1, 10, "%d", 0);
 		return isUpdated;
 	}
@@ -164,6 +166,9 @@ namespace vtx::gui
 				settings.isUpdated |= vtxImGui::halfSpaceDragInt("Depth To Debug", &settings.depthToDebug, 1, 0, 5, "%d", 0);
 				ImGui::Unindent();
 			}
+			settings.isUpdated |= vtxImGui::halfSpaceCheckbox("Learn Input Radiance", &settings.learnInputRadiance);
+			settings.isUpdated |= vtxImGui::halfSpaceDragFloat("Loss Smooth Clamp Value", &settings.lossClamp, 1.0f, 0.f, 1000);
+
 			ImGui::SetNextItemOpen(true, ImGuiCond_Once);
 			if (ImGui::CollapsingHeader("Main Network Settings"))
 			{
@@ -228,10 +233,12 @@ namespace vtx::gui
 					ImGui::Indent();
 					settings.isUpdated |= vtxImGui::halfSpaceCheckbox("Clamp Bsdf Prob", &settings.clampBsdfProb);
 					settings.isUpdated |= vtxImGui::halfSpaceCheckbox("Scale Loss Blended", &settings.scaleLossBlendedQ);
+					settings.isUpdated |= vtxImGui::halfSpaceCheckbox("Scale By Sample Prob", &settings.scaleBySampleProb);
 
 					settings.isUpdated |= vtxImGui::halfSpaceDragFloat("Loss Blending Factor", &settings.blendFactor,	   0.00001, 0, 1, "%.10f", 0);
 					settings.isUpdated |= vtxImGui::halfSpaceCheckbox("Constant Loss Blend Factor",	  &settings.constantBlendFactor);
 					settings.isUpdated |= vtxImGui::halfSpaceCheckbox("Sampling Fraction Blend",	  &settings.samplingFractionBlend);
+					settings.isUpdated |= vtxImGui::halfSpaceDragFloat("Sampling Fraction Blend Train %", &settings.fractionBlendTrainPercentage, 0.01, 0, 1, "%.10f", 0);
 					settings.isUpdated |= vtxImGui::halfSpaceCombo("Loss Type", settings.lossType, lossNames, L_COUNT);
 					settings.isUpdated |= vtxImGui::halfSpaceCombo("Loss Reduction", settings.lossReduction,   lossReductionNames, COUNT);
 					settings.isUpdated |= vtxImGui::halfSpaceDragFloat("Target Scale", &settings.targetScale, 0.1f,	   0.0f, 1.0f);

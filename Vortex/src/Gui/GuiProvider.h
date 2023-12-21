@@ -43,6 +43,7 @@ namespace vtx
 		class Instance;
 		class Group;
 		class Mesh;
+		class EnvironmentLight;
 	}
 }
 
@@ -58,6 +59,7 @@ namespace vtx::gui
 		static bool drawEditGui(const std::shared_ptr<graph::Instance>& instance);
 		static bool drawEditGui(const std::shared_ptr<graph::Group>& group);
 		static bool drawEditGui(const std::shared_ptr<graph::Mesh>& mesh);
+		static bool drawEditGui(const std::shared_ptr<graph::EnvironmentLight>& mesh);
 
 		static bool drawEditGui(const std::shared_ptr<graph::shader::ShaderNode>& shaderNode, const bool isNodeEditor = false);
 		static bool drawEditGui(const graph::shader::ShaderNodeSocket& socket);

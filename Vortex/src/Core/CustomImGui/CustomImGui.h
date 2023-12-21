@@ -2,6 +2,8 @@
 #include <string>
 #include "imgui.h"
 #include <type_traits>
+#include <vector>
+
 #include "Core/Math.h"
 
 static const std::string hiddenLabel = "##hidden";
@@ -88,6 +90,8 @@ namespace vtx::vtxImGui
         }
         return isUpdated;
     }
+
+    bool halfSpaceIntCombo(const char* label, int& intVariable, const std::vector<int>& options);
 
     bool halfSpaceCheckbox(const char* label, bool* v);
 

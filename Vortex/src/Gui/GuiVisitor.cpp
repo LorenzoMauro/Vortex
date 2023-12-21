@@ -101,6 +101,7 @@ namespace vtx::gui
 
 	void GuiVisitor::visit(const std::shared_ptr<graph::EnvironmentLight>& node)
 	{
+		changed |= GuiProvider::drawEditGui(node);
 	}
 
 	void GuiVisitor::visit(const std::shared_ptr<graph::MeshLight>& node)

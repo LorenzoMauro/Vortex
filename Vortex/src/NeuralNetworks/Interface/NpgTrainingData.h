@@ -30,6 +30,7 @@ namespace vtx
 		math::vec3f*  throughput;
 		float*        bsdfProbabilities;
 		int           nAlloc;
+		float*           overallProb;
 	};
 }
 

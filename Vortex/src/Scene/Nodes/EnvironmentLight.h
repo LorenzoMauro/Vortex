@@ -34,6 +34,7 @@ namespace vtx::graph
 		std::vector<float>								importanceData;
 
 		float invIntegral;
+		float scaleLuminosity = 1.0f;
 		bool								isValid = false;
 
 	};

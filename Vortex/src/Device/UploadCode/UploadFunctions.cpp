@@ -141,12 +141,15 @@ namespace vtx::device
 		envLightData.transformation = envLight->transform->affineTransform;
 		envLightData.invTransformation = math::affine3f(envLightData.transformation.l.inverse(), envLightData.transformation.p);
 		envLightData.aliasMap = aliasBuffer.castedPointer<AliasData>();
+		envLightData.scaleLuminosity = envLight->scaleLuminosity;
 
 		CUDABuffer& attributeBuffer = onDeviceData->lightDataMap.getResourceBuffers(envLight->getUID()).attributeBuffer;
 		attributeBuffer.upload(envLightData);
 
 		lightData.type = L_ENV;
 		lightData.attributes = attributeBuffer.dPointer();
+		envLight->transform->state.updateOnDevice = false;
+		envLight->state.updateOnDevice = false;
 
 		return lightData;
 	}
@@ -695,7 +698,7 @@ namespace vtx::device
 		QueuesData queuesData;
 		if(create)
 		{
-			VTX_INFO("Creating Wavefront Queues");
+			VTX_INFO("Creating Wavefront Queues with Size: Width: {}, Height: {}, MaxBounces: {}, TotPixels: {}, MaxShadowQueue: {}, MaxAccumulationQueue: {}", width, height, maxBounces, totPixels, maxShadowQueue, maxAccumulationQueue);
 			CUDABufferManager::deallocateAll();
 			const WorkQueueSOA<TraceWorkItem> radianceTraceQueue(totPixels, "radianceTraceQueue");
 			queuesData.radianceTraceQueue = onDeviceData->workQueuesData.resourceBuffers.radianceTraceQueueBuffer.upload(radianceTraceQueue);

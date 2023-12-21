@@ -11,6 +11,7 @@
 #include "NeuralNetworks/Interface/InferenceQueries.h"
 #include "NeuralNetworks/Interface/NetworkInterface.h"
 #include "NeuralNetworks/Interface/Paths.h"
+#include "NeuralNetworks/Interface/TrainingDataBuffers.h"
 
 #ifdef ARCHITECTURE_OPTIX
 #include <optix_device.h>
@@ -101,14 +102,15 @@ namespace vtx
 
     __forceinline__ __device__ void accumulateRay(const AccumulationWorkItem& awi, const LaunchParams* params)
     {
-        if (params->settings.renderer.adaptiveSamplingSettings.active && params->settings.renderer.adaptiveSamplingSettings.minAdaptiveSamples <= params->settings.renderer.iteration)
-        {
-            nanCheckAddAtomic(awi.radiance, params->frameBuffer.radianceAccumulator[awi.originPixel]);
-        }
-        else
-        {
-            nanCheckAdd(awi.radiance, params->frameBuffer.radianceAccumulator[awi.originPixel]);
-        }
+        nanCheckAddAtomic(awi.radiance, params->frameBuffer.radianceAccumulator[awi.originPixel]);
+        //if (params->settings.renderer.adaptiveSamplingSettings.active && params->settings.renderer.adaptiveSamplingSettings.minAdaptiveSamples <= params->settings.renderer.iteration)
+        //{
+        //    nanCheckAddAtomic(awi.radiance, params->frameBuffer.radianceAccumulator[awi.originPixel]);
+        //}
+        //else
+        //{
+        //    nanCheckAdd(awi.radiance, params->frameBuffer.radianceAccumulator[awi.originPixel]);
+        //}
     }
 
 
@@ -148,14 +150,18 @@ namespace vtx
             params->networkInterface->debugBuffer2[id] = 0.0f;
         }
         params->frameBuffer.debugColor1[id] = 0.0f;
+
     }
 
     __forceinline__ __device__ void generateCameraRay(int id, const LaunchParams* params, TraceWorkItem& twi) {
 
+
         math::vec2f pixel = math::vec2f((float)(id % params->frameBuffer.frameSize.x), (float)(id / params->frameBuffer.frameSize.x));
         math::vec2f screen {(float)params->frameBuffer.frameSize.x, (float)params->frameBuffer.frameSize.y };
-        math::vec2f sample = rng2(twi.seed);
-        const math::vec2f fragment = pixel + sample;                    // Jitter the sub-pixel location
+
+        math::vec2f rnd01 = rng2(twi.seed);
+        math::vec2f rnd02 = rng2(twi.seed);
+        const math::vec2f fragment = pixel + math::vec2f(rnd01.x > 0.5f ? 0.5f : -0.5f, rnd01.y > 0.5f ? 0.5f : -0.5f) + (rnd02 * 0.5f - 0.25f);
         const math::vec2f ndc = (fragment / screen) * 2.0f - 1.0f;      // Normalized device coordinates in range [-1, 1].
 
         const CameraData camera = params->cameraData;
@@ -207,7 +213,7 @@ namespace vtx
                 const auto x = math::min<unsigned>((unsigned int)(u * (float)texture->dimension.x), texture->dimension.x - 1);
                 const auto y = math::min<unsigned>((unsigned int)(v * (float)texture->dimension.y), texture->dimension.y - 1);
                 emission = tex2D<float4>(texture->texObj, u, v);
-                //emission = emission; *attrib.envIntensity;
+                emission = emission * attrib.scaleLuminosity;
 
                 // to incorporate the point light selection probability
                 // If the last surface intersection was a diffuse event which was directly lit with multiple importance sampling,
@@ -365,6 +371,7 @@ namespace vtx
         lightSample.normal = -lightSample.direction;
         // Get the emission from the spherical environment texture.
         math::vec3f emission = tex2D<float4>(texture->texObj, u, v);
+        emission *= attrib.scaleLuminosity;
         // For simplicity we pretend that we perfectly importance-sampled the actual texture-filtered environment map
         // and not the Gaussian-smoothed one used to actually generate the CDFs and uniform sampling in the texel.
         // (Note that this does not contain the light.emission which just modulates the texture.)
@@ -892,6 +899,7 @@ namespace vtx
         {
             prd.direction = matEval.bsdfSample.nextDirection; // Continuation direction.
             const math::vec3f throughputMultiplier = matEval.bsdfSample.bsdfOverPdf/ continuationProbability;
+            
             prd.throughput *= throughputMultiplier;
             prd.pdf = matEval.bsdfSample.pdf;
             prd.eventType = matEval.bsdfSample.eventType;
@@ -927,7 +935,7 @@ namespace vtx
         {
             params.queues.radianceTraceQueue->Push(twi);
         }
-        else
+        else if (twi.radiance != math::vec3f(0.0f))
         {
             AccumulationWorkItem awi{};
             awi.radiance = twi.radiance;
@@ -1165,7 +1173,9 @@ namespace vtx
             params->escapedQueue->Reset();
         }*/
         if (queueWorkId >= params->queues.accumulationQueue->Size())
+        {
             return;
+        }
         const AccumulationWorkItem             awi = (*params->queues.accumulationQueue)[queueWorkId];
         accumulateRay(awi, params);
     }
@@ -1313,8 +1323,8 @@ namespace vtx
             if (hit)
             {
                 int shadeQueueIndex = params.queues.shadeQueue->Push(prd);
-
-                if(neuralSamplingActivated(&params, prd.depth))
+                bool doNeuralSampling = neuralSamplingActivated(&params, prd.depth);
+                if(doNeuralSampling)
                 {
                     prd.hitProperties.calculateForInferenceQuery(&params);
                     int inferenceQueueIndex = params.networkInterface->inferenceQueries->addInferenceQuery(prd, shadeQueueIndex);

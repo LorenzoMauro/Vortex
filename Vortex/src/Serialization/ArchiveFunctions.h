@@ -356,7 +356,8 @@ namespace cereal
             nvp(data, strategy),
             nvp(data, weightByMis),
             //nvp(data, isUpdated),
-            nvp(data, lightSamplingProb)
+            nvp(data, lightSamplingProb),
+            nvp(data, limitToFirstBounce)
         );
     }
 
@@ -509,6 +510,11 @@ namespace cereal
             nvp(data, useTriangleId),
             nvp(data, useMaterialId),
             nvp(data, scaleLossBlendedQ),
+            nvp(data, scaleBySampleProb),
+            nvp(data, fractionBlendTrainPercentage),
+            nvp(data, learnInputRadiance),
+            nvp(data, lossClamp),
+            nvp(data, fractionBlendTrainPercentage),
             nvp(data, clampBsdfProb)
         );
     }

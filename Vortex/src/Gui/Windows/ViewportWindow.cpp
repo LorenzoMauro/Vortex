@@ -23,7 +23,10 @@ namespace vtx {
         ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
         const int width = (int)ImGui::GetContentRegionAvail().x;
         const int height = (int)ImGui::GetContentRegionAvail().y;
-        renderer->resize(width, height);
+        if(!renderer->isSizeLocked)
+        {
+            renderer->resize(width, height);
+        }
         const GlFrameBuffer& bf = renderer->getFrame();
         ImGui::Image((ImTextureID)bf.colorAttachment, ImVec2{ static_cast<float>(bf.width), static_cast<float>(bf.height) }, ImVec2{ 0, 1 }, ImVec2{ 1, 0 });
 
@@ -110,11 +113,10 @@ namespace vtx {
         if (renderer->isSizeLocked)
         {
             const float titleBarHeight = ImGui::GetFontSize() + ImGui::GetStyle().FramePadding.y * 2;
-            const int height = renderer->height;
-            const int width = renderer->width;
-            const float adjustedHeight = width + titleBarHeight;// +menu_bar_height;
+            const int height = renderer->height + 10 + titleBarHeight;
+            const int width = renderer->width+10;
 
-            ImGui::SetNextWindowSize(ImVec2(height, adjustedHeight), ImGuiCond_Always);
+            ImGui::SetNextWindowSize(ImVec2(width, height), ImGuiCond_Always);
             windowFlags |= ImGuiWindowFlags_NoDocking | ImGuiWindowFlags_NoResize;
         }
     }

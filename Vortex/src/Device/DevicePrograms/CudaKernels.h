@@ -12,4 +12,6 @@ namespace vtx
 	void removeFireflies(const LaunchParams* launchParams, int kernelSize, float threshold, int width, int height);
 
 	void toneMapRadianceKernel(const LaunchParams* launchParams, const int width, const int height, const char* name);
+
+	void toneMapBuffer(CUDABuffer& src, CUDABuffer& dst, const int width, const int height, ToneMapperSettings settings);
 }

@@ -46,6 +46,7 @@ namespace vtx
 		MapePlot.title = "Mape";
 		MapePlot.xLabel = "samples";
 		MapePlot.yLabel = "Mape";
+		MapePlot.logScale = true;
 
 		for (auto& experiment : em.experiments)
 		{
@@ -164,16 +165,17 @@ namespace vtx
 		vtxImGui::halfSpaceWidget("Experiments in Queue", vtxImGui::booleanText, "%d", em.experimentQueue.size());
 
 		std::vector<int> toRemove;
-		int i = -1;
+		int i = 0;
 		for (auto& experiment : em.experiments)
 		{
-			i++;
 			if (experiment.rendererSettings.samplingTechnique == S_MIS && !toggleMisExperiment)
 			{
+				i++;
 				continue;
 			}
 			if (experiment.rendererSettings.samplingTechnique == S_BSDF && !toggleBsdfExperiment)
 			{
+				i++;
 				continue;
 			}
 			ImGui::Separator();
@@ -188,11 +190,14 @@ namespace vtx
 				}
 			}
 			ImGui::PopID();
+			i++;
 		}
 
 		for (auto& i : toRemove)
 		{
+			std::string hashKey = em.experiments[i].getStringHashKey();
 			em.experiments.erase(em.experiments.begin() + i);
+			em.experimentSet.erase(hashKey);
 			em.currentExperiment = std::min(0, em.currentExperiment - 1);
 		}
 	}
@@ -262,7 +267,7 @@ namespace vtx
 			return;
 		}
 
-		const float mape = cuda::computeMape(em.groundTruth, onDeviceData->launchParamsData.getHostImage().frameBuffer.tmRadiance, em.width, em.height);
+		const float mape = cuda::computeMse(em.groundTruth, onDeviceData->launchParamsData.getHostImage().frameBuffer.tmRadiance, em.width, em.height);
 		experiment.mape.push_back(mape);
 
 		if (renderer->settings.iteration == em.testSamples)
@@ -295,6 +300,7 @@ namespace vtx
 	}
 	void ExperimentsWindow::runCurrentSettingsExperiment()
 	{
+
 		em.experiments.emplace_back();
 
 		Experiment& mapeExperiment = em.experiments.back();
@@ -306,6 +312,7 @@ namespace vtx
 		mapeExperiment.constructName(em.currentExperiment);
 		em.currentExperimentStep = 0;
 		em.stage = STAGE_MAPE_COMPUTATION;
+
 	}
 
 	void ExperimentsWindow::stopExperiment()

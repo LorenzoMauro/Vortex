@@ -78,6 +78,7 @@ namespace vtx::network::config
 		float         blendFactor           = 0.9f;
 		float         targetScale			= 1.0f;
 		bool          samplingFractionBlend = false;
+		bool		  scaleBySampleProb    = false;
 
 		// ENTROPY LOSS SETTINGS
 		bool          useEntropyLoss = false;
@@ -103,8 +104,12 @@ namespace vtx::network::config
 		bool useInstanceId = false;
 		EncodingConfig instanceIdEncodingConfig = {};
 
-		bool  scaleLossBlendedQ = false;
-		bool clampBsdfProb = false;
+		bool  scaleLossBlendedQ            = false;
+		bool  clampBsdfProb                = false;
+		float fractionBlendTrainPercentage = 0.2;
+
+		bool learnInputRadiance = false;
+		float  lossClamp = 100.0f;
 
 		void resetUpdate()
 		{

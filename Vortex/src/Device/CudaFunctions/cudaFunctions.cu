@@ -23,7 +23,7 @@ namespace vtx::cuda{
 
 	__forceinline__ __device__ void computeMseDevice(const math::vec3f* target, const math::vec3f* input, math::vec2f* mse, const int& id)
 	{
-		const math::vec3f delta = input[id] - target[id];
+		const math::vec3f delta = ((input[id] - target[id]));
 		const float rMse = delta.x * delta.x;
 		const float gMse = delta.y * delta.y;
 		const float bMse = delta.z * delta.z;
@@ -32,6 +32,7 @@ namespace vtx::cuda{
 		float& count = (*mse).y;
 		float addedMseValue = cuAtomicAdd(&mseValue, newValue);
 		float addedCountValue = cuAtomicAdd(&count, 1);
+
 	}
 
 	float computeMape(math::vec3f* groundTruth, math::vec3f* input, const int& width, const int& height)

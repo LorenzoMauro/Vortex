@@ -82,15 +82,17 @@ namespace vtx
 
 		static std::vector<network::config::NetworkSettings>                   generateNetworkSettingNeighbors(const network::config::NetworkSettings& setting);
 		static std::vector<Experiment>                                         generateExperimentNeighbors(const Experiment& experiment);
-		static network::config::NetworkSettings getBestGuess();
+		static network::config::NetworkSettings                                getBestGuess();
+		network::config::NetworkSettings getSOTA();
 		std::tuple<Experiment, Experiment, Experiment, Experiment, Experiment> startingConfigExperiments(const std::shared_ptr<graph::Renderer>& renderer);
-		void																   setupNewExperiment(const Experiment& experiment, const std::shared_ptr<graph::Renderer>& renderer);
+		void                                                                   setupNewExperiment(const Experiment& experiment, const std::shared_ptr<graph::Renderer>& renderer);
 		static std::vector<network::config::NetworkSettings>                   generateNetworkSettingsCombination();
 		std::pair<Experiment, std::vector<Experiment>>                         generateExperiments(const std::shared_ptr<graph::Renderer>& renderer);
 		void                                                                   generateGroundTruth(const Experiment& gtExperiment,Application* app, const std::shared_ptr<graph::Renderer>& renderer);
-		bool performExperiment(Experiment& experiment, Application* app,const std::shared_ptr<graph::Renderer>& renderer);
-		void refillExperimentQueue();
-		void BatchExperimentRun();
+		bool                                                                   runExperiment(Experiment& experiment, Application* app, const std::shared_ptr<graph::Renderer>& renderer);
+		bool                                                                   performExperiment(Experiment& experiment, Application* app,const std::shared_ptr<graph::Renderer>& renderer);
+		void                                                                   refillExperimentQueue();
+		void                                                                   BatchExperimentRun();
 
 		std::string getImageSavePath(std::string experimentName);
 
@@ -104,6 +106,8 @@ namespace vtx
 		math::vec3f* groundTruth = nullptr;
 		CUDABuffer groundTruthBuffer;
 
+		CUDABuffer rendererImageBufferToneMapped;
+
 		int gtSamples = 5000;
 		int testSamples = 400;
 
@@ -111,7 +115,6 @@ namespace vtx
 		int currentExperiment = 0;
 		int currentExperimentStep = 0;
 		ExperimentStages stage = STAGE_NONE;
-
 
 		// Batch Testing
 		std::string                                                                                       saveFilePath;

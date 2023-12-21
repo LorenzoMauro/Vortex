@@ -230,6 +230,7 @@ namespace vtx::device
 		CUDABuffer          bsdfProbabilitiesBuffer;
 		CUDABuffer          trhoughputBuffer;
 		CUDABuffer          incomingRadianceBuffer;
+		CUDABuffer                 overallProbBuffer;
 
 		~NpgTrainingDataBuffers()
 		{
@@ -238,6 +239,7 @@ namespace vtx::device
 			outgoingRadianceBuffer.free();
 			incomingDirectionBuffer.free();
 			bsdfProbabilitiesBuffer.free();
+			overallProbBuffer.free();
 		}
 	};
 

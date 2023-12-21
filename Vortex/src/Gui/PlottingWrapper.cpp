@@ -51,6 +51,11 @@ namespace vtx::gui
 			flags |= ImPlotAxisFlags_NoLabel;
 			ImPlot::SetupAxis(ImAxis_X1, lines.xLabel.c_str(), flags);
 			ImPlot::SetupAxis(ImAxis_Y1, lines.yLabel.c_str(), flags);
+			if(lines.logScale)
+			{
+				ImPlot::SetupAxisScale(ImAxis_X1, ImPlotScale_Log10);
+				ImPlot::SetupAxisScale(ImAxis_Y1, ImPlotScale_Log10);
+			}
 
 			for (int i = 0; i < lines.color.size(); i++)
 			{

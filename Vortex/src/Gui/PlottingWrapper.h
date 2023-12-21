@@ -34,6 +34,7 @@ namespace vtx::gui
 		std::string title = "Plot";
 
 		void addPlot(const DataType& _data, std::string _name = "");
+		bool logScale = false;
 	};
 
 	void plotLines(const PlotInfo& lines, const ImVec2& quadrantSize = ImGui::GetContentRegionAvail());
