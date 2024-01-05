@@ -262,7 +262,7 @@ namespace vtx::graph
 		const int& width = launchParams.frameBuffer.frameSize.x;
 		const int& height = launchParams.frameBuffer.frameSize.y;
 		const InteropUsage usage = settings.runOnSeparateThread ? InteropUsage::MultiThreaded : InteropUsage::SingleThreaded;
-		interopDraw.prepare(width, height, usage);
+		interopDraw.prepare(width, height, 4, usage);
 		interopDraw.copyToGlBuffer(buffer, width, height);
 		std::swap(interopDraw, interopDisplay);
 
@@ -305,7 +305,7 @@ namespace vtx::graph
 		waveFrontAccumulate = factor * cuTimes.accumulateRay;
 		waveFrontReset = factor * cuTimes.reset;
 		waveFrontFetchQueueSize = factor * cuTimes.fetchQueueSize;
-		neuralShuffleDataset = factor * cuTimes.nnShuffleDataset;
+		neuralShuffleDataset = factor * (cuTimes.nnPrepareDataset + cuTimes.nnFillPath);
 		neuralNetworkTrain = factor * cuTimes.nnTrain;
 		neuralNetworkInfer = factor * cuTimes.nnInfer;
 	}

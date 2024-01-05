@@ -1,4 +1,5 @@
 #pragma once
+#include "ErrorTypes.h"
 #include "Core/Math.h"
 
 namespace vtx::cuda
@@ -7,7 +8,12 @@ namespace vtx::cuda
 
 	float computeMse(math::vec3f* groundTruth, math::vec3f* input, const int& width, const int& height);
 
-	float* triangleWaveEncoding(CUDABuffer& outputBuffer, float* input, const int inputFeatures, const int outputFeatures, const int nFrequencies);
+	Errors computeErrors(const CUDABuffer& reference, const CUDABuffer& input, CUDABuffer& errorMaps, const int& width, const int& height);
+
+	void copyRGBtoRGBA(const CUDABuffer& src, CUDABuffer&  dst, const int& width, const int& height);
+
+	void copyRtoRGBA(const CUDABuffer& src, CUDABuffer&  dst, const int& width, const int& height);
+
 
 	void overlayEdgesOnImage(
 		float* d_edgeData,
@@ -29,4 +35,19 @@ namespace vtx::cuda
 		CUDABuffer* edgeMapBuffer = nullptr,
 		CUDABuffer* valuesBuffer = nullptr
 	);
+
+	void printDistribution(
+		CUDABuffer& buffer,
+		const int width,
+		const int height,
+		const math::vec3f& mean,
+		const math::vec3f& normal,
+		const math::vec3f& sample
+	);
+
+	void accumulateAtDebugBounce(
+		CUDABuffer& buffer,
+		const int width,
+		const int height,
+		const int pixel);
 }

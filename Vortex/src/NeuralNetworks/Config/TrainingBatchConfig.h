@@ -28,11 +28,13 @@ namespace vtx::network::config
 
 	struct BatchGenerationConfig
 	{
-		SamplingStrategy strategy          = SS_PATHS_WITH_CONTRIBUTION;
-		bool             weightByMis       = true;
-		float            lightSamplingProb = 0.0f;
-		bool             isUpdated         = true;
-		bool              limitToFirstBounce = true;
+		bool             limitToFirstBounce = true;
+		bool			 onlyNonZero		= false;
+		bool             weightByMis		= true;
+		bool             weightByPdf		= true;
+		bool             useLightSample 	= true;
+		bool             trainOnLightSample = true;
+		bool             isUpdated			= true;
 	};
 
 }

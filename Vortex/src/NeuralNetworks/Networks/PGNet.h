@@ -20,7 +20,9 @@ namespace vtx::network
 		torch::Tensor instanceId = torch::Tensor();
 		torch::Tensor triangleId = torch::Tensor();
 		torch::Tensor materialId = torch::Tensor();
-		torch::Tensor sampleProb = torch::Tensor();
+		torch::Tensor wiProb = torch::Tensor();
+
+		void printInfo();
 	};
 
 	struct InputDataPointers
@@ -36,7 +38,7 @@ namespace vtx::network
 		float* instanceId		 = nullptr;
 		float* materialId		 = nullptr;
 		float* triangleId		 = nullptr;
-		float* sampleProb		 = nullptr;
+		float* wiProb		 = nullptr;
 	};
 
 	class PGNet : public NetworkImplementation
@@ -56,11 +58,13 @@ namespace vtx::network
 		void copyOutputToCudaBuffer(const torch::Tensor& mixtureParameters, const torch::Tensor& c,
 			const torch::Tensor& mixtureWeights, int                     inferenceSize);
 
-		GraphsData& getGraphs() override;
+		GraphsData&   getGraphs() override;
 		bool          doNormalizePosition();
-		InputTensors  generateTrainingInputTensors();
+		void          sliceToBatches(InputTensors& tensors);
+		void          generateTrainingInputTensors();
 		InputTensors  generateInferenceInputTensors(int* inferenceSize);
 		torch::Tensor pointerToTensor(float* pointer, int batchSize, int dim, float minClamp, float maxClamp);
+		torch::Tensor pointerToTensor(int* pointer, int batchSize, int dim);
 
 
 		InputTensors generateInputTensors(
@@ -68,29 +72,24 @@ namespace vtx::network
 			const InputDataPointers& inputPointers,
 			const torch::Tensor& minExtents,
 			const torch::Tensor& deltaExtents);
+
 		std::tuple<torch::Tensor, torch::Tensor, torch::Tensor> splitGuidingOutput(const torch::Tensor& rawOutput);
-		std::tuple<torch::Tensor, torch::Tensor, torch::Tensor> finalizeGuidingOutput(
-			torch::Tensor& rawMixtureParameters, const torch::Tensor& rawMixtureWeights,
-			const torch::Tensor& rawSamplingFraction);
+		std::tuple<torch::Tensor, torch::Tensor, torch::Tensor> finalizeGuidingOutput(torch::Tensor& rawMixtureParameters, const torch::Tensor& rawMixtureWeights,const torch::Tensor& rawSamplingFraction);
 		std::tuple<torch::Tensor, torch::Tensor, torch::Tensor> guidingForward(const torch::Tensor& rawOutput);
-		torch::Tensor gudingLossIncomingRadiance(const torch::Tensor& neuralProb, torch::Tensor& bsdfProb, const torch::Tensor& outRadiance, const torch::Tensor& c, const torch::Tensor& sampleProb);
-		torch::Tensor guidingLoss(const torch::Tensor& neuralProb, torch::Tensor& bsdfProb,
-								  const torch::Tensor& outRadiance, const torch::Tensor& c, const torch::Tensor& sampleProb);
-		std::tuple<torch::Tensor, torch::Tensor, torch::Tensor> splitAuxiliaryOutput(
-			const torch::Tensor& rawAuxiliaryOutput);
+		torch::Tensor guidingLoss(const torch::Tensor& neuralProb, torch::Tensor& bsdfProb,const torch::Tensor& outRadiance, const torch::Tensor& c, const torch::Tensor& sampleProb);
+		std::tuple<torch::Tensor, torch::Tensor, torch::Tensor> splitAuxiliaryOutput(const torch::Tensor& rawAuxiliaryOutput);
 		torch::Tensor relativeL2LossRadiance(const torch::Tensor& radiance, const torch::Tensor& radianceTarget);
 		torch::Tensor relativeL2LossThroughput(const torch::Tensor& throughput, const torch::Tensor& throughputTarget);
-		torch::Tensor auxiliaryLoss(const torch::Tensor& inRadiance, const torch::Tensor& inRadianceTarget,
-			const torch::Tensor& throughput, const torch::Tensor& throughputTarget,
-			const torch::Tensor& outRadiance, const torch::Tensor& outRadianceTarget);
+		torch::Tensor auxiliaryLoss(const torch::Tensor& inRadiance, const torch::Tensor& inRadianceTarget,const torch::Tensor& throughput, const torch::Tensor& throughputTarget,const torch::Tensor& outRadiance, const torch::Tensor& outRadianceTarget);
 		torch::Tensor guidingEntropyLoss(const torch::Tensor& neuralProb);
-		torch::Tensor divergenceLoss(const torch::Tensor& neuralProb, const torch::Tensor& targetProb);
+		torch::Tensor divergenceLoss(const torch::Tensor& targetProb, const torch::Tensor& neuralProb, const torch::Tensor& wiProb);
 		float         lossBlendFactor();
 		float         tau();
 
 	private:
 	public:
 		std::shared_ptr<torch::optim::Adam> optimizer;
+		std::shared_ptr<torch::optim::StepLR> scheduler;
 		torch::Device device;
 
 
@@ -107,6 +106,8 @@ namespace vtx::network
 		GraphsData graphs;
 
 		torch::Tensor ntscLuminance;
+
+		std::vector<InputTensors> batches;
 		//std::vector<GraphType> plotTypes;
 		//std::vector<torch::Tensor> plotTensors;
 	};

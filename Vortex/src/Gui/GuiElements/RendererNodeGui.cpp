@@ -165,6 +165,27 @@ namespace vtx::gui
 		return settings.isUpdated;
 	}
 
+	bool quadrantTechniqueSettingsSplit(QuadrantTechniqueSplit& settings, std::string quadrantName)
+	{
+		bool isUpdated = false;
+		isUpdated |= vtxImGui::halfSpaceCombo((quadrantName + "Sampling").c_str(), settings.st, samplingTechniqueNames, S_COUNT);
+		isUpdated |= vtxImGui::halfSpaceCheckbox((quadrantName + "Neural Activated").c_str(), &settings.neuralActivated);
+		return isUpdated;
+	}
+
+	bool quadrantSettingsEditorGui(QuadrantsSettings& settings)
+	{
+		settings.isUpdated |= vtxImGui::halfSpaceCheckbox("Activated", &settings.isActivated);
+		if (ImGui::CollapsingHeader("Quadrant Settings"))
+		{
+			settings.isUpdated |= quadrantTechniqueSettingsSplit(settings.topLeft, "Top Left ");
+			settings.isUpdated |= quadrantTechniqueSettingsSplit(settings.topRight, "Top Right ");
+			settings.isUpdated |= quadrantTechniqueSettingsSplit(settings.bottomLeft, "Bottom Left ");
+			settings.isUpdated |= quadrantTechniqueSettingsSplit(settings.bottomRight, "Bottom Right ");
+		}
+		return settings.isUpdated;
+	}
+
 	void GuiProvider::drawDisplayGui(graph::Statistics& statistics)
 	{
 		if (ImGui::CollapsingHeader("Statistics"))
@@ -192,7 +213,7 @@ namespace vtx::gui
 			vtxImGui::halfSpaceWidget("WaveFront Reset				", vtxImGui::booleanText, "%.2f ms", statistics.waveFrontReset);
 			vtxImGui::halfSpaceWidget("WaveFront Fetch Queue Size	", vtxImGui::booleanText, "%.2f ms", statistics.waveFrontFetchQueueSize);
 			ImGui::Separator();																			 
-			vtxImGui::halfSpaceWidget("Neural Shuffle Dataset		", vtxImGui::booleanText, "%.2f ms", statistics.neuralShuffleDataset);
+			vtxImGui::halfSpaceWidget("Neural Prepare Dataset		", vtxImGui::booleanText, "%.2f ms", statistics.neuralShuffleDataset);
 			vtxImGui::halfSpaceWidget("Neural Network Train			", vtxImGui::booleanText, "%.2f ms", statistics.neuralNetworkTrain);
 			vtxImGui::halfSpaceWidget("Neural Network Infer			", vtxImGui::booleanText, "%.2f ms", statistics.neuralNetworkInfer);
 
@@ -226,6 +247,10 @@ namespace vtx::gui
 				settings.isUpdated = true;
 				restartRendering = true;
 			}
+
+			restartRendering |= quadrantSettingsEditorGui(settings.quadrantsSettings);
+			settings.isUpdated |= restartRendering;
+
 			if (vtxImGui::halfSpaceWidget("Display Buffer Type", (ComboFuncType)ImGui::Combo, (hiddenLabel + "_Display Buffer Type").c_str(), reinterpret_cast<int*>(&settings.displayBuffer), displayBufferNames, FB_COUNT, -1))
 			{
 				settings.isUpdated = true;

@@ -28,12 +28,14 @@ namespace vtx::gui
 		std::vector<DataType> data;
 		std::vector<ImU32> color;
 		std::vector<std::string> name;
+		std::vector<bool> secondaryAxis;
+		bool hasSecondaryAxis = false;
 
 		std::string xLabel = "X";
 		std::string yLabel = "Y";
 		std::string title = "Plot";
 
-		void addPlot(const DataType& _data, std::string _name = "");
+		void addPlot(const DataType& _data, std::string _name = "", bool _secondaryAxis = false);
 		bool logScale = false;
 	};
 

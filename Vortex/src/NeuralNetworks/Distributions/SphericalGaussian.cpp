@@ -1,9 +1,9 @@
 #include "SphericalGaussian.h"
 
+#include "Core/Constants.h"
 #include "NeuralNetworks/NeuralNetworkGraphs.h"
 #include "NeuralNetworks/tools.h"
 
-#define SCALE_EPS 0.01f
 namespace vtx::distribution
 {
     torch::Tensor SphericalGaussian::sample(const torch::Tensor& loc, const torch::Tensor& scale) {
@@ -12,20 +12,20 @@ namespace vtx::distribution
 
         torch::Device       device = loc.device();
         const torch::Tensor uniform = torch::rand({ batchSize, 1 }, torch::TensorOptions().device(device));
-        torch::Tensor       w = 1.0f + torch::log(uniform + (1.0f - uniform) * torch::exp(-2.0f * scale) + EPS) / (scale + EPS);
+        torch::Tensor       w = 1.0f + torch::log(uniform + (1.0f - uniform) * torch::exp(-2.0f * scale) + sEps) / (scale + sEps);
 
         torch::Tensor angleUniform = torch::rand({ batchSize, 1 }, torch::TensorOptions().device(device));
         angleUniform = angleUniform * 2.0f * M_PI_F;
         const torch::Tensor v = torch::cat({ torch::cos(angleUniform), torch::sin(angleUniform) }, -1);
 
-        const torch::Tensor w_ = torch::sqrt(clamp(1 - w.pow(2), EPS, 1));
+        const torch::Tensor w_ = torch::sqrt(clamp(1 - w.pow(2), sEps, 1));
 
         const torch::Tensor x = torch::cat({ w, w_ * v }, -1);
 
         // Householder rotation
         const torch::Tensor e1 = torch::tensor({ 1.0, 0.0, 0.0 }, loc.options()).expand_as(loc);
         auto       u = e1 - loc;
-        u = u / (u.norm(2, 1, true) + EPS);
+        u = u / (u.norm(2, 1, true) + sEps);
         auto sample = x - 2 * (x * u).sum(-1, true) * u;
 
         TRACE_TENSOR(loc);
@@ -55,7 +55,7 @@ namespace vtx::distribution
 
     torch::Tensor SphericalGaussian::logLikelihood(const torch::Tensor& x, const torch::Tensor& loc, const torch::Tensor& scale) {
 
-        torch::Tensor logP = torch::log(prob(x, loc, scale) + EPS);
+        torch::Tensor logP = torch::log(prob(x, loc, scale) + sEps);
         TRACE_TENSOR(x);
         TRACE_TENSOR(loc);
         TRACE_TENSOR(scale);
@@ -98,10 +98,10 @@ namespace vtx::distribution
         auto [loc, scale] = splitParams(params);
         TRACE_TENSOR(loc);
         TRACE_TENSOR(scale);
-        loc = loc + EPS;
+        loc = loc + sEps;
         torch::Tensor locNorm = linalg_vector_norm(loc, 2, -1, true);
         loc                 = loc / (locNorm);
-        scale               = softplus(scale) + SCALE_EPS;
+        scale               = softplus(scale) + sEps;
         TRACE_TENSOR(loc);
         TRACE_TENSOR(scale);
         // Stacking them along the last dimension

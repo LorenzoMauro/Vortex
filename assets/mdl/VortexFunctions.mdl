@@ -6,6 +6,16 @@ import ::base::*;
 import ::tex::*;
 
 
+
+export float luminance(color inputColor){
+    float3 fColor = float3(inputColor);
+    float red = fColor.x;
+    float green = fColor.y;
+    float blue = fColor.z;
+    float luminance = 0.2126 * red + 0.7152 * green + 0.0722 * blue;
+    return luminance;
+}
+
 export struct AnisotropicRoughness {
     float3 tangent;
     float2 roughness;
@@ -19,16 +29,6 @@ export float3 rotate_tangent(float rotation, float3 tangent = state::texture_tan
     float sin_rot_angle = math::sin(rot_angle);
     return cos_rot_angle * tangent - sin_rot_angle * bitangent;
 }
-
-export float luminance(color inputColor){
-    float3 fColor = float3(inputColor);
-    float red = fColor.x;
-    float green = fColor.y;
-    float blue = fColor.z;
-    float luminance = 0.2126 * red + 0.7152 * green + 0.0722 * blue;
-    return luminance;
-}
-
 export AnisotropicRoughness computeRoughnessAnisotropy(float roughness, float anisotropy = 0.0f, float anisotropyRotation = 0.0f){
 
     float R2 = roughness * roughness;

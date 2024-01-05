@@ -26,7 +26,8 @@ namespace vtx
 		R_TONE_MAP_RADIANCE,
 
 		//NN CUDA EVENTS
-		N_SHUFFLE_DATASET,
+		N_FILL_PATH,
+		N_PREPARE_DATASET,
 		N_TRAIN,
 		N_INFER,
 		N_TRIANGLE_WAVE_ENCODING,
@@ -34,6 +35,7 @@ namespace vtx
 		//EXPERIMENT
 		K_MAPE,
 		K_MSE,
+		K_DISTRIBUTION_PRINT,
 
 		K_COUNT
 	};
@@ -55,13 +57,15 @@ namespace vtx
 		"Rendering Display",
 		"Rendering Tone Mapping Radiance",
 
-		"NN Shuffle Dataset",
+		"NN Fill Path",
+		"NN Prepare Dataset",
 		"NN Train",
 		"NN Infer",
 		"NN Triangle Wave Encoding",
 
 		"MAPE",
-		"MSE"
+		"MSE",
+		"Distribution Print"
 
 	};
 
@@ -80,7 +84,8 @@ namespace vtx
 		float postProcessing   = 0.0f;
 		float display          = 0.0f;
 		float toneMapRadiance  = 0.0f;
-		float nnShuffleDataset = 0.0f;
+		float nnFillPath = 0.0f;
+		float nnPrepareDataset = 0.0f;
 		float nnTrain          = 0.0f;
 		float nnInfer          = 0.0f;
 		float   shadowRay = 0.0f;

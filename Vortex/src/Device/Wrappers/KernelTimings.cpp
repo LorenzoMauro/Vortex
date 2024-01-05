@@ -88,7 +88,8 @@ namespace vtx
         times.display = GetKernelTimeMS(eventNames[R_DISPLAY]);
         times.toneMapRadiance = GetKernelTimeMS(eventNames[R_TONE_MAP_RADIANCE]);
 
-        times.nnShuffleDataset = GetKernelTimeMS(eventNames[N_SHUFFLE_DATASET]);
+        times.nnFillPath = GetKernelTimeMS(eventNames[N_FILL_PATH]);
+        times.nnPrepareDataset = GetKernelTimeMS(eventNames[N_PREPARE_DATASET]);
         times.nnTrain = GetKernelTimeMS(eventNames[N_TRAIN]);
         times.nnInfer = GetKernelTimeMS(eventNames[N_INFER]);
         return times;

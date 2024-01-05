@@ -20,7 +20,8 @@ namespace gdt {
 
 	// Helper function for comparing floating point numbers
 	template<typename T>
-	inline __forceinline__ __both__ bool isEqual(const T& a, const T& b, const float maxDiff =0.00001f, const float maxRelDiff = FLT_EPSILON)
+	inline __forceinline__ __both__ bool isEqual(const T& a, const T& b, const float maxDiff = 1e-10f,
+		const float maxRelDiff = FLT_EPSILON)
 	{
 		// Check if the numbers are really close -- needed
 		// when comparing numbers near zero.

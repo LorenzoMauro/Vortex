@@ -97,8 +97,18 @@ namespace vtx {
         /*Internal Function to manage allocation, resize and upload on upload request*/
         void uploadImplementation(const void* uploadData, const size_t newSize);
 
+    protected:
         size_t sizeInBytes{ 0 };
         void* d_ptr{ nullptr };
     };
 
+
+    struct PreAllocatedCudaBuffer : private CUDABuffer
+    {
+        PreAllocatedCudaBuffer(const size_t size, void* ptr)
+        {
+	        sizeInBytes = size;
+			d_ptr = ptr;
+        }
+    };
 }

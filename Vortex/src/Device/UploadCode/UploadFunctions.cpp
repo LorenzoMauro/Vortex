@@ -9,7 +9,7 @@
 
 #include "MDL/CudaLinker.h"
 #include "NeuralNetworks/Interface/NetworkInterface.h"
-#include "UploadBuffers.h"
+#include "NeuralNetworks/Interface/NetworkInterfaceUploader.h"
 
 namespace vtx::device
 {
@@ -826,87 +826,27 @@ namespace vtx::device
 			{
 				if (rendererNode->waveFrontIntegrator.network.settings.active && rendererNode->waveFrontIntegrator.settings.active)
 				{
-					NetworkInterface::WhatChanged changed;
-
 					const int totPixels = rendererNode->width * rendererNode->height;
-					const int maxDatasetSize = rendererNode->waveFrontIntegrator.network.settings.batchSize;// *rendererNode->waveFrontIntegrator.network.settings.maxTrainingStepPerFrame;
+					const int maxDatasetSize = totPixels * rendererNode->settings.maxBounces*2;// rendererNode->waveFrontIntegrator.network.settings.batchSize;
 					const int maxBounces = rendererNode->settings.maxBounces;
 					const network::config::DistributionType distributionType = rendererNode->waveFrontIntegrator.network.settings.distributionType;
 					const int mixtureSize = rendererNode->waveFrontIntegrator.network.settings.mixtureSize;
 
-					DeviceDataCoordinator::PrevNetworkInterfaceInfo& prevNetworkInterfaceInfo = onDeviceData->prevNetworkInterfaceInfo;
-
-					bool createNetworkInterface = false;
-					if (!prevNetworkInterfaceInfo.wasAllocated)
-					{
-						createNetworkInterface = true;
-						changed.maxDepth = true;
-						changed.numberOfPixels = true;
-						changed.maxDatasetSize = true;
-						changed.distributionType = true;
-					}
-					else
-					{
-						if (prevNetworkInterfaceInfo.maxDatasetSize != maxDatasetSize)
-						{
-							changed.maxDatasetSize = true;
-							createNetworkInterface = true;
-						}
-						if (prevNetworkInterfaceInfo.numberOfPixels != totPixels)
-						{
-							changed.numberOfPixels = true;
-							createNetworkInterface = true;
-						}
-						if (prevNetworkInterfaceInfo.maxDepth != maxBounces)
-						{
-							changed.maxDepth = true;
-							createNetworkInterface = true;
-						}
-						if (prevNetworkInterfaceInfo.distributionType != distributionType)
-						{
-							changed.distributionType = true;
-							createNetworkInterface = true;
-						}
-						if (prevNetworkInterfaceInfo.mixtureSize != mixtureSize)
-						{
-							changed.distributionType = true;
-							createNetworkInterface = true;
-						}
-					}
-
-					if (createNetworkInterface)
+					if (needNetworkInterfaceReallocation(totPixels,maxBounces,maxDatasetSize,distributionType,mixtureSize))
 					{
 						VTX_INFO("Creating network interface");
 						onDeviceData->launchParamsData.editableHostImage().networkInterface
-							= NetworkInterface::upload(
+							= uploadNetworkInterface(
 								totPixels,
-								maxDatasetSize,
 								maxBounces,
-								onDeviceData->frameId,
+								maxDatasetSize,
 								distributionType,
-								mixtureSize,
-								rendererNode->settings.toneMapperSettings,
-								changed, onDeviceData->networkInterfaceData.resourceBuffers);
-
-
-						prevNetworkInterfaceInfo.wasAllocated = true;
-						prevNetworkInterfaceInfo.numberOfPixels = totPixels;
-						prevNetworkInterfaceInfo.maxDatasetSize = maxDatasetSize;
-						prevNetworkInterfaceInfo.maxDepth = maxBounces;
-						prevNetworkInterfaceInfo.distributionType = distributionType;
-						prevNetworkInterfaceInfo.mixtureSize = mixtureSize;
+								mixtureSize);
 					}
-
 				}
 				else
 				{
-					if (auto& netInterface = onDeviceData->launchParamsData.getHostImage().networkInterface; netInterface != nullptr)
-					{
-						// Free memory if we are not using neural network
-						onDeviceData->networkInterfaceData.freeResourceBuffer();
-						onDeviceData->prevNetworkInterfaceInfo = DeviceDataCoordinator::PrevNetworkInterfaceInfo();
-						onDeviceData->launchParamsData.editableHostImage().networkInterface = nullptr;
-					}
+					resetNetworkInterfaceAllocation();
 				}
 			}
 			catch (const std::exception& e) {

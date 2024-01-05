@@ -2,6 +2,8 @@
 #include <string>
 #include "Core/Utils.h"
 #include "Core/Math.h"
+#include "Device/InteropWrapper.h"
+#include "Device/UploadCode/CUDABuffer.h"
 
 namespace vtx
 {
@@ -34,6 +36,10 @@ namespace vtx
 
 		float* getData();
 
+		GlFrameBuffer getGlFrameBufferFromCudaBuffer();
+
+		bool isCudaBufferSet() const;
+
 	private:
 		bool saveJpeg(const std::string& path);
 
@@ -47,9 +53,12 @@ namespace vtx
 
 		std::vector<float> flipImageVertically();
 
-		std::vector<float> data ={};
-		int width = 0;
-		int height = 0;
-		int channels = 0;
+		std::vector<float> data     ={};
+		int                width    = 0;
+		int                height   = 0;
+		int                channels = 0;
+		CUDABuffer*                bufferP = nullptr;
+		InteropWrapper	interopDraw;
+
 	};
 }

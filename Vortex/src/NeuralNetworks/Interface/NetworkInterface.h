@@ -1,138 +1,449 @@
-﻿#pragma once
-#ifndef NETWORK_INTERFACE_H
-#define NETWORK_INTERFACE_H
-#include "NetworkInputs.h"
-#include "NpgTrainingData.h"
-#include "Paths.h"
-#include "ReplayBuffer.h"
-#include "Scene/Nodes/RendererSettings.h"
-#include "Device/DevicePrograms/ToneMapper.h"
+#pragma once
+#ifndef NEW_NETWORK_INTERFACE
+#define NEW_NETWORK_INTERFACE
+
+#define CUDA_INTERFACE
+#include "NeuralNetworks/Distributions/Mixture.h"
+#include "NetworkInterfaceStructs.h"
 #include "NeuralNetworks/Config/NetworkSettings.h"
+#include "Device/DevicePrograms/nvccUtils.h"
 
 namespace vtx
 {
-	namespace device
+#define printInvalidCondition(condition) if (condition) {printf("Invalid condition file %s line %d condition %s\n", __FILE__, __LINE__, #condition); return;}
+	struct Samples
 	{
-		struct NetworkInterfaceBuffer;
-	}
+		math::vec3f* position = nullptr;
+		math::vec3f* wo = nullptr;
+		math::vec3f* normal = nullptr;
+		float* instanceId = nullptr;
+		float* triangleId = nullptr;
+		float* matId = nullptr;
+		math::vec3f* Lo;
+		math::vec3f* wi;
+		math::vec3f* Li;
+		math::vec3f* bsdf;
+		float* bsdfProb;
+		float* wiProb;
+		int* validSamples;
 
-	struct InferenceQueries;
-	struct NpgTrainingData;
-	struct ReplayBuffer;
-	struct Paths;
+		cudaFunction static bool isNotValid(const float value)
+		{
+			return (isnan(value) || isinf(value));
+		}
+
+		cudaFunction static bool isNotValid(const math::vec3f& value)
+		{
+			return (math::isNan(value) || math::isInf(value));
+		}
+
+		cudaFunction void registerBsdfSample(const int index, const BounceData& data)
+		{
+			//printInvalidCondition(isNotValid(data.hit.position));
+			//printInvalidCondition(isNotValid(data.wo));
+			//printInvalidCondition(isNotValid(data.hit.normal));
+			//printInvalidCondition(isNotValid((float)data.hit.instanceId));
+			//printInvalidCondition(isNotValid((float)data.hit.triangleId));
+			//printInvalidCondition(isNotValid((float)data.hit.matId));
+			//printInvalidCondition(isNotValid(data.bsdfSample.Lo));
+			//printInvalidCondition(isNotValid(data.bsdfSample.wi));
+			//printInvalidCondition(isNotValid(data.bsdfSample.Li));
+			//printInvalidCondition(isNotValid(data.bsdfSample.bsdf));
+			//printInvalidCondition(isNotValid(data.bsdfSample.bsdfProb));
+			//printInvalidCondition(data.bsdfSample.bsdfProb < 0.0000001f);
+			//printInvalidCondition(math::length(data.hit.normal) < 0.00001f);
+			//printInvalidCondition(math::length(data.wo) < 0.00001f);
+
+			position[index] = data.hit.position;
+			wo[index] = data.wo;
+			normal[index] = data.hit.normal;
+			instanceId[index] = (float)data.hit.instanceId;
+			triangleId[index] = (float)data.hit.triangleId;
+			matId[index] = (float)data.hit.matId;
+			Lo[index] = data.bsdfSample.Li * data.bsdfSample.bsdf;
+			wi[index] = data.bsdfSample.wi;
+			Li[index] = data.bsdfSample.Li;
+			bsdf[index] = data.bsdfSample.bsdf;
+			bsdfProb[index] = data.bsdfSample.bsdfProb;
+			wiProb[index] = data.bsdfSample.wiProb;
+			validSamples[index] = 1;
+		}
+
+		cudaFunction void registerLightSample(const int index, const BounceData& data)
+		{
+			if (!data.lightSample.valid)
+			{
+				return;
+			}
+			//printInvalidCondition(isNotValid(data.hit.position));
+			//printInvalidCondition(isNotValid(data.wo));
+			//printInvalidCondition(isNotValid(data.hit.normal));
+			//printInvalidCondition(isNotValid((float)data.hit.instanceId));
+			//printInvalidCondition(isNotValid((float)data.hit.triangleId));
+			//printInvalidCondition(isNotValid((float)data.hit.matId));
+			//printInvalidCondition(isNotValid(data.lightSample.Lo));
+			//printInvalidCondition(isNotValid(data.lightSample.wi));
+			//printInvalidCondition(isNotValid(data.lightSample.Li));
+			//printInvalidCondition(isNotValid(data.lightSample.bsdf));
+			//printInvalidCondition(isNotValid(data.lightSample.bsdfProb));
+			//printInvalidCondition(data.lightSample.bsdfProb < 0.0000001f);
+			//printInvalidCondition(math::length(data.hit.normal) < 0.001f);
+			//printInvalidCondition(math::length(data.wo) < 0.001f);
+
+			position[index] = data.hit.position;
+			wo[index] = data.wo;
+			normal[index] = data.hit.normal;
+			instanceId[index] = (float)data.hit.instanceId;
+			triangleId[index] = (float)data.hit.triangleId;
+			matId[index] = (float)data.hit.matId;
+			Lo[index] = data.lightSample.Li * data.lightSample.bsdf;
+			wi[index] = data.lightSample.wi;
+			Li[index] = data.lightSample.Li;
+			bsdf[index] = data.lightSample.bsdf;
+			bsdfProb[index] = data.lightSample.bsdfProb;
+			wiProb[index] = data.lightSample.wiProb;
+			validSamples[index] = 1;
+		}
+
+		cudaFunction int getIndex(const int pixelId, const int bounce, const int maxBounce, bool isLightSample)
+		{
+			//return cuAtomicAdd(size, 1);
+			int id = pixelId * maxBounce * 2 + bounce;
+			if (isLightSample)
+			{
+				id++;
+			}
+			return id;
+		}
+
+		cudaFunction void registerSample(const int pixelId, const int maxBounce, const int bounce, const BounceData& p, const network::config::NetworkSettings& netSettings)
+		{
+			if (
+				//!p.bsdfSample.isSpecular &&
+				bounce < maxBounce &&
+				(netSettings.trainingBatchGenerationSettings.limitToFirstBounce == false || bounce == 0)
+				)
+			{
+				if (!netSettings.trainingBatchGenerationSettings.onlyNonZero) {
+					if (netSettings.trainingBatchGenerationSettings.trainOnLightSample)
+					{
+						registerLightSample(getIndex(pixelId, bounce, maxBounce, true), p);
+					}
+					if (bounce != maxBounce)
+					{
+						registerBsdfSample(getIndex(pixelId, bounce, maxBounce, false), p);
+					}
+				}
+				else
+				{
+					if (!math::isZero(p.bsdfSample.Lo) && bounce != maxBounce)
+					{
+						registerBsdfSample(getIndex(pixelId, bounce, maxBounce, false), p);
+					}
+					if (!math::isZero(p.lightSample.Lo) && netSettings.trainingBatchGenerationSettings.trainOnLightSample)
+					{
+						registerLightSample(getIndex(pixelId, bounce, maxBounce, true), p);
+					}
+				}
+			}
+		}
+	};
+
+	struct TrainingData
+	{
+		math::vec3f* position = nullptr;
+		math::vec3f* wo = nullptr;
+		math::vec3f* normal = nullptr;
+		float* instanceId = nullptr;
+		float* triangleId = nullptr;
+		float* matId = nullptr;
+		math::vec3f* Lo;
+		math::vec3f* wi;
+		math::vec3f* Li;
+		math::vec3f* bsdf;
+		float* bsdfProb;
+		float* wiProb;
+
+		int nAlloc;
+		int* size;
+
+		cudaFunction void reset()
+		{
+			*size = 0;
+		}
+
+		cudaFunction void buildTrainingData(const int id, const Samples* samples)
+		{
+			if(samples->validSamples[id]!=1)
+			{
+				return;
+			}
+			int index = cuAtomicAdd(size, 1);
+			position[index] = samples->position[id];
+			wo[index] = samples->wo[id];
+			normal[index] = samples->normal[id];
+			instanceId[index] = samples->instanceId[id];
+			triangleId[index] = samples->triangleId[id];
+			matId[index] = samples->matId[id];
+			Lo[index] = samples->Lo[id];
+			wi[index] = samples->wi[id];
+			Li[index] = samples->Li[id];
+			bsdf[index] = samples->bsdf[id];
+			bsdfProb[index] = samples->bsdfProb[id];
+			wiProb[index] = samples->wiProb[id];
+		}
+	};
+
+	struct InferenceData
+	{
+		math::vec3f* position = nullptr;
+		math::vec3f* wo = nullptr;
+		math::vec3f* normal = nullptr;
+		float* instanceId = nullptr;
+		float* triangleId = nullptr;
+		float* matId = nullptr;
+
+		float* distributionParameters = nullptr;
+		float* mixtureWeights = nullptr;
+		float* samplingFractionArray = nullptr;
+
+		int* size;
+
+		int                        nAlloc;
+		network::config::DistributionType  distributionType;
+		int                        mixtureSize;
+
+		cudaFunction void registerQuery(const int queryId, const BounceData& data)
+		{
+			cuAtomicAdd(size, 1);
+			position[queryId] = data.hit.position;
+			wo[queryId] = data.wo;
+			normal[queryId] = data.hit.normal;
+			instanceId[queryId] = (float)data.hit.instanceId;
+			triangleId[queryId] = (float)data.hit.triangleId;
+			matId[queryId] = (float)data.hit.matId;
+		}
+
+		cudaFunction void reset()
+		{
+			*size = 0;
+		}
+
+		cudaFunction float evaluate(const int& idx, const math::vec3f& action)
+		{
+			const float* sampleMixtureParams = nullptr;
+			const float* sampleMixtureWeights = nullptr;
+			getSampleMixtureParameters(idx, sampleMixtureParams, sampleMixtureWeights);
+			const float  sampleProb = distribution::Mixture::evaluate(sampleMixtureParams, sampleMixtureWeights, mixtureSize, distributionType, action);
+			return sampleProb;
+		}
+
+		cudaFunction math::vec4f sample(const int& idx, unsigned& seed) const
+		{
+			const float* sampleMixtureParams = nullptr;
+			const float* sampleMixtureWeights = nullptr;
+			getSampleMixtureParameters(idx, sampleMixtureParams, sampleMixtureWeights);
+			math::vec3f  sample = distribution::Mixture::sample(sampleMixtureParams, sampleMixtureWeights, mixtureSize, distributionType, seed);
+			const float  sampleProb = distribution::Mixture::evaluate(sampleMixtureParams, sampleMixtureWeights, mixtureSize, distributionType, sample);
+			return { sample, sampleProb };
+		}
+
+		cudaFunction void getSampleMixtureParameters(const int& idx, const float*& sampleMixtureParams, const float*& sampleMixtureWeights) const
+		{
+			const int mixtureParamsOffset = idx * mixtureSize * distribution::Mixture::getDistributionParametersCount(distributionType);
+			const int mixtureWeightsOffset = idx * mixtureSize;
+			sampleMixtureParams = distributionParameters + mixtureParamsOffset;
+			sampleMixtureWeights = mixtureWeights + mixtureWeightsOffset;
+		}
+
+		cudaFunction math::vec3f& getStatePosition(const int& idx)
+		{
+			return position[idx];
+		}
+
+		cudaFunction math::vec3f& getStateDirection(const int& idx)
+		{
+			return wo[idx];
+		}
+
+		cudaFunction math::vec3f& getStateNormal(const int& idx)
+		{
+			return normal[idx];
+		}
+
+		cudaFunction math::vec3f getMean(const int& idx)
+		{
+			const float* sampleMixtureParams = nullptr;
+			const float* sampleMixtureWeights = nullptr;
+			getSampleMixtureParameters(idx, sampleMixtureParams, sampleMixtureWeights);
+			return distribution::Mixture::getAvarageAxis(sampleMixtureParams, sampleMixtureWeights, mixtureSize, distributionType);
+		}
+
+		cudaFunction float getConcentration(const int& idx)
+		{
+			const float* sampleMixtureParams = nullptr;
+			const float* sampleMixtureWeights = nullptr;
+			getSampleMixtureParameters(idx, sampleMixtureParams, sampleMixtureWeights);
+			return distribution::Mixture::getAvarageConcentration(sampleMixtureParams, sampleMixtureWeights, mixtureSize, distributionType);
+		}
+
+		cudaFunction float& getSamplingFraction(const int& idx)
+		{
+			return samplingFractionArray[idx];
+		}
+
+		cudaFunction float getAnisotropy(const int& idx)
+		{
+			const float* sampleMixtureParams = nullptr;
+			const float* sampleMixtureWeights = nullptr;
+			getSampleMixtureParameters(idx, sampleMixtureParams, sampleMixtureWeights);
+			return distribution::Mixture::getAverageAnisotropy(sampleMixtureParams, sampleMixtureWeights, mixtureSize, distributionType);
+		}
+	};
 
 	struct NetworkInterface
 	{
-		struct WhatChanged
+		BounceData* path = nullptr;
+		int* maxPathLength = nullptr;
+		int maxAllowedPathLength = 0;
+
+		Samples* samples = nullptr;
+		TrainingData* trainingData = nullptr;
+		InferenceData* inferenceData = nullptr;
+
+		NetworkInterfaceDebugBuffers* debugBuffers = nullptr;
+
+		NetworkDebugInfo* debugInfo = nullptr;
+
+		cudaFunction BounceData& get(unsigned pixel, unsigned bounce)
 		{
-			bool maxDepth = false;
-			bool numberOfPixels = false;
-			bool maxDatasetSize = false;
-			bool distributionType = false;
-		};
-
-		static NetworkInterface* upload(
-			const int&                      _numberOfPixels,
-			const int&                      _maxDatasetSize,
-			const int&                      _maxDepth,
-			const int&                      frameId,
-			const network::config::DistributionType _distributionType,
-			const int                       _mixtureSize,
-			const ToneMapperSettings&       _toneMapperSettings,
-			const WhatChanged&              changed,
-			device::NetworkInterfaceBuffer& networkInterfaceBuffers);
-
-	private:
-		NetworkInterface(
-			const int& numberOfPixels,
-			const int& maxDatasetSize,
-			const int& maxDepth,
-			const int& frameId,
-			const network::config::DistributionType distributionType,
-			int mixtureSize,
-			const ToneMapperSettings& _toneMapperSettings,
-			WhatChanged changed,
-			device::NetworkInterfaceBuffer& networkInterfaceBuffers);
-	public:
-
-		__forceinline__ __device__ void sppDebugFrame(const int sampledPixel, const int sampledDepth)
-		{
-			debugBuffer3[sampledPixel].x += 1.0f;
+			return path[pixel*maxAllowedPathLength + bounce];
 		}
 
-		__forceinline__ __device__ void shuffleDataset(const int& trainingDatasetIdx, const network::config::NetworkSettings& settings)
+		cudaFunction BounceData& getAndReset(unsigned pixel, unsigned bounce)
 		{
-			if (trainingDatasetIdx >= npgTrainingData->nAlloc)
+			BounceData& d = get(pixel, bounce);
+			//d.reset();
+			//if(bounce < maxAllowedPathLength) get(pixel, bounce + 1).reset();
+			return d;
+		}
+
+		cudaFunction void record(
+			unsigned pixel
+			, unsigned bounce
+			, BounceData& data
+		)
+		{
+			BounceData& d = get(pixel, bounce);
+			d = data;
+			maxPathLength[pixel] = bounce;
+		}
+
+		cudaFunction void validateLightSample(unsigned pixel, unsigned bounce)
+		{
+			BounceData& d = get(pixel, bounce);
+			d.lightSample.valid = true;
+		}
+
+		cudaFunction __host__ void static bounceComputation(const int bounce, const int maxBounce, BounceData& p, const math::vec3f& nextPLo, const network::config::NetworkSettings& netSettings)
+		{
+			if (bounce != maxBounce)
+			{
+				p.bsdfSample.Li = nextPLo;
+				if (netSettings.trainingBatchGenerationSettings.weightByPdf)
+				{
+					p.bsdfSample.Lo = p.bsdfSample.bsdfOverProb * p.bsdfSample.Li;
+				}
+				else
+				{
+					p.bsdfSample.Lo = p.bsdfSample.bsdf * p.bsdfSample.Li;
+				}
+			}
+
+			// Light Sample Contribution
+			p.lightSample.Lo = 0.0f;
+			if (p.lightSample.valid && netSettings.trainingBatchGenerationSettings.useLightSample)
+			{
+				if (netSettings.trainingBatchGenerationSettings.weightByPdf)
+				{
+					p.lightSample.Lo = p.lightSample.bsdf * p.lightSample.LiOverProb;
+				}
+				else
+				{
+					p.lightSample.Lo = p.lightSample.bsdf * p.lightSample.Li;
+				}
+				if (netSettings.trainingBatchGenerationSettings.weightByMis)
+				{
+					p.lightSample.Lo *= p.lightSample.misWeight;
+				}
+			}
+
+			p.Lo += p.bsdfSample.Lo;
+			p.Lo += p.lightSample.Lo;
+
+			if (netSettings.trainingBatchGenerationSettings.weightByMis)
+			{
+				p.Lo += p.surfaceEmission.Le * p.surfaceEmission.misWeight;
+			}
+			else
+			{
+				p.Lo += p.surfaceEmission.Le;
+			}
+		}
+
+		cudaFunction void finalizePath(unsigned pixel, unsigned width, unsigned height, const network::config::NetworkSettings& netSettings, bool registerTrainingSample = true)
+		{
+			const int maxBounce = maxPathLength[pixel];
+			if(maxBounce == -1)
+			{
+
+				return;
+			}
+
+			math::vec3f nextPLo = 0.0f;
+			for(int bounce = maxBounce; bounce >= 0; bounce--)
+			{
+				BounceData& p = get(pixel, bounce);
+
+				// Bsdf Sample Contribution
+				bounceComputation(bounce, maxBounce, p, nextPLo, netSettings);
+				nextPLo = p.Lo;
+
+				if(registerTrainingSample)
+				{
+					samples->registerSample(pixel, maxAllowedPathLength, bounce, p, netSettings);
+				}
+				
+			}
+			debugBuffers->filmBuffer[pixel] += math::vec4f{ nextPLo, 1.0f };
+		}
+
+		cudaFunction __host__ static void finalizePathStatic(const network::config::NetworkSettings& netSettings, int maxBounce, BounceData* data)
+		{
+			if (maxBounce == -1)
 			{
 				return;
 			}
 
-			unsigned& seed = lcgSeeds[trainingDatasetIdx];
-			Paths::Hit hit;
-			Paths::Hit* nextHit = nullptr;
-			/*if (settings.type == network::NT_SAC)
+			math::vec3f nextPLo = 0.0f;
+			for (int bounce = maxBounce-1; bounce >= 0; bounce--)
 			{
-				*nextHit = Paths::Hit();
-			}*/
-			Paths::LightContribution lightContribution;
-			bool isTerminal = false;
-			int sampledPixel = 0;
-			int sampledDepth = 0;
-			if(settings.trainingBatchGenerationSettings.strategy == network::config::SS_ALL || settings.trainingBatchGenerationSettings.strategy == network::config::SS_PATHS_WITH_CONTRIBUTION)
-			{
-				paths->getRandomPathSample(
-					seed, settings,
-					sampledPixel, sampledDepth,
-					&hit, &lightContribution, isTerminal, nextHit
-				);
-			}
-			else if(settings.trainingBatchGenerationSettings.strategy == network::config::SS_LIGHT_SAMPLES)
-			{
-				paths->getRandomLightSamplePath(
-					seed, settings.trainingBatchGenerationSettings,
-					sampledPixel, sampledDepth,
-					&hit, &lightContribution, isTerminal, nextHit
-				);
-			}
-			else
-			{
-				printf("Unknown training batch generation strategy, file: %s, line %d\n", __FILE__, __LINE__);
-			}
+				BounceData& p = data[bounce];
 
-
-			npgTrainingData->inputs->addState(trainingDatasetIdx, hit.position, hit.wOutgoing, hit.normal, (float)hit.instanceId, (float)hit.triangleId, (float)hit.materialId);
-			npgTrainingData->incomingDirection[trainingDatasetIdx] = lightContribution.wIncoming;
-			npgTrainingData->bsdfProbabilities[trainingDatasetIdx] = lightContribution.bsdfProb;
-			npgTrainingData->outRadiance[trainingDatasetIdx] = lightContribution.outRadiance;
-			npgTrainingData->inRadiance[trainingDatasetIdx] = lightContribution.inRadiance;
-			npgTrainingData->throughput[trainingDatasetIdx] = lightContribution.throughput;
-			npgTrainingData->overallProb[trainingDatasetIdx] = hit.overallProb;
-			
-			const float signal = utl::luminance(lightContribution.outRadiance);
-			debugBuffer1[sampledPixel].x += signal;
-			//debugBuffer2[sampledPixel] += lightContribution.outRadiance;
-			debugBuffer1[sampledPixel].x = lightContribution.bsdfProb;
-			debugBuffer1[sampledPixel].z += 1.0f;
-			sppDebugFrame(sampledPixel, sampledDepth);
+				// Bsdf Sample Contribution
+				bounceComputation(bounce, maxBounce, p, nextPLo, netSettings);
+				nextPLo = p.Lo;
+			}
 		}
 
-		Paths* paths;
-		ReplayBuffer* replayBuffer;
-		NpgTrainingData* npgTrainingData;
-		InferenceQueries* inferenceQueries;
-		unsigned* lcgSeeds;
-		ToneMapperSettings toneMapperSettings;
-
-		math::vec3f* debugBuffer1;
-		math::vec3f* debugBuffer2;
-		math::vec3f* debugBuffer3;
-
-		int numberOfPixels;
-		int maxDatasetSize;
-		int maxDepth;
-		network::config::DistributionType distributionType;
-		int mixtureSize;
+		cudaFunction void reset(unsigned pixel)
+		{
+			maxPathLength[pixel] = -1;
+			for(int bounce = 0; bounce < maxAllowedPathLength; ++bounce)
+			{
+				get(pixel, bounce).reset();
+			}
+		}
 	};
 }
-
 #endif

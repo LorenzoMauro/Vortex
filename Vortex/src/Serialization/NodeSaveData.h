@@ -218,7 +218,8 @@ namespace vtx::serializer
 		EnvironmentLightNodeSaveData() = default;
 		EnvironmentLightNodeSaveData(const std::shared_ptr<graph::EnvironmentLight>& node, const std::string& filePath)
 			: base(node),
-			transformUID(node->transform->getUID())
+			transformUID(node->transform->getUID()),
+			scaleLuminosity(node->scaleLuminosity)
 		{
 			texturePath = moveImageToSaveLocation(filePath, node->envTexture->filePath);
 		}
@@ -230,6 +231,7 @@ namespace vtx::serializer
 			restoreNode->name = base.name;
 			texturePath = restoreActualImagePath(filePath, texturePath);
 			restoreNode->envTexture = ops::createNode<graph::Texture>(texturePath);
+			restoreNode->scaleLuminosity = scaleLuminosity;
 		}
 
 		void link(std::map<vtxID, vtxID>& oldToNewUIDMap)
@@ -240,6 +242,7 @@ namespace vtx::serializer
 		BaseNodeSaveData base;
 		vtxID            transformUID;
 		std::string      texturePath;
+		float            scaleLuminosity;
 
 		std::shared_ptr<graph::EnvironmentLight> restoreNode = nullptr;
 
@@ -280,9 +283,11 @@ namespace vtx::serializer
 		ExperimentSaveData(const Experiment& experiment, const std::string& filePath)
 			: name(experiment.name)
 			, mape(experiment.mape)
+			, mse(experiment.mse)
 			, rendererSettings(experiment.rendererSettings)
 			, wavefrontSettings(experiment.wavefrontSettings)
 			, averageMape(experiment.averageMape)
+			, averageMse(experiment.averageMse)
 			, statistics(experiment.statistics)
 			, generatedByBatchExperiments(experiment.generatedByBatchExperiments)
 			, completed(experiment.completed)
@@ -295,6 +300,7 @@ namespace vtx::serializer
 			Experiment experiment;
 			experiment.name = name;
 			experiment.mape = mape;
+			experiment.mse = mse;
 			experiment.rendererSettings = rendererSettings;
 			experiment.networkSettings = networkSettings;
 			experiment.wavefrontSettings = wavefrontSettings;
@@ -307,10 +313,12 @@ namespace vtx::serializer
 
 		std::string                      name;
 		std::vector<float>               mape;
+		std::vector<float>               mse;
 		RendererSettings                 rendererSettings;
 		network::config::NetworkSettings networkSettings;
 		WavefrontSettings                wavefrontSettings;
 		float 							 averageMape;
+		float 							 averageMse;
 		graph::Statistics                statistics;
 		bool                             generatedByBatchExperiments;
 		bool                             completed;
@@ -363,11 +371,10 @@ namespace vtx::serializer
 					if(exp.completed)
 					{
 						experimentManager.experimentSet.emplace(exp.getStringHashKey());
-						float mapeScore = exp.averageMape + exp.mape.back();
-						experimentManager.experimentMinHeap.push({ mapeScore, experimentManager.experiments.size() - 1 });
-						if (mapeScore < experimentManager.bestMapeScore)
+						experimentManager.experimentMinHeap.push({ experiment.mape.back(), experimentManager.experiments.size() - 1});
+						if (experiment.mape.back() < experimentManager.bestMapeScore)
 						{
-							experimentManager.bestMapeScore = mapeScore;
+							experimentManager.bestMapeScore = experiment.mape.back();
 							experimentManager.bestExperimentIndex = experimentManager.experiments.size() - 1;
 							exp.displayExperiment = true;
 						}
@@ -892,7 +899,7 @@ namespace vtx::serializer
 			linkNodes(materials, oldToNewUIDMap);
 			linkNodes(instances, oldToNewUIDMap);
 			linkNodes(groups, oldToNewUIDMap);
-			//linkNodes(environmentLights, oldToNewUIDMap);
+			linkNodes(environmentLights, oldToNewUIDMap);
 			linkNodes(cameras, oldToNewUIDMap);
 			linkNodes(renderers, oldToNewUIDMap);
 			linkNodes(shaderNodes, oldToNewUIDMap);

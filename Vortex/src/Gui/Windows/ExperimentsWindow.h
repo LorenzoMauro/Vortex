@@ -9,6 +9,23 @@ namespace vtx {
 		class Renderer;
 	}
 
+    enum PopUpImage
+	{
+		POPUP_IMAGE_NONE,
+		POPUP_IMAGE_GROUND_TRUTH,
+		POPUP_IMAGE_MAPE,
+		POPUP_IMAGE_MSE,
+        POPUP_IMAGE_COUNT
+	};
+
+    const static inline char* popUpImageNames[] =
+	{
+			"None",
+			"Ground Truth",
+			"MAPE",
+			"MSE"
+	};
+
 	class ExperimentsWindow : public Window {
     public:
 
@@ -33,12 +50,17 @@ namespace vtx {
 		void test();
 
 	public:
-        CUDABuffer mapeBuffer;
+        CUDABuffer                              mapeBuffer;
         const std::shared_ptr<graph::Renderer>& renderer;
-        bool toggleMisExperiment = true;
-        bool toggleBsdfExperiment = true;
-        float lossesContentPercentage = 0.75f;
-        bool performBatchExperiment = false;
-        bool displayAll = false;
-    };
+        bool                                    toggleMisExperiment     = true;
+        bool                                    toggleBsdfExperiment    = true;
+        float                                   lossesContentPercentage = 0.75f;
+        bool                                    performBatchExperiment  = false;
+        bool                                    displayAll              = false;
+        bool                                    displayGtImage          = false;
+		bool                                    displayMSE = false;
+		bool                                    displayMAPE = false;
+		bool                                    displayMSEPlot = true;
+		bool                                    displayMAPEPlot = true;
+	};
 };

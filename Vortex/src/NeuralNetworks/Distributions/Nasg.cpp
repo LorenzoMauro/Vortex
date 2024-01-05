@@ -1,12 +1,13 @@
 ﻿#include "Nasg.h"
 #include "TransformUtils.h"
+#include "Core/Constants.h"
 #include "NeuralNetworks/NeuralNetworkGraphs.h"
 
 namespace vtx::distribution
 {
 	torch::Tensor Nasg::normalizationFactor(const torch::Tensor& lambda, const torch::Tensor& a)
 	{
-		const torch::Tensor denumenator = lambda * torch::sqrt(1.0f + a)+EPS;
+		const torch::Tensor denumenator = lambda * torch::sqrt(1.0f + a)+sEps;
 		const torch::Tensor numerator = 2.0f * (float)M_PI * (1.0f - torch::exp(-2.0f * lambda));
 		torch::Tensor normalizationFactor = numerator / denumenator;
 		TRACE_TENSOR(denumenator);
@@ -18,9 +19,8 @@ namespace vtx::distribution
 	torch::Tensor lambdaAActivation(const torch::Tensor& rawParams, const int& startIndex)
 	{
 		const torch::Tensor s1 = rawParams.narrow(-1, startIndex, 2);
-		//torch::Tensor lambdaA = sigmoid(s1)*50.0f + EPS*10;
-		torch::Tensor       lambdaA = softplus(s1) + EPS*10;
-		lambdaA = torch::clamp(lambdaA, 0, 50.0f);
+		torch::Tensor       lambdaA = softplus(s1) + sEps*10;
+		lambdaA = torch::clamp(lambdaA, 0, 200.0f);
 		return lambdaA;
 	}
 
@@ -52,7 +52,7 @@ namespace vtx::distribution
 		torch::Tensor trigParams = 2 * sigmoid(s0) - 1;
 
 		const torch::Tensor cosTheta = trigParams.narrow(-1, 0, 1);
-		const torch::Tensor sinTheta = torch::sqrt(1 - torch::pow(cosTheta, 2) + EPS);
+		const torch::Tensor sinTheta = torch::sqrt(1 - torch::pow(cosTheta, 2) + sEps);
 		TRACE_TENSOR(sinTheta);
 
 		// Extract parts of trigParams
@@ -64,7 +64,7 @@ namespace vtx::distribution
 
 		// Normalize the trigonometric values so that they refer to real angles
 
-		trigParams += EPS;
+		trigParams += sEps;
 		const torch::Tensor normalization = linalg_vector_norm(trigParams, 2, -1, true).expand_as(trigParams);
 		trigParams = trigParams / normalization;
 		TRACE_TENSOR(trigParams);
@@ -108,7 +108,7 @@ namespace vtx::distribution
 	std::tuple<torch::Tensor, torch::Tensor, torch::Tensor> axisAngleParametrization(const torch::Tensor& rawParams)
 	{
 		// Normalize z using the given approach
-		torch::Tensor zAxis = rawParams.narrow(-1, 0, 3) + EPS;
+		torch::Tensor zAxis = rawParams.narrow(-1, 0, 3) + sEps;
 		zAxis = normalize(zAxis, torch::nn::functional::NormalizeFuncOptions().dim(-1));
 
 		torch::Tensor gamma = rawParams.narrow(-1, 3, 1);
@@ -119,7 +119,7 @@ namespace vtx::distribution
 
 		// Just to handle the extremely rare case where z might be [0, 1, 0] or very close.
 		// Add a tiny bit to x_init to ensure it's not zero.
-		xInit = xInit + EPS;
+		xInit = xInit + sEps;
 		xInit = normalize(xInit, torch::nn::functional::NormalizeFuncOptions().dim(-1));
 		// Normalize x_init again using the same approach
 
@@ -191,7 +191,7 @@ namespace vtx::distribution
 		const torch::Tensor& a
 	)
 	{
-		const torch::Tensor vDotZ = (sample * zAxis).sum(-1, true).clamp(-1.0f + EPS, 1.0f - EPS);
+		const torch::Tensor vDotZ = (sample * zAxis).sum(-1, true).clamp(-1.0f + sEps, 1.0f - sEps);
 		const torch::Tensor vDotX = (sample * xAxis).sum(-1, true);
 		const torch::Tensor scaleValue = (vDotZ + 1.0f) / 2.0f;
 		const torch::Tensor denominator = 1.0f - torch::pow(vDotZ, 2.0f);
@@ -201,7 +201,7 @@ namespace vtx::distribution
 		const torch::Tensor pow2 = torch::pow(scaleValue, powerValue);
 		const torch::Tensor g = torch::exp(2.0f * lambda * (pow1 - 1.0f)) * pow2;
 		const torch::Tensor normalization = normalizationFactor(lambda, a);
-		torch::Tensor       finalResult = g / (normalization+EPS);
+		torch::Tensor       finalResult = g / (normalization+sEps);
 
 		TRACE_TENSOR(vDotZ);
 		TRACE_TENSOR(vDotX);

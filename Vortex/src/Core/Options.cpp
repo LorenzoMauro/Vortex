@@ -33,7 +33,7 @@ namespace vtx {
 		options.rendererSettings.maxSamples = 100000;
 		options.rendererSettings.accumulate = true;
 		options.rendererSettings.samplingTechnique = S_MIS;
-		options.rendererSettings.displayBuffer = FB_BEAUTY;
+		options.rendererSettings.displayBuffer = FB_NETWORK_DEBUG_PATHS;
 		options.rendererSettings.minClamp = 0.0001f;
 		options.rendererSettings.maxClamp = 1000.0f;
 		options.rendererSettings.useRussianRoulette = true;
@@ -89,9 +89,12 @@ namespace vtx {
 		options.networkSettings.inferenceIterationStart = 1;
 		options.networkSettings.clearOnInferenceStart = true;
 
-		options.networkSettings.trainingBatchGenerationSettings.lightSamplingProb = 0.0f;
-		options.networkSettings.trainingBatchGenerationSettings.weightByMis= true;
-		options.networkSettings.trainingBatchGenerationSettings.strategy = network::config::SS_PATHS_WITH_CONTRIBUTION;
+		options.networkSettings.trainingBatchGenerationSettings.onlyNonZero = false;
+		options.networkSettings.trainingBatchGenerationSettings.limitToFirstBounce = false;
+		options.networkSettings.trainingBatchGenerationSettings.weightByMis = true;
+		options.networkSettings.trainingBatchGenerationSettings.weightByPdf = true;
+		options.networkSettings.trainingBatchGenerationSettings.useLightSample = true;
+		options.networkSettings.trainingBatchGenerationSettings.trainOnLightSample = true;
 
 		options.networkSettings.inputSettings.position.otype = network::config::EncodingType::Frequency;
 

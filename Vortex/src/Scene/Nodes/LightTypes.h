@@ -25,7 +25,8 @@ namespace vtx
 		float       distance;
 		float       pdf;
 		bool        isValid = false;
-		LightType         typeLight;
+		LightType   typeLight;
+		math::vec3f         radiance;
 	};
 }
 

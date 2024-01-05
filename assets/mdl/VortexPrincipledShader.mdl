@@ -214,7 +214,7 @@ export material principledVortex(
     //Metallic Glossy Mix
     bsdf MetalGlossyMix = df::weighted_layer(
         weight: Metallic,
-        layer: metal_brdf_fresnel_factored,
+        layer: metal,
         base: glossyFresnel,
         normal: Normal);
     

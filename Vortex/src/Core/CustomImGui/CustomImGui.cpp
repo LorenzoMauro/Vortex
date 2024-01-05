@@ -3,6 +3,7 @@
 #include <stack>
 #include <vector>
 #include "Core/Log.h"
+#include "Scene/Nodes/Camera.h"
 
 namespace vtx::vtxImGui
 {
@@ -318,6 +319,27 @@ namespace vtx::vtxImGui
         return false;
     }
 
+    bool halfSpaceStringCombo(const char* label, std::string& stringVariable, const std::vector<std::string>& options)
+    {
+	    const int nOptions = options.size();
+		std::vector<const char*> charOptions(nOptions);
+		int optionIndex = 0;
+		for (int i = 0; i < nOptions; ++i)
+		{
+			charOptions[i] = options[i].c_str();
+			if (stringVariable == options[i])
+			{
+				optionIndex = i;
+			}
+		}
+		if (vtxImGui::halfSpaceWidget(label, (ComboFuncType)ImGui::Combo, (hiddenLabel + label).c_str(), &optionIndex, charOptions.data(), nOptions, -1))
+		{
+			stringVariable = options[optionIndex];
+			return true;
+		}
+		return false;
+	}
+
     bool halfSpaceCheckbox(const char* label, bool* v)
     {
         return vtxImGui::halfSpaceWidget(label, ImGui::Checkbox, (hiddenLabel + label).c_str(), v);
@@ -418,6 +440,53 @@ namespace vtx::vtxImGui
             drawList->AddLine(p0, p1, ImColor(0, 0, 0, 200), 1.0f);
         }
     }
+
+    void drawVector(const std::shared_ptr<graph::Camera>& camera, const math::vec3f& origin, const math::vec3f& direction, const math::vec3f& color)
+    {
+        // Project vector endpoints to screen space
+        const math::vec2f screenOrigin = camera->project(origin, true);
+        const math::vec2f screenPosition = camera->project(origin+direction, true);
+
+        //drawOrigin(screenOrigin);
+        //drawOrigin(screenPosition);
+        
+        // Draw the vector in ImGui
+        ImDrawList* drawList = ImGui::GetWindowDrawList();
+        const ImVec2 winPos = ImGui::GetWindowPos(); // Top-left corner
+        const ImVec2 start = ImVec2(winPos.x + screenOrigin.x, winPos.y + screenOrigin.y);
+        const ImVec2 end = ImVec2(winPos.x + screenPosition.x, winPos.y + screenPosition.y);
+        drawList->AddLine(
+            start,
+            end,
+            ImColor((int)(255*color.x), (int)(255*color.y), (int)(255*color.z), 255),
+            1.0f
+        );
+
+    }
+
+    void connectScenePoints(const std::shared_ptr<graph::Camera>& camera, const math::vec3f& point1, const math::vec3f& point2, const math::vec3f& color)
+    {
+        // Project vector endpoints to screen space
+        const math::vec2f screenOrigin = camera->project(point1, true);
+        const math::vec2f screenPosition = camera->project(point2, true);
+
+        //drawOrigin(screenOrigin);
+        //drawOrigin(screenPosition);
+
+        // Draw the vector in ImGui
+        ImDrawList* drawList = ImGui::GetWindowDrawList();
+        const ImVec2 winPos = ImGui::GetWindowPos(); // Top-left corner
+        const ImVec2 start = ImVec2(winPos.x + screenOrigin.x, winPos.y + screenOrigin.y);
+        const ImVec2 end = ImVec2(winPos.x + screenPosition.x, winPos.y + screenPosition.y);
+        drawList->AddLine(
+            start,
+            end,
+            ImColor((int)(255 * color.x), (int)(255 * color.y), (int)(255 * color.z), 255),
+            2.0f
+        );
+
+    }
+
 
 
 }

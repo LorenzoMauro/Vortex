@@ -20,7 +20,7 @@ namespace vtx
         math::vec3f uv;
         math::vec3f bitangent;
         math::vec3f tangent;
-        math::affine3f* oTw;
+        const math::affine3f* oTw;
         bool isFrontFace;
 
         // Material Related data
@@ -41,135 +41,119 @@ namespace vtx
             isInit = true;
         }
 
-        __forceinline__ __device__ void calculateForMeshLightSampling(const LaunchParams* params, const math::vec3f& rayOrigin, math::vec3f* outgoingDirection, float* distance)
+        // Can be used after defining instanceId and triangleId
+        __forceinline__ __device__ void getTriangleVertices(
+            const InstanceData& instance,
+            const graph::VertexAttributes*& v0,
+            const graph::VertexAttributes*& v1,
+            const graph::VertexAttributes*& v2
+        )
         {
-            InstanceData* instance = params->instances[instanceId];
-            const GeometryData* geometry = instance->geometryData;
-            const math::vec3ui       triVerticesIndices = reinterpret_cast<math::vec3ui*>(geometry->indicesData)[triangleId];
-            graph::VertexAttributes* vertices[3]{ nullptr, nullptr, nullptr };
-            vertices[0] = &(geometry->vertexAttributeData[triVerticesIndices.x]);
-            vertices[1] = &(geometry->vertexAttributeData[triVerticesIndices.y]);
-            vertices[2] = &(geometry->vertexAttributeData[triVerticesIndices.z]);
+            const GeometryData* geometry = instance.geometryData;
+            const unsigned* indices = &geometry->indicesData[triangleId*3];
+            v0 = &geometry->vertexAttributeData[indices[0]];
+            v1 = &geometry->vertexAttributeData[indices[1]];
+            v2 = &geometry->vertexAttributeData[indices[2]];
+        }
 
-            math::vec3f ngO = math::normalize(cross(vertices[1]->position - vertices[0]->position, vertices[2]->position - vertices[0]->position));
-            const math::vec3f nsO = math::normalize(vertices[0]->normal * baricenter.x + vertices[1]->normal * baricenter.y + vertices[2]->normal * baricenter.z);
-            const math::vec3f tgO = math::normalize(vertices[0]->tangent * baricenter.x + vertices[1]->tangent * baricenter.y + vertices[2]->tangent * baricenter.z);
-            const math::vec3f btO = math::normalize(vertices[0]->bitangent * baricenter.x + vertices[1]->bitangent * baricenter.y + vertices[2]->bitangent * baricenter.z);
-            uv = vertices[0]->texCoord * baricenter.x + vertices[1]->texCoord * baricenter.y + vertices[2]->texCoord * baricenter.z;
+        // Can be used after defining otw and baricentric Coordinates
+        __forceinline__ __device__ void computeSurfaceProperties(
+            const graph::VertexAttributes* v0,
+            const graph::VertexAttributes* v1,
+            const graph::VertexAttributes* v2
+        )
+        {
+            trueNormal = cross(v1->position - v0->position, v2->position - v0->position);
+            shadingNormal = v0->normal * baricenter.x + v1->normal * baricenter.y + v2->normal * baricenter.z;
+            //bitangent = v0->bitangent * baricenter.x + v1->bitangent * baricenter.y + v2->bitangent * baricenter.z;
+            tangent = v0->tangent * baricenter.x + v1->tangent * baricenter.y + v2->tangent * baricenter.z;
 
-            if (dot(ngO, nsO) < 0.0f) // make sure that shading and geometry normal agree on sideness
+            if (dot(trueNormal, shadingNormal) < 0.0f) // make sure that shading and geometry normal agree on sideness
             {
-                ngO = -ngO;
+                trueNormal = -trueNormal;
             }
 
-            oTw = &(instance->transform);
-            shadingNormal = math::normalize(math::transformNormal3F(*oTw, nsO));
-            trueNormal = math::normalize(math::transformNormal3F(*oTw, ngO));
-            tangent = math::normalize(math::transformVector3F(*oTw, tgO));
-            bitangent = math::normalize(math::transformVector3F(*oTw, btO));
+            trueNormal = math::normalize(math::transformNormal3F(*oTw, trueNormal));
+            shadingNormal = math::normalize(math::transformNormal3F(*oTw, shadingNormal));
+            tangent = math::transformVector3F(*oTw, tangent);
+            bitangent = math::transformVector3F(*oTw, bitangent);
 
-            position = vertices[0]->position * baricenter.x + vertices[1]->position * baricenter.y + vertices[2]->position * baricenter.z;
-            position = math::transformPoint3F(*oTw, position);
-            *outgoingDirection = position - rayOrigin;
-            *distance = math::length(*outgoingDirection);
-            *outgoingDirection = *outgoingDirection / (*distance + EPS);
+            //tangent = tangent - shadingNormal * dot(shadingNormal, tangent);
+            tangent = math::normalize(tangent);
 
-            // Calculate an ortho-normal system respective to the shading normal.
-            // Expanding the TBN tbn(tg, ns) constructor because TBN members can't be used as pointers for the Mdl_state with NUM_TEXTURE_SPACES > 1.
+            //bitangent = bitangent - shadingNormal * dot(shadingNormal, bitangent);
+            bitangent = math::normalize(bitangent);
+
             bitangent = math::normalize(cross(shadingNormal, tangent));
-            if(utl::isNan(bitangent))
+            tangent = math::normalize(cross(bitangent, shadingNormal));
+
+        	if (utl::isNan(bitangent))
             {
                 printf(
-                    "Nan Bitangent\n"
+                    "\nNan Bitangent\n"
+                    "v0 : %f %f %f\n"
+                    "v1 : %f %f %f\n"
+                    "v2 : %f %f %f\n"
+                    "Baricenter : %f %f %f\n"
+                    "True Normal : %f %f %f\n"
                     "Shading Normal : %f %f %f\n"
-                    "Tangent : %f %f %f\n\n",
+                    "Tangent : %f %f %f\n"
+                    ,
+                    v0->position.x, v0->position.y, v0->position.z,
+                    v1->position.x, v1->position.y, v1->position.z,
+                    v2->position.x, v2->position.y, v2->position.z,
+                    baricenter.x, baricenter.y, baricenter.z,
                     shadingNormal.x, shadingNormal.y, shadingNormal.z,
+                    trueNormal.x, trueNormal.y, trueNormal.z,
                     tangent.x, tangent.y, tangent.z
                 );
             }
-            tangent = cross(bitangent, shadingNormal); // Now the tangent is orthogonal to the shading normal.
 
-            // Explicitly include edge-on cases as frontface condition!
-            isFrontFace = 0.0f <= dot(*outgoingDirection, trueNormal);
+            uv = v0->texCoord * baricenter.x + v1->texCoord * baricenter.y + v2->texCoord * baricenter.z;
         }
+
+        __forceinline__ __device__ void calculateForMeshLightSampling(const LaunchParams* params)
+        {
+            const InstanceData& instance = *params->instances[instanceId];
+            oTw = &(instance.transform);
+            const graph::VertexAttributes* v0 = nullptr;
+            const graph::VertexAttributes* v1 = nullptr;
+            const graph::VertexAttributes* v2 = nullptr;
+            getTriangleVertices(instance, v0, v1, v2);
+            computeSurfaceProperties(v0, v1, v2);
+            position = v0->position * baricenter.x + v1->position * baricenter.y + v2->position * baricenter.z;
+            position = math::transformPoint3F(*oTw, position);
+        }
+
         __forceinline__ __device__ void calculate(const LaunchParams* params, const math::vec3f& outgoingDirection)
         {
-            InstanceData* instance = params->instances[instanceId];
-            const GeometryData* geometry = instance->geometryData;
-            const math::vec3ui       triVerticesIndices = reinterpret_cast<math::vec3ui*>(geometry->indicesData)[triangleId];
-            graph::VertexAttributes* vertices[3]{ nullptr, nullptr, nullptr };
-            vertices[0] = &(geometry->vertexAttributeData[triVerticesIndices.x]);
-            vertices[1] = &(geometry->vertexAttributeData[triVerticesIndices.y]);
-            vertices[2] = &(geometry->vertexAttributeData[triVerticesIndices.z]);
-
-            math::vec3f ngO = math::normalize(cross(vertices[1]->position - vertices[0]->position, vertices[2]->position - vertices[0]->position));
-            const math::vec3f nsO = math::normalize(vertices[0]->normal * baricenter.x + vertices[1]->normal * baricenter.y + vertices[2]->normal * baricenter.z);
-            const math::vec3f tgO = math::normalize(vertices[0]->tangent * baricenter.x + vertices[1]->tangent * baricenter.y + vertices[2]->tangent * baricenter.z);
-            const math::vec3f btO = math::normalize(vertices[0]->bitangent * baricenter.x + vertices[1]->bitangent * baricenter.y + vertices[2]->bitangent * baricenter.z);
-            uv = vertices[0]->texCoord * baricenter.x + vertices[1]->texCoord * baricenter.y + vertices[2]->texCoord * baricenter.z;
-
-            if (dot(ngO, nsO) < 0.0f) // make sure that shading and geometry normal agree on sideness
-            {
-                ngO = -ngO;
-            }
-
-            oTw = &(instance->transform);
-            shadingNormal = math::normalize(math::transformNormal3F(*oTw, nsO));
-            trueNormal = math::normalize(math::transformNormal3F(*oTw, ngO));
-            tangent = math::normalize(math::transformVector3F(*oTw, tgO));
-            bitangent = math::normalize(math::transformVector3F(*oTw, btO));
-
-            // Calculate an ortho-normal system respective to the shading normal.
-            // Expanding the TBN tbn(tg, ns) constructor because TBN members can't be used as pointers for the Mdl_state with NUM_TEXTURE_SPACES > 1.
-            bitangent = math::normalize(cross(shadingNormal, tangent));
-            if (utl::isNan(bitangent))
-            {
-                printf(
-                    "Nan Bitangent\n"
-                    "Shading Normal : %f %f %f\n"
-                    "Tangent : %f %f %f\n\n"
-                    "tgO: %f %f %f\n"
-                    "Tangent Vertex 0: %f %f %f\n"
-                    "Tanget Vertex 1: %f %f %f\n"
-                    "Tanget Vertex 2: %f %f %f\n"
-                    ,
-                    shadingNormal.x, shadingNormal.y, shadingNormal.z,
-                    tangent.x, tangent.y, tangent.z,
-                    tgO.x, tgO.y, tgO.z,
-                    vertices[0]->tangent.x, vertices[0]->tangent.y, vertices[0]->tangent.z,
-                    vertices[1]->tangent.x, vertices[1]->tangent.y, vertices[1]->tangent.z,
-                    vertices[2]->tangent.x, vertices[2]->tangent.y, vertices[2]->tangent.z
-                );
-            }
-
-            tangent = cross(bitangent, shadingNormal); // Now the tangent is orthogonal to the shading normal.
-
-            // Explicitly include edge-on cases as frontface condition!
-            isFrontFace = 0.0f <= dot(-outgoingDirection, trueNormal);
-
-            determineMaterialInfo(params);
+            const InstanceData& instance = *params->instances[instanceId];
+            oTw = &(instance.transform);
+            const graph::VertexAttributes* v0 = nullptr;
+            const graph::VertexAttributes* v1 = nullptr;
+            const graph::VertexAttributes* v2 = nullptr;
+            getTriangleVertices(instance, v0, v1, v2);
+            computeSurfaceProperties(v0, v1, v2);
+            isFrontFace = 0.0f <= dot(-outgoingDirection, trueNormal); // Explicitly include edge-on cases as frontface condition!
+            determineMaterialInfo(instance);
         }
         __forceinline__ __device__ void calculateForInferenceQuery(const LaunchParams* params)
         {
-            const InstanceData* instance = params->instances[instanceId];
-            const GeometryData* geometry = instance->geometryData;
-            const math::affine3f& objectToWorld = instance->transform;
-            const math::vec3ui       triVerticesIndices = reinterpret_cast<math::vec3ui*>(geometry->indicesData)[triangleId];
-            graph::VertexAttributes* vertices[3]{ nullptr, nullptr, nullptr };
-            vertices[0] = &(geometry->vertexAttributeData[triVerticesIndices.x]);
-            vertices[1] = &(geometry->vertexAttributeData[triVerticesIndices.y]);
-            vertices[2] = &(geometry->vertexAttributeData[triVerticesIndices.z]);
-            const math::vec3f nsO = math::normalize(vertices[0]->normal * baricenter.x + vertices[1]->normal * baricenter.y + vertices[2]->normal * baricenter.z);
-            shadingNormal = math::normalize(math::transformNormal3F(objectToWorld, nsO));
-            determineMaterialInfo(params);
+            const InstanceData& instance = *params->instances[instanceId];
+            const graph::VertexAttributes* v0 = nullptr;
+            const graph::VertexAttributes* v1 = nullptr;
+            const graph::VertexAttributes* v2 = nullptr;
+            getTriangleVertices(instance, v0, v1, v2);
+            oTw = &(instance.transform);
+            const math::vec3f nsO = math::normalize(v0->normal * baricenter.x + v1->normal * baricenter.y + v2->normal * baricenter.z);
+            shadingNormal = math::normalize(math::transformNormal3F(*oTw, nsO));
+            determineMaterialInfo(instance);
 
         }
-        __forceinline__ __device__ void determineMaterialInfo(const LaunchParams* params)
+        __forceinline__ __device__ void determineMaterialInfo(const InstanceData& instance)
         {
-            const InstanceData* instance = params->instances[instanceId];
-            const GeometryData* geometry = (instance->geometryData);
-            const unsigned& materialSlotIndex = geometry->faceAttributeData[triangleId].materialSlotId;
-            const InstanceData::SlotIds slotIds = instance->materialSlots[materialSlotIndex];
+            const unsigned& materialSlotIndex = instance.geometryData->faceAttributeData[triangleId].materialSlotId;
+            const InstanceData::SlotIds slotIds = instance.materialSlots[materialSlotIndex];
             if (slotIds.material != nullptr)
             {
                 textureHandler = slotIds.material->textureHandler;
@@ -184,9 +168,9 @@ namespace vtx
                 if (slotIds.meshLight != nullptr)
                 {
                     hasEdf = true;
-                    lightData = instance->materialSlots[materialSlotIndex].meshLight;
+                    lightData = instance.materialSlots[materialSlotIndex].meshLight;
                 }
-                if (instance->hasOpacity)
+                if (instance.hasOpacity)
                 {
                     hasOpacity = true;
                 }

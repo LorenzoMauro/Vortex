@@ -6,10 +6,8 @@
 #include <torch/torch.h>
 #include "Device/CUDAChecks.h"
 
-#define MAX_CONCENTRATION 50.0f
-#define M_PI_F (float)M_PI
-#define EPS 1e-3f
 
+#define M_PI_F (float)M_PI
 #ifdef USE_HALF_PRECISION
 #define TO_TYPE .to(torch::kHalf)
 #else
@@ -52,6 +50,11 @@ namespace vtx::network
         TensorDebugger& operator=(const TensorDebugger&) = delete;
         TensorDebugger(TensorDebugger&&) = delete;
     };
+
+    void printTensorMinMax(const std::string& tensorName, const torch::Tensor& tensor);
+
+#define PRINT_TENSOR_MIN_MAX(tensor) \
+	vtx::network::printTensorMinMax(#tensor, tensor); \
 
 #if defined(_DEBUG) || defined(TENSOR_DEBUGGER)
 #define TRACE_TENSOR(tensor) vtx::network::TensorDebugger::push(std::string(__FUNCSIG__),#tensor, tensor)

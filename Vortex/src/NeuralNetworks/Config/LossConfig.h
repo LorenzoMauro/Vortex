@@ -8,6 +8,7 @@ namespace vtx::network::config
 	{
 		L_KL_DIV,
 		L_KL_DIV_MC_ESTIMATION,
+		L_KL_DIV_MC_ESTIMATION_NORMALIZED,
 		L_PEARSON_DIV,
 		L_PEARSON_DIV_MC_ESTIMATION,
 		L_COUNT
@@ -16,6 +17,7 @@ namespace vtx::network::config
 	inline static const char* lossNames[] = {
 		"KL Divergence",
 		"KL Divergence MC Estimation",
+		"KL Divercence MC Estimation Normalized",
 		"Pearson Divergence",
 		"Pearson Divergence MC Estimation"
 	};
@@ -24,6 +26,7 @@ namespace vtx::network::config
 	{
 			{"KL Divergence", L_KL_DIV},
 			{"KL Divergence MC Estimation", L_KL_DIV_MC_ESTIMATION},
+			{"KL Divergence MC Estimation Normalized", L_KL_DIV_MC_ESTIMATION_NORMALIZED},
 			{"Pearson Divergence", L_PEARSON_DIV},
 			{"Pearson Divergence MC Estimation", L_PEARSON_DIV_MC_ESTIMATION}
 	};

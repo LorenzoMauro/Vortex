@@ -6,12 +6,12 @@
 namespace vtx
 {
 
-	void InteropWrapper::prepare(const int width, const int height, const InteropUsage newUsage)
+	void InteropWrapper::prepare(const int width, const int height, const int nChannels, const InteropUsage newUsage)
 	{
 		if (width != (int)glFrameBuffer.width || height != (int)glFrameBuffer.height || newUsage != usage)
 		{
 			const bool regenerateGlBuffer = (newUsage != usage) ? true : false;
-			glFrameBuffer.setSize(width, height, regenerateGlBuffer);
+			glFrameBuffer.setSize(width, height, nChannels, regenerateGlBuffer);
 			glFrameBuffer.bind();
 			glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
 			glClear(GL_COLOR_BUFFER_BIT);
@@ -33,15 +33,17 @@ namespace vtx
 
 		CU_CHECK_CONTINUE(cuGraphicsMapResources(1, &cuGraphicResource, stream));
 
+		const auto elemSize = (glFrameBuffer.nChannels == 4) ? sizeof(math::vec4f) : sizeof(math::vec3f);
+
 		CUDA_MEMCPY3D params = {};
 		params.srcMemoryType = CU_MEMORYTYPE_DEVICE;
 		params.srcDevice = buffer;
-		params.srcPitch = width * sizeof(math::vec4f);
+		params.srcPitch = width * elemSize;
 		params.srcHeight = height;
 
 		params.dstMemoryType = CU_MEMORYTYPE_ARRAY;
 		params.dstArray = cuArray;
-		params.WidthInBytes = width * sizeof(math::vec4f);
+		params.WidthInBytes = width * elemSize;
 		params.Height = height;
 		params.Depth = 1;
 

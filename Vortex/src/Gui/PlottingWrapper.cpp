@@ -6,10 +6,12 @@ namespace vtx::gui
 {
 	static ColorMap colorMap;
 
-	void PlotInfo::addPlot(const DataType& _data, std::string _name)
+	void PlotInfo::addPlot(const DataType& _data, std::string _name, bool _secondaryAxis)
 	{
 		data.push_back(_data);
 		color.push_back(colorMap.getColor());
+		secondaryAxis.push_back(_secondaryAxis);
+		if(_secondaryAxis) hasSecondaryAxis = true;
 
 		_name = (_name.empty()) ? "Plot_" + std::to_string(name.size()) : _name;
 		name.push_back(_name);
@@ -51,26 +53,30 @@ namespace vtx::gui
 			flags |= ImPlotAxisFlags_NoLabel;
 			ImPlot::SetupAxis(ImAxis_X1, lines.xLabel.c_str(), flags);
 			ImPlot::SetupAxis(ImAxis_Y1, lines.yLabel.c_str(), flags);
+			if(lines.hasSecondaryAxis) ImPlot::SetupAxis(ImAxis_Y2, lines.yLabel.c_str(), flags);
 			if(lines.logScale)
 			{
-				ImPlot::SetupAxisScale(ImAxis_X1, ImPlotScale_Log10);
+				//ImPlot::SetupAxisScale(ImAxis_X1, ImPlotScale_Log10);
 				ImPlot::SetupAxisScale(ImAxis_Y1, ImPlotScale_Log10);
+				if (lines.hasSecondaryAxis) ImPlot::SetupAxisScale(ImAxis_Y2, ImPlotScale_Log10);
 			}
 
 			for (int i = 0; i < lines.color.size(); i++)
 			{
 				ImPlot::PushStyleColor(ImPlotCol_Line, lines.color[i]);
+				if (lines.secondaryAxis[i])
+				{
+					ImPlot::SetAxis(ImAxis_Y2);
+				}
+				else
+				{
+					ImPlot::SetAxis(ImAxis_Y1);
+				}
 				std::visit([&](auto&& arg) {
-					using T = std::decay_t<decltype(arg)>;
-					if constexpr (std::is_same_v<T, std::vector<int>>)
-					{
+
 						ImPlot::PlotLine(lines.name[i].c_str(), arg.data(), arg.size());
-					}
-					else if constexpr (std::is_same_v<T, std::vector<float>>)
-					{
-						ImPlot::PlotLine(lines.name[i].c_str(), arg.data(), arg.size());
-					}
-					}, lines.data[i]);
+					},
+					lines.data[i]);
 				ImPlot::PopStyleColor();
 			}
 

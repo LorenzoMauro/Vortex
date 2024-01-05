@@ -7,6 +7,7 @@
 #include "Device/UploadCode/DeviceDataCoordinator.h"
 #include "Gui/PlottingWrapper.h"
 #include "Gui/GuiProvider.h"
+#include "Gui/GuiElements/ImageWindowPopUp.h"
 #include "Scene/Nodes/Renderer.h"
 #include "Scene/Scene.h"
 #include "Serialization/Serializer.h"
@@ -42,11 +43,11 @@ namespace vtx
 	}
 	void ExperimentsWindow::mainContent()
 	{
-		gui::PlotInfo MapePlot;
-		MapePlot.title = "Mape";
-		MapePlot.xLabel = "samples";
-		MapePlot.yLabel = "Mape";
-		MapePlot.logScale = true;
+		gui::PlotInfo ErrorPlot;
+		ErrorPlot.title = "Error";
+		ErrorPlot.xLabel = "samples";
+		ErrorPlot.yLabel = "Mape";
+		ErrorPlot.logScale = true;
 
 		for (auto& experiment : em.experiments)
 		{
@@ -58,9 +59,16 @@ namespace vtx
 			{
 				continue;
 			}
-			if (experiment.displayExperiment || displayAll)
+			if (experiment.displayExperiment || displayAll) 
 			{
-				MapePlot.addPlot(experiment.mape, experiment.name);
+				if(displayMAPEPlot && !experiment.mape.empty())
+				{
+					ErrorPlot.addPlot(experiment.mape, "MAPE " + experiment.name, false);
+				}
+				if(displayMSEPlot && !experiment.mse.empty())
+				{
+				    ErrorPlot.addPlot(experiment.mse, "MSE " + experiment.name, true);
+				}
 			}
 		}
 
@@ -75,7 +83,7 @@ namespace vtx
 			// First child window
 			ImGui::BeginChild("Child1", ImVec2(plotsWindowWidth, MapePlotHeight), false);
 			{
-				gui::gridPlot({ MapePlot });
+				gui::gridPlot({ ErrorPlot });
 			}
 			ImGui::EndChild();
 
@@ -91,13 +99,15 @@ namespace vtx
 		}
 		else
 		{
-			gui::gridPlot({ MapePlot });
+			gui::gridPlot({ ErrorPlot });
 		}
 	}
 
 
 	void ExperimentsWindow::toolBarContent()
 	{
+
+		vtxImGui::pushHalfSpaceWidgetFraction(0.7f);
 		const float halfItemWidth = ImGui::CalcItemWidth() * 0.5f;
 		ImVec2 buttonSize = ImVec2(halfItemWidth, 0);
 
@@ -129,6 +139,17 @@ namespace vtx
 		{
 			em.stage = STAGE_REFERENCE_GENERATION;
 		}
+		ImGui::SameLine();
+
+		if (ImGui::Button("Delete All Experiments", buttonSize))
+		{
+			for (auto& exp : em.experiments)
+			{
+				em.experimentSet.erase(exp.getStringHashKey());
+			}
+			em.experiments.clear();
+			em.currentExperiment = 0;
+		}
 
 		if (em.isGroundTruthReady)
 		{
@@ -145,6 +166,47 @@ namespace vtx
 			if (ImGui::Button("Stop Experiment", buttonSize))
 			{
 				stopExperiment();
+			}
+
+			ImGui::SetNextItemOpen(true, ImGuiCond_Once);
+			if (ImGui::CollapsingHeader("Display"))
+			{
+				vtxImGui::halfSpaceCheckbox("Ground Truth", &displayGtImage);
+				vtxImGui::halfSpaceCheckbox("MSE Map", &displayMSE);
+				vtxImGui::halfSpaceCheckbox("MAPE Map", &displayMAPE);
+				vtxImGui::halfSpaceCheckbox("MSE Plot", &displayMSEPlot);
+				vtxImGui::halfSpaceCheckbox("MAPE Plot", &displayMAPEPlot);
+				
+			}
+
+			if(displayMSE || displayMAPE || displayGtImage)
+			{
+				bool doSameLine = false;
+				ImGui::Begin("Experiment Display", nullptr, ImGuiWindowFlags_AlwaysAutoResize);
+				if (displayGtImage)
+				{
+					vtx::gui::popUpImageWindow("GT", em.groundTruthBuffer, em.width, em.height, 3, false);
+					doSameLine = true;
+				}
+				if(!em.experiments.empty())
+				{
+					const auto& exp = em.experiments.back();
+					if (displayMSE && exp.mseMap != nullptr)
+					{
+						if (doSameLine) ImGui::SameLine();
+						auto        pre           = PreAllocatedCudaBuffer(em.width * em.height * sizeof(float), (void*)exp.mseMap);
+						vtx::gui::popUpImageWindow("MSE", *(CUDABuffer*)(&pre), em.width, em.height, 1, true);
+						doSameLine = true;
+					}
+					if (displayMAPE && exp.mapeMap != nullptr)
+					{
+						if (doSameLine ) ImGui::SameLine();
+						auto        pre           = PreAllocatedCudaBuffer(em.width * em.height * sizeof(float), (void*)exp.mapeMap);
+						vtx::gui::popUpImageWindow("MAPE", *(CUDABuffer*)(&pre), em.width, em.height, 1, true);
+					}
+				}
+
+				ImGui::End();
 			}
 		}
 
@@ -164,6 +226,7 @@ namespace vtx
 
 		vtxImGui::halfSpaceWidget("Experiments in Queue", vtxImGui::booleanText, "%d", em.experimentQueue.size());
 
+		vtxImGui::popHalfSpaceWidgetFraction();
 		std::vector<int> toRemove;
 		int i = 0;
 		for (auto& experiment : em.experiments)
@@ -267,8 +330,11 @@ namespace vtx
 			return;
 		}
 
-		const float mape = cuda::computeMse(em.groundTruth, onDeviceData->launchParamsData.getHostImage().frameBuffer.tmRadiance, em.width, em.height);
-		experiment.mape.push_back(mape);
+		const Errors errors = cuda::computeErrors(em.groundTruthBuffer, onDeviceData->frameBufferData.resourceBuffers.tmRadiance, em.errorMapsBuffer, em.width, em.height);
+		experiment.mape.push_back(errors.mape);
+		experiment.mse.push_back(errors.mse);
+		experiment.mapeMap = errors.dMapeMap;
+		experiment.mseMap = errors.dMseMap;
 
 		if (renderer->settings.iteration == em.testSamples)
 		{

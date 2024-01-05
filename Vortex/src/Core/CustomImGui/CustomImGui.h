@@ -6,6 +6,14 @@
 
 #include "Core/Math.h"
 
+namespace vtx
+{
+	namespace graph
+	{
+		class Camera;
+	}
+}
+
 static const std::string hiddenLabel = "##hidden";
 
 typedef bool (*ComboFuncType)(const char*, int*, const char* const [], int, int);
@@ -93,6 +101,8 @@ namespace vtx::vtxImGui
 
     bool halfSpaceIntCombo(const char* label, int& intVariable, const std::vector<int>& options);
 
+    bool halfSpaceStringCombo(const char* label, std::string& stringVariable, const std::vector<std::string>& options);
+
     bool halfSpaceCheckbox(const char* label, bool* v);
 
 
@@ -104,6 +114,10 @@ namespace vtx::vtxImGui
     void drawCornersAndCenter();
 
     void drawDashedLine(const math::vec2f& point1, const math::vec2f& point2, float dashLength = 5.0f, float gapLength = 4.0f);
+
+    void drawVector(const std::shared_ptr<graph::Camera>& camera, const math::vec3f& origin, const math::vec3f& direction, const math::vec3f& color = 1.0f);
+
+    void connectScenePoints(const std::shared_ptr<graph::Camera>& camera, const math::vec3f& point1, const math::vec3f& point2, const math::vec3f& color);
 
 }
 

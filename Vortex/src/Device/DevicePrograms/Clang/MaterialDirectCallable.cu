@@ -14,7 +14,6 @@ namespace vtx::mdl
         if(request->evalOnNeuralSampling)
         {
             result->neuralBsdfEvaluation = evaluateBsdf(&mdlData, request->surroundingIor, request->outgoingDirection, request->toNeuralSample);
-            // TODO: evaluation returs nan values sometimes, I checked the input and they are not nan...
         }
         if (request->bsdfEvaluation)
         {
@@ -31,7 +30,6 @@ namespace vtx::mdl
         if (request->bsdfSample)
         {
             result->bsdfSample = sampleBsdf(&mdlData, request->surroundingIor, request->outgoingDirection, *request->seed);
-            correctBsdfSample(result->bsdfSample, mdlData.state.normal);
         }
         if (request->auxiliary)
         {

@@ -52,11 +52,14 @@ namespace vtx::network::config
 		bool doInference  = true;
 		bool plotGraphs   = true;
 		bool isUpdated    = true;
+
+		// DEBUG SETTINGS
 		int  depthToDebug = 0;
+		int   debugPixelId = -2;
+		bool isDebuggingUpdated = false;
 
 		int   maxTrainingSteps        = 1000;
 		int   batchSize               = 1;
-		float learningRate            = 0.001f;
 		int   inferenceIterationStart = 1;
 		bool  clearOnInferenceStart   = false;
 
@@ -79,6 +82,14 @@ namespace vtx::network::config
 		float         targetScale			= 1.0f;
 		bool          samplingFractionBlend = false;
 		bool		  scaleBySampleProb    = false;
+		bool          clampSamplingFraction = false;
+		float          sfClampValue = 1.0f;
+
+		// OPTIMIZER SETTINGS
+		float learningRate = 0.001f;
+		int	  adamEps = 15;
+		float schedulerGamma = 0.33f;
+		int schedulerStep = 200;
 
 		// ENTROPY LOSS SETTINGS
 		bool          useEntropyLoss = false;
@@ -108,18 +119,19 @@ namespace vtx::network::config
 		bool  clampBsdfProb                = false;
 		float fractionBlendTrainPercentage = 0.2;
 
-		bool learnInputRadiance = false;
-		float  lossClamp = 100.0f;
+		bool  learnInputRadiance = false;
+		float lossClamp          = 100.0f;
 
 		void resetUpdate()
 		{
 			isUpdated                                 = false;
 			trainingBatchGenerationSettings.isUpdated = false;
+			isDebuggingUpdated 					= false;
 		}
 
 		bool isAnyUpdated()
 		{
-			return isUpdated || trainingBatchGenerationSettings.isUpdated;
+			return isUpdated || trainingBatchGenerationSettings.isUpdated || isDebuggingUpdated;
 		}
 	};
 

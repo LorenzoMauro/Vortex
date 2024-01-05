@@ -6,8 +6,6 @@
 #include "Device/DevicePrograms/LaunchParams.h"
 #include "Device/Wrappers/KernelLaunch.h"
 #include "NeuralNetworks/Interface/NetworkInterface.h"
-#include "NeuralNetworks/Interface/Paths.h"
-#include "NeuralNetworks/Interface/TrainingDataBuffers.h"
 
 namespace vtx
 {
@@ -233,58 +231,58 @@ namespace vtx
 		{
 			if (launchParams->settings.neural.active)
 			{
-				outputBuffer[fbIndex] = math::vec4f{ launchParams->networkInterface->debugBuffer2[fbIndex], 1.0f };
+				outputBuffer[fbIndex] = math::vec4f{ launchParams->networkInterface->debugBuffers->inferenceDebugBuffer[fbIndex], 1.0f };
 			}
 		}
 		break;
 		case(FB_NETWORK_REPLAY_BUFFER_REWARD):
 		{
-			if (launchParams->settings.neural.active)
-			{
-				/*outputBuffer[fbIndex] = math::vec4f{ launchParams->networkInterface->debugBuffer2[fbIndex] / (launchParams->networkInterface->debugBuffer3[fbIndex].x), 1.0f };*/
-				const float value = launchParams->networkInterface->debugBuffer1[fbIndex].x / (float)launchParams->networkInterface->debugBuffer1[fbIndex].z;
-				outputBuffer[fbIndex] = math::vec4f(math::vec3f(value), 1.0f);// math::vec4f(floatToScientificRGB(value), 1.0f);
-			}
+			//if (launchParams->settings.neural.active)
+			//{
+			//	/*outputBuffer[fbIndex] = math::vec4f{ launchParams->networkInterface->debugBuffer2[fbIndex] / (launchParams->networkInterface->debugBuffer3[fbIndex].x), 1.0f };*/
+			//	const float value = launchParams->networkInterface->debugBuffer1[fbIndex].x / (float)launchParams->networkInterface->debugBuffer1[fbIndex].z;
+			//	outputBuffer[fbIndex] = math::vec4f(math::vec3f(value), 1.0f);// math::vec4f(floatToScientificRGB(value), 1.0f);
+			//}
 		}
 		break;
 		case(FB_NETWORK_REPLAY_BUFFER_SAMPLES):
 		{
-			if (launchParams->settings.neural.active)
-			{
-				math::vec3f* debugBuffer = launchParams->networkInterface->debugBuffer3;
+			//if (launchParams->settings.neural.active)
+			//{
+			//	math::vec3f* debugBuffer = launchParams->networkInterface->debugBuffer3;
 
-				/*if (launchParams->networkInterface->paths->paths[fbIndex].isDepthAtTerminalZero)
-				{
-					debugBuffer[fbIndex].y += 1.0f;
-				}
-				float value = debugBuffer[fbIndex].y / ((float)launchParams->settings.renderer.iteration+1.0f);
+			//	/*if (launchParams->networkInterface->paths->paths[fbIndex].isDepthAtTerminalZero)
+			//	{
+			//		debugBuffer[fbIndex].y += 1.0f;
+			//	}
+			//	float value = debugBuffer[fbIndex].y / ((float)launchParams->settings.renderer.iteration+1.0f);
 
-				math::vec3f color = floatToScientificRGB(value);
-				outputBuffer[fbIndex] = math::vec4f(color, 1.0f);*/
+			//	math::vec3f color = floatToScientificRGB(value);
+			//	outputBuffer[fbIndex] = math::vec4f(color, 1.0f);*/
 
-				const int& batchSize = launchParams->settings.neural.batchSize;
-				int totPixel = frameSize.x * frameSize.y;
-				int iteration = launchParams->frameBuffer.samples[fbIndex] + 1;
-				//const int& numberOfTrainingStep = launchParams->settings.neural.maxTrainingStepPerFrame;
-				int totSamples = batchSize * iteration; // *numberOfTrainingStep;
-				float maxSamplesPerPixel = (float)totSamples / (float)(totPixel);
+			//	const int& batchSize = launchParams->settings.neural.batchSize;
+			//	int totPixel = frameSize.x * frameSize.y;
+			//	int iteration = launchParams->frameBuffer.samples[fbIndex] + 1;
+			//	//const int& numberOfTrainingStep = launchParams->settings.neural.maxTrainingStepPerFrame;
+			//	int totSamples = batchSize * iteration; // *numberOfTrainingStep;
+			//	float maxSamplesPerPixel = (float)totSamples / (float)(totPixel);
 
-				float& totSampleAtPixel = debugBuffer[fbIndex].x;
-				float value = fmaxf(0.0f, fminf(totSampleAtPixel / maxSamplesPerPixel, 1.0f));
-				if (value < 0.0f || value > 1.0f || isnan(value))
-				{
-					printf(
-						"ToT sample at pixel %d is %f\n"
-						"Max sample per pixel is %f\n",
-						fbIndex,
-						totSampleAtPixel,
-						maxSamplesPerPixel
-					);
-				}
+			//	float& totSampleAtPixel = debugBuffer[fbIndex].x;
+			//	float value = fmaxf(0.0f, fminf(totSampleAtPixel / maxSamplesPerPixel, 1.0f));
+			//	if (value < 0.0f || value > 1.0f || isnan(value))
+			//	{
+			//		printf(
+			//			"ToT sample at pixel %d is %f\n"
+			//			"Max sample per pixel is %f\n",
+			//			fbIndex,
+			//			totSampleAtPixel,
+			//			maxSamplesPerPixel
+			//		);
+			//	}
 
-				math::vec3f color = floatToScientificRGB(value);
-				outputBuffer[fbIndex] = math::vec4f(color, 1.0f);
-			}
+			//	math::vec3f color = floatToScientificRGB(value);
+			//	outputBuffer[fbIndex] = math::vec4f(color, 1.0f);
+			//}
 			
 
 		}
@@ -293,14 +291,18 @@ namespace vtx
 		{
 			if (launchParams->settings.neural.active)
 			{
-				math::vec3f reconstructedRadiance = launchParams->networkInterface->paths->pathsAccumulator[fbIndex] / launchParams->frameBuffer.samples[fbIndex];
+
+				math::vec4f filmBuffer = launchParams->networkInterface->debugBuffers->filmBuffer[fbIndex];
+				math::vec3f reconstructedRadiance = { filmBuffer.x, filmBuffer.y, filmBuffer.z };
+				reconstructedRadiance /= filmBuffer.w;
 				reconstructedRadiance = toneMap(launchParams->settings.renderer.toneMapperSettings, reconstructedRadiance);
-				const math::vec3f& integratedRadiance = frameBuffer->tmRadiance[fbIndex];
-				const math::vec3f difference = integratedRadiance - reconstructedRadiance;
-				const float value = math::length(difference) * 0.5f;
-				const math::vec3f fts = floatToScientificRGB(value);
-				//outputBuffer[fbIndex] = math::vec4f(reconstructedRadiance, 1.0f);
-				outputBuffer[fbIndex] = math::vec4f(fts, 1.0f);
+				outputBuffer[fbIndex] = math::vec4f(reconstructedRadiance, 1.0f);
+
+				//const math::vec3f& integratedRadiance = frameBuffer->tmRadiance[fbIndex];
+				//const math::vec3f difference = integratedRadiance - reconstructedRadiance;
+				//const float value = math::length(difference) * 0.5f;
+				//const math::vec3f fts = floatToScientificRGB(value);
+				//outputBuffer[fbIndex] = math::vec4f(fts, 1.0f);
 			}
 		}
 		break;

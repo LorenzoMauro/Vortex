@@ -144,155 +144,165 @@ namespace vtx::device
 		}
 	};
 
-	struct PathsBuffer
-	{
-		CUDABuffer pathStructBuffer;
-		CUDABuffer bouncesBuffer;
-		CUDABuffer pathsArrayBuffer;
-		CUDABuffer validPixelsBuffer;
-		CUDABuffer pathsAccumulatorBuffer;
-		//CUDABuffer resetBouncesBuffer;
-		CUDABuffer validLightSampleBuffer;
-		CUDABuffer pixelsWithContributionBuffer;
 
-		~PathsBuffer()
-		{
-			VTX_INFO("ShutDown: Destroying Paths Buffers");
-			bouncesBuffer.free();
-			pathStructBuffer.free();
-			pathsArrayBuffer.free();
-			validPixelsBuffer.free();
-			pathsAccumulatorBuffer.free();
-			//resetBouncesBuffer.free();
-			validLightSampleBuffer.free();
-			pixelsWithContributionBuffer.free();
-		}
-	};
-
-	struct NetworkInputBuffers
+	struct SamplesBuffers
 	{
-		CUDABuffer networkStateStructBuffer;
 		CUDABuffer positionBuffer;
-		CUDABuffer normalBuffer;
 		CUDABuffer woBuffer;
-		CUDABuffer encodedPositionBuffer;
-		CUDABuffer encodedNormalBuffer;
-		CUDABuffer encodedWoBuffer;
+		CUDABuffer normalBuffer;
 		CUDABuffer instanceIdBuffer;
-		CUDABuffer materialIdBuffer;
 		CUDABuffer triangleIdBuffer;
+		CUDABuffer matIdBuffer;
+		CUDABuffer LoBuffer;
+		CUDABuffer wiBuffer;
+		CUDABuffer LiBuffer;
+		CUDABuffer bsdfBuffer;
+		CUDABuffer bsdfProbBuffer;
+		CUDABuffer wiProbBuffer;
+		CUDABuffer validSamplesBuffer;
+		CUDABuffer structBuffer;
 
-		~NetworkInputBuffers()
+		~SamplesBuffers()
 		{
-			VTX_INFO("ShutDown: Destroying Network Input Buffers");
-			networkStateStructBuffer.free();
 			positionBuffer.free();
-			normalBuffer.free();
 			woBuffer.free();
-			encodedPositionBuffer.free();
-			encodedNormalBuffer.free();
-			encodedWoBuffer.free();
+			normalBuffer.free();
 			instanceIdBuffer.free();
-			materialIdBuffer.free();
 			triangleIdBuffer.free();
+			matIdBuffer.free();
+			LoBuffer.free();
+			wiBuffer.free();
+			LiBuffer.free();
+			bsdfBuffer.free();
+			bsdfProbBuffer.free();
+			wiProbBuffer.free();
+			structBuffer.free();
+			validSamplesBuffer.free();
 		}
 	};
 
-	struct ReplayBufferBuffers
+	struct TrainingDataBuffers
 	{
-		CUDABuffer          replayBufferStructBuffer;
-		CUDABuffer          actionBuffer;
-		CUDABuffer          rewardBuffer;
-		CUDABuffer          nextActionBuffer;
-		CUDABuffer          doneBuffer;
-		CUDABuffer          maxSize;
-		NetworkInputBuffers stateBuffer;
-		NetworkInputBuffers nextStatesBuffer;
+		CUDABuffer positionBuffer;
+		CUDABuffer woBuffer;
+		CUDABuffer normalBuffer;
+		CUDABuffer instanceIdBuffer;
+		CUDABuffer triangleIdBuffer;
+		CUDABuffer matIdBuffer;
+		CUDABuffer LoBuffer;
+		CUDABuffer wiBuffer;
+		CUDABuffer LiBuffer;
+		CUDABuffer bsdfBuffer;
+		CUDABuffer bsdfProbBuffer;
+		CUDABuffer wiProbBuffer;
+		CUDABuffer sizeBuffer;
+		CUDABuffer structBuffer;
 
-		~ReplayBufferBuffers()
+		~TrainingDataBuffers()
 		{
-			VTX_INFO("ShutDown: Destroying Replay Buffer Buffers");
-			replayBufferStructBuffer.free();
-			actionBuffer.free();
-			rewardBuffer.free();
-			nextActionBuffer.free();
-			doneBuffer.free();
-			maxSize.free();
+			positionBuffer.free();
+			woBuffer.free();
+			normalBuffer.free();
+			instanceIdBuffer.free();
+			triangleIdBuffer.free();
+			matIdBuffer.free();
+			LoBuffer.free();
+			wiBuffer.free();
+			LiBuffer.free();
+			bsdfBuffer.free();
+			bsdfProbBuffer.free();
+			wiProbBuffer.free();
+			sizeBuffer.free();
+			structBuffer.free();
 		}
 	};
 
-	struct NpgTrainingDataBuffers
+	struct InferenceDataBuffers
 	{
-		CUDABuffer          npgTrainingDataStructBuffers;
-		NetworkInputBuffers inputBuffer;
-		CUDABuffer          outgoingRadianceBuffer;
-		CUDABuffer          incomingDirectionBuffer;
-		CUDABuffer          bsdfProbabilitiesBuffer;
-		CUDABuffer          trhoughputBuffer;
-		CUDABuffer          incomingRadianceBuffer;
-		CUDABuffer                 overallProbBuffer;
+		CUDABuffer positionBuffer;
+		CUDABuffer woBuffer;
+		CUDABuffer normalBuffer;
+		CUDABuffer instanceIdBuffer;
+		CUDABuffer triangleIdBuffer;
+		CUDABuffer matIdBuffer;
+		CUDABuffer distributionParametersBuffer;
+		CUDABuffer mixtureWeightsBuffer;
+		CUDABuffer samplingFractionArrayBuffer;
+		CUDABuffer sizeBuffer;
+		CUDABuffer structBuffer;
 
-		~NpgTrainingDataBuffers()
+		~InferenceDataBuffers()
 		{
-			VTX_INFO("ShutDown: Destroying NPG Training Data Buffers");
-			npgTrainingDataStructBuffers.free();
-			outgoingRadianceBuffer.free();
-			incomingDirectionBuffer.free();
-			bsdfProbabilitiesBuffer.free();
-			overallProbBuffer.free();
-		}
-	};
-
-	struct InferenceBuffers
-	{
-		CUDABuffer          inferenceStructBuffer;
-		NetworkInputBuffers stateBuffer;
-		CUDABuffer          distributionParameters;
-		CUDABuffer          inferenceSize;
-		CUDABuffer          decodedStateBuffer;
-		CUDABuffer          samplingFractionArrayBuffer;
-		CUDABuffer          distributionTypeBuffer;
-		CUDABuffer          samplesBuffer;
-		CUDABuffer          probabilitiesBuffer;
-		CUDABuffer          mixtureWeightBuffer;
-
-		~InferenceBuffers()
-		{
-			VTX_INFO("ShutDown: Destroying Inference Buffers");
-			inferenceStructBuffer.free();
-			distributionParameters.free();
-			inferenceSize.free();
-			decodedStateBuffer.free();
+			positionBuffer.free();
+			woBuffer.free();
+			normalBuffer.free();
+			instanceIdBuffer.free();
+			triangleIdBuffer.free();
+			matIdBuffer.free();
+			distributionParametersBuffer.free();
+			mixtureWeightsBuffer.free();
 			samplingFractionArrayBuffer.free();
-			distributionTypeBuffer.free();
-			samplesBuffer.free();
-			probabilitiesBuffer.free();
-			mixtureWeightBuffer.free();
+			sizeBuffer.free();
+			structBuffer.free();
 		}
 	};
+
+	struct NetworkDebugInfoBuffers
+	{
+		CUDABuffer structBuffer;
+		CUDABuffer mixtureWeightsBuffer;
+		CUDABuffer distributionParametersBuffer;
+		CUDABuffer distributionPrintBuffer;
+		CUDABuffer accumulateBuffer;
+		CUDABuffer bouncesPositionsBuffer;
+
+		~NetworkDebugInfoBuffers()
+		{
+			VTX_INFO("ShutDown: Network Debug Info Buffers");
+			structBuffer.free();
+			mixtureWeightsBuffer.free();
+			distributionParametersBuffer.free();
+			distributionPrintBuffer.free();
+			accumulateBuffer.free();
+			bouncesPositionsBuffer.free();
+		}
+	};
+
+	struct NetworkInterfaceDebugBuffers
+	{
+		CUDABuffer inferenceDebugBuffer;
+		CUDABuffer filmBuffer;
+		CUDABuffer structBuffer;
+
+		~NetworkInterfaceDebugBuffers()
+		{
+			VTX_INFO("ShutDown: Network Interface Debug Buffers");
+			inferenceDebugBuffer.free();
+			structBuffer.free();
+			filmBuffer.free();
+		}
+	};
+
 
 	struct NetworkInterfaceBuffer
 	{
-		PathsBuffer            pathsBuffers;
-		ReplayBufferBuffers    replayBufferBuffers;
-		NpgTrainingDataBuffers npgTrainingDataBuffers;
-		InferenceBuffers       inferenceBuffers;
-
-		CUDABuffer networkInterfaceBuffer;
-		CUDABuffer seedsBuffer;
-
-		CUDABuffer debugBuffer1Buffer;
-		CUDABuffer debugBuffer2Buffer;
-		CUDABuffer debugBuffer3Buffer;
+		TrainingDataBuffers trainingDataBuffers;
+		SamplesBuffers samplesBuffers;
+		InferenceDataBuffers inferenceDataBuffers;
+		NetworkInterfaceDebugBuffers debugBuffers;
+		NetworkDebugInfoBuffers networkDebugInfoBuffers;
+		CUDABuffer bounceDataBuffer;
+		CUDABuffer maxPathLengthBuffer;
+		CUDABuffer structBuffer;
 
 		~NetworkInterfaceBuffer()
 		{
-			VTX_INFO("ShutDown: Destroying Network Interface Buffer");
-			networkInterfaceBuffer.free();
-			seedsBuffer.free();
-			debugBuffer1Buffer.free();
-			debugBuffer2Buffer.free();
-			debugBuffer3Buffer.free();
+			VTX_INFO("ShutDown: Network Interface Buffers");
+			trainingDataBuffers.~TrainingDataBuffers();
+			inferenceDataBuffers.~InferenceDataBuffers();
+			bounceDataBuffer.free();
+			maxPathLengthBuffer.free();
+			structBuffer.free();
 		}
 	};
 

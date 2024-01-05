@@ -11,10 +11,13 @@
 #include "Device/UploadCode/CUDABuffer.h"
 #include "Scene/Nodes/RendererSettings.h"
 #include "Scene/Nodes/Statistics.h"
+#include "Device/CudaFunctions/ErrorTypes.h"
 
 
 namespace vtx
 {
+	struct Errors;
+
 	namespace graph
 	{
 		class Renderer;
@@ -58,12 +61,16 @@ namespace vtx
 		RendererSettings                 rendererSettings;
 		network::config::NetworkSettings networkSettings;
 		WavefrontSettings                wavefrontSettings;
-		std::vector<float>               mape;
+		std::vector<float>               mape = std::vector<float>(0);
+		std::vector<float>               mse = std::vector<float>(0);
+		float* mseMap = nullptr;
+		float* mapeMap = nullptr;
 		std::string                      name        = "Unnamed";
 		float                            averageMape = FLT_MAX;
+		float                            averageMse = FLT_MAX;
 		graph::Statistics                statistics;
 		bool                             generatedByBatchExperiments = false;
-		bool                             completed = false;
+		bool                             completed                   = false;
 
 		void        constructName(const int experimentNumber);
 		std::string getStringHashKey();
@@ -96,6 +103,8 @@ namespace vtx
 
 		std::string getImageSavePath(std::string experimentName);
 
+		GlFrameBuffer getGroundTruthGlBuffer();
+
 	public:
 		std::vector<Experiment> experiments;
 
@@ -107,6 +116,8 @@ namespace vtx
 		CUDABuffer groundTruthBuffer;
 
 		CUDABuffer rendererImageBufferToneMapped;
+
+		CUDABuffer errorMapsBuffer;
 
 		int gtSamples = 5000;
 		int testSamples = 400;
@@ -122,8 +133,11 @@ namespace vtx
 		std::priority_queue<std::pair<float, int>, std::vector<std::pair<float, int>>, MinHeapComparator> experimentMinHeap;
 		std::deque<Experiment>                                                                            experimentQueue;
 		float                                                                                             bestMapeScore = FLT_MAX;
+		float            bestMseScore= FLT_MAX;
 		int                                                                                               bestExperimentIndex;
 		std::vector<float>																				  groundTruthHost;
+
+		InteropWrapper gtImageInterop;
 	};
 
 }

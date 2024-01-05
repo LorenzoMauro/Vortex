@@ -197,6 +197,31 @@ namespace vtx
 			{"Multiple Importance Sampling", S_MIS}
 		};
 
+
+	enum Quadrant
+	{
+		Q_TOP_LEFT,
+		Q_TOP_RIGHT,
+		Q_BOTTOM_LEFT,
+		Q_BOTTOM_RIGHT
+	};
+
+	struct QuadrantTechniqueSplit
+	{
+		SamplingTechnique st = S_MIS;
+		bool neuralActivated = false;
+	};
+
+	struct QuadrantsSettings
+	{
+		bool isActivated = false;
+		QuadrantTechniqueSplit topLeft;
+		QuadrantTechniqueSplit topRight;
+		QuadrantTechniqueSplit bottomLeft;
+		QuadrantTechniqueSplit bottomRight;
+		bool isUpdated = false;
+	};
+
 	struct RendererSettings
 	{
 		int               iteration;
@@ -214,6 +239,7 @@ namespace vtx
 		FireflySettings           fireflySettings;
 		DenoiserSettings          denoiserSettings;
 		ToneMapperSettings        toneMapperSettings;
+		QuadrantsSettings         quadrantsSettings;
 
 		void resetUpdate()
 		{
@@ -222,11 +248,12 @@ namespace vtx
 			fireflySettings.isUpdated = false;
 			denoiserSettings.isUpdated = false;
 			toneMapperSettings.isUpdated = false;
+			quadrantsSettings.isUpdated = false;
 		}
 
 		bool isAnyUpdated()
 		{
-			return isUpdated || adaptiveSamplingSettings.isUpdated || fireflySettings.isUpdated || denoiserSettings.isUpdated || toneMapperSettings.isUpdated;
+			return isUpdated || adaptiveSamplingSettings.isUpdated || fireflySettings.isUpdated || denoiserSettings.isUpdated || toneMapperSettings.isUpdated || quadrantsSettings.isUpdated;
 		}
 	};
 }

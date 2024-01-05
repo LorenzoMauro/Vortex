@@ -67,6 +67,13 @@ namespace vtx::network
         return false;
     }
 
+    void printTensorMinMax(const std::string& tensorName, const torch::Tensor& tensor)
+    {
+        float min = tensor.min().item<float>();
+        float max = tensor.max().item<float>();
+        VTX_INFO("Tensor {} min: {} max: {}", tensorName, min, max);
+    }
+
     void copyNetworkParameters(const std::shared_ptr<torch::nn::Module>& sourceNetwork, const std::shared_ptr<torch::nn::Module>& targetNetwork) {
         torch::OrderedDict<std::string, torch::Tensor> sourceParams = sourceNetwork->named_parameters();
         torch::OrderedDict<std::string, torch::Tensor> targetParams = targetNetwork->named_parameters();

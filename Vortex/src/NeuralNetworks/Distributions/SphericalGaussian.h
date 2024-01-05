@@ -55,7 +55,7 @@ namespace vtx::distribution
         __forceinline__ __device__ static math::vec3f sample(const math::vec3f& mean, const float& k, unsigned& seed)
         {
             const float uniform = rng(seed);
-            const float w = 1.0f + logf(uniform + (1.0f - uniform) * expf(-2.0f * k) + EPS) / (k + EPS);
+            const float w = 1.0f + logf(uniform + (1.0f - uniform) * expf(-2.0f * k) + sEps) / (k + sEps);
 
             const float angleUniform = rng(seed) * 2.0f * M_PI;
             const math::vec2f v = math::vec2f(cosf(angleUniform), sinf(angleUniform));

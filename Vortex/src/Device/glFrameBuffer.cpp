@@ -12,21 +12,27 @@ namespace vtx
 		
 	}
 
-	void GlFrameBuffer::setSize(const uint32_t widthParam, const uint32_t heightParam, const bool forceRegenerate) {
-		if (width != widthParam || height != heightParam || forceRegenerate) {
+	void GlFrameBuffer::setSize(const uint32_t widthParam, const uint32_t heightParam, const uint32_t _nChannels, const bool forceRegenerate) {
+		if (width != widthParam || height != heightParam || forceRegenerate || nChannels != _nChannels) {
 			width = widthParam;
 			height = heightParam;
+			nChannels = _nChannels;
 			generate();
 		}
 	}
 
 	void GlFrameBuffer::generate() {
+
+
+		const auto internalFormat = (nChannels == 4) ? GL_RGBA32F : GL_RGB32F;
+		const auto format = (nChannels == 4) ? GL_RGBA : GL_RGB;
+
 		glCreateFramebuffers(1, &frameBufferId);
 		glBindFramebuffer(GL_FRAMEBUFFER, frameBufferId);
 
 		glCreateTextures(GL_TEXTURE_2D, 1, &colorAttachment);
 		glBindTexture(GL_TEXTURE_2D, colorAttachment);
-		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, width, height, 0, GL_RGBA, GL_FLOAT, nullptr);
+		glTexImage2D(GL_TEXTURE_2D, 0, internalFormat, width, height, 0, format, GL_FLOAT, nullptr);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
@@ -63,7 +69,7 @@ namespace vtx
 
 	void GlFrameBuffer::copyToThis(const GlFrameBuffer& src)
 	{
-		setSize(src.width, src.height);
+		setSize(src.width, src.height, src.nChannels);
 		glBindFramebuffer(GL_READ_FRAMEBUFFER, src.frameBufferId); // Source framebuffer
 		//check error
 

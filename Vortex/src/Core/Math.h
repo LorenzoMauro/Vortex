@@ -5,14 +5,11 @@
 #include "Math/AffineSpace.h"
 #include <tuple>
 #include <cuda_runtime.h>
+#include "Constants.h"
 
 namespace vtx::math
 {
 
-#define PI 3.1415926535897932384626433832795
-#define PI_180 0.01745329251994329576923690768489
-#define _180_PI 57.295779513082320876798154814105
-#define EPS 1e-6f
 
 	template<typename T>
 	__both__ T max(T a , T b)

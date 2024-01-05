@@ -10,7 +10,7 @@ namespace vtx {
 	public:
 		GlFrameBuffer();
 
-		void setSize(const uint32_t widthParam, const uint32_t heightParam, const bool forceRegenerate = false);
+		void setSize(const uint32_t widthParam, const uint32_t heightParam, uint32_t nChannels, const bool forceRegenerate = false);
 		void generate();
 
 		void bind();
@@ -33,6 +33,7 @@ namespace vtx {
 		GLuint			colorAttachment;
 		uint32_t		height;
 		uint32_t		width;
+		uint32_t		nChannels;
 	};
 
 }

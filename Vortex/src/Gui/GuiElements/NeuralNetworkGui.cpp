@@ -1,9 +1,14 @@
+#include "ImageWindowPopUp.h"
 #include "Core/CustomImGui/CustomImGui.h"
 #include "NeuralNetworks/NeuralNetworkGraphs.h"
 #include "NeuralNetworks/NeuralNetwork.h"
 #include "Gui/GuiProvider.h"
 #include "NeuralNetworks/Config/NetworkSettings.h"
 #include "NeuralNetworks/Distributions/Mixture.h"
+#include "NeuralNetworks/Interface/NetworkInterfaceStructs.h"
+#include "NeuralNetworks/Interface/NetworkInterfaceUploader.h"
+#include "Device/CudaFunctions/cudaFunctions.h"
+#include "Device/UploadCode/DeviceDataCoordinator.h"
 
 namespace vtx::gui
 {
@@ -109,9 +114,11 @@ namespace vtx::gui
 	{
 		if (ImGui::CollapsingHeader("Training Batch Generation Settings"))
 		{
-			settings.isUpdated |= vtxImGui::halfSpaceCombo("Sampling Strategy", settings.strategy, samplingStrategyNames, SS_COUNT);
-			settings.isUpdated |= vtxImGui::halfSpaceDragFloat("Light Sampling Prob", &settings.lightSamplingProb, 0.00001, 0, 1, "%.10f", 0);
-			settings.isUpdated |= vtxImGui::halfSpaceCheckbox("Weight Contribution", &settings.weightByMis);
+			settings.isUpdated |= vtxImGui::halfSpaceCheckbox("Use Only Non Zero", &settings.onlyNonZero);
+			settings.isUpdated |= vtxImGui::halfSpaceCheckbox("Use Mis Weight", &settings.weightByMis);
+			settings.isUpdated |= vtxImGui::halfSpaceCheckbox("Use Pdf Weight", &settings.weightByPdf);
+			settings.isUpdated |= vtxImGui::halfSpaceCheckbox("Use Light Sample", &settings.useLightSample);
+			settings.isUpdated |= vtxImGui::halfSpaceCheckbox("Train on Light Sample", &settings.trainOnLightSample);
 			settings.isUpdated |= vtxImGui::halfSpaceCheckbox("Limit To First Bounce", &settings.limitToFirstBounce);
 		}
 		
@@ -150,6 +157,51 @@ namespace vtx::gui
 		{
 			ImGui::Indent();
 			settings.wasActive = settings.active;
+
+			if (ImGui::CollapsingHeader("Debug Info"))
+			{
+				ImGui::Indent();
+				settings.isDebuggingUpdated |= vtxImGui::halfSpaceDragInt("Depth To Debug", &settings.depthToDebug, 1, 0, 5, "%d", 0);
+				settings.isDebuggingUpdated |= vtxImGui::halfSpaceDragInt("Debug Pixel", &settings.debugPixelId, 1, 0, 500000, "%d", 0);
+				auto& buffers = onDeviceData->networkInterfaceData.resourceBuffers.networkDebugInfoBuffers;
+				int width = ImGui::GetContentRegionAvail().x;
+				int height = width / 2;
+				if (settings.doInference && settings.active && settings.debugPixelId >= 0)
+				{
+					NetworkDebugInfo debugInfo = getNetworkDebugInfoFromDevice();
+
+					std::vector<float> mixtureWeights = std::vector<float>(settings.mixtureSize);
+					buffers.mixtureWeightsBuffer.download(mixtureWeights.data());
+					std::string weights = "";
+					for (int i = 0; i < settings.mixtureSize; i++)
+					{
+						weights += std::to_string(mixtureWeights[i]) + " ";
+					}
+
+					vtxImGui::halfSpaceWidget("Position", vtxImGui::vectorGui, (float*)&debugInfo.position, true);
+					vtxImGui::halfSpaceWidget("Normal", vtxImGui::vectorGui, (float*)&debugInfo.normal, true);
+					vtxImGui::halfSpaceWidget("Wo", vtxImGui::vectorGui, (float*)&debugInfo.wo, true);
+					vtxImGui::halfSpaceWidget("Mean", vtxImGui::vectorGui, (float*)&debugInfo.distributionMean, true);
+					vtxImGui::halfSpaceWidget("Sample", vtxImGui::vectorGui, (float*)&debugInfo.sample, true);
+					vtxImGui::halfSpaceWidget("Bsdf Sample", vtxImGui::vectorGui, (float*)&debugInfo.bsdfSample, true);
+					vtxImGui::halfSpaceWidget("Neural Prob:", vtxImGui::booleanText, "%.10f", debugInfo.neuralProb);
+					vtxImGui::halfSpaceWidget("Bsdf Prob:", vtxImGui::booleanText, "%.10f", debugInfo.bsdfProb);
+					vtxImGui::halfSpaceWidget("Sampling Fraction Prob:", vtxImGui::booleanText, "%.10f", debugInfo.samplingFraction);
+					vtxImGui::halfSpaceWidget("Sample Prob:", vtxImGui::booleanText, "%.10f", debugInfo.wiProb);
+					vtxImGui::halfSpaceWidget("Mixture Weights : ", vtxImGui::booleanText, " %s", weights.c_str());
+
+					cuda::printDistribution(buffers.distributionPrintBuffer, width, height, debugInfo.distributionMean, debugInfo.normal, debugInfo.sample);
+					vtx::gui::popUpImageWindow("Distribution", buffers.distributionPrintBuffer, width, height, 3, true);
+
+				}
+				if (settings.active && settings.doTraining && settings.debugPixelId >= 0 && settings.depthToDebug == 0)
+				{
+					cuda::accumulateAtDebugBounce(buffers.accumulateBuffer, width, height, settings.debugPixelId);
+					vtx::gui::popUpImageWindow("Accumulate Spherical", buffers.accumulateBuffer, width, height, 3, true);
+				}
+				ImGui::Unindent();
+			}
+
 			settings.isUpdated |= vtxImGui::halfSpaceCheckbox("Enable", &settings.active);
 			//settings.wasActive = (settings.active && !wasActive) ? false : true;
 			settings.isUpdated |= vtxImGui::halfSpaceCheckbox("Reset Network", &settings.isUpdated);
@@ -163,12 +215,7 @@ namespace vtx::gui
 				settings.isUpdated |= vtxImGui::halfSpaceWidget("Do Inference", ImGui::Checkbox,(hiddenLabel + "_Do Inference").c_str(),&settings.doInference);
 				settings.isUpdated |= vtxImGui::halfSpaceDragInt("Inference Start", &settings.inferenceIterationStart, 1, 0, 10000, "%d", 0);
 				settings.isUpdated |= vtxImGui::halfSpaceWidget("Clear buffer on Inference Start", ImGui::Checkbox,(hiddenLabel + "_Inference Start").c_str(),&settings.clearOnInferenceStart);
-				settings.isUpdated |= vtxImGui::halfSpaceDragInt("Depth To Debug", &settings.depthToDebug, 1, 0, 5, "%d", 0);
-				ImGui::Unindent();
 			}
-			settings.isUpdated |= vtxImGui::halfSpaceCheckbox("Learn Input Radiance", &settings.learnInputRadiance);
-			settings.isUpdated |= vtxImGui::halfSpaceDragFloat("Loss Smooth Clamp Value", &settings.lossClamp, 1.0f, 0.f, 1000);
-
 			ImGui::SetNextItemOpen(true, ImGuiCond_Once);
 			if (ImGui::CollapsingHeader("Main Network Settings"))
 			{
@@ -222,15 +269,25 @@ namespace vtx::gui
 			if (ImGui::CollapsingHeader("Training"))
 			{
 				ImGui::Indent();
-				settings.isUpdated |= vtxImGui::halfSpaceDragFloat("Learning Rate", &settings.learningRate, 0.00001, 0,   1, "%.10f", 0);
 				vtxImGui::halfSpaceDragInt("BatchSize", &settings.batchSize, 1, 1, 10000, "%d", 0);
 				settings.batchSize = (settings.batchSize == 0) ? 1 : settings.batchSize;
 				ImGui::SetNextItemOpen(true, ImGuiCond_Once);
 				settings.isUpdated |= drawEditGui(settings.trainingBatchGenerationSettings);
 				ImGui::SetNextItemOpen(true, ImGuiCond_Once);
+				if (ImGui::CollapsingHeader("Optimizer Settings"))
+				{
+					settings.isUpdated |= vtxImGui::halfSpaceDragInt("Adam Eps Exp Value", &settings.adamEps);
+					settings.isUpdated |= vtxImGui::halfSpaceDragFloat("Learning Rate", &settings.learningRate, 0.0000001f, 0, 1, "%.00010f", 0);
+					settings.isUpdated |= vtxImGui::halfSpaceDragFloat("Scheduler Gamma", &settings.schedulerGamma, 0.000001f, 0, 1, "%.00010f", 0);
+					settings.isUpdated |= vtxImGui::halfSpaceDragInt("Scheduler Step", &settings.schedulerStep);
+
+				}
+				ImGui::SetNextItemOpen(true, ImGuiCond_Once);
 				if (ImGui::CollapsingHeader("Loss Settings"))
 				{
 					ImGui::Indent();
+					settings.isUpdated |= vtxImGui::halfSpaceCheckbox("Learn Input Radiance", &settings.learnInputRadiance);
+					settings.isUpdated |= vtxImGui::halfSpaceDragFloat("Loss Smooth Clamp Value", &settings.lossClamp, 1.0f, 0.f, 1000);
 					settings.isUpdated |= vtxImGui::halfSpaceCheckbox("Clamp Bsdf Prob", &settings.clampBsdfProb);
 					settings.isUpdated |= vtxImGui::halfSpaceCheckbox("Scale Loss Blended", &settings.scaleLossBlendedQ);
 					settings.isUpdated |= vtxImGui::halfSpaceCheckbox("Scale By Sample Prob", &settings.scaleBySampleProb);
@@ -239,6 +296,8 @@ namespace vtx::gui
 					settings.isUpdated |= vtxImGui::halfSpaceCheckbox("Constant Loss Blend Factor",	  &settings.constantBlendFactor);
 					settings.isUpdated |= vtxImGui::halfSpaceCheckbox("Sampling Fraction Blend",	  &settings.samplingFractionBlend);
 					settings.isUpdated |= vtxImGui::halfSpaceDragFloat("Sampling Fraction Blend Train %", &settings.fractionBlendTrainPercentage, 0.01, 0, 1, "%.10f", 0);
+					settings.isUpdated |= vtxImGui::halfSpaceCheckbox("Clamp Sampling Fraction", &settings.clampSamplingFraction);
+					settings.isUpdated |= vtxImGui::halfSpaceDragFloat("Clamp Value", &settings.sfClampValue, 0.01, 0, 1, "%.10f", 0);
 					settings.isUpdated |= vtxImGui::halfSpaceCombo("Loss Type", settings.lossType, lossNames, L_COUNT);
 					settings.isUpdated |= vtxImGui::halfSpaceCombo("Loss Reduction", settings.lossReduction,   lossReductionNames, COUNT);
 					settings.isUpdated |= vtxImGui::halfSpaceDragFloat("Target Scale", &settings.targetScale, 0.1f,	   0.0f, 1.0f);

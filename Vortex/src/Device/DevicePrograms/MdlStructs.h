@@ -29,6 +29,7 @@ namespace vtx::mdl
         case mi::neuraylib::BSDF_EVENT_SPECULAR_REFLECTION: return "BSDF_EVENT_SPECULAR_REFLECTION";
         case mi::neuraylib::BSDF_EVENT_SPECULAR_TRANSMISSION: return "BSDF_EVENT_SPECULAR_TRANSMISSION";
         case mi::neuraylib::BSDF_EVENT_FORCE_32_BIT: return "BSDF_EVENT_FORCE_32_BIT";
+        case (mi::neuraylib::BSDF_EVENT_DIFFUSE| mi::neuraylib::BSDF_EVENT_GLOSSY): return "BSDF_EVENT_DIFFUSE_GLOSSY";
         default: return "UNKNOWN_BSDF_EVENT_TYPE";
         }
     }
@@ -60,6 +61,8 @@ namespace vtx::mdl
         float       pdf;
         float       bsdfPdf;
         bool        isValid = false;
+		math::vec3f bsdf;
+        BsdfEventType eventType = mi::neuraylib::BSDF_EVENT_ABSORB;
     };
 
     struct BsdfSampleResult
@@ -68,6 +71,7 @@ namespace vtx::mdl
         float         pdf;
         float         bsdfPdf;
         math::vec3f   bsdfOverPdf;
+        math::vec3f   bsdf; //(bsdf * cosTheta)
         BsdfEventType eventType = mi::neuraylib::BSDF_EVENT_ABSORB;
         bool          isValid = false;
         bool          isComputed = false;
@@ -108,7 +112,7 @@ namespace vtx::mdl
         float            opacity;
         bool             isThinWalled;
         // We export these as well to not compute them twice
-        BsdfEvalResult         neuralBsdfEvaluation;
+        BsdfEvalResult   neuralBsdfEvaluation;
 
 	};
 

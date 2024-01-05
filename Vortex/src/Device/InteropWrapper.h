@@ -17,7 +17,7 @@ namespace vtx
 		CUgraphicsResource cuGraphicResource = nullptr;
 		InteropUsage usage = SingleThreaded;
 
-		void prepare(int width, int height, InteropUsage newUsage);
+		void prepare(const int width, const int height, const int nChannels, const InteropUsage newUsage);
 
 		void copyToGlBuffer(const CUdeviceptr buffer, const int width, const int height);
 	};

@@ -241,7 +241,12 @@ namespace cereal
     template<class Archive>
     void serialize(Archive& archive, vtx::serializer::EnvironmentLightNodeSaveData& data)
     {
-	    archive(nvp(data, base), nvp(data, transformUID), nvp(data, texturePath));
+	    archive(
+            nvp(data, base),
+            nvp(data, transformUID),
+            nvp(data, texturePath),
+            nvp(data, scaleLuminosity)
+        );
 	}
 
     //Serialization for CameraNodeSaveData
@@ -353,11 +358,12 @@ namespace cereal
     void serialize(Archive& archive, vtx::network::config::BatchGenerationConfig& data)
     {
         archive(
-            nvp(data, strategy),
+            nvp(data, limitToFirstBounce),
+            nvp(data, onlyNonZero),
             nvp(data, weightByMis),
-            //nvp(data, isUpdated),
-            nvp(data, lightSamplingProb),
-            nvp(data, limitToFirstBounce)
+            nvp(data, weightByPdf),
+            nvp(data, useLightSample),
+            nvp(data, trainOnLightSample)
         );
     }
 
@@ -556,11 +562,13 @@ namespace cereal
         archive(
             nvp(data, name),
             nvp(data, mape),
+            nvp(data, mse),
             nvp(data, rendererSettings),
             nvp(data, networkSettings),
             nvp(data, wavefrontSettings),
             nvp(data, statistics),
             nvp(data, averageMape),
+            nvp(data, averageMse),
             nvp(data, generatedByBatchExperiments),
             nvp(data, completed)
         );

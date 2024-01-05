@@ -19,6 +19,7 @@ namespace vtx
 
 	Image::Image(CUDABuffer buffer, const int _width, const int _height, const int _channels)
 	{
+		bufferP = &buffer;
 		std::vector<float> tmpData(_width * _height * _channels);
 		buffer.download(tmpData.data());
 		load(tmpData.data(), _width, _height, _channels);
@@ -97,6 +98,20 @@ namespace vtx
 			return data.data();
 		}
 		return nullptr;
+	}
+
+	inline GlFrameBuffer Image::getGlFrameBufferFromCudaBuffer()
+	{
+		if (bufferP == nullptr || bufferP->bytesSize() == 0)
+			return GlFrameBuffer();
+		interopDraw.prepare(width, height, channels, InteropUsage::SingleThreaded);
+		interopDraw.copyToGlBuffer(bufferP->dPointer(), width, height);
+		return interopDraw.glFrameBuffer;
+	}
+
+	bool Image::isCudaBufferSet() const
+	{
+		return bufferP != nullptr;
 	}
 
 	bool Image::saveJpeg(const std::string& path)

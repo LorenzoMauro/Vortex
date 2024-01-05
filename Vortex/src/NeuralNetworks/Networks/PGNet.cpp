@@ -19,6 +19,7 @@ namespace vtx::network
 	}
 	void PGNet::init()
 	{
+		batches.clear();
 		constexpr int auxAdditionInputSize = 3; // wi
 		constexpr int mainOutputSize = 9; // outRadiance, inRadiance, throughput
 		distributionParametersCount = distribution::Mixture::getDistributionParametersCount(settings->distributionType, true);
@@ -75,11 +76,12 @@ namespace vtx::network
 		}
 		else
 		{
-			optimizer = std::make_shared<torch::optim::Adam>(mlpBase->parameters(), torch::optim::AdamOptions(settings->learningRate).amsgrad(true));
+			double eps = std::pow(10, -settings->adamEps);
+			optimizer = std::make_shared<torch::optim::Adam>(mlpBase->parameters(), torch::optim::AdamOptions(settings->learningRate).amsgrad(true).eps(eps));
 		}
 
-
-		trainingStep = 0;
+		scheduler = std::make_shared<torch::optim::StepLR>(*optimizer, settings->schedulerStep, settings->schedulerGamma);
+		trainingStep                   = 0;
 	}
 
 	void PGNet::reset()
@@ -90,6 +92,7 @@ namespace vtx::network
 
 	void PGNet::train()
 	{
+		//VTX_INFO("Training Step {}", trainingStep);
 		CLEAR_TENSOR_DEBUGGER();
 		ANOMALY_SWITCH;
 		if (trainingStep >= settings->maxTrainingSteps)
@@ -100,7 +103,22 @@ namespace vtx::network
 		trainingStep++;
 		optimizer->zero_grad();
 
-		auto inputTensors = generateTrainingInputTensors();
+		if(batches.size()==0)
+		{
+			generateTrainingInputTensors();
+		}
+		if(batches.size()==0)
+		{
+			VTX_WARN("No training data available");
+			return;
+		}
+		InputTensors inputTensors = batches.back();
+		batches.pop_back();
+		if(inputTensors.position.size(0)==0)
+		{
+			VTX_WARN("No training data available on Batch");
+			return;
+		}
 		const torch::Tensor& position = inputTensors.position;
 		const torch::Tensor& wo = inputTensors.wo;
 		const torch::Tensor& normal = inputTensors.normal;
@@ -137,14 +155,14 @@ namespace vtx::network
 		const torch::Tensor neuralProb = distribution::Mixture::prob(incomingDirection, mixtureParameters, mixtureWeights, settings->distributionType);
 
 		torch::Tensor pgLoss;
-		pgLoss = guidingLoss(neuralProb, bsdfProb, targetRadiance, c, inputTensors.sampleProb);
+		pgLoss = guidingLoss(neuralProb, bsdfProb, targetRadiance, c, inputTensors.wiProb);
 		/*if (!settings->learnInputRadiance) {
-			pgLoss = guidingLoss(neuralProb, bsdfProb, targetRadiance, c, inputTensors.sampleProb);
+			pgLoss = guidingLoss(neuralProb, bsdfProb, targetRadiance, c, inputTensors.wiProb);
 		}
 		else
 		{
-			pgLoss = guidingLoss(neuralProb, bsdfProb, targetRadiance, c, inputTensors.sampleProb);
-			pgLoss = gudingLossIncomingRadiance(neuralProb, bsdfProb, targetRadiance, c, inputTensors.sampleProb);
+			pgLoss = guidingLoss(neuralProb, bsdfProb, targetRadiance, c, inputTensors.wiProb);
+			pgLoss = gudingLossIncomingRadiance(neuralProb, bsdfProb, targetRadiance, c, inputTensors.wiProb);
 		}*/
 
 
@@ -178,12 +196,14 @@ namespace vtx::network
 			return; // NAN or INF gradients
 		}
 		optimizer->step();
+		scheduler->step();
 
 		if (settings->plotGraphs)
 		{
-
 			graphs.addData(SAMPLING_FRACTION_PLOT, "Sampling Fraction Train", c.mean().item<float>());
 			graphs.addData(SAMPLING_FRACTION_PLOT, "Loss Blend", lossBlendFactor());
+			graphs.addData("BatchSize","Iteration","BatchSize", "BatchSize", inputTensors.position.size(0));
+			graphs.addData("Learning Rate", "Iteration", "Learning Rate", "Learing Rate", optimizer->param_groups().at(0).options().get_lr());
 
 			distribution::Mixture::setGraphData(settings->distributionType, mixtureParameters, mixtureWeights, graphs, true);
 		}
@@ -230,6 +250,11 @@ namespace vtx::network
 			c = fractionBlend * c;
 		}
 
+		if (settings->clampSamplingFraction)
+		{
+			c = torch::clamp(c, 0.0f, settings->sfClampValue);
+		}
+
 		TRACE_TENSOR(c);
 		TRACE_TENSOR(mixtureParameters);
 		//print first 10 batches of mixturePrameters
@@ -247,10 +272,10 @@ namespace vtx::network
 
 	void PGNet::copyOutputToCudaBuffer(const torch::Tensor& mixtureParameters, const torch::Tensor& c, const torch::Tensor& mixtureWeights, int inferenceSize)
 	{
-		const device::InferenceBuffers& buffers = onDeviceData->networkInterfaceData.resourceBuffers.inferenceBuffers;
-		const auto distributionParametersPtr = buffers.distributionParameters.castedPointer<float>();
+		const device::InferenceDataBuffers& buffers = onDeviceData->networkInterfaceData.resourceBuffers.inferenceDataBuffers;
+		const auto distributionParametersPtr = buffers.distributionParametersBuffer.castedPointer<float>();
 		const auto samplingFractionPtr = buffers.samplingFractionArrayBuffer.castedPointer<float>();
-		const auto mixtureWeightPtr = buffers.mixtureWeightBuffer.castedPointer<float>();
+		const auto mixtureWeightPtr = buffers.mixtureWeightsBuffer.castedPointer<float>();
 
 		int inferenceDistributionParameterCount = distribution::Mixture::getDistributionParametersCount(settings->distributionType);
 		const torch::Tensor distributionParameterCuda = torch::from_blob(distributionParametersPtr, { inferenceSize, settings->mixtureSize, inferenceDistributionParameterCount }, at::device(device).dtype(torch::kFloat));
@@ -260,17 +285,6 @@ namespace vtx::network
 		distributionParameterCuda.copy_(mixtureParameters);
 		samplingFractionCuda.copy_(c);
 		mixtureWeightCuda.copy_(mixtureWeights);
-
-		if (false)
-		{
-			std::cout << "Distribution Parameter Cuda: " << distributionParameterCuda.slice(0, 0, 10) << std::endl;
-			std::cout << "Sampling Fraction Cuda: " << samplingFractionCuda.slice(0, 0, 10) << std::endl;
-			std::cout << "Mixture Weight Cuda: " << mixtureWeightCuda.slice(0, 0, 10) << std::endl;
-
-			std::cout << "MixtureParameters: " << mixtureParameters.slice(0, 0, 10) << std::endl;
-			std::cout << "Sampling Fraction: " << c.slice(0, 0, 10) << std::endl;
-			std::cout << "Mixture Weights: " << mixtureWeights.slice(0, 0, 10) << std::endl;
-		}
 
 		TRACE_TENSOR(distributionParameterCuda);
 		TRACE_TENSOR(samplingFractionCuda);
@@ -285,12 +299,12 @@ namespace vtx::network
 	bool PGNet::doNormalizePosition()
 	{
 		if (
-			settings->inputSettings.normalizePosition ||
-			settings->inputSettings.position.otype == config::EncodingType::Frequency ||
-			settings->inputSettings.position.otype == config::EncodingType::Grid ||
-			settings->inputSettings.position.otype == config::EncodingType::OneBlob ||
-			settings->inputSettings.position.otype == config::EncodingType::SphericalHarmonics ||
-			settings->inputSettings.position.otype == config::EncodingType::TriangleWave
+			settings->inputSettings.normalizePosition// ||
+			//settings->inputSettings.position.otype == config::EncodingType::Frequency ||
+			//settings->inputSettings.position.otype == config::EncodingType::Grid ||
+			//settings->inputSettings.position.otype == config::EncodingType::OneBlob ||
+			//settings->inputSettings.position.otype == config::EncodingType::SphericalHarmonics ||
+			//settings->inputSettings.position.otype == config::EncodingType::TriangleWave
 			)
 		{
 			return true;
@@ -298,63 +312,128 @@ namespace vtx::network
 		return false;
 	}
 
-	InputTensors PGNet::generateTrainingInputTensors()
+	InputTensors& shuffle(InputTensors& inputTensors)
 	{
-		LaunchParams* deviceParams = onDeviceData->launchParamsData.getDeviceImage();
-		shuffleDataset(deviceParams);
-		const device::NpgTrainingDataBuffers& buffers = onDeviceData->networkInterfaceData.resourceBuffers.npgTrainingDataBuffers;
+		auto indices = torch::randperm(inputTensors.position.size(0), torch::TensorOptions().device(inputTensors.position.device()));
+		if (inputTensors.position.defined()) inputTensors.position = inputTensors.position.index_select(0, indices);
+		if (inputTensors.wo.defined()) inputTensors.wo = inputTensors.wo.index_select(0, indices);
+		if (inputTensors.normal.defined()) inputTensors.normal = inputTensors.normal.index_select(0, indices);
+		if (inputTensors.wi.defined()) inputTensors.wi = inputTensors.wi.index_select(0, indices);
+		if (inputTensors.bsdfProb.defined()) inputTensors.bsdfProb = inputTensors.bsdfProb.index_select(0, indices);
+		if (inputTensors.outRadiance.defined()) inputTensors.outRadiance = inputTensors.outRadiance.index_select(0, indices);
+		if (inputTensors.throughput.defined()) inputTensors.throughput = inputTensors.throughput.index_select(0, indices);
+		if (inputTensors.inRadiance.defined()) inputTensors.inRadiance = inputTensors.inRadiance.index_select(0, indices);
+		if (inputTensors.instanceId.defined()) inputTensors.instanceId = inputTensors.instanceId.index_select(0, indices);
+		if (inputTensors.triangleId.defined()) inputTensors.triangleId = inputTensors.triangleId.index_select(0, indices);
+		if (inputTensors.materialId.defined()) inputTensors.materialId = inputTensors.materialId.index_select(0, indices);
+		if (inputTensors.wiProb.defined()) inputTensors.wiProb = inputTensors.wiProb.index_select(0, indices);
+		return inputTensors;
+	}
 
+	void PGNet::sliceToBatches(InputTensors& tensors)
+	{
+		int batchSize = settings->batchSize;
+		int numBatches = tensors.position.size(0) / batchSize;
+		int remainder = tensors.position.size(0) % batchSize;
+
+		for (int i = 0; i <= numBatches; ++i) {
+			int startIdx = i * batchSize;
+			int endIdx = startIdx + batchSize;
+			if (i == numBatches)
+			{
+				if (remainder == 0) break;
+				endIdx = startIdx + remainder;
+			}
+
+			InputTensors batch;
+			if (tensors.position.defined()) batch.position = tensors.position.slice(0, startIdx, endIdx);
+			if (tensors.wo.defined()) batch.wo = tensors.wo.slice(0, startIdx, endIdx);
+			if (tensors.normal.defined()) batch.normal = tensors.normal.slice(0, startIdx, endIdx);
+			if (tensors.wi.defined()) batch.wi = tensors.wi.slice(0, startIdx, endIdx);
+			if (tensors.bsdfProb.defined()) batch.bsdfProb = tensors.bsdfProb.slice(0, startIdx, endIdx);
+			if (tensors.outRadiance.defined()) batch.outRadiance = tensors.outRadiance.slice(0, startIdx, endIdx);
+			if (tensors.throughput.defined()) batch.throughput = tensors.throughput.slice(0, startIdx, endIdx);
+			if (tensors.inRadiance.defined()) batch.inRadiance = tensors.inRadiance.slice(0, startIdx, endIdx);
+			if (tensors.instanceId.defined()) batch.instanceId = tensors.instanceId.slice(0, startIdx, endIdx);
+			if (tensors.triangleId.defined()) batch.triangleId = tensors.triangleId.slice(0, startIdx, endIdx);
+			if (tensors.materialId.defined()) batch.materialId = tensors.materialId.slice(0, startIdx, endIdx);
+			if (tensors.wiProb.defined()) batch.wiProb = tensors.wiProb.slice(0, startIdx, endIdx);
+			batches.push_back(batch);
+		}
+	}
+
+	void debugInputTensors(InputTensors& tensors, std::string msg)
+	{
+		VTX_INFO("{}", msg);
+		PRINT_TENSOR_SLICE(tensors.position);
+		PRINT_TENSOR_SLICE(tensors.wo);
+		PRINT_TENSOR_SLICE(tensors.normal);
+		PRINT_TENSOR_SLICE(tensors.outRadiance);
+	}
+
+	void PGNet::generateTrainingInputTensors()
+	{
+		prepareDataset();
+		const device::TrainingDataBuffers& buffers = onDeviceData->networkInterfaceData.resourceBuffers.trainingDataBuffers;
 
 		InputDataPointers inputPointers;
-		inputPointers.wi = buffers.incomingDirectionBuffer.castedPointer<float>();
-		inputPointers.bsdfProb = buffers.bsdfProbabilitiesBuffer.castedPointer<float>();
-		inputPointers.position = buffers.inputBuffer.positionBuffer.castedPointer<float>();
+		inputPointers.wi = buffers.wiBuffer.castedPointer<float>();
+		inputPointers.bsdfProb = buffers.bsdfProbBuffer.castedPointer<float>();
+		inputPointers.position = buffers.positionBuffer.castedPointer<float>();
 
 		if (settings->useTriangleId)
 		{
-			inputPointers.triangleId = buffers.inputBuffer.triangleIdBuffer.castedPointer<float>();
+			inputPointers.triangleId = buffers.triangleIdBuffer.castedPointer<float>();
 		}
 		if (settings->useMaterialId)
 		{
-			inputPointers.materialId = buffers.inputBuffer.materialIdBuffer.castedPointer<float>();
+			inputPointers.materialId = buffers.matIdBuffer.castedPointer<float>();
 		}
 		if (settings->useInstanceId)
 		{
-			inputPointers.instanceId = buffers.inputBuffer.instanceIdBuffer.castedPointer<float>();
+			inputPointers.instanceId = buffers.instanceIdBuffer.castedPointer<float>();
 		}
-		inputPointers.wo = buffers.inputBuffer.woBuffer.castedPointer<float>();
-		inputPointers.normal = buffers.inputBuffer.normalBuffer.castedPointer<float>();
-		inputPointers.outRadiance = buffers.outgoingRadianceBuffer.castedPointer<float>();
-		inputPointers.inRadiance = buffers.incomingRadianceBuffer.castedPointer<float>();
+		inputPointers.wo = buffers.woBuffer.castedPointer<float>();
+		inputPointers.normal = buffers.normalBuffer.castedPointer<float>();
+		inputPointers.outRadiance = buffers.LoBuffer.castedPointer<float>();
+		inputPointers.inRadiance = buffers.LiBuffer.castedPointer<float>();
 		if(settings->useAuxiliaryNetwork)
 		{
-			inputPointers.throughput = buffers.trhoughputBuffer.castedPointer<float>();
+			inputPointers.throughput = buffers.bsdfBuffer.castedPointer<float>();
 		}
-		if(settings->scaleBySampleProb)
-		{
-			inputPointers.sampleProb = buffers.overallProbBuffer.castedPointer<float>();
-		}
+		inputPointers.wiProb = buffers.wiProbBuffer.castedPointer<float>();
 
 		const auto          aabb = onDeviceData->launchParamsData.getHostImage().aabb;
 		const torch::Tensor minExtents = torch::tensor({ aabb.minX, aabb.minY, aabb.minZ }).to(device).to(torch::kFloat);
 		const torch::Tensor maxExtents = torch::tensor({ aabb.maxX, aabb.maxY, aabb.maxZ }).to(device).to(torch::kFloat);
 		const torch::Tensor deltaExtents = maxExtents - minExtents;
 
-		InputTensors output = generateInputTensors(settings->batchSize, inputPointers, minExtents, deltaExtents);
+
+		CUDABuffer trainingDataSizeBuffer = buffers.sizeBuffer;
+		int trainingDataSize = 0;
+		trainingDataSizeBuffer.download(&trainingDataSize);
+		if (trainingDataSize == 0)
+		{
+			VTX_WARN("No training data available");
+			return;
+		}
+
+		InputTensors output = generateInputTensors(trainingDataSize, inputPointers, minExtents, deltaExtents);
 		TRACE_TENSOR(output.position);
 		TRACE_TENSOR(output.wo);
 		TRACE_TENSOR(output.normal);
-		TRACE_TENSOR(output.incomingDirection);
+		TRACE_TENSOR(output.wi);
 		TRACE_TENSOR(output.bsdfProb);
 		TRACE_TENSOR(output.outRadiance);
 
-		return output;
+		shuffle(output);
+		sliceToBatches(output);
 	}
 
 	InputTensors PGNet::generateInferenceInputTensors(int* inferenceSize)
 	{
-		const device::InferenceBuffers& buffers = onDeviceData->networkInterfaceData.resourceBuffers.inferenceBuffers;
-		CUDABuffer inferenceSizeBuffers = buffers.inferenceSize;
+		const device::InferenceDataBuffers& buffers = onDeviceData->networkInterfaceData.resourceBuffers.inferenceDataBuffers;
+		CUDABuffer inferenceSizeBuffers = buffers.sizeBuffer;
 		inferenceSizeBuffers.download(inferenceSize);
 		if (*inferenceSize == 0)
 		{
@@ -362,20 +441,20 @@ namespace vtx::network
 		}
 
 		InputDataPointers inputPointers;
-		inputPointers.position = buffers.stateBuffer.positionBuffer.castedPointer<float>();
-		inputPointers.wo = buffers.stateBuffer.woBuffer.castedPointer<float>();
-		inputPointers.normal = buffers.stateBuffer.normalBuffer.castedPointer<float>();
+		inputPointers.position = buffers.positionBuffer.castedPointer<float>();
+		inputPointers.wo = buffers.woBuffer.castedPointer<float>();
+		inputPointers.normal = buffers.normalBuffer.castedPointer<float>();
 		if (settings->useTriangleId)
 		{
-			inputPointers.triangleId = buffers.stateBuffer.triangleIdBuffer.castedPointer<float>();
+			inputPointers.triangleId = buffers.triangleIdBuffer.castedPointer<float>();
 		}
 		if (settings->useMaterialId)
 		{
-			inputPointers.materialId = buffers.stateBuffer.materialIdBuffer.castedPointer<float>();
+			inputPointers.materialId = buffers.matIdBuffer.castedPointer<float>();
 		}
 		if (settings->useInstanceId)
 		{
-			inputPointers.instanceId = buffers.stateBuffer.instanceIdBuffer.castedPointer<float>();
+			inputPointers.instanceId = buffers.instanceIdBuffer.castedPointer<float>();
 		}
 
 		const auto          aabb = onDeviceData->launchParamsData.getHostImage().aabb;
@@ -400,6 +479,14 @@ namespace vtx::network
 		{
 			tensor = torch::clamp(tensor, minClamp, maxClamp);
 		}
+
+		return tensor;
+	}
+
+	torch::Tensor PGNet::pointerToTensor(int* pointer, int batchSize, int dim)
+	{
+		if (pointer == nullptr) return {};
+		torch::Tensor tensor = torch::from_blob(pointer, { batchSize, dim }, torch::TensorOptions().device(device).dtype(torch::kInt))toPrecision;
 
 		return tensor;
 	}
@@ -438,7 +525,7 @@ namespace vtx::network
 		tensors.triangleId = pointerToTensor(inputPointers.triangleId, batchDim, 1);
 		tensors.instanceId = pointerToTensor(inputPointers.instanceId, batchDim, 1);
 		tensors.materialId = pointerToTensor(inputPointers.materialId, batchDim, 1);
-		tensors.sampleProb = pointerToTensor(inputPointers.sampleProb, batchDim, 1);
+		tensors.wiProb = pointerToTensor(inputPointers.wiProb, batchDim, 1);
 		return tensors;
 	}
 
@@ -448,6 +535,7 @@ namespace vtx::network
 		torch::Tensor rawMixtureParameters = rawOutput.narrow(1, 1, mixtureParametersCount);
 		rawMixtureParameters = rawMixtureParameters.view({ rawOutput.size(0), settings->mixtureSize, distributionParametersCount });
 		const torch::Tensor rawMixtureWeights = rawOutput.narrow(1, 1 + mixtureParametersCount, settings->mixtureSize);
+
 		TRACE_TENSOR(rawMixtureParameters);
 		TRACE_TENSOR(rawMixtureWeights);
 		TRACE_TENSOR(rawSamplingFraction);
@@ -476,102 +564,52 @@ namespace vtx::network
 
 	torch::Tensor crossEntropy(const torch::Tensor& target, const torch::Tensor& prediction)
 	{
-		return -target * torch::log(prediction + 1e-8);
+		return -target * torch::log(prediction + bEps);
 	}
-	torch::Tensor customLoss(const torch::Tensor& target, const torch::Tensor& prediction)
-	{
-		torch::Tensor lossCE = crossEntropy(target, prediction);
-		//torch::Tensor lossRCE = crossEntropy(prediction, target);
-		torch::Tensor loss = lossCE;// +lossRCE;
-		return loss;
-	}
+	
 	torch::Tensor sigmoidClamp(const torch::Tensor& input, const float clampValue, const float steepness)
 	{
 		torch::Tensor output = clampValue * torch::tanh(steepness * input);
 		return output;
 	}
 
-	torch::Tensor PGNet::gudingLossIncomingRadiance(const torch::Tensor& neuralProb, torch::Tensor& bsdfProb, const torch::Tensor& outRadiance, const torch::Tensor& c, const torch::Tensor& sampleProb)
-	{
-		using namespace torch::nn::functional;
-		const torch::Tensor    targetLuminance = settings->targetScale * (outRadiance * ntscLuminance).sum(-1, true);
-		const torch::Tensor    blendedQ        = c * neuralProb + (1 - c) * bsdfProb;
-		const torch::Tensor    lossQ = customLoss(targetLuminance, neuralProb);
-		const torch::Tensor    lossBlendedQ = customLoss(targetLuminance, blendedQ);
-		torch::Tensor          loss            = lossBlendFactor() * lossQ + (1.0f - lossBlendFactor()) * lossBlendedQ;
-		loss = sigmoidClamp(loss, settings->lossClamp, 0.01f);
-
-		switch (settings->lossReduction)
-		{
-		case config::SUM:
-			loss = loss.sum();
-			break;
-		case config::MEAN:
-			loss = loss.mean();
-			break;
-		case config::ABS:
-			loss = torch::abs(loss);
-			break;
-		default:
-			VTX_ERROR("Loss Reduction Not implemented");
-		}
-
-		TRACE_TENSOR(loss);
-
-		if (settings->plotGraphs)
-		{
-			graphs.addData(LOSS_PLOT, "Path Guiding Loss", loss.unsqueeze(-1).item<float>());
-			graphs.addData(LOSS_PLOT, "Loss Q", lossQ.mean().unsqueeze(-1).item<float>());
-			graphs.addData(LOSS_PLOT, "Loss Blended Q", lossBlendedQ.mean().unsqueeze(-1).item<float>());
-
-			graphs.addData(PROB_PLOT, "Neural Prob", neuralProb.mean().unsqueeze(-1).item<float>());
-			graphs.addData(PROB_PLOT, "Target Prob", targetLuminance.mean().unsqueeze(-1).item<float>());
-
-			graphs.addData(SAMPLING_PROB_PLOT, "BSDF Prob", bsdfProb.mean().unsqueeze(-1).item<float>());
-			graphs.addData(SAMPLING_PROB_PLOT, "Blended Prob", blendedQ.mean().unsqueeze(-1).item<float>());
-
-			if (settings->scaleBySampleProb)
-			{
-				graphs.addData("Overall Prob", "Iteration", "Prob", "Overall Sample Prob", sampleProb.mean().unsqueeze(-1).item<float>());
-			}
-
-		}
-
-
-		TRACE_TENSOR(blendedQ);
-		TRACE_TENSOR(lossQ);
-		TRACE_TENSOR(lossBlendedQ);
-		TRACE_TENSOR(loss);
-		return loss;
-	}
 	torch::Tensor PGNet::guidingLoss(const torch::Tensor& neuralProb, torch::Tensor& bsdfProb, const torch::Tensor& outRadiance, const torch::Tensor& c, const torch::Tensor& sampleProb)
 	{
-		//const auto mask = bsdfProb > 100.0f; // Replace `threshold` with your threshold value
-		//const auto neuralProbNoGrad = neuralProb.detach();
-		//const auto neuralProbConditional = torch::where(mask, neuralProbNoGrad, neuralProb);
-
-		//auto bsdfProbClamped = torch::clamp(bsdfProb, 0.0f, 1.0f);
-
-		const torch::Tensor targetLuminance = settings->targetScale*(outRadiance * ntscLuminance).sum(-1, true);
-		const torch::Tensor lossQ = customLoss(targetLuminance, neuralProb);
-		if(settings->clampBsdfProb)
+		const torch::Tensor targetLuminance = settings->targetScale * (outRadiance * ntscLuminance).sum(-1, true);
+		if (settings->clampBsdfProb)
 		{
 			bsdfProb = torch::min(bsdfProb, targetLuminance);
 		}
-		const torch::Tensor blendedQ = c * neuralProb + (1 - c) * bsdfProb;
-		torch::Tensor lossBlendedQ = customLoss(targetLuminance, blendedQ);
+		const torch::Tensor blendedQ = c * neuralProb.detach() + (1 - c) * bsdfProb;
+		torch::Tensor lossQ = divergenceLoss(targetLuminance, neuralProb, sampleProb);
+		torch::Tensor lossBlendedQ = divergenceLoss(targetLuminance, blendedQ, sampleProb);
+
 		if(settings->scaleLossBlendedQ)
 		{
 			lossBlendedQ  = lossBlendedQ / (bsdfProb + 0.01);
 		}
 
+		if(settings->lossClamp!=0.0f)
+		{
+			lossBlendedQ = sigmoidClamp(lossBlendedQ, settings->lossClamp, 0.01f);
+			lossQ = sigmoidClamp(lossQ, settings->lossClamp, 0.01f);
+		}
+
 		torch::Tensor loss = lossBlendFactor() * lossQ + (1.0f - lossBlendFactor()) * lossBlendedQ;
 
-		if(settings->scaleBySampleProb)
+		if (settings->scaleBySampleProb)
 		{
-			loss /= (sampleProb+0.01);
+			loss /= (sampleProb + 0.01);
 		}
-		loss = sigmoidClamp(loss, settings->lossClamp, 0.01f);
+		//torch::Tensor debugPrint = torch::stack({ targetLuminance, neuralProb, lossQ}, -1);
+		//PRINT_TENSOR_SLICE(debugPrint);
+		//PRINT_TENSOR_MIN_MAX(loss);
+		//PRINT_TENSOR_MIN_MAX(neuralProb);
+		//PRINT_TENSOR_MIN_MAX(bsdfProb);
+		//PRINT_TENSOR_MIN_MAX(targetLuminance);
+		//PRINT_TENSOR_MIN_MAX(lossQ);
+		//PRINT_TENSOR_MIN_MAX(lossBlendedQ);
+
 		switch (settings->lossReduction)
 		{
 		case config::SUM:
@@ -695,7 +733,7 @@ namespace vtx::network
 
 	torch::Tensor PGNet::guidingEntropyLoss(const torch::Tensor& neuralProb)
 	{
-		const torch::Tensor entropy = -torch::sum(neuralProb * torch::log(neuralProb + EPS), 1);
+		const torch::Tensor entropy = -torch::sum(neuralProb * torch::log(neuralProb + bEps), 1);
 		const float targetEntropy = -logf(settings->targetEntropy);
 		torch::Tensor entropyLoss = torch::pow(entropy - targetEntropy, 2).mean();
 		TRACE_TENSOR(entropy);
@@ -703,22 +741,29 @@ namespace vtx::network
 		return entropyLoss;
 	}
 
-	torch::Tensor PGNet::divergenceLoss(const torch::Tensor& neuralProb, const torch::Tensor& targetProb)
+	torch::Tensor PGNet::divergenceLoss(const torch::Tensor& targetProb, const torch::Tensor& neuralProb, const torch::Tensor& wiProb)
 	{
 		torch::Tensor loss;
 		switch (settings->lossType)
 		{
 		case config::L_KL_DIV:
-			loss = kl_div(torch::log(neuralProb + EPS), targetProb, at::Reduction::None);
+			loss = kl_div(torch::log(neuralProb + bEps), targetProb, at::Reduction::None);
 			break;
 		case config::L_KL_DIV_MC_ESTIMATION:
-			loss = - targetProb * torch::log(neuralProb + EPS);
+			loss = -(targetProb/ wiProb + bEps)* log(neuralProb + bEps);
+			break;
+		case config::L_KL_DIV_MC_ESTIMATION_NORMALIZED:
+			{
+				const torch::Tensor logRatio = torch::log(targetProb+bEps) -torch::log(neuralProb + bEps);
+				const torch::Tensor weights = targetProb / (wiProb + bEps);
+				loss = weights * logRatio;
+			}
 			break;
 		case config::L_PEARSON_DIV:
-			loss = torch::pow(targetProb - neuralProb, 2.0f) / (neuralProb + EPS);
+			loss = torch::pow(targetProb - neuralProb, 2.0f);
 			break;
 		case config::L_PEARSON_DIV_MC_ESTIMATION:
-			loss = -torch::pow(targetProb, 2.0f) * torch::log(neuralProb + EPS);
+			loss = -torch::pow(targetProb, 2.0f) * torch::log(neuralProb + bEps);
 			break;
 		default:
 			VTX_ERROR("Loss Type Not implemented");
@@ -742,5 +787,81 @@ namespace vtx::network
 	{
 		float tau = std::min(1.0f, (float)trainingStep / ((float)settings->maxTrainingSteps));
 		return tau;
+	}
+
+	void InputTensors::printInfo()
+	{
+		if (position.defined()){
+			PRINT_TENSOR_SIZE_ALWAYS(position)
+		}
+		else{
+			VTX_INFO("Tensor position is not defined");
+		}
+		if (wo.defined()){
+			PRINT_TENSOR_SIZE_ALWAYS(wo)
+		}
+		else{
+			VTX_INFO("Tensor wo is not defined");
+		}
+		if (normal.defined()){
+			PRINT_TENSOR_SIZE_ALWAYS(normal)
+		}
+		else{
+			VTX_INFO("Tensor normal is not defined");
+		}
+		if (wi.defined()){
+			PRINT_TENSOR_SIZE_ALWAYS(wi)
+		}
+		else{
+			VTX_INFO("Tensor wi is not defined");
+		}
+		if (bsdfProb.defined()){
+			PRINT_TENSOR_SIZE_ALWAYS(bsdfProb)
+		}
+		else{
+			VTX_INFO("Tensor bsdfProb is not defined");
+		}
+		if (outRadiance.defined()){
+			PRINT_TENSOR_SIZE_ALWAYS(outRadiance)
+		}
+		else{
+			VTX_INFO("Tensor outRadiance is not defined");
+		}
+		if (throughput.defined()){
+			PRINT_TENSOR_SIZE_ALWAYS(throughput)
+		}
+		else{
+			VTX_INFO("Tensor throughput is not defined");
+		}
+		if (inRadiance.defined()){
+			PRINT_TENSOR_SIZE_ALWAYS(inRadiance)
+		}
+		else{
+			VTX_INFO("Tensor inRadiance is not defined");
+		}
+		if (instanceId.defined()){
+			PRINT_TENSOR_SIZE_ALWAYS(instanceId)
+		}
+		else{
+			VTX_INFO("Tensor instanceId is not defined");
+		}
+		if (triangleId.defined()){
+			PRINT_TENSOR_SIZE_ALWAYS(triangleId)
+		}
+		else{
+			VTX_INFO("Tensor triangleId is not defined");
+		}
+		if (materialId.defined()){
+			PRINT_TENSOR_SIZE_ALWAYS(materialId)
+		}
+		else{
+			VTX_INFO("Tensor materialId is not defined");
+		}
+		if (wiProb.defined()){
+			PRINT_TENSOR_SIZE_ALWAYS(wiProb)
+		}
+		else{
+			VTX_INFO("Tensor wiProb is not defined");
+		}
 	}
 }

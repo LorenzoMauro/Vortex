@@ -18,6 +18,115 @@
 #endif
 
 namespace vtx::mdl {
+
+    __forceinline__ __device__ BsdfEvalResult evaluateBsdf(const MdlData* mdlData, const math::vec3f& surroundingIor, const math::vec3f& outgoingDirection, const math::vec3f& incomingDirection)
+    {
+        BsdfEvaluateData evalData;
+
+        evalData.k1 = outgoingDirection;
+        evalData.k2 = incomingDirection;
+        evalData.bsdf_diffuse = math::vec3f(0.0f);
+        evalData.bsdf_glossy = math::vec3f(0.0f);
+
+        // If the hit is either on the surface or a thin-walled material,
+        // the ray is inside the surrounding material and the material ior is on the other side.
+        if (mdlData->isFrontFace || mdlData->isThinWalled)
+        {
+            evalData.ior1 = { 1.0f, 1.0f, 1.0f }; // From surrounding medium ior
+            evalData.ior2.x = MI_NEURAYLIB_BSDF_USE_MATERIAL_IOR;                    // to material ior.
+        }
+        else
+        {
+            // When hitting the backface of a non-thin-walled material, 
+            // the ray is inside the current material and the surrounding material is on the other side.
+            // The material's IOR is the current top-of-stack. We need the one further down!
+            evalData.ior1.x = MI_NEURAYLIB_BSDF_USE_MATERIAL_IOR;                    // From material ior 
+            evalData.ior2 = { 1.0f, 1.0f, 1.0f }; // From surrounding medium ior
+        }
+
+        if (mdlData->isFrontFace || !mdlData->isThinWalled || true)
+        {
+            frontBsdf_evaluate(&evalData, &mdlData->state, &mdlData->resourceData, nullptr, mdlData->argBlock);
+        }
+        else
+        {
+            backBsdf_evaluate(&evalData, &mdlData->state, &mdlData->resourceData, nullptr, mdlData->argBlock);
+        }
+
+        BsdfEvalResult result;
+        result.isValid = true;
+        result.pdf = evalData.pdf;
+        result.bsdfPdf = evalData.pdf;
+        result.diffuse = evalData.bsdf_diffuse;
+        result.glossy = evalData.bsdf_glossy;
+        result.bsdf = result.diffuse + result.glossy;
+        result.eventType = mi::neuraylib::BSDF_EVENT_ABSORB;
+        bool isDiffuse = !math::isZero(result.diffuse);
+        bool isGlossy = !math::isZero(result.glossy);
+        if (!math::isZero(result.diffuse))
+        {
+            result.eventType = mi::neuraylib::BSDF_EVENT_DIFFUSE;
+        }
+        if (!math::isZero(result.glossy))
+        {
+            result.eventType = (mi::neuraylib::Bsdf_event_type)( result.eventType | mi::neuraylib::BSDF_EVENT_SPECULAR);
+        }
+        if(result.eventType == mi::neuraylib::BSDF_EVENT_ABSORB)
+        {
+	        result.isValid = false;
+		}
+        return result;
+    }
+
+	__forceinline__ __device__ void correctBsdfSample(BsdfSampleResult& bsdfSample, const math::vec3f& normal)
+    {
+        if (bsdfSample.eventType == mi::neuraylib::BSDF_EVENT_ABSORB)
+        {
+            return;
+        }
+        if (bsdfSample.eventType != 0 && (math::isZero(bsdfSample.bsdfOverPdf) || math::isNan(bsdfSample.bsdfOverPdf) || utl::isNan(bsdfSample.nextDirection)))
+        {
+            // TODO: there might be a bug somewhere since sometimes the bsdfOverPdf is 0.0f but the event type is not ABSORB
+            // not sure what is going on here
+            bsdfSample.isValid = false;
+            bsdfSample.eventType = mi::neuraylib::BSDF_EVENT_ABSORB;
+            return;
+        }
+
+        //const float cosTheta = math::dot(bsdfSample.nextDirection, normal);
+        //const math::vec3f bsdf = bsdfSample.bsdfOverPdf * (bsdfSample.pdf / cosTheta);
+        //const float bsdfNorm = math::length(bsdf);
+
+        ////change Type to specular if bsdfNorm > 1.0f
+        //if (bsdfNorm > 1.0f || (bsdfSample.pdf == 0.0f && !math::isZero(bsdfSample.bsdfOverPdf)))
+        //{
+        //    switch (bsdfSample.eventType)
+        //    {
+        //    case mi::neuraylib::BSDF_EVENT_DIFFUSE_REFLECTION:
+        //    {
+        //        bsdfSample.eventType = mi::neuraylib::BSDF_EVENT_SPECULAR_REFLECTION;
+        //    }
+        //    break;
+        //    case mi::neuraylib::BSDF_EVENT_DIFFUSE_TRANSMISSION:
+        //    {
+        //        bsdfSample.eventType = mi::neuraylib::BSDF_EVENT_SPECULAR_TRANSMISSION;
+        //    }
+        //    break;
+        //    case mi::neuraylib::BSDF_EVENT_GLOSSY_REFLECTION:
+        //    {
+        //        bsdfSample.eventType = mi::neuraylib::BSDF_EVENT_SPECULAR_REFLECTION;
+        //    }
+        //    break;
+        //    case mi::neuraylib::BSDF_EVENT_GLOSSY_TRANSMISSION:
+        //    {
+        //        bsdfSample.eventType = mi::neuraylib::BSDF_EVENT_SPECULAR_TRANSMISSION;
+        //    }
+        //    break;
+        //    }
+
+        //}
+    }
+
     // Importance sample the BSDF. 
     __forceinline__ __device__ BsdfSampleResult sampleBsdf(const MdlData* mdlData, const math::vec3f& surroundingIor, const math::vec3f& outgoingDirection, unsigned& seed)
     {
@@ -61,120 +170,19 @@ namespace vtx::mdl {
         result.pdf = data.pdf;
         result.bsdfPdf = data.pdf;
 
+        correctBsdfSample(result, mdlData->state.normal);
 
-        return result;
-    }
-
-    __forceinline__ __device__ void correctBsdfSample(BsdfSampleResult& bsdfSample, const math::vec3f& normal)
-    {
-        if (bsdfSample.eventType == mi::neuraylib::BSDF_EVENT_ABSORB)
+        if (!(result.eventType & mi::neuraylib::BSDF_EVENT_SPECULAR) && (result.eventType != mi::neuraylib::BSDF_EVENT_ABSORB)) {
+            result.bsdf = result.bsdfOverPdf * result.bsdfPdf;
+        }
+        else if (result.eventType & mi::neuraylib::BSDF_EVENT_SPECULAR)
         {
-	        return;
+            result.bsdf = result.bsdfOverPdf;
 		}
-        const float cosTheta = math::dot(bsdfSample.nextDirection, normal);
-        if (bsdfSample.eventType != 0 && (math::isZero(bsdfSample.bsdfOverPdf) || math::isNan(bsdfSample.bsdfOverPdf) || utl::isNan(bsdfSample.nextDirection)))
-        {
-            // TODO: there might be a bug somewhere since sometimes the bsdfOverPdf is 0.0f but the event type is not ABSORB
-            //if(math::isNan(bsdfSample.bsdfOverPdf))
-            //{
-            //    printf(
-            //        "Bsdf Pdf : %f\n"
-            //        "Bsdf over Pdf : %.10f %.10f %.10f\n"
-            //        "Next Direction: %f %f %f\n"
-            //        "eventType: %s\n\n"
-            //        "CosTheta: %f\n"
-            //        ,
-            //        bsdfSample.pdf,
-            //        bsdfSample.bsdfOverPdf.x, bsdfSample.bsdfOverPdf.y, bsdfSample.bsdfOverPdf.z,
-            //        bsdfSample.nextDirection.x, bsdfSample.nextDirection.y, bsdfSample.nextDirection.z,
-            //        bsdfEventTypeName(bsdfSample.eventType),
-            //        cosTheta
-            //    );
-            //}
-            // not sure what is going on here
-            bsdfSample.isValid = false;
-            bsdfSample.eventType = mi::neuraylib::BSDF_EVENT_ABSORB;
-            return;
-        }
-
-        const math::vec3f bsdf = bsdfSample.bsdfOverPdf * (bsdfSample.pdf/cosTheta);
-        const float bsdfNorm = math::length(bsdf);
-
-        //change Type to specular if bsdfNorm > 1.0f
-        if (bsdfNorm > 1.0f || (bsdfSample.pdf == 0.0f && !math::isZero(bsdfSample.bsdfOverPdf)))
-        {
-			switch (bsdfSample.eventType)
-			{
-			case mi::neuraylib::BSDF_EVENT_DIFFUSE_REFLECTION:
-				{
-                    bsdfSample.eventType = mi::neuraylib::BSDF_EVENT_SPECULAR_REFLECTION;
-				}
-				break;
-			case mi::neuraylib::BSDF_EVENT_DIFFUSE_TRANSMISSION:
-				{
-                    bsdfSample.eventType = mi::neuraylib::BSDF_EVENT_SPECULAR_TRANSMISSION;
-				}
-				break;
-			case mi::neuraylib::BSDF_EVENT_GLOSSY_REFLECTION:
-				{
-                    bsdfSample.eventType = mi::neuraylib::BSDF_EVENT_SPECULAR_REFLECTION;
-				}
-				break;
-			case mi::neuraylib::BSDF_EVENT_GLOSSY_TRANSMISSION:
-				{
-                    bsdfSample.eventType = mi::neuraylib::BSDF_EVENT_SPECULAR_TRANSMISSION;
-				}
-				break;
-			}
-            
-        }
-
-        
-    }
-    __forceinline__ __device__ BsdfEvalResult evaluateBsdf(const MdlData* mdlData, const math::vec3f& surroundingIor, const math::vec3f& outgoingDirection, const math::vec3f& incomingDirection)
-    {
-        BsdfEvaluateData evalData;
-
-        evalData.k1 = outgoingDirection;
-        evalData.k2 = incomingDirection;
-        evalData.bsdf_diffuse = math::vec3f(0.0f);
-        evalData.bsdf_glossy = math::vec3f(0.0f);
-
-        // If the hit is either on the surface or a thin-walled material,
-        // the ray is inside the surrounding material and the material ior is on the other side.
-        if (mdlData->isFrontFace || mdlData->isThinWalled)
-        {
-            evalData.ior1 = surroundingIor; // From surrounding medium ior
-            evalData.ior2.x = MI_NEURAYLIB_BSDF_USE_MATERIAL_IOR;                    // to material ior.
-        }
-        else
-        {
-            // When hitting the backface of a non-thin-walled material, 
-            // the ray is inside the current material and the surrounding material is on the other side.
-            // The material's IOR is the current top-of-stack. We need the one further down!
-            evalData.ior1.x = MI_NEURAYLIB_BSDF_USE_MATERIAL_IOR;                    // From material ior 
-            evalData.ior2 = surroundingIor; // From surrounding medium ior
-        }
-
-        if(mdlData->isFrontFace || !mdlData->isThinWalled ||true)
-        {
-            frontBsdf_evaluate(&evalData, &mdlData->state, &mdlData->resourceData, nullptr, mdlData->argBlock);
-        }
-        else
-        {
-            backBsdf_evaluate(&evalData, &mdlData->state, &mdlData->resourceData, nullptr, mdlData->argBlock);
-        }
-
-        BsdfEvalResult result;
-        result.isValid = true;
-        result.pdf = evalData.pdf;
-        result.bsdfPdf = evalData.pdf;
-        result.diffuse = evalData.bsdf_diffuse;
-        result.glossy = evalData.bsdf_glossy;
 
         return result;
-
     }
+
 
     __forceinline__ __device__ BsdfAuxResult auxiliaryBsdf(const MdlData* mdlData, const math::vec3f& surroundingIor, const math::vec3f& outgoingDirection)
     {
@@ -273,7 +281,7 @@ namespace vtx::mdl {
         float3 textureBitangents[2];
         float3 textureTangents[2];
         float4 textureResults[16]; //TODO add macro
-        MdlData mdlData;
+        MdlData mdlData{};
 
         const math::affine3f& objectToWorld = *request->hitProperties->oTw;
         const math::affine3f& worldToObject = math::affine3f(objectToWorld.l.inverse(), objectToWorld.p);
@@ -293,8 +301,10 @@ namespace vtx::mdl {
         mdlData.state.position = request->hitProperties->position;
         mdlData.state.animation_time = 0.0f;
         mdlData.state.text_coords = textureCoordinates;
-        mdlData.state.tangent_u = textureBitangents;
-        mdlData.state.tangent_v = textureTangents;
+
+    	mdlData.state.tangent_u = textureTangents;
+        mdlData.state.tangent_v = textureBitangents;
+
         mdlData.state.text_results = textureResults;
         mdlData.state.ro_data_segment = nullptr;
         mdlData.state.world_to_object = wToF4;

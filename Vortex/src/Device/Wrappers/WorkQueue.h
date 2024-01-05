@@ -49,6 +49,10 @@ namespace vtx
         __forceinline__ __device__ int Push(WorkItem w) {
             int index = AllocateEntry();
             localAssert(index < nAlloc);
+            if(index >= nAlloc)
+            {
+	            printf("WorkQueueSOA: %s: index %d >= nAlloc %d\n", name, index, nAlloc);
+            }
             (*this)[index] = w;
             return index;
         }

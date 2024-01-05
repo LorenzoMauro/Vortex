@@ -72,7 +72,7 @@ namespace vtx::distribution
 			const float& a
 		)
 		{
-			const float factor = 2.0f * M_PI * (1.0f - expf(-2.0f * lambda)) / (lambda * sqrtf(1.0f + a) + EPS);
+			const float factor = 2.0f * M_PI * (1.0f - expf(-2.0f * lambda)) / (lambda * sqrtf(1.0f + a) + sEps);
 			return factor;
 		}
 
@@ -89,8 +89,8 @@ namespace vtx::distribution
 				return -1.0f;
 			}
 			
-			float lambdaClamp = fmaxf(lambda, EPS);
-			float aClamp = fmaxf(a, EPS);
+			float lambdaClamp = fmaxf(lambda, sEps);
+			float aClamp = fmaxf(a, sEps);
 
 			const float vDotZ = dot(v, zAxis);
 
@@ -109,7 +109,7 @@ namespace vtx::distribution
 			const float vDotX = dot(v, xAxis);
 
 			const float scaleValue = (vDotZ + 1.0f) / 2.0f;
-			const float denominator = fmaxf(EPS, 1.0f - (vDotZ * vDotZ));
+			const float denominator = fmaxf(sEps, 1.0f - (vDotZ * vDotZ));
 
 			const float powerValue = aClamp * vDotX * vDotX / denominator;
 
@@ -158,7 +158,7 @@ namespace vtx::distribution
 			const float sUpperBound = 1.0f;
 			const float sDelta = sUpperBound - sLowerBound;
 			float s = sLowerBound + uniform0 * sDelta;
-			s = fmaxf(s, EPS);
+			s = fmaxf(s, sEps);
 
 			// rho is in the range [-pi/2, pi/2]s
 			const float rhoLowerBound = -(float)M_PI_2;
@@ -173,7 +173,7 @@ namespace vtx::distribution
 
 			// for the computation of theta I have introduced the fmaxf to avoid NaNs and also compute cosRho and multiply it by itself again, for stability issues
 			float cosRho = cosf(rho);
-			const float base = fmaxf(logf(s) / (2.0f * lambda) + 1.0f, EPS);
+			const float base = fmaxf(logf(s) / (2.0f * lambda) + 1.0f, sEps);
 			const float exponent = (1.0f + a * (1.0f - cosRho * cosRho)) / (1.0f + a);
 			const float theta = acosf(2.0f * powf(base, exponent) - 1.0f);
 

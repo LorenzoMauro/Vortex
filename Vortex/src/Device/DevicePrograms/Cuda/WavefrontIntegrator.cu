@@ -37,6 +37,7 @@ namespace vtx
 		accumulateRays();
 		network.train();
 
+
 	}
 
 	void WaveFrontIntegrator::downloadCountersPointers()
@@ -107,7 +108,7 @@ namespace vtx
 			optix::PipelineOptix::launchOptixKernel(math::vec2i{queueSizes.shadeQueueCounter, 1}, "wfShade");
 		}
 		else{
-			const CUfunction& cudaFunction = mdl::getMdlCudaLinker().getKernelFunction();
+			const CUfunction& cuFunction = mdl::getMdlCudaLinker().getKernelFunction();
 
 
 			constexpr int threadsPerBlockX = 256;
@@ -116,7 +117,7 @@ namespace vtx
 
 			// Launch the kernel
 			const CUresult res = cuLaunchKernel(
-				cudaFunction,            // function pointer to kernel
+				cuFunction,            // function pointer to kernel
 				numBlocksX, 1, 1,        // grid dimensions (only x is non-1)
 				threadsPerBlockX, 1, 1,  // block dimensions (only x is non-1)
 				0, nullptr,              // shared memory size and stream
@@ -130,7 +131,7 @@ namespace vtx
 
 	void WaveFrontIntegrator::handleShadowTrace()
 	{
-		if(rendererSettings->samplingTechnique == S_BSDF)
+		if(rendererSettings->samplingTechnique == S_BSDF && !rendererSettings->quadrantsSettings.isActivated)
 		{
 			return;
 		}
